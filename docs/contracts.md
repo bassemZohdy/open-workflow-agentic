@@ -114,6 +114,8 @@ Ports are interfaces in `...contracts.port`. Their Javadoc states the failure se
 | `TaskStore` | `insert`, `find(taskId)`, `findByThread(threadId)`, `replace(next, expectedVersion)` | A missing row is an empty optional. The runtime then refuses the thread and never creates a row to fill the gap. A duplicate task id or thread id is `IllegalStateException`. `replace` is optimistic: a version mismatch or a skipped version is `IllegalStateException`. An unavailable store throws, and callers must not read an exception as "no task". |
 | `ArtifactRegistry` | `activeVersion(kind, name)`, `version(kind, name, version)` | An artifact that is not approved, or unknown, is empty, and work that needs it is refused. An unavailable registry throws; the runtime keeps running pinned versions and starts no new work that needs an unverified one. A stale answer past the freshness limit is empty, never guessed. |
 
+**Bulkhead on the policy decision point.** `FailClosedPolicyDecisionPoint` admits at most `maxInFlight` delegate calls at once. The bound is a constructor argument, validated to be between 1 and `MAX_IN_FLIGHT` (1,024). The default is `DEFAULT_MAX_IN_FLIGHT` (64), used by the two constructors that do not take it. Admission is a non-blocking `Semaphore.tryAcquire()`, so a full bulkhead never waits: the call returns `ERROR` at once, with a reason that names the bulkhead, and the delegate is not called. A permit is released only when the delegate call itself returns or throws, never when the caller times out. A delegate that never returns therefore strands at most `maxInFlight` virtual threads, and capacity comes back when they finish. For WP-103, the PEP should keep the default 64 for an in-process PDP and raise it only after measuring peak concurrent decisions under load, staying below 1,024 and within the connection pool when the PDP calls out. Tests: `FailClosedBulkheadTest`.
+
 ## 9. Wire form and JSON Schemas
 
 The schemas are in `oa-contracts/src/main/resources/schemas/`, Draft 2020-12, one self-contained file per type with `additionalProperties: false`:
@@ -142,6 +144,7 @@ The schema cannot express two rules: a due time after creation (`HumanTask`) and
 | `AuditHashTest` | Intact chain, changed field, recomputed event, removed, inserted and reordered events, truncation against a head, full rewrite |
 | `GovernanceRecordsTest` | Decision attribution, effect state machine, human task and evidence invariants |
 | `FailClosedPolicyDecisionPointTest` | Pass-through of ALLOW and DENY; throw, null, slow, interrupt and `Error` become `ERROR` |
+| `FailClosedBulkheadTest` | Stuck delegates exhaust the bound and refusals are prompt; live delegates never exceed the bound; permits return only when delegates return; capacity recovers; a 300-caller burst; bound validation |
 | `PortContractTest` | Port semantics with in-memory doubles and a guarded gateway |
 | `SchemaContractTest` | Samples validate; invalid documents are rejected; schema properties match the records |
 
