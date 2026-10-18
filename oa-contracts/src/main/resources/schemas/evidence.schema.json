@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:open-workflow-agentic:schema:evidence:v1",
+  "title": "Evidence",
+  "description": "A reference to content an agent step relied on, with its SHA-256 at capture time (M15). Sensitive payloads are referenced, not copied. Mirrors io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "agentTaskId", "kind", "reference", "sha256", "capturedAt"],
+  "properties": {
+    "id": { "$ref": "#/$defs/ulid" },
+    "agentTaskId": { "$ref": "#/$defs/ulid" },
+    "kind": { "enum": ["TOOL_RESULT", "MODEL_OUTPUT", "SOURCE_EXTRACT", "HUMAN_DECISION", "POLICY_DECISION"] },
+    "reference": { "type": "string", "pattern": "\\S", "maxLength": 2048 },
+    "sha256": { "$ref": "#/$defs/sha256" },
+    "capturedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "ulid": { "type": "string", "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

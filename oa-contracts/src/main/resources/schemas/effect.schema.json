@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:open-workflow-agentic:schema:effect:v1",
+  "title": "Effect",
+  "description": "One effect-ledger row: an intent with its idempotency key, target and outcome state (M03, M06, ADR 0020 decision 6). Keyed by checkpoint thread and node id. Mirrors io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Effect.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["threadId", "nodeId", "idempotencyKey", "target", "state", "detail", "recordedAt"],
+  "properties": {
+    "threadId": { "type": "string", "pattern": "^ws1-[0-9a-f]{64}$" },
+    "nodeId": { "type": "string", "pattern": "\\S", "maxLength": 128 },
+    "idempotencyKey": { "type": "string", "pattern": "\\S", "maxLength": 200 },
+    "target": { "type": "string", "pattern": "\\S", "maxLength": 256 },
+    "state": { "enum": ["INTENDED", "CONFIRMED", "FAILED", "COMPENSATED"] },
+    "detail": { "type": ["string", "null"], "maxLength": 1000 },
+    "recordedAt": { "type": "string", "format": "date-time" }
+  }
+}

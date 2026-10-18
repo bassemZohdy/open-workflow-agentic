@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:open-workflow-agentic:schema:decision:v1",
+  "title": "Decision",
+  "description": "A policy decision with attribution and versioning (M12, M15, ADR 0021). Mirrors io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision. Only outcome ALLOW permits an action; ERROR is a refusal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decidedBy", "outcome", "reason", "policy", "decidedAt"],
+  "properties": {
+    "decidedBy": { "type": "string", "pattern": "\\S", "maxLength": 128 },
+    "outcome": { "enum": ["ALLOW", "DENY", "ERROR"] },
+    "reason": { "type": "string", "pattern": "\\S", "maxLength": 1000 },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policyId", "policySetVersion"],
+      "properties": {
+        "policyId": { "type": "string", "pattern": "\\S", "maxLength": 128 },
+        "policySetVersion": { "type": "string", "pattern": "\\S", "maxLength": 64 }
+      }
+    },
+    "decidedAt": { "type": "string", "format": "date-time" }
+  }
+}

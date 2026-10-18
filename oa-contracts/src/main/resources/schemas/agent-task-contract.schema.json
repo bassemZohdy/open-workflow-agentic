@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:open-workflow-agentic:schema:agent-task-contract:v1",
+  "title": "AgentTaskContract",
+  "description": "Approved authority of one agent task (M02, ADR 0021). Allow-lists default to empty. Limits are mandatory and bounded. Mirrors io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract. Wire form: maxWallClockSeconds is the wall-clock limit in whole seconds.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "goal", "permittedTools", "permittedDataScopes", "riskTier", "limits", "requestingSubject", "delegationGrantId"],
+  "properties": {
+    "id": { "$ref": "#/$defs/ulid" },
+    "goal": { "type": "string", "pattern": "\\S", "maxLength": 4000 },
+    "permittedTools": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "permittedDataScopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "riskTier": { "enum": ["LOW", "MEDIUM", "HIGH"] },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxIterations", "maxWallClockSeconds", "maxCostMicros"],
+      "properties": {
+        "maxIterations": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "maxWallClockSeconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+        "maxCostMicros": { "type": "integer", "minimum": 1, "maximum": 1000000000000 }
+      }
+    },
+    "requestingSubject": { "$ref": "#/$defs/subject" },
+    "delegationGrantId": { "$ref": "#/$defs/ulid" }
+  },
+  "$defs": {
+    "ulid": { "type": "string", "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$" },
+    "token": { "type": "string", "pattern": "^[a-z][a-z0-9_.:-]{0,127}$" },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["USER", "AGENT", "WORKFLOW", "SERVICE"] },
+        "id": { "type": "string", "pattern": "\\S", "maxLength": 256 }
+      }
+    }
+  }
+}

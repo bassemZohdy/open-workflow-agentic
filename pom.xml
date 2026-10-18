@@ -44,6 +44,7 @@
     <dependency-plugin.version>3.8.1</dependency-plugin.version>
     <jandex-plugin.version>3.2.5</jandex-plugin.version>
     <archunit.version>1.4.1</archunit.version>
+    <json-schema-validator.version>2.0.8</json-schema-validator.version>
   </properties>
 
   <dependencyManagement>
@@ -80,6 +81,13 @@
         <groupId>com.tngtech.archunit</groupId>
         <artifactId>archunit-junit5</artifactId>
         <version>${archunit.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <!-- Apache-2.0. Test scope only: validates the JSON Schemas of oa-contracts in tests (WP-101). -->
+      <dependency>
+        <groupId>com.networknt</groupId>
+        <artifactId>json-schema-validator</artifactId>
+        <version>${json-schema-validator.version}</version>
         <scope>test</scope>
       </dependency>
     </dependencies>
