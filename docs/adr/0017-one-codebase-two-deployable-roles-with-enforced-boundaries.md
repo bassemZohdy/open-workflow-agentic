@@ -9,7 +9,26 @@ M26 and M27 require separable authority and execution that does not depend on th
 
 ## Decision
 
-Keep one repository with modules `oa-runtime` and `oa-control` and two deployables that can run together or apart. ArchUnit forbids runtime-to-control dependencies. Database roles give the runtime read-only access to approved activations and the control application no write access to execution state. The runtime keeps the last approved snapshot with a freshness policy.
+Keep one repository with two roles, execution and administration, and two deployables (`app-runtime`, `app-control`) that can run together or apart. ArchUnit forbids runtime-to-control dependencies. Database roles give the runtime read-only access to approved activations and the control application no write access to execution state. The runtime keeps the last approved snapshot with a freshness policy.
+
+### Module layout (as built in WP-001)
+
+| Module | Role |
+|---|---|
+| `oa-contracts` | Pure Java contracts; JDK only |
+| `oa-runtime` | Execution: agents, workflow glue, REST conventions |
+| `oa-control` | Administration (skeleton) |
+| `oa-eval` | Evaluation suites and gate (skeleton) |
+| `oa-testkit` | Test support (skeleton) |
+| `app-runtime` | Deployable serving execution |
+| `app-control` | Deployable serving administration (skeleton) |
+
+Two rules are enforced by ArchUnit tests in the build:
+
+1. Classes in `..runtime..` do not depend on `..control..` (`oa-runtime`).
+2. Classes in `..contracts..` depend only on `java.*` and on each other (`oa-contracts`).
+
+A dependency policy check (`tools/check_dependency_policy.py`) also requires that `oa-contracts` has no main-classpath dependency.
 
 ## Consequences
 
