@@ -65,4 +65,21 @@ class ToolCallHttpPolicyTest {
     void unknownToolIsDeniedEvenWithAllScopes() throws Exception {
         assertEquals(403, call(tools, "drop_database"));
     }
+
+    @Test
+    @TestSecurity(user = "agent-42", roles = {"cases:read"})
+    void pathVariantsDoNotBypassThePolicy() throws Exception {
+        // A high-risk call the caller is not allowed to make, sent with path variants.
+        // Any 200 here would be a bypass. Other statuses are recorded for the findings.
+        String[] variants = {
+            "close_case/call/", "%63lose_case/call", "close_case//call", "./close_case/call", "CLOSE_CASE/call"
+        };
+        for (String v : variants) {
+            int status = HTTP.send(HttpRequest.newBuilder(URI.create(tools + "/" + v))
+                    .POST(HttpRequest.BodyPublishers.noBody()).build(),
+                    HttpResponse.BodyHandlers.ofString()).statusCode();
+            System.out.println("QUARKUS_PATH_VARIANT " + v + " status=" + status);
+            assertTrue(status != 200, "bypass via path variant " + v);
+        }
+    }
 }
