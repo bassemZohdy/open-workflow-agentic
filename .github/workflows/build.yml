@@ -14,7 +14,15 @@ jobs:
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - run: python3 tools/render_requirements.py --check
+      - name: Generated requirement documents are up to date
+        run: python3 tools/render_requirements.py --check
+      - name: Dev compose file is valid
+        run: docker compose -f docker-compose.yml config --quiet
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '21', cache: maven }
-      - run: mvn -B verify
+      - name: Build and test all modules (module boundaries and API conventions are checked here)
+        run: mvn -B verify
+      - name: Dependency policy (contracts purity, licence allow-list)
+        run: python3 tools/check_dependency_policy.py
+      - name: Dependency policy tests
+        run: python3 -m unittest discover -s tools -p 'test_*.py' -v
