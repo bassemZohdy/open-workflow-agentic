@@ -65,7 +65,8 @@ These apply to every REST endpoint. The types live in `oa-contracts`, the HTTP m
 ## Dependencies and licences
 
 - Add a dependency only with a clear need. Prefer the Quarkus BOM and the versions already managed in the parent POM.
-- Licences: Apache-2.0, MIT, BSD and EPL-2.0 are allowed for any scope. MPL-2.0, CDDL and LGPL are allowed in test scope only. A dual-licensed component passes when one of its licences is allowed. Anything else needs a decision before it is added; the script tells you which licence it found.
+- Licences: Apache-2.0, MIT, MIT-0, BSD, EPL-2.0 and Public Domain (including CC0) are allowed in any scope. CDDL, GPL-2.0 with the Classpath Exception, UPL, MPL-2.0 and LGPL are allowed in test scope only. GPL, AGPL and EPL-1.0 are not allowed. A dual-licensed component passes when one of its licences is allowed. The check reads each POM's licence and tells you which name it could not classify.
+- An artifact whose POM declares no licence can be added to `tools/dependency-policy-exceptions.json` after its licence is verified from its own metadata. Entries are reviewed, scoped, and fail the build when stale or marked `unverified`.
 - The Maven enforcer enforces Java 21, Maven 3.9 and no duplicate dependency declarations.
 
 ## Definition of done for a work package
