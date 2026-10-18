@@ -1,0 +1,29 @@
+# Q03: a listen with an 8 second deadline. Used to test whether the deadline survives a restart.
+document:
+  dsl: '1.0.0'
+  namespace: spike
+  name: spike-listen-timeout
+  version: '1.0.0'
+do:
+  - probeBefore:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: http://localhost:18094/spike/probe/timeout-before
+        body: ${ . }
+  - waitForGo:
+      listen:
+        to:
+          one:
+            with:
+              type: spike.timeout.go
+      timeout:
+        after: PT8S
+  - probeAfter:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: http://localhost:18094/spike/probe/timeout-after
+        body: ${ . }

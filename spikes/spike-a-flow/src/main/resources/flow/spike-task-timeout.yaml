@@ -1,0 +1,22 @@
+# Q03: a task deadline. The called endpoint sleeps 10 seconds; the task allows 2.
+document:
+  dsl: '1.0.0'
+  namespace: spike
+  name: spike-task-timeout
+  version: '1.0.0'
+do:
+  - slowCall:
+      timeout:
+        after: PT2S
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: http://localhost:18094/spike/slow?ms=10000
+  - probeAfter:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: http://localhost:18094/spike/probe/task-timeout-after
+        body: ${ . }
