@@ -8,6 +8,8 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEven
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -27,7 +29,7 @@ class WriterRoleTest {
         execute("do $$ begin if not exists (select 1 from pg_roles where rolname = '" + ROLE + "') then "
                 + "create role " + ROLE + " login password '" + PASSWORD + "'; end if; end $$");
         execute("grant usage on schema audit to " + ROLE);
-        execute("grant select, insert on audit.event, audit.head_log to " + ROLE);
+        execute("grant select, insert on audit.event, audit.head_log, audit.payload_blob to " + ROLE);
     }
 
     @AfterAll
@@ -51,6 +53,19 @@ class WriterRoleTest {
 
         SQLException error = assertThrows(SQLException.class, () -> executeAsWriter(
                 "update audit.event set resource_id = 'forged' where chain_id = '" + chain + "'"));
+        assertEquals("42501", error.getSQLState());
+        assertTrue(error.getMessage().contains("permission denied"), error.getMessage());
+    }
+
+    @Test
+    void theWriterRoleStoresAndReadsPayloadsButCannotDeleteThem() throws SQLException {
+        JdbcPayloadStore writerStore = new JdbcPayloadStore(writerDataSource());
+        String ref = AuditTestDatabase.newId().value();
+        writerStore.put(ref, Map.of("prompt", "kept by reference"));
+        assertEquals(Optional.of(Map.of("prompt", "kept by reference")), writerStore.get(ref));
+
+        SQLException error = assertThrows(SQLException.class, () -> executeAsWriter(
+                "delete from audit.payload_blob where ref_id = '" + ref + "'"));
         assertEquals("42501", error.getSQLState());
         assertTrue(error.getMessage().contains("permission denied"), error.getMessage());
     }

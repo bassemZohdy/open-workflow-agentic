@@ -95,7 +95,7 @@ Goal, requesting subject and delegation grant are carried over unchanged. A chai
 - a rewritten event that is recomputed alone (the next event's `previousHash` no longer links);
 - a removed, inserted or reordered event (sequence and links break).
 
-What it cannot detect alone: a full rewrite of the chain from some point, including the head. `verifyChain(events, expectedHead)` detects that, and also a truncation, when the head is kept outside the log. The head anchor is part of the audit work (WP-111).
+What it cannot detect alone: a full rewrite of the chain from some point, including the head. `verifyChain(events, expectedHead)` detects that, and also a truncation, when the head is kept outside the log. WP-111 keeps the head in the insert-only `audit.head_log` and checks it in `ChainVerifier`; an external anchor of the head is still open ([audit.md](audit.md) section 10). The attributes of an event also carry the chain, instance, correlation, version stamp and payload-reference keys that the trail uses ([audit.md](audit.md) section 1).
 
 ## 7. Artifacts (M09, M10, ADR 0020 decision 4)
 
