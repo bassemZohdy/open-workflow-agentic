@@ -22,6 +22,10 @@ jobs:
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Build and test all modules (module boundaries and API conventions are checked here)
         run: mvn -B verify
+      - name: Acceptance status matches the build (no automated test regressed)
+        run: >-
+          java -cp "oa-testkit/target/classes:$(cat oa-testkit/target/classpath.txt)"
+          io.github.bassemzohdy.openworkflow.agentic.testkit.acceptance.AcceptanceStatus --check
       - name: Dependency policy (contracts purity, licence allow-list)
         run: python3 tools/check_dependency_policy.py
       - name: Dependency policy tests

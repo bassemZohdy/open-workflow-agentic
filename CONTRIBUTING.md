@@ -28,6 +28,8 @@ python3 tools/render_requirements.py --check               # generated documents
 python3 tools/check_dependency_policy.py                   # after mvn verify: contracts purity, licence allow-list
 python3 -m unittest discover -s tools -p 'test_*.py' -v    # tests for the policy check
 docker compose -f docker-compose.yml config --quiet        # the dev compose file is valid
+java -cp "oa-testkit/target/classes:$(cat oa-testkit/target/classpath.txt)" \
+  io.github.bassemzohdy.openworkflow.agentic.testkit.acceptance.AcceptanceStatus --check   # after mvn verify: status matches the build
 ```
 
 CI runs the same checks (see `.github/workflows/build.yml`); the policy check needs the output of `mvn verify`.
@@ -47,8 +49,8 @@ cd app-runtime && mvn quarkus:dev
 | `oa-runtime` | `...agentic.runtime` | `oa-contracts` and framework libraries | Never depends on `oa-control`. Checked by ArchUnit. |
 | `oa-control` | `...agentic.control` | `oa-contracts` | Administration (skeleton). |
 | `oa-eval` | `...agentic.eval` | `oa-contracts` | Evaluation (skeleton). |
-| `oa-testkit` | `...agentic.testkit` | `oa-contracts` | Test support (skeleton). |
-| `app-runtime` | (deployable) | `oa-runtime` | Runnable Quarkus application: configuration, workflow definitions, boot tests. |
+| `oa-testkit` | `...agentic.testkit` | `oa-contracts`, `oa-runtime` | Test support: acceptance annotation and status generator, scripted model, fault injection, fake IdP and policy service. Used from tests only; never depends on `oa-control`, and does not start Quarkus. See [docs/testing.md](docs/testing.md). |
+| `app-runtime` | (deployable) | `oa-runtime`; `oa-testkit` (test) | Runnable Quarkus application: configuration, workflow definitions, boot tests (`*Test`), and process-level tests run after package (`*IT`, failsafe). |
 | `app-control` | (deployable) | `oa-control` | Administration deployable (skeleton). |
 
 The runtime keeps working without the control application (ADR 0017). Keep it that way: a runtime class must not reference a control class, even indirectly through a shared type.
@@ -96,3 +98,5 @@ CI runs the same script with `--check` and fails if the committed Markdown diffe
 ## Tests and the status of acceptance tests
 
 Acceptance tests (T01 to T39) are described in [docs/test-cases.md](docs/test-cases.md). A test counts as done only when it is automated, runs in CI, and carries its requirement IDs. Status is recorded in `docs/requirements/test-status.json`; documents must not claim more than the build proves.
+
+To automate a test, annotate it with `@Acceptance("T06", requirements = {"M02"})` from `oa-testkit`. Then run the generator (the command is in the build section above, without `--check`) to record a passing test; CI fails if a recorded automated test regresses. The annotation, the generator, the test doubles and their limits are described in [docs/testing.md](docs/testing.md).
