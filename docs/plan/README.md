@@ -128,7 +128,7 @@ WP-105 (canonical progress) is the single most important package: almost everyth
 
 ## 5. Order of work and parallelism
 
-- **Start together:** WP-001, then WP-002 to WP-007 in parallel (two or three people can close all spikes in two weeks of elapsed time).
+- **Start together:** WP-001, then WP-002 to WP-007 in parallel; WP-008 follows WP-002 (two or three people can close all spikes in two weeks of elapsed time).
 - **Phase 1** splits into three streams: execution (WP-105, 107, 108, 109, 110), security (WP-102, 103, 104), and cross-cutting (WP-111, 112, 113).
 - **Phase 2** splits into agent core (201 to 203), tools and knowledge (204, 205, 209), and collaboration (206 to 208).
 - **From phase 3** the control application (WP-301 to 305) and runtime hardening (WP-306, 401, 402) run in parallel.

@@ -1,0 +1,4 @@
+{
+  "note": "Reviewed overrides for tools/check_dependency_policy.py. Use only when an artifact's POM declares no licence or an unrecognised one, and the licence is verified from the artifact's own metadata. Each entry: coordinates (group:artifact:version), licence (a recognised name), scopes (list), status ('verified' or 'unverified'; 'unverified' fails the check), justification. Entries that match no resolved dependency fail the check as stale. An exception cannot allow a licence the scope rule forbids.",
+  "exceptions": []
+}
