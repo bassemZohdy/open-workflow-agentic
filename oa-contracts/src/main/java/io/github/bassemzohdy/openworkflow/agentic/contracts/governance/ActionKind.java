@@ -13,5 +13,11 @@ public enum ActionKind {
     /** A paused agent or workflow resumes under a delegation grant. */
     RESUME,
     /** Authority is delegated to another agent or subject. */
-    DELEGATE
+    DELEGATE,
+    /** A person acts on a human task (approve, redirect, take over). */
+    HUMAN_TASK_ACTION,
+    /** A versioned artifact is published or activated for execution. */
+    PUBLICATION,
+    /** An operator runs a safe-recovery operation (cancel, pause, drain) on work or on the runtime. */
+    OPERATION
 }
