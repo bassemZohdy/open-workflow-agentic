@@ -21,14 +21,15 @@
    "exit": [
     "Multi-module build with enforced runtime/control boundary is green in CI",
     "Acceptance-test harness marks test status automatically",
-    "Spikes A to E are closed with an ADR each; unknowns are now decisions or accepted risks",
-    "Acceptance status reporting includes Maven Failsafe reports for process-level integration tests"
+    "Spikes A to E are closed with an ADR each; remaining unknowns have an owner and a validation point",
+    "Acceptance status reporting includes Maven Failsafe reports for process-level integration tests",
+    "Standalone spike tests have reproducible commands and an explicit CI or manual verification policy"
    ]
   },
   {
    "id": 1,
    "name": "Secure governed execution core",
-   "goal": "A process that runs durably, authenticates people and agents, enforces policy outside the agent, involves humans, and survives failure with exactly-once business effects.",
+   "goal": "A process that runs durably, authenticates people and agents, enforces policy outside the agent, involves humans, and survives failure with explicit idempotency and recovery semantics for business effects.",
    "milestone": "M1 Governed run (S1, S3 core)",
    "exit": [
     "T01, T02, T03, T07, T12, T13, T16, T17 pass",
@@ -167,8 +168,9 @@
     "WP-001"
    ],
    "deliverables": [
-    "Written findings plus characterization tests",
-    "ADR on how instances are started, queried, cancelled and resumed"
+    "Written findings with evidence, confidence and explicit unknowns; standalone characterization tests with reproducible commands",
+    "ADR on how instances are started, queried, cancelled and resumed",
+    "Document which standalone tests run in CI and which require an isolated Postgres/database or process environment"
    ],
    "reuse": [
     "quarkus-flow-jpa",
@@ -176,7 +178,7 @@
     "quarkus-flow-scheduler",
     "quarkus-flow-messaging"
    ],
-   "notes": "Questions: start by API with input; listen and emit events with durable resume after restart; timeouts and deadlines; two versions of one definition running together; instance query and cancel API; schema created by JPA module; Kubernetes lease durability; retries; calling a CDI bean as a function; how MDC and identity propagate."
+   "notes": "Questions: start by API with input; listen and emit events with durable resume after restart; timeouts and deadlines; two versions of one definition running together; instance query and cancel API; schema created by JPA module; Kubernetes lease durability; retries; calling a CDI bean as a function; how MDC and identity propagate. Process tests are opt-in and must only use the dedicated spike_a database; the root Maven build does not include this standalone project."
   },
   {
    "id": "WP-004",
@@ -333,7 +335,8 @@
     "OIDC for users and service identity for agents",
     "Delegation grants with scope and expiry; token exchange for short-lived credentials; no token passthrough",
     "Re-authorization after long waits",
-    "Secret handling and rotation"
+    "Secret handling and rotation",
+    "Verify identity and correlation propagation through asynchronous Flow tasks and after resume; do not persist credentials in workflow or checkpoint state."
    ],
    "reuse": [
     "quarkus-oidc",
@@ -405,7 +408,7 @@
    "title": "Run lifecycle and canonical progress",
    "size": "XL",
    "type": "build",
-   "goal": "Give every unit of work one authoritative progress model that survives crashes.",
+   "goal": "Own the lifecycle registry and reconcile it with Flow instances and agent checkpoints so work recovers safely after crashes.",
    "requirements": [
     "M28",
     "M16",
@@ -420,17 +423,19 @@
     "WP-101"
    ],
    "deliverables": [
-    "Start by API, event or schedule; instance registry",
+    "Idempotent start by API, event or schedule; platform-owned instance registry with definition id/version, input reference, request idempotency key and lifecycle status",
     "agent_task state machine linked to the Flow instance and graph checkpoint",
     "Transactional outbox feeding a task_view projection",
-    "Reconciler that detects and repairs orphaned or stuck work",
-    "Operations API: inspect, cancel, retry, pause, recover (authorized)"
+    "Startup and periodic reconciler that waits for definition warmup, finds restored PENDING instances and explicitly resumes them",
+    "Reconciler handles duplicate starts and re-execution of unfinished work through the effect ledger",
+    "Operations API: inspect, cancel, retry, pause, recover (authorized)",
+    "Keep lifecycle history and version-scoped ownership in platform records; Flow JPA rows are execution state, not the sole source of truth"
    ],
    "reuse": [
     "quarkus-flow-jpa",
     "db-scheduler"
    ],
-   "notes": "Design: the Flow instance is canonical for process progress, the effect ledger for external effects, the agent_task row for agent progress. Everything else is a projection."
+   "notes": "Flow 1.2.0 restores persisted instances into memory without starting them. The platform registry is authoritative for lifecycle and definition version; Flow executes the workflow. Flow can rerun the first unfinished task after restart, so outbound effects must use WP-108 idempotency semantics. WP-105 is already XL; revisit scope, estimate range and critical path with spike evidence instead of increasing the size label mechanically."
   },
   {
    "id": "WP-106",
@@ -452,6 +457,7 @@
    ],
    "deliverables": [
     "Tasks bound to workflow waits; assign, delegate, reassign, approve, reject, escalate",
+    "Persist human decisions before waking a Flow listener; replay pending decisions after restart",
     "Separation-of-duties rules; agents cannot self-approve consequential actions",
     "Audit of every transition"
    ],
@@ -479,7 +485,8 @@
    ],
    "deliverables": [
     "CloudEvents HTTP endpoint with correlation keys",
-    "Duplicate, late and out-of-order event handling; cancellation race rules"
+    "Persist received events in an idempotent inbox before waking listeners; replay eligible events after restart",
+    "Duplicate, early, late and out-of-order event handling; cancellation race rules"
    ],
    "reuse": [
     "quarkus-flow-messaging"
@@ -492,7 +499,7 @@
    "title": "Effect ledger and compensation",
    "size": "L",
    "type": "build",
-   "goal": "No duplicate business effect and visible handling of partial failure.",
+   "goal": "Prevent duplicate external effects where target idempotency is available and make partial or uncertain outcomes visible.",
    "requirements": [
     "M06",
     "M07"
@@ -505,12 +512,13 @@
     "WP-105"
    ],
    "deliverables": [
-    "Write-ahead intent with idempotency key, call, outcome record",
+    "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution",
+    "Require an idempotent target or explicit reconciliation/manual resolution where exactly-once effects cannot be guaranteed",
     "Reconciliation for unknown outcomes (lost acknowledgment)",
     "Compensation steps and a manual-resolution queue"
    ],
    "reuse": [],
-   "notes": ""
+   "notes": "The workflow HTTP client retries below OWS retry policy by default, and restart can re-run the first unfinished task. Disable unintended client retries and require the effect ledger/idempotency contract for every external effect; do not promise exactly-once delivery to arbitrary targets."
   },
   {
    "id": "WP-109",
@@ -532,15 +540,15 @@
     "WP-106"
    ],
    "deliverables": [
-    "Per-instance deadlines, maximum lifetime, escalation timers",
+    "Persist absolute per-instance deadlines and enforce them across restart; maximum lifetime and escalation timers",
     "Duplicate timer delivery harmless",
-    "Kubernetes lease durable mode; failover test with two replicas"
+    "Kubernetes lease durable mode; failover test with two replicas and verify restored work starts after warmup"
    ],
    "reuse": [
     "quarkus-flow-durable-kubernetes",
     "quarkus-db-scheduler"
    ],
-   "notes": ""
+   "notes": "Flow listen deadlines re-arm from resume, so the platform deadline is absolute and stored outside Flow state. Kubernetes lease behavior is not experimentally verified by WP-003; close that evidence gap in the two-replica test."
   },
   {
    "id": "WP-110",
@@ -930,7 +938,7 @@
     "Inventory queries and traceability of decisions to versions"
    ],
    "reuse": [],
-   "notes": ""
+   "notes": "Operations history and status must come from platform-owned lifecycle/audit records because Flow deletes completed and cancelled rows and does not persist WAITING status."
   },
   {
    "id": "WP-302",
@@ -951,13 +959,14 @@
     "WP-301"
    ],
    "deliverables": [
-    "Instances pin definition, prompt, model, tool, policy and configuration versions",
+    "Instances pin definition id and version plus prompt, model, tool, policy and configuration versions",
+    "Every lookup, resume, cancel and recovery validates the instance's pinned definition id/version",
     "v1 continues through v2 rollout and rollback"
    ],
    "reuse": [
     "Flow definition versions"
    ],
-   "notes": ""
+   "notes": "Flow's persisted key does not scope instance ids by definition version. Store the full definition identity in the platform registry and validate it on each operation."
   },
   {
    "id": "WP-303",
@@ -1136,12 +1145,13 @@
    ],
    "deliverables": [
     "Expand/contract database migrations; API versioning; N-1 compatibility",
-    "Rolling upgrade test with in-flight instances and checkpoints"
+    "Rolling upgrade test with in-flight instances and checkpoints",
+    "Re-run Flow characterization checks on upgrades for restore/start behavior, HTTP retry defaults, entity/DDL compatibility and definition warmup."
    ],
    "reuse": [
     "Flyway"
    ],
-   "notes": ""
+   "notes": "Keep engine-specific workarounds until upgrade evidence proves the relevant behavior changed; recheck before removing them."
   },
   {
    "id": "WP-403",
@@ -1423,12 +1433,13 @@
    ],
    "deliverables": [
     "Technology decision (server-rendered or TypeScript SPA)",
-    "Runs, tasks, conversations, inventory, approvals, incidents"
+    "Runs, tasks, conversations, inventory, approvals, incidents",
+    "Show current status and history from the platform instance registry and audit/task records, not directly from transient Flow tables."
    ],
    "reuse": [
     "Qute or React"
    ],
-   "notes": "Every action goes through an authorized, audited API."
+   "notes": "Every action goes through an authorized, audited API. Flow JPA is execution state and deletes completed/cancelled instances; the console reads the platform registry for durable history."
   },
   {
    "id": "WP-604",

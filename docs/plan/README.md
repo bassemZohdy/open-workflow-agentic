@@ -64,15 +64,15 @@ The runtime database role can read `registry` activations but not write them; th
 
 ### The canonical progress model (M28)
 
-- The Flow instance is authoritative for process progress.
+- The platform instance registry is authoritative for lifecycle status, definition id/version, request idempotency key and durable history. Flow executes the pinned definition; its persisted rows are not the only source of truth.
 - The `agent_task` row is authoritative for agent progress and links to the Flow instance and the latest checkpoint.
-- The effect ledger is authoritative for external side effects.
+- The effect ledger is authoritative for external side effects and their idempotency keys.
 - `task_view` is a projection written through a transactional outbox, never a second source of truth.
-- A reconciler compares these on startup and periodically and repairs orphaned or stuck work, with every repair audited.
+- After definitions warm up, a startup and periodic reconciler finds restored Flow instances that are registered as active but still PENDING, explicitly starts them, and repairs orphaned or stuck work. Every repair is audited.
 
-### Exactly-once business effects (M03, M06)
+### Idempotent external effects (M03, M06)
 
-Write the intent with an idempotency key, call the target, record the outcome. After a crash the ledger shows an intent without an outcome and the reconciler asks the target (or retries with the same key). Restores use ledger markers so irreversible effects are not replayed (M08).
+Write the intent with a stable idempotency key before calling the target, then record the outcome. A restart can re-run the first unfinished Flow task, and the Flow HTTP client may retry below the workflow policy, so retries must reuse the same key. After a crash the ledger shows an intent without an outcome; the reconciler asks the target or retries with that key. Exactly-once effects cannot be promised for arbitrary targets: require target-side idempotency or make the uncertain outcome visible for reconciliation/manual resolution (M08).
 
 ### Identity (M11)
 
@@ -96,7 +96,7 @@ Known weak spots: `quarkus-flow-langchain4j` is Preview and `langchain4j-agentic
 
 | Phase | Goal | Milestone demonstration | Effort (days) |
 |---|---|---|---:|
-| 0 Foundations and spikes | Structure, harness, answers to open questions | Build enforces boundaries; tests report status | 54 |
+| 0 Foundations and spikes | Structure, harness, answers to open questions | Build enforces boundaries; tests report status | 57 |
 | 1 Secure governed execution core | Durable, authenticated, policy-enforced run with humans | Scenario S1 and S3 core: a case survives kill -9 and completes once | 124 |
 | 2 Agent capability | Plan, tools, knowledge, memory, multi-agent, interaction | Scenario S8: an unstructured request is resolved by a supervisor and specialists | 98 |
 | 3 Governed lifecycle and authority | Inventory, pinning, publication, separation, containment | Scenario S7: governed release and rollback; runtime survives control outage | 79 |
@@ -104,7 +104,7 @@ Known weak spots: `quarkus-flow-langchain4j` is Preview and `langchain4j-agentic
 | 5 Quality and model governance | Evaluation gate, production monitoring, model routing | A quality drop raises an alert; same task on three models | 43 |
 | 6 Tooling, coexistence, console | Authoring tools, shadow runs, console, assistant | All 39 tests automated | 75 |
 
-The total is 530 days for one engineer. The critical path is 144 days. Sizes are relative; they exist to compare packages and find the critical path, not to promise dates.
+The total is 533 days for one engineer. The critical path is 144 days. Sizes are relative; they exist to compare packages and find the critical path, not to promise dates.
 
 ### Critical path
 
