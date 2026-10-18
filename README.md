@@ -20,7 +20,8 @@ Requires Java 21, Maven 3.9 and PostgreSQL 16.
 ```bash
 docker compose up -d                 # Postgres on :5432 (db "agentic", user/password postgres)
 export OPENAI_API_KEY=...            # or point LLM_BASE_URL at any OpenAI-compatible gateway
-mvn quarkus:dev
+mvn -B install -DskipTests          # once, from the repository root
+cd app-runtime && mvn quarkus:dev
 curl -s localhost:8080/agents/research -H 'content-type: application/json' \
      -d '{"topic":"agentic process modernization"}'
 ```
@@ -33,11 +34,16 @@ mvn verify
 
 ## Layout
 
+Maven multi-module build (ADR 0017). The runtime never depends on control; `oa-contracts` depends on nothing but the JDK. See [CONTRIBUTING.md](CONTRIBUTING.md) for the rules and how to build.
+
 ```
-src/main/resources/flow/                 OWS workflow definitions (loaded by Quarkus Flow)
-src/main/java/.../agent/                 LangGraph4j graphs, model port
-src/main/java/.../api/                   REST endpoints (agent step, later: control plane)
-src/main/resources/db/migration/         Flyway (scheduler table)
+oa-contracts/      pure Java: ids (ULID), pagination, problem details, correlation id, ports
+oa-runtime/        execution: agent graphs, workflow glue, REST conventions, scheduler migration
+oa-control/        administration (skeleton)
+oa-eval/           evaluation suites and gate (skeleton)
+oa-testkit/        test support (skeleton)
+app-runtime/       deployable: Quarkus application, configuration, OWS workflow definitions, boot tests
+app-control/       deployable: administration (skeleton)
 docs/requirements/                       requirements (JSON source + generated Markdown)
 docs/test-cases.md                       39 acceptance tests in 8 scenarios
 docs/traceability.md                     requirement-to-test coverage and status
@@ -45,6 +51,7 @@ docs/adr/                                architecture decision records
 docs/plan/                               implementation plan (7 phases, 52 work packages)
 docs/                                    architecture
 tools/render_requirements.py             regenerates the generated documents
+tools/check_dependency_policy.py         contracts purity and licence allow-list (after mvn verify)
 ```
 
 ## Requirements, tests and decisions
@@ -57,9 +64,9 @@ tools/render_requirements.py             regenerates the generated documents
 
 The JSON is the source of truth. After editing `docs/requirements/requirements.json` or `test-status.json`, run `python3 tools/render_requirements.py`. CI fails if the generated files are out of date.
 
-None of the 39 acceptance tests is automated yet; the tests in `src/test` are bootstrap smoke tests.
+None of the 39 acceptance tests is automated yet; the tests in `app-runtime/src/test` are bootstrap smoke tests, and the module rules and API conventions have their own unit tests.
 
-## What works today (verified by `mvn test`)
+## What works today (last verified on the single-module layout, before the module split)
 
 - Application boots with Quarkus Flow, LangGraph4j, db-scheduler and Postgres together.
 - The OWS definition `agentic/research-and-approve` is discovered and registered as a `WorkflowDefinition` bean.
