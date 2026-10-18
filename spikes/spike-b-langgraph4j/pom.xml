@@ -41,6 +41,10 @@
     <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId><version>${jackson.version}</version></dependency>
     <dependency><groupId>com.zaxxer</groupId><artifactId>HikariCP</artifactId><version>${hikari.version}</version></dependency>
 
+    <!-- Q11: optional langgraph4j modules at the same 1.9.5 line (versions from the BOM) -->
+    <dependency><groupId>org.bsc.langgraph4j</groupId><artifactId>langgraph4j-opentelemetry</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>org.bsc.langgraph4j</groupId><artifactId>langgraph4j-ag-ui-sdk</artifactId><scope>test</scope></dependency>
+
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>${junit.version}</version><scope>test</scope></dependency>
   </dependencies>
 
