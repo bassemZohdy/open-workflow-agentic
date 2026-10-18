@@ -37,9 +37,13 @@ public final class AuditKeys {
 
     /** The chain named by the attributes; {@link #DEFAULT_CHAIN} when absent. Throws on an invalid chain id. */
     public static String chainOf(Map<String, String> attributes) {
-        String chain = attributes.getOrDefault(CHAIN, DEFAULT_CHAIN);
-        if (!CHAIN_ID.matcher(chain).matches()) {
-            throw new IllegalArgumentException("oa.chain must match [A-Za-z0-9._:-]{1,128}");
+        return requireChainId(attributes.getOrDefault(CHAIN, DEFAULT_CHAIN));
+    }
+
+    /** {@code chain} when it is a valid chain id, otherwise {@link IllegalArgumentException}. */
+    public static String requireChainId(String chain) {
+        if (chain == null || !CHAIN_ID.matcher(chain).matches()) {
+            throw new IllegalArgumentException("chain id must match [A-Za-z0-9._:-]{1,128}");
         }
         return chain;
     }
