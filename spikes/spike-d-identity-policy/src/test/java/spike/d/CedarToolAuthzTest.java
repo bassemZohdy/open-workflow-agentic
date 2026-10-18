@@ -48,6 +48,16 @@ class CedarToolAuthzTest {
     void forbidOverridesPermitForHighRiskWithoutApproval() {
         Pdp.Decision d = pdp.decide(request("close_case", Set.of("cases:write"), 5, false));
         assertFalse(d.allowed(), d.reason());
+        // The reason names the policy that produced it. Cedar 4.10 reports engine-assigned ids
+        // ("policy1" = second policy in the file), not the @id annotation. Attribution therefore needs
+        // our own id map (open question in the spike report).
+        assertTrue(d.reason().contains("policy1"), d.reason());
+    }
+
+    @Test
+    void allowDecisionNamesThePermitPolicy() {
+        Pdp.Decision d = pdp.decide(request("search", Set.of("cases:read"), 5, false));
+        assertTrue(d.reason().contains("policy0"), d.reason());
     }
 
     @Test
