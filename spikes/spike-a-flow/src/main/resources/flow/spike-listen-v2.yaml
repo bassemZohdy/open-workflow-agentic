@@ -1,0 +1,27 @@
+# Q04: second version of the same definition name, listening on its own event type.
+document:
+  dsl: '1.0.0'
+  namespace: spike
+  name: spike-listen
+  version: '2.0.0'
+do:
+  - probeBefore:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: http://localhost:18094/spike/probe/before-v2
+        body: ${ . }
+  - waitForGo:
+      listen:
+        to:
+          one:
+            with:
+              type: spike.go.v2
+  - probeAfter:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: http://localhost:18094/spike/probe/after-v2
+        body: ${ . }

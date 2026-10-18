@@ -1,0 +1,18 @@
+# Q02: emits the event that spike-listen-v1 waits for.
+document:
+  dsl: '1.0.0'
+  namespace: spike
+  name: spike-emit
+  version: '1.0.0'
+do:
+  - announceGo:
+      emit:
+        event:
+          with:
+            id: spike-emit-go
+            source: urn:spike:emitter
+            type: spike.go
+            data: ${ . }
+  - afterEmit:
+      set:
+        emitted: true
