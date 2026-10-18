@@ -42,7 +42,8 @@ docs/requirements/                       requirements (JSON source + generated M
 docs/test-cases.md                       39 acceptance tests in 8 scenarios
 docs/traceability.md                     requirement-to-test coverage and status
 docs/adr/                                architecture decision records
-docs/                                    architecture, proof-of-concept plan
+docs/plan/                               implementation plan (7 phases, 52 work packages)
+docs/                                    architecture
 tools/render_requirements.py             regenerates the generated documents
 ```
 
@@ -51,7 +52,8 @@ tools/render_requirements.py             regenerates the generated documents
 - [Requirements](docs/requirements/README.md): 34 Mandatory, 25 High, 5 Optional, deployment profiles, principles.
 - [Test cases](docs/test-cases.md): 39 acceptance tests (T01 to T39) in 8 scenarios, with implementation status.
 - [Traceability](docs/traceability.md): which tests verify which requirement.
-- [ADRs](docs/adr/README.md): 7 requirement-level and 8 project decisions.
+- [Implementation plan](docs/plan/README.md): phases, milestones, risks, decisions needed, 52 work packages with owners for all 39 tests.
+- [ADRs](docs/adr/README.md): 7 requirement-level and 11 project decisions.
 
 The JSON is the source of truth. After editing `docs/requirements/requirements.json` or `test-status.json`, run `python3 tools/render_requirements.py`. CI fails if the generated files are out of date.
 
@@ -66,7 +68,7 @@ None of the 39 acceptance tests is automated yet; the tests in `src/test` are bo
 
 ## Not done yet (next steps)
 
-See [docs/poc-plan.md](docs/poc-plan.md). Key gaps:
+See the [implementation plan](docs/plan/README.md) and [work packages](docs/plan/work-packages.md). Key gaps:
 
 - Start a workflow instance and complete the human-approval wait through an event (the YAML contains the `listen` task, no test drives it yet).
 - Graph-to-workflow integration is plain HTTP today. There is no official Quarkus Flow extension for LangGraph4j, so a tighter bridge is ours to write.

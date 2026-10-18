@@ -1,0 +1,1561 @@
+{
+ "meta": {
+  "title": "Implementation plan: work packages",
+  "date": "2026-10-18",
+  "version": "0.1",
+  "status": "Proposed; sizes are relative, not calendar commitments",
+  "sizes": {
+   "S": 3,
+   "M": 7,
+   "L": 12,
+   "XL": 20
+  },
+  "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only."
+ },
+ "phases": [
+  {
+   "id": 0,
+   "name": "Foundations and spikes",
+   "goal": "Fix the repository structure and test harness, and answer the open technical questions before building on them.",
+   "milestone": "M0 Ready to build",
+   "exit": [
+    "Multi-module build with enforced runtime/control boundary is green in CI",
+    "Acceptance-test harness marks test status automatically",
+    "Spikes A to E are closed with an ADR each; unknowns are now decisions or accepted risks"
+   ]
+  },
+  {
+   "id": 1,
+   "name": "Secure governed execution core",
+   "goal": "A process that runs durably, authenticates people and agents, enforces policy outside the agent, involves humans, and survives failure with exactly-once business effects.",
+   "milestone": "M1 Governed run (S1, S3 core)",
+   "exit": [
+    "T01, T02, T03, T07, T12, T13, T16, T17 pass",
+    "One end-to-end governed case runs, survives kill -9 and completes once",
+    "Traces show workflow, agent, tool and model spans under one correlation id"
+   ]
+  },
+  {
+   "id": 2,
+   "name": "Agent capability",
+   "goal": "Agents plan and re-plan, use tools and knowledge, remember within scope, collaborate with other agents and with people, all inside the bounds from phase 1.",
+   "milestone": "M2 Agent-led case (S8, S2, S5)",
+   "exit": [
+    "T05, T06, T08, T09, T15, T25, T26, T34, T35, T36, T37 pass",
+    "An unstructured request is resolved by a supervisor agent with two specialists, one over A2A",
+    "Limits stop a runaway agent; injected attacks are rejected"
+   ]
+  },
+  {
+   "id": 3,
+   "name": "Governed lifecycle and authority",
+   "goal": "Everything that changes agent behavior is inventoried, versioned, approved and reversible; in-flight work is pinned; emergency control works without the admin service.",
+   "milestone": "M3 Governed change (S7, S4 security)",
+   "exit": [
+    "T04, T11, T14, T19, T22, T23, T28, T30, T32 pass",
+    "Runtime keeps working with the control application stopped",
+    "Revoking a tool or model stops active and waiting tasks within the agreed bound"
+   ]
+  },
+  {
+   "id": 4,
+   "name": "Operations and deployment",
+   "goal": "The platform can be backed up, upgraded, deployed on several environments, isolated per tenant and scaled with evidence.",
+   "milestone": "M4 Production readiness (S4)",
+   "exit": [
+    "T18, T20, T21, T24 pass",
+    "Restore and rolling-upgrade drills are automated in CI or a scheduled job",
+    "Published RTO and RPO measured, not assumed"
+   ]
+  },
+  {
+   "id": 5,
+   "name": "Quality and model governance",
+   "goal": "Quality is measured before release and in production; models are chosen by configuration and evaluated consistently.",
+   "milestone": "M5 Measured quality",
+   "exit": [
+    "T10, T31, T38, T39 pass",
+    "A quality drop raises an alert and opens a gate review",
+    "The same task runs on two providers and a self-hosted model"
+   ]
+  },
+  {
+   "id": 6,
+   "name": "Lifecycle tooling, coexistence and console",
+   "goal": "Authors, operators and approvers get tooling; legacy coexistence and the governance assistant are delivered.",
+   "milestone": "M6 Complete scenario set",
+   "exit": [
+    "T27, T29, T33 pass",
+    "Operators use the console for all routine tasks; every action is API-backed and audited",
+    "All 39 acceptance tests are automated"
+   ]
+  }
+ ],
+ "work_packages": [
+  {
+   "id": "WP-001",
+   "phase": 0,
+   "title": "Repository foundations",
+   "size": "M",
+   "type": "build",
+   "goal": "Make the structure of the code enforce the architecture.",
+   "requirements": [
+    "M26",
+    "M22",
+    "H23",
+    "H24"
+   ],
+   "tests": [],
+   "depends_on": [],
+   "deliverables": [
+    "Maven multi-module layout: oa-contracts (pure Java), oa-runtime, oa-control, oa-eval, oa-testkit, deployable apps",
+    "ArchUnit rules: runtime never depends on control; contracts depend on nothing",
+    "Licence and dependency policy check in CI",
+    "API conventions: RFC 9457 errors, correlation id, ULID ids, pagination",
+    "CI with Postgres service; dev compose; CONTRIBUTING"
+   ],
+   "reuse": [
+    "Quarkus platform BOM",
+    "ArchUnit",
+    "Maven enforcer"
+   ],
+   "notes": "Keeps the current sample working while moving it into modules; no behavior change."
+  },
+  {
+   "id": "WP-002",
+   "phase": 0,
+   "title": "Acceptance-test harness",
+   "size": "L",
+   "type": "build",
+   "goal": "Turn the 39 tests from a document into executable, traceable tests.",
+   "requirements": [
+    "H12"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-001"
+   ],
+   "deliverables": [
+    "@Acceptance(\"T12\") annotation and JUnit extension",
+    "Generator that updates test-status.json from surefire reports; CI fails on regressions of automated tests",
+    "Scriptable model double (scripted answers, injected failures, token counts)",
+    "Fault injection: kill and restart the app process, pause the database, delay or drop calls, advance a test clock",
+    "Fake IdP and fake policy service for isolated tests"
+   ],
+   "reuse": [
+    "Quarkus test framework",
+    "Toxiproxy-style proxy or in-process fault wrapper"
+   ],
+   "notes": "Local sandbox has Postgres but no Docker daemon, so process-level fault injection must not need Testcontainers."
+  },
+  {
+   "id": "WP-003",
+   "phase": 0,
+   "title": "Spike A: Quarkus Flow capabilities",
+   "size": "M",
+   "type": "spike",
+   "goal": "Learn what Quarkus Flow 1.2 really provides for our requirements.",
+   "requirements": [
+    "M03",
+    "M04",
+    "M09",
+    "H01"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-001"
+   ],
+   "deliverables": [
+    "Written findings plus characterization tests",
+    "ADR on how instances are started, queried, cancelled and resumed"
+   ],
+   "reuse": [
+    "quarkus-flow-jpa",
+    "quarkus-flow-durable-kubernetes",
+    "quarkus-flow-scheduler",
+    "quarkus-flow-messaging"
+   ],
+   "notes": "Questions: start by API with input; listen and emit events with durable resume after restart; timeouts and deadlines; two versions of one definition running together; instance query and cancel API; schema created by JPA module; Kubernetes lease durability; retries; calling a CDI bean as a function; how MDC and identity propagate."
+  },
+  {
+   "id": "WP-004",
+   "phase": 0,
+   "title": "Spike B: LangGraph4j durability",
+   "size": "M",
+   "type": "spike",
+   "goal": "Prove agent runs can pause and resume safely across restarts.",
+   "requirements": [
+    "M03",
+    "M19",
+    "M32"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-001"
+   ],
+   "deliverables": [
+    "Findings and characterization tests",
+    "ADR on checkpoint scoping and state evolution"
+   ],
+   "reuse": [
+    "langgraph4j-postgres-saver",
+    "langgraph4j-ag-ui-sdk",
+    "langgraph4j-opentelemetry"
+   ],
+   "notes": "Questions: interrupt and resume across restart; checkpoint size and growth; changing the state class between versions; thread id scoping to user, instance and tenant; streaming events; cancellation; parallel branches and subgraphs; connection use of the saver."
+  },
+  {
+   "id": "WP-005",
+   "phase": 0,
+   "title": "Spike C: workflow-to-agent bridge",
+   "size": "M",
+   "type": "spike",
+   "goal": "Choose how a workflow task invokes an agent and how context travels.",
+   "requirements": [
+    "M28",
+    "M11",
+    "M03"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-003",
+    "WP-004"
+   ],
+   "deliverables": [
+    "Prototype of three bridges: HTTP call, in-process CDI function, asynchronous start with callback event",
+    "ADR replacing ADR 0014 or confirming it"
+   ],
+   "reuse": [],
+   "notes": "Decision criteria: identity, deadline, correlation and budget propagation; behavior when the agent crashes mid-step; at-least-once versus exactly-once; testability; ability to move the agent out of process later."
+  },
+  {
+   "id": "WP-006",
+   "phase": 0,
+   "title": "Spike D: identity, policy and secrets",
+   "size": "M",
+   "type": "spike",
+   "goal": "Choose the identity provider integration, policy engine and secret store.",
+   "requirements": [
+    "M11",
+    "M12"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-001"
+   ],
+   "deliverables": [
+    "Prototype: Keycloak token exchange (RFC 8693) for delegated, short-lived tokens",
+    "Comparison and ADR: OPA sidecar, Cedar embedded, or Quarkus security policies with custom rules",
+    "Fail-closed behavior and decision latency measured",
+    "Secret store choice (Vault or Kubernetes secrets) with rotation"
+   ],
+   "reuse": [
+    "quarkus-oidc",
+    "quarkus-flow-oidc",
+    "Keycloak",
+    "OPA or Cedar"
+   ],
+   "notes": "Needs a decision from the owner about the identity provider already in use."
+  },
+  {
+   "id": "WP-007",
+   "phase": 0,
+   "title": "Spike E: MCP, A2A and agent protocols",
+   "size": "M",
+   "type": "spike",
+   "goal": "Establish what is usable today for tool and agent interoperability in Java.",
+   "requirements": [
+    "M23",
+    "H03",
+    "M32"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-001"
+   ],
+   "deliverables": [
+    "Findings on quarkus-langchain4j-mcp (1.14 vs 2.0 beta), secured MCP auth providers, MCP registry",
+    "Findings on A2A Java SDK and Apicurio registry integration",
+    "Findings on AG-UI for streaming to a UI"
+   ],
+   "reuse": [
+    "quarkus-langchain4j-mcp",
+    "quarkus-langchain4j-oidc-mcp-auth-provider",
+    "quarkus-langchain4j-a2a-apicurio-registry",
+    "langgraph4j-ag-ui-sdk"
+   ],
+   "notes": "No A2A client artifact was found in the Quarkus LangChain4j group; the A2A SDK may be used directly."
+  },
+  {
+   "id": "WP-101",
+   "phase": 1,
+   "title": "Contracts and domain model",
+   "size": "M",
+   "type": "build",
+   "goal": "Define the shared vocabulary every other package builds on.",
+   "requirements": [
+    "M01",
+    "M02",
+    "M15"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-001"
+   ],
+   "deliverables": [
+    "AgentTaskContract: goal, permitted tools and data, risk tier, limits for iterations, time, cost",
+    "Records for Decision, Effect, HumanTask, AuditEvent, Evidence; JSON schemas",
+    "Ports: PolicyDecisionPoint, ToolGateway, ModelGateway, EffectLedger, TaskStore, ArtifactRegistry"
+   ],
+   "reuse": [],
+   "notes": "Pure Java, no framework dependency."
+  },
+  {
+   "id": "WP-102",
+   "phase": 1,
+   "title": "Identity and delegated authority",
+   "size": "L",
+   "type": "build",
+   "goal": "Authenticate users, agents and services and carry the effective user's authority safely.",
+   "requirements": [
+    "M11"
+   ],
+   "tests": [
+    "T07"
+   ],
+   "depends_on": [
+    "WP-005",
+    "WP-006",
+    "WP-101"
+   ],
+   "deliverables": [
+    "OIDC for users and service identity for agents",
+    "Delegation grants with scope and expiry; token exchange for short-lived credentials; no token passthrough",
+    "Re-authorization after long waits",
+    "Secret handling and rotation"
+   ],
+   "reuse": [
+    "quarkus-oidc",
+    "Keycloak",
+    "quarkus-flow-oidc"
+   ],
+   "notes": "T07 uses two scripted agents; real multi-agent flows arrive in WP-207."
+  },
+  {
+   "id": "WP-103",
+   "phase": 1,
+   "title": "Policy enforcement points",
+   "size": "M",
+   "type": "build",
+   "goal": "Enforce business and security policy outside the agent, failing closed.",
+   "requirements": [
+    "M12"
+   ],
+   "tests": [
+    "T23"
+   ],
+   "depends_on": [
+    "WP-006",
+    "WP-101"
+   ],
+   "deliverables": [
+    "PEP library used by tool, model, human-task and publication boundaries",
+    "PDP adapter, versioned and attributable decisions",
+    "Fail-closed with a safe recovery path (cancel, pause, drain remain possible)"
+   ],
+   "reuse": [
+    "OPA or Cedar (per WP-006)"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-104",
+   "phase": 1,
+   "title": "Definition validation and agent output contract",
+   "size": "M",
+   "type": "build",
+   "goal": "Reject bad definitions before activation and bad agent output before use.",
+   "requirements": [
+    "M01",
+    "M14",
+    "M02"
+   ],
+   "tests": [
+    "T01"
+   ],
+   "depends_on": [
+    "WP-003",
+    "WP-101",
+    "WP-103"
+   ],
+   "deliverables": [
+    "OWS schema and semantic validation at build and at load (referenced tools, agents and policies exist)",
+    "Structured-output validation for agent steps; forbidden-action list; escalation authorization"
+   ],
+   "reuse": [
+    "serverlessworkflow validators",
+    "JSON Schema"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-105",
+   "phase": 1,
+   "title": "Run lifecycle and canonical progress",
+   "size": "XL",
+   "type": "build",
+   "goal": "Give every unit of work one authoritative progress model that survives crashes.",
+   "requirements": [
+    "M28",
+    "M16",
+    "M04"
+   ],
+   "tests": [
+    "T16"
+   ],
+   "depends_on": [
+    "WP-003",
+    "WP-005",
+    "WP-101"
+   ],
+   "deliverables": [
+    "Start by API, event or schedule; instance registry",
+    "agent_task state machine linked to the Flow instance and graph checkpoint",
+    "Transactional outbox feeding a task_view projection",
+    "Reconciler that detects and repairs orphaned or stuck work",
+    "Operations API: inspect, cancel, retry, pause, recover (authorized)"
+   ],
+   "reuse": [
+    "quarkus-flow-jpa",
+    "db-scheduler"
+   ],
+   "notes": "Design: the Flow instance is canonical for process progress, the effect ledger for external effects, the agent_task row for agent progress. Everything else is a projection."
+  },
+  {
+   "id": "WP-106",
+   "phase": 1,
+   "title": "Human task service",
+   "size": "L",
+   "type": "build",
+   "goal": "Durable, auditable human work with separation of duties.",
+   "requirements": [
+    "M05"
+   ],
+   "tests": [
+    "T02"
+   ],
+   "depends_on": [
+    "WP-102",
+    "WP-103",
+    "WP-105"
+   ],
+   "deliverables": [
+    "Tasks bound to workflow waits; assign, delegate, reassign, approve, reject, escalate",
+    "Separation-of-duties rules; agents cannot self-approve consequential actions",
+    "Audit of every transition"
+   ],
+   "reuse": [
+    "Flow listen/emit"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-107",
+   "phase": 1,
+   "title": "Event correlation and idempotent inbox",
+   "size": "M",
+   "type": "build",
+   "goal": "Route external events to the right instance exactly once in effect.",
+   "requirements": [
+    "M06",
+    "M04"
+   ],
+   "tests": [
+    "T13"
+   ],
+   "depends_on": [
+    "WP-105"
+   ],
+   "deliverables": [
+    "CloudEvents HTTP endpoint with correlation keys",
+    "Duplicate, late and out-of-order event handling; cancellation race rules"
+   ],
+   "reuse": [
+    "quarkus-flow-messaging"
+   ],
+   "notes": "Kafka comes later in WP-406."
+  },
+  {
+   "id": "WP-108",
+   "phase": 1,
+   "title": "Effect ledger and compensation",
+   "size": "L",
+   "type": "build",
+   "goal": "No duplicate business effect and visible handling of partial failure.",
+   "requirements": [
+    "M06",
+    "M07"
+   ],
+   "tests": [
+    "T03"
+   ],
+   "depends_on": [
+    "WP-101",
+    "WP-105"
+   ],
+   "deliverables": [
+    "Write-ahead intent with idempotency key, call, outcome record",
+    "Reconciliation for unknown outcomes (lost acknowledgment)",
+    "Compensation steps and a manual-resolution queue"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-109",
+   "phase": 1,
+   "title": "Timers, deadlines and durable failover",
+   "size": "L",
+   "type": "build",
+   "goal": "Deadlines and waits survive node loss.",
+   "requirements": [
+    "M03",
+    "M04"
+   ],
+   "tests": [
+    "T12"
+   ],
+   "depends_on": [
+    "WP-002",
+    "WP-105",
+    "WP-106"
+   ],
+   "deliverables": [
+    "Per-instance deadlines, maximum lifetime, escalation timers",
+    "Duplicate timer delivery harmless",
+    "Kubernetes lease durable mode; failover test with two replicas"
+   ],
+   "reuse": [
+    "quarkus-flow-durable-kubernetes",
+    "quarkus-db-scheduler"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-110",
+   "phase": 1,
+   "title": "Resilience and overload",
+   "size": "M",
+   "type": "build",
+   "goal": "Bounded failure behavior under dependency failure and load.",
+   "requirements": [
+    "M07"
+   ],
+   "tests": [
+    "T17"
+   ],
+   "depends_on": [
+    "WP-105",
+    "WP-108"
+   ],
+   "deliverables": [
+    "Timeouts, retries within a budget, circuit breakers, bulkheads, rate limits, load shedding",
+    "Proof that committed work is neither lost nor duplicated under overload"
+   ],
+   "reuse": [
+    "SmallRye Fault Tolerance"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-111",
+   "phase": 1,
+   "title": "Audit trail and provenance",
+   "size": "M",
+   "type": "build",
+   "goal": "Tamper-evident record of who decided what, with which versions.",
+   "requirements": [
+    "M15"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-101"
+   ],
+   "deliverables": [
+    "Append-only events with hash chain; verification job",
+    "Payload redaction or reference per retention rule",
+    "Version stamps for model, prompt, tool, policy and definition",
+    "Query API"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-112",
+   "phase": 1,
+   "title": "Observability",
+   "size": "M",
+   "type": "build",
+   "goal": "One correlated view across workflow, agent, tool and model.",
+   "requirements": [
+    "M16"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-105"
+   ],
+   "deliverables": [
+    "OpenTelemetry traces across Flow, graph, tool and model calls",
+    "Micrometer metrics, structured logs, dashboards as code"
+   ],
+   "reuse": [
+    "quarkus-flow-opentelemetry",
+    "langgraph4j-opentelemetry",
+    "quarkus-opentelemetry"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-113",
+   "phase": 1,
+   "title": "Enterprise service adapters",
+   "size": "M",
+   "type": "build",
+   "goal": "Call existing services through documented, bounded contracts.",
+   "requirements": [
+    "M23"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-103",
+    "WP-108"
+   ],
+   "deliverables": [
+    "OpenAPI-based adapters with timeout contract, error mapping and correlation"
+   ],
+   "reuse": [
+    "quarkus-rest-client"
+   ],
+   "notes": "T05 is closed in WP-207 once MCP and A2A exist."
+  },
+  {
+   "id": "WP-201",
+   "phase": 2,
+   "title": "Agent runtime and graph catalog",
+   "size": "L",
+   "type": "build",
+   "goal": "A standard, governed way to run agents.",
+   "requirements": [
+    "M29",
+    "M19",
+    "M03"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-004",
+    "WP-005",
+    "WP-101",
+    "WP-103",
+    "WP-111"
+   ],
+   "deliverables": [
+    "Graph patterns: tool-using agent, plan-and-execute, supervisor",
+    "ModelGateway replacing LlmClient",
+    "Node interceptors for limits, policy and audit",
+    "Checkpointing with state-schema versioning"
+   ],
+   "reuse": [
+    "LangGraph4j",
+    "LangChain4j"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-202",
+   "phase": 2,
+   "title": "Budgets and limits",
+   "size": "M",
+   "type": "build",
+   "goal": "Agents cannot exceed their approved bounds.",
+   "requirements": [
+    "M02"
+   ],
+   "tests": [
+    "T06"
+   ],
+   "depends_on": [
+    "WP-201"
+   ],
+   "deliverables": [
+    "BudgetMeter for tokens, cost, time, iterations and tool calls enforced at gateways and in the graph",
+    "Escalation on exhaustion"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-203",
+   "phase": 2,
+   "title": "Planning and re-planning",
+   "size": "L",
+   "type": "build",
+   "goal": "Agents decompose goals at runtime and adapt.",
+   "requirements": [
+    "M29",
+    "M15",
+    "M28"
+   ],
+   "tests": [
+    "T34",
+    "T26"
+   ],
+   "depends_on": [
+    "WP-201",
+    "WP-202",
+    "WP-204"
+   ],
+   "deliverables": [
+    "Plan as versioned state; every plan change recorded",
+    "Execution restricted to permitted tools",
+    "Re-plan on failure or new information; recover after a crash mid-plan"
+   ],
+   "reuse": [
+    "LangGraph4j"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-204",
+   "phase": 2,
+   "title": "Tool gateway and MCP",
+   "size": "L",
+   "type": "build",
+   "goal": "One non-bypassable place where tools are called.",
+   "requirements": [
+    "M30",
+    "M23",
+    "M14"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-007",
+    "WP-103",
+    "WP-113",
+    "WP-201"
+   ],
+   "deliverables": [
+    "Tool registry (basic) and ToolGateway: allow-list, input and output schema validation, policy check, audit",
+    "MCP client with secured authentication"
+   ],
+   "reuse": [
+    "quarkus-langchain4j-mcp",
+    "oidc-mcp-auth-provider"
+   ],
+   "notes": "Generalized into the governed inventory by WP-301."
+  },
+  {
+   "id": "WP-205",
+   "phase": 2,
+   "title": "Knowledge and unstructured input",
+   "size": "L",
+   "type": "build",
+   "goal": "Answer from enterprise knowledge with citations and permissions.",
+   "requirements": [
+    "M30",
+    "M14"
+   ],
+   "tests": [
+    "T35"
+   ],
+   "depends_on": [
+    "WP-102",
+    "WP-201",
+    "WP-204"
+   ],
+   "deliverables": [
+    "Ingestion of documents, e-mail and attachments",
+    "pgvector store with access-control metadata",
+    "Retrieval with citations; structured extraction with validation"
+   ],
+   "reuse": [
+    "quarkus-langchain4j-pgvector",
+    "document parsers"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-206",
+   "phase": 2,
+   "title": "Memory service",
+   "size": "L",
+   "type": "build",
+   "goal": "Scoped, consented, bounded memory.",
+   "requirements": [
+    "M19",
+    "H25"
+   ],
+   "tests": [
+    "T08",
+    "T15"
+   ],
+   "depends_on": [
+    "WP-102",
+    "WP-111",
+    "WP-201"
+   ],
+   "deliverables": [
+    "Short-term (checkpoint) and long-term memory scoped to user, instance and tenant",
+    "Provenance, retention, erasure, compaction",
+    "Recovery of correctly scoped memory under reauthorized identity"
+   ],
+   "reuse": [
+    "quarkus-langchain4j-memory-store"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-207",
+   "phase": 2,
+   "title": "Multi-agent collaboration and A2A",
+   "size": "L",
+   "type": "build",
+   "goal": "Supervisors delegate safely to specialists, including external agents.",
+   "requirements": [
+    "M31",
+    "M23",
+    "M11"
+   ],
+   "tests": [
+    "T36",
+    "T25",
+    "T05"
+   ],
+   "depends_on": [
+    "WP-102",
+    "WP-105",
+    "WP-203",
+    "WP-204"
+   ],
+   "deliverables": [
+    "Supervisor and specialist graphs; handoff with explicit context",
+    "Scoped authority passed down; depth and cycle limits",
+    "A2A server and client; shared progress view"
+   ],
+   "reuse": [
+    "A2A Java SDK",
+    "langgraph4j-lc4j-agent-handoff"
+   ],
+   "notes": "T05 needs both an MCP tool and an A2A agent."
+  },
+  {
+   "id": "WP-208",
+   "phase": 2,
+   "title": "Interactive human-agent collaboration",
+   "size": "L",
+   "type": "build",
+   "goal": "People converse with, redirect and take over running agents.",
+   "requirements": [
+    "M32",
+    "M05",
+    "M03"
+   ],
+   "tests": [
+    "T37"
+   ],
+   "depends_on": [
+    "WP-004",
+    "WP-106",
+    "WP-201"
+   ],
+   "deliverables": [
+    "Conversation API with streaming",
+    "Clarifying questions through durable interrupts that survive restart",
+    "Redirect and takeover"
+   ],
+   "reuse": [
+    "langgraph4j-ag-ui-sdk",
+    "quarkus-langchain4j-websockets-next"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-209",
+   "phase": 2,
+   "title": "Untrusted input defense and sandbox",
+   "size": "M",
+   "type": "build",
+   "goal": "Treat model output, retrieved content and tool results as hostile.",
+   "requirements": [
+    "M14"
+   ],
+   "tests": [
+    "T09"
+   ],
+   "depends_on": [
+    "WP-204",
+    "WP-205"
+   ],
+   "deliverables": [
+    "Prompt and tool-result injection corpus",
+    "Guardrails and output validation",
+    "Code execution off by default; optional isolated job runner with explicit grants"
+   ],
+   "reuse": [
+    "quarkus-langchain4j guardrails"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-301",
+   "phase": 3,
+   "title": "Governance registry and AI inventory",
+   "size": "L",
+   "type": "build",
+   "goal": "Know every agent, prompt, model binding, tool and MCP server.",
+   "requirements": [
+    "M18",
+    "M02"
+   ],
+   "tests": [
+    "T04"
+   ],
+   "depends_on": [
+    "WP-111",
+    "WP-204"
+   ],
+   "deliverables": [
+    "Artifact model with owner, purpose, risk tier, version, status",
+    "Runtime enforcement: only approved, inventoried artifacts and endpoints",
+    "Inventory queries and traceability of decisions to versions"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-302",
+   "phase": 3,
+   "title": "Version pinning of in-flight work",
+   "size": "L",
+   "type": "build",
+   "goal": "New releases never change the meaning of running work.",
+   "requirements": [
+    "M09"
+   ],
+   "tests": [
+    "T14",
+    "T28"
+   ],
+   "depends_on": [
+    "WP-105",
+    "WP-301"
+   ],
+   "deliverables": [
+    "Instances pin definition, prompt, model, tool, policy and configuration versions",
+    "v1 continues through v2 rollout and rollback"
+   ],
+   "reuse": [
+    "Flow definition versions"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-303",
+   "phase": 3,
+   "title": "Governed publication and activation",
+   "size": "L",
+   "type": "build",
+   "goal": "Controlled, integrity-checked, reversible change.",
+   "requirements": [
+    "M10",
+    "M18"
+   ],
+   "tests": [
+    "T19",
+    "T30"
+   ],
+   "depends_on": [
+    "WP-301",
+    "WP-302",
+    "WP-304"
+   ],
+   "deliverables": [
+    "Bundle validation, approval workflow, integrity check, staged activation, rollback, evidence",
+    "Secret rotation within a release"
+   ],
+   "reuse": [
+    "Sigstore or digest verification"
+   ],
+   "notes": "No bundle format is mandated by M10."
+  },
+  {
+   "id": "WP-304",
+   "phase": 3,
+   "title": "Separation of authority and admin-outage safety",
+   "size": "L",
+   "type": "build",
+   "goal": "Authors, approvers and operators have separate privileges; the runtime keeps working without the control application.",
+   "requirements": [
+    "M26",
+    "M27"
+   ],
+   "tests": [
+    "T22",
+    "T32"
+   ],
+   "depends_on": [
+    "WP-001",
+    "WP-103",
+    "WP-301"
+   ],
+   "deliverables": [
+    "Roles and database privileges for author, approver, operator, runtime",
+    "Runtime runs from the last approved snapshot within a freshness policy",
+    "Fail closed for operations that need fresh authorization or emergency revocation"
+   ],
+   "reuse": [],
+   "notes": "One codebase, two deployable roles, co-deployable (see ADR 0017)."
+  },
+  {
+   "id": "WP-305",
+   "phase": 3,
+   "title": "Emergency containment and AI incidents",
+   "size": "L",
+   "type": "build",
+   "goal": "Stop a bad agent, tool or model quickly, then learn from it.",
+   "requirements": [
+    "M20"
+   ],
+   "tests": [
+    "T11"
+   ],
+   "depends_on": [
+    "WP-105",
+    "WP-301",
+    "WP-304"
+   ],
+   "deliverables": [
+    "Revocation of an agent, tool or model binding across active and waiting tasks within a bound",
+    "Does not need an AI assistant or the authoring service",
+    "Incident record, severity, reporting hook, review, regression case"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-306",
+   "phase": 3,
+   "title": "Data security and privacy",
+   "size": "L",
+   "type": "build",
+   "goal": "Protect state, memory, prompts and audit data in transit and at rest.",
+   "requirements": [
+    "M13"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-111",
+    "WP-206"
+   ],
+   "deliverables": [
+    "TLS everywhere; encryption at rest; application-level encryption for sensitive payloads; key management",
+    "Retention and erasure jobs",
+    "Location constraints for models, tools and backups"
+   ],
+   "reuse": [],
+   "notes": "T20 is closed with tenancy in WP-404."
+  },
+  {
+   "id": "WP-307",
+   "phase": 3,
+   "title": "Supply-chain integrity",
+   "size": "M",
+   "type": "build",
+   "goal": "Know what is deployed and where it came from.",
+   "requirements": [
+    "M18",
+    "H23"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-001",
+    "WP-303"
+   ],
+   "deliverables": [
+    "CycloneDX SBOM, dependency and licence scans",
+    "Signed images (cosign); provenance for definitions, models and tools"
+   ],
+   "reuse": [
+    "CycloneDX",
+    "cosign"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-401",
+   "phase": 4,
+   "title": "Backup, restore and disaster recovery",
+   "size": "M",
+   "type": "ops",
+   "goal": "Prove recovery, not assume it.",
+   "requirements": [
+    "M08"
+   ],
+   "tests": [
+    "T18"
+   ],
+   "depends_on": [
+    "WP-108",
+    "WP-111"
+   ],
+   "deliverables": [
+    "Backup strategy (PITR or dump plus WAL); automated restore drill",
+    "Documented and measured RTO and RPO",
+    "Restored instances do not replay irreversible effects (ledger markers)"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-402",
+   "phase": 4,
+   "title": "Safe upgrades",
+   "size": "M",
+   "type": "ops",
+   "goal": "Upgrade and roll back without corrupting in-flight work.",
+   "requirements": [
+    "M21",
+    "H11"
+   ],
+   "tests": [
+    "T24"
+   ],
+   "depends_on": [
+    "WP-105",
+    "WP-302"
+   ],
+   "deliverables": [
+    "Expand/contract database migrations; API versioning; N-1 compatibility",
+    "Rolling upgrade test with in-flight instances and checkpoints"
+   ],
+   "reuse": [
+    "Flyway"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-403",
+   "phase": 4,
+   "title": "Deployment and provider independence",
+   "size": "L",
+   "type": "ops",
+   "goal": "Run in several self-hosted environments, including offline.",
+   "requirements": [
+    "M22"
+   ],
+   "tests": [
+    "T21"
+   ],
+   "depends_on": [
+    "WP-001",
+    "WP-201"
+   ],
+   "deliverables": [
+    "OCI images; Helm or Kustomize for OpenShift and plain Kubernetes; dev compose",
+    "Air-gapped bundle with a self-hosted model; health and readiness probes"
+   ],
+   "reuse": [
+    "Helm",
+    "Ollama or vLLM"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-404",
+   "phase": 4,
+   "title": "Multi-tenancy",
+   "size": "L",
+   "type": "build",
+   "goal": "Isolation when more than one tenant is hosted.",
+   "requirements": [
+    "M24"
+   ],
+   "tests": [
+    "T20"
+   ],
+   "depends_on": [
+    "WP-102",
+    "WP-206",
+    "WP-306"
+   ],
+   "deliverables": [
+    "Tenant context; Postgres row-level security; per-tenant secrets and keys; memory and telemetry isolation"
+   ],
+   "reuse": [
+    "PostgreSQL RLS"
+   ],
+   "notes": "Single-tenant stays the default."
+  },
+  {
+   "id": "WP-405",
+   "phase": 4,
+   "title": "Scale and performance",
+   "size": "L",
+   "type": "ops",
+   "goal": "Evidence for horizontal scale.",
+   "requirements": [
+    "H04",
+    "H14"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-109",
+    "WP-110"
+   ],
+   "deliverables": [
+    "Load and soak tests: many waiting instances and due timers",
+    "Tuning guide and capacity model"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-406",
+   "phase": 4,
+   "title": "Event broker integration",
+   "size": "M",
+   "type": "build",
+   "goal": "First-class Kafka and compatible messaging.",
+   "requirements": [
+    "H07",
+    "H03"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-107"
+   ],
+   "deliverables": [
+    "Flow messaging with Kafka/AMQP; reliable subscriptions; correlation"
+   ],
+   "reuse": [
+    "quarkus-flow-messaging"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-501",
+   "phase": 5,
+   "title": "Evaluation gate",
+   "size": "L",
+   "type": "build",
+   "goal": "No material AI change reaches production without evidence.",
+   "requirements": [
+    "M17"
+   ],
+   "tests": [
+    "T10",
+    "T31"
+   ],
+   "depends_on": [
+    "WP-303",
+    "WP-305"
+   ],
+   "deliverables": [
+    "Versioned datasets, scorers and judges; security evaluations",
+    "Gate in CI and in publication",
+    "Model retirement and substitution policy"
+   ],
+   "reuse": [
+    "quarkus-langchain4j-testing-evaluation"
+   ],
+   "notes": ""
+  },
+  {
+   "id": "WP-502",
+   "phase": 5,
+   "title": "Production quality monitoring",
+   "size": "L",
+   "type": "build",
+   "goal": "Detect quality drops in production.",
+   "requirements": [
+    "M33",
+    "H13"
+   ],
+   "tests": [
+    "T38"
+   ],
+   "depends_on": [
+    "WP-112",
+    "WP-305",
+    "WP-501"
+   ],
+   "deliverables": [
+    "Sampled automatic evaluation of outputs and trajectories; feedback capture; review queue",
+    "Alerts linked to the gate and to containment"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-503",
+   "phase": 5,
+   "title": "Model routing and choice",
+   "size": "L",
+   "type": "build",
+   "goal": "Pick models by configuration and route by task, risk and cost.",
+   "requirements": [
+    "M34",
+    "M17",
+    "M22"
+   ],
+   "tests": [
+    "T39"
+   ],
+   "depends_on": [
+    "WP-301",
+    "WP-306",
+    "WP-501"
+   ],
+   "deliverables": [
+    "Named model bindings; providers including self-hosted; routing rules; fallback",
+    "Per-model evaluation evidence; location constraints"
+   ],
+   "reuse": [
+    "Quarkus LangChain4j providers",
+    "optional external gateway"
+   ],
+   "notes": "An external model gateway is an option, not a dependency."
+  },
+  {
+   "id": "WP-504",
+   "phase": 5,
+   "title": "Cost and usage governance",
+   "size": "M",
+   "type": "build",
+   "goal": "Budgets and attribution beyond hard per-task limits.",
+   "requirements": [
+    "H09"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-202",
+    "WP-503"
+   ],
+   "deliverables": [
+    "Usage and cost attribution; dashboards; budget alerts"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-601",
+   "phase": 6,
+   "title": "Authoring lifecycle and plan promotion",
+   "size": "L",
+   "type": "build",
+   "goal": "A reproducible path from artifact to production.",
+   "requirements": [
+    "M25",
+    "M01",
+    "M02",
+    "M26",
+    "H12"
+   ],
+   "tests": [
+    "T29",
+    "T33"
+   ],
+   "depends_on": [
+    "WP-303",
+    "WP-501"
+   ],
+   "deliverables": [
+    "Artifact repository layout; CLI or Maven plugin to validate, test, simulate and package",
+    "Fixtures; reproducible builds",
+    "Promotion service: a runtime-generated plan becomes a candidate artifact only through review"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-602",
+   "phase": 6,
+   "title": "Coexistence and shadow runs",
+   "size": "L",
+   "type": "build",
+   "goal": "Modernize beside a legacy process safely.",
+   "requirements": [
+    "H19",
+    "M06",
+    "M23"
+   ],
+   "tests": [
+    "T27"
+   ],
+   "depends_on": [
+    "WP-108",
+    "WP-302"
+   ],
+   "deliverables": [
+    "Shadow mode with effects disabled by the ledger",
+    "Decision comparison; cohort cutover; reversal; reconciliation"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-603",
+   "phase": 6,
+   "title": "Operator console and approver inbox",
+   "size": "XL",
+   "type": "build",
+   "goal": "Useful UI over stable APIs.",
+   "requirements": [
+    "H05"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-105",
+    "WP-106",
+    "WP-208",
+    "WP-301",
+    "WP-303"
+   ],
+   "deliverables": [
+    "Technology decision (server-rendered or TypeScript SPA)",
+    "Runs, tasks, conversations, inventory, approvals, incidents"
+   ],
+   "reuse": [
+    "Qute or React"
+   ],
+   "notes": "Every action goes through an authorized, audited API."
+  },
+  {
+   "id": "WP-604",
+   "phase": 6,
+   "title": "Governance assistant",
+   "size": "L",
+   "type": "build",
+   "goal": "An embedded agent for operators, under the same controls.",
+   "requirements": [
+    "O01",
+    "H22"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-102",
+    "WP-111",
+    "WP-603"
+   ],
+   "deliverables": [
+    "Explanation, investigation and change proposals",
+    "Acts as the user; every action authorized and audited (ADR 0004)"
+   ],
+   "reuse": [],
+   "notes": "Optional; delivered because administration through an agent was an explicit goal."
+  },
+  {
+   "id": "WP-605",
+   "phase": 6,
+   "title": "OWS conformance and portability",
+   "size": "M",
+   "type": "build",
+   "goal": "Know how portable the definitions really are.",
+   "requirements": [
+    "H01",
+    "H02"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-104"
+   ],
+   "deliverables": [
+    "Conformance test run; vendor-extension inventory; import, export and round-trip loss report"
+   ],
+   "reuse": [],
+   "notes": ""
+  },
+  {
+   "id": "WP-606",
+   "phase": 6,
+   "title": "Replay, simulation and explanations",
+   "size": "L",
+   "type": "build",
+   "goal": "Deterministic replay and richer explanations.",
+   "requirements": [
+    "H08",
+    "H06"
+   ],
+   "tests": [],
+   "depends_on": [
+    "WP-111",
+    "WP-601"
+   ],
+   "deliverables": [
+    "Replay with recorded model and tool fixtures; what-if runs; reviewer-facing explanations"
+   ],
+   "reuse": [],
+   "notes": "Lowest priority."
+  }
+ ],
+ "deferred": [
+  {
+   "ids": [
+    "H10"
+   ],
+   "reason": "Automatic migration of in-flight work is a preference; pinning (M09) is mandatory and planned.",
+   "revisit": "After WP-302 shows how often pinned work lingers."
+  },
+  {
+   "ids": [
+    "H15"
+   ],
+   "reason": "Cells and strong isolation are justified only by scale evidence from WP-405.",
+   "revisit": "If load tests show noisy-neighbor impact."
+  },
+  {
+   "ids": [
+    "H16"
+   ],
+   "reason": "Self-service tenancy administration; M24 isolation is planned.",
+   "revisit": "When a second tenant is real."
+  },
+  {
+   "ids": [
+    "H17"
+   ],
+   "reason": "Dynamic activation of more artifact types; staged activation exists in WP-303.",
+   "revisit": "After M3."
+  },
+  {
+   "ids": [
+    "H18"
+   ],
+   "reason": "Automated AI incident triage and red-team operations build on WP-305 and WP-501.",
+   "revisit": "After M5."
+  },
+  {
+   "ids": [
+    "H20"
+   ],
+   "reason": "Multilingual evaluation depends on the languages actually served.",
+   "revisit": "When the language set is known."
+  },
+  {
+   "ids": [
+    "H21"
+   ],
+   "reason": "Multiple runtimes are not needed while one runtime serves all scenarios.",
+   "revisit": "If a second runtime is proposed."
+  },
+  {
+   "ids": [
+    "O02",
+    "O03",
+    "O04",
+    "O05"
+   ],
+   "reason": "Optional items that add cost without evidence: separate authoring server, physical cells, universal hot swap, custom orchestration engine (ADR 0008 reuses a proven engine).",
+   "revisit": "Only with evidence."
+  }
+ ]
+}

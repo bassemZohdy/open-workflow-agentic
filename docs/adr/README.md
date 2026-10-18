@@ -1,6 +1,6 @@
 # Architecture decision records
 
-Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of the requirements set. Project decisions (ADR 0008 onward) record how this repository implements them.
+Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of the requirements set. Project decisions (ADR 0008 onward; 0016 to 0018 concern delivery) record how this repository implements them.
 
 | ADR | Title | Status |
 |---|---|---|
@@ -19,5 +19,8 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 | [0013](0013-use-db-scheduler-for-time-based-triggers.md) | Use db-scheduler for time-based triggers | Accepted for the proof of concept |
 | [0014](0014-bridge-workflow-to-agent-over-a-narrow-http-contract.md) | Bridge workflow to agent over a narrow HTTP contract | Accepted as an interim step |
 | [0015](0015-specify-requirements-and-tests-as-data-render-documents-from-it.md) | Specify requirements and tests as data, render documents from it | Accepted |
+| [0016](0016-deliver-in-vertical-slices-with-spikes-first.md) | Deliver in vertical slices by scenario, spikes first | Proposed |
+| [0017](0017-one-codebase-two-deployable-roles-with-enforced-boundaries.md) | One codebase, two deployable roles, boundaries enforced by the build | Proposed |
+| [0018](0018-plan-is-data-and-checked.md) | Keep the implementation plan as validated data | Proposed |
 
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.

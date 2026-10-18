@@ -15,4 +15,4 @@ Start with an OWS `call: http` task to `POST /agents/research` (JSON in, JSON ou
 
 - Simple, testable, replaceable on either side.
 - Adds a local HTTP hop and requires authority propagation to be designed explicitly (M11).
-- Revisit in proof of concept item 7.
+- Revisit in spike WP-005 and, if replaced, in WP-105 (see the [implementation plan](../plan/README.md)).

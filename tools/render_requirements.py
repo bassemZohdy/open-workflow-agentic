@@ -12,6 +12,17 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 DIR = ROOT / "docs" / "requirements"
 D = json.loads((DIR / "requirements.json").read_text(encoding="utf-8"))
 STATUS = json.loads((DIR / "test-status.json").read_text(encoding="utf-8"))
+PLAN = json.loads((ROOT / "docs" / "plan" / "work-packages.json").read_text(encoding="utf-8"))
+WPS = {w["id"]: w for w in PLAN["work_packages"]}
+SIZE = PLAN["meta"]["sizes"]
+TEST_OWNER = {}
+REQ_WPS = {}
+for _w in PLAN["work_packages"]:
+    for _t in _w["tests"]:
+        TEST_OWNER.setdefault(_t, []).append(_w["id"])
+    for _r in _w["requirements"]:
+        REQ_WPS.setdefault(_r, []).append(_w["id"])
+DEFERRED = {i: d for d in PLAN["deferred"] for i in d["ids"]}
 
 REQ = {r["id"]: r for k in ("mandatory", "high", "optional") for r in D[k]}
 TESTS = [dict(t, scenario=s["id"], scenario_title=s["title"]) for s in D["scenarios"] for t in s["tests"]]
@@ -42,11 +53,12 @@ def requirements_md():
             ("high", "High-priority requirements", "Expected for a production platform; a gap needs a documented mitigation."),
             ("optional", "Optional requirements", "Valuable when enabled; constraints apply only when the capability is on.")):
         o += ["", f"## {title}", "", intro, "",
-              "| ID | Title | Requirement | Scenarios | Verified by |", "|---|---|---|---|---|"]
+              "| ID | Title | Requirement | Scenarios | Verified by | Work packages |", "|---|---|---|---|---|---|"]
         for r in D[key]:
-            o.append("| %s | %s | %s | %s | %s |" % (
+            o.append("| %s | %s | %s | %s | %s | %s |" % (
                 r["id"], cell(r["title"]), cell(r["requirement"]),
-                ", ".join(r.get("scenarios", [])) or "-", ", ".join(BY_REQ.get(r["id"], [])) or "-"))
+                ", ".join(r.get("scenarios", [])) or "-", ", ".join(BY_REQ.get(r["id"], [])) or "-",
+                ", ".join(REQ_WPS.get(r["id"], [])) or ("deferred" if r["id"] in DEFERRED else "-")))
     o += ["", "## Deployment profiles", "",
           "Profiles switch extra requirements on for specific deployments.", "",
           "| ID | Profile | Effect | Activated when |", "|---|---|---|---|"]
@@ -74,10 +86,10 @@ def tests_md_full():
          "Status values: `not-started`, `planned`, `partial`, `automated`.", ""]
     for s in D["scenarios"]:
         o += [f"## {s['id']} · {s['title']}", "", s["purpose"], "",
-              "| Test | Description | Verifies | Status | Automated in |", "|---|---|---|---|---|"]
+              "| Test | Description | Verifies | Owner WP | Status | Automated in |", "|---|---|---|---|---|---|"]
         for t in s["tests"]:
             st = STATUS.get(t["id"], {"status": "not-started", "where": ""})
-            o.append("| %s | %s | %s | %s | %s |" % (t["id"], cell(t["description"]), ", ".join(t["verifies"]), st["status"], cell(st["where"]) or "-"))
+            o.append("| %s | %s | %s | %s | %s | %s |" % (t["id"], cell(t["description"]), ", ".join(t["verifies"]), ", ".join(TEST_OWNER.get(t["id"], [])) or "-", st["status"], cell(st["where"]) or "-"))
         o.append("")
     return "\n".join(o)
 
@@ -93,12 +105,12 @@ def trace_md():
     o += ["| Status | Tests |", "|---|---:|"] + [f"| {k} | {v} |" for k, v in sorted(counts.items())]
     uncovered = [rid for rid in REQ if rid not in BY_REQ]
     o += ["", "## Requirement coverage", "",
-          "| Requirement | Level | Tests | Best test status |", "|---|---|---|---|"]
+          "| Requirement | Level | Tests | Work packages | Best test status |", "|---|---|---|---|---|"]
     rank = {"automated": 3, "partial": 2, "planned": 1, "not-started": 0}
     for rid, r in REQ.items():
         ts = BY_REQ.get(rid, [])
         best = max((STATUS.get(t, {}).get("status", "not-started") for t in ts), key=lambda x: rank[x], default="no test")
-        o.append("| %s %s | %s | %s | %s |" % (rid, cell(r["title"]), {"M": "Mandatory", "H": "High", "O": "Optional"}[rid[0]], ", ".join(ts) or "-", best))
+        o.append("| %s %s | %s | %s | %s | %s |" % (rid, cell(r["title"]), {"M": "Mandatory", "H": "High", "O": "Optional"}[rid[0]], ", ".join(ts) or "-", ", ".join(REQ_WPS.get(rid, [])) or ("deferred" if rid in DEFERRED else "-"), best))
     o += ["", "## Requirements without a dedicated acceptance test", "",
           ", ".join(uncovered) if uncovered else "None.", "",
           "Requirements without a test are not untested by intent: High and Optional items are normally verified "
@@ -106,8 +118,103 @@ def trace_md():
     return "\n".join(o) + "\n"
 
 
+def validate_plan():
+    errs = []
+    ids = {t["id"] for t in TESTS}
+    for t in sorted(ids):
+        n = len(TEST_OWNER.get(t, []))
+        if n != 1:
+            errs.append(f"test {t} has {n} owning work packages (needs exactly 1)")
+    for t in TEST_OWNER:
+        if t not in ids:
+            errs.append(f"unknown test {t}")
+    for rid, r in REQ.items():
+        if rid[0] == "M" and rid not in REQ_WPS:
+            errs.append(f"mandatory {rid} has no work package")
+        if rid[0] in "HO" and rid not in REQ_WPS and rid not in DEFERRED:
+            errs.append(f"{rid} is neither planned nor deferred")
+        if rid in REQ_WPS and rid in DEFERRED:
+            errs.append(f"{rid} is both planned and deferred")
+    for w in PLAN["work_packages"]:
+        for r in w["requirements"]:
+            if r not in REQ:
+                errs.append(f"{w['id']}: unknown requirement {r}")
+        for d in w["depends_on"]:
+            if d not in WPS:
+                errs.append(f"{w['id']}: unknown dependency {d}")
+            elif WPS[d]["phase"] > w["phase"]:
+                errs.append(f"{w['id']}: depends on later-phase {d}")
+        if w["size"] not in SIZE:
+            errs.append(f"{w['id']}: bad size")
+    # cycle check
+    state = {}
+    def visit(n, path):
+        if state.get(n) == 2:
+            return
+        if state.get(n) == 1:
+            errs.append("dependency cycle: " + " -> ".join(path + [n]))
+            return
+        state[n] = 1
+        for d in WPS[n]["depends_on"]:
+            if d in WPS:
+                visit(d, path + [n])
+        state[n] = 2
+    for n in WPS:
+        visit(n, [])
+    if errs:
+        sys.exit("plan errors:\n  " + "\n  ".join(errs))
+
+
+def critical_path():
+    best = {}
+    def finish(n):
+        if n in best:
+            return best[n]
+        w = WPS[n]
+        pre = max((finish(d) for d in w["depends_on"]), default=(0, []))
+        best[n] = (pre[0] + SIZE[w["size"]], pre[1] + [n])
+        return best[n]
+    return max((finish(n) for n in WPS), key=lambda x: x[0])
+
+
+def plan_md():
+    total = sum(SIZE[w["size"]] for w in PLAN["work_packages"])
+    cp_days, cp = critical_path()
+    m = PLAN["meta"]
+    o = ["# Work packages", "",
+         f"**Version:** {m['version']} · **Date:** {m['date']} · **Status:** {m['status']}  ",
+         "Generated by `tools/render_requirements.py` from [`work-packages.json`](work-packages.json). Narrative and rationale are in [README.md](README.md).", "",
+         f"{len(WPS)} work packages in {len(PLAN['phases'])} phases. {m['size_note']}", "",
+         "| Size | Days |", "|---|---:|"] + [f"| {k} | {v} |" for k, v in SIZE.items()]
+    o += ["", "## Effort by phase", "", "| Phase | Work packages | Spikes | Effort (days) | Milestone |", "|---|---:|---:|---:|---|"]
+    for ph in PLAN["phases"]:
+        ws = [w for w in PLAN["work_packages"] if w["phase"] == ph["id"]]
+        o.append("| %d %s | %d | %d | %d | %s |" % (ph["id"], ph["name"], len(ws), sum(w["type"] == "spike" for w in ws), sum(SIZE[w["size"]] for w in ws), ph["milestone"]))
+    o.append("| **Total** | **%d** | | **%d** | |" % (len(WPS), total))
+    o += ["", f"Critical path: {cp_days} days of sequential work.  ", "`" + " -> ".join(cp) + "`", "",
+          "With parallel work the calendar length approaches the critical path plus integration overhead; a single engineer needs the full total."]
+    for ph in PLAN["phases"]:
+        o += ["", f"## Phase {ph['id']}: {ph['name']}", "", ph["goal"], "", f"**Milestone:** {ph['milestone']}", "", "**Exit criteria**", ""]
+        o += [f"- {e}" for e in ph["exit"]]
+        o += ["", "| WP | Title | Type | Size | Requirements | Owns tests | Depends on |", "|---|---|---|---|---|---|---|"]
+        for w in PLAN["work_packages"]:
+            if w["phase"] == ph["id"]:
+                o.append("| %s | %s | %s | %s | %s | %s | %s |" % (w["id"], cell(w["title"]), w["type"], w["size"], ", ".join(w["requirements"]) or "-", ", ".join(w["tests"]) or "-", ", ".join(w["depends_on"]) or "-"))
+        for w in PLAN["work_packages"]:
+            if w["phase"] == ph["id"]:
+                o += ["", f"### {w['id']} {w['title']}", "", w["goal"], "", "Deliverables:", ""] + [f"- {d}" for d in w["deliverables"]]
+                if w["reuse"]:
+                    o += ["", "Reuse: " + ", ".join(w["reuse"])]
+                if w["notes"]:
+                    o += ["", "Notes: " + w["notes"]]
+    o += ["", "## Deferred or not planned", "", "| Requirements | Reason | Revisit when |", "|---|---|---|"]
+    o += ["| %s | %s | %s |" % (", ".join(d["ids"]), cell(d["reason"]), cell(d["revisit"])) for d in PLAN["deferred"]]
+    return "\n".join(o) + "\n"
+
+validate_plan()
+
 OUT = {DIR / "README.md": requirements_md(), DIR.parent / "test-cases.md": tests_md_full() + "\n",
-       DIR.parent / "traceability.md": trace_md()}
+       DIR.parent / "traceability.md": trace_md(), DIR.parent / "plan" / "work-packages.md": plan_md()}
 if "--check" in sys.argv:
     bad = [str(p) for p, c in OUT.items() if not p.exists() or p.read_text(encoding="utf-8") != c]
     if bad:
@@ -115,5 +222,6 @@ if "--check" in sys.argv:
     print("requirements docs up to date")
 else:
     for p, c in OUT.items():
+        p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(c, encoding="utf-8")
         print("wrote", p.relative_to(ROOT))
