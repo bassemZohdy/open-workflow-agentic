@@ -38,9 +38,9 @@ Add the test dependency to the module's pom:
 
 The extension cannot write `test-status.json` directly, because the test run may be partial or fail. Instead:
 
-1. The extension writes one marker per annotated method to `<module>/target/acceptance-markers/<class>.tsv`. Surefire 3.5.3 does not put JUnit report entries into its XML, so the markers are the link between the annotation and the report.
-2. Surefire writes `<module>/target/surefire-reports/TEST-*.xml` as usual.
-3. `AcceptanceStatus` joins the markers with the XML results of the same module and decides what changes.
+1. The extension writes one marker per annotated method to `<module>/target/acceptance-markers/<class>.tsv`. Surefire 3.5.3 does not put JUnit report entries into its XML, so the markers are the link between the annotation and the report. The same holds for Failsafe: an annotated `*IT` class writes its markers to the same directory of its module (checked with a real `mvn -B verify`; surefire and failsafe both set `basedir` to the module).
+2. Surefire writes `<module>/target/surefire-reports/TEST-*.xml` (unit tests) and Failsafe writes `<module>/target/failsafe-reports/TEST-*.xml` (integration tests, `integration-test` and `verify` phases). Both use the same format.
+3. `AcceptanceStatus` joins the markers with the XML results of the same module, from both report directories, and decides what changes.
 
 Run the full build first, then the generator from the repository root:
 
@@ -57,15 +57,18 @@ java -cp "oa-testkit/target/classes:$(cat oa-testkit/target/classpath.txt)" \
   io.github.bassemzohdy.openworkflow.agentic.testkit.acceptance.AcceptanceStatus --check
 ```
 
-`--root DIR` selects another repository root. Exit status: `0` consistent; `1` a regression, or with `--check` a pending change; `2` usage or input error (for example no reports: run `mvn -B verify` first).
+`--root DIR` selects another repository root. Exit status: `0` consistent; `1` a regression, or with `--check` a pending change; `2` usage or input error (for example no surefire or failsafe reports: run `mvn -B verify` first).
 
 Rules of the generator:
 
-- A test is **passing** when every observation of it passed. A passing test that is not `automated` is promoted to `automated`, with `where` set to `module:Class#method`.
-- A test recorded as `automated` that **fails, is skipped, or is missing** (no marker, or the method did not run) is a **regression**. The generator never lowers a status automatically and does not write the file when there is a regression.
-- The generator writes only `automated`. `planned`, `partial` and `not-started` are set by people, and their vocabulary must match `tools/render_requirements.py` (checked by a unit test).
-- Markers of classes that did not run under surefire are ignored and reported.
-- Run the full build. Running a subset with `-Dtest=...` makes the other automated tests look missing, which is a regression.
+- A test is **passing** when every observation of it passed. A passing test that is not `automated` is promoted to `automated`, with `where` set to `module:Class#method`. A test that runs in both report sets (the same method in surefire and failsafe) is one observation: it passes only if every testcase passes, and it is recorded once.
+- A test recorded as `automated` that **fails, is skipped, or is missing** is a **regression**, whichever report set it is in. Missing means: no marker, the method has no testcase in any report, or the marker's class has no entry in any report (the class did not run, or was skipped as a whole). A failsafe test that is skipped under `-DskipITs` is therefore a regression. The generator never lowers a status automatically and does not write the file when there is a regression.
+- The generator writes only `automated`. `planned`, `partial` and `not-started` are set by people, and their vocabulary must match `tools/render_requirements.py` (checked by a unit test). A planned test that fails or is missing is left alone.
+- Run the full build. Running a subset with `-Dtest=...` or `-Dit.test=...` makes the other automated tests look missing, which is a regression.
+
+Continuous integration runs `mvn -B verify` (which runs Failsafe in the `verify` phase) and then `--check`, so a failing integration test stops the build before the check, and a skipped or missing one fails the check.
+
+The integration test `ProcessRestartIT` in `app-runtime` is not annotated: no test in [test-cases.md](test-cases.md) describes what it checks (a kill and restart of the packaged application that answers health). Annotate an integration test only when a plan test describes its behaviour truthfully.
 
 ## 3. Test doubles
 

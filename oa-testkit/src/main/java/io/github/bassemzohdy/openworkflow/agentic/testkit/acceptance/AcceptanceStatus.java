@@ -13,11 +13,13 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
 /**
- * Generates docs/requirements/test-status.json from the surefire reports of a build.
+ * Generates docs/requirements/test-status.json from the surefire and failsafe reports of a build.
  *
  * <pre>
  * mvn -B verify                                   # produces the reports (run the full build, not a -Dtest subset)
@@ -78,25 +80,30 @@ public final class AcceptanceStatus {
             throws IOException {
         List<Path> modules = findModules(catalog.root());
         if (modules.isEmpty()) {
-            err.println("no surefire reports under " + catalog.root() + "; run mvn -B verify first");
+            err.println("no surefire or failsafe reports under " + catalog.root() + "; run mvn -B verify first");
             return USAGE;
         }
         List<Observation> observations = new ArrayList<>();
-        int ignored = 0;
+        int noReportEntry = 0;
         for (Path module : modules) {
             String name = catalog.root().relativize(module).toString();
             name = name.isEmpty() ? "." : name;
-            SurefireResults.Module results = SurefireResults.read(module.resolve("target/surefire-reports"));
+            SurefireResults.Module results = SurefireResults.readAll(reportDirectories(module));
             for (AcceptanceMarkers.Marker m : AcceptanceMarkers.read(module.resolve("target/" + AcceptanceMarkers.DIRECTORY))) {
-                if (!results.classesRun().contains(m.className())) {
-                    ignored++;
-                    continue;
-                }
                 if (!catalog.hasTest(m.testId())) {
                     err.println("marker for unknown acceptance test " + m.testId() + " in " + name + ": " + m.className());
                     return FAILED;
                 }
-                observations.add(new Observation(m.testId(), name, m.className(), m.method(), verdictOf(results.of(m.className(), m.method()))));
+                // A marker whose class has no entry in any report means the class did not run (or was skipped as a
+                // whole). For an automated test that is a missing test, so it is observed as MISSING.
+                Verdict verdict;
+                if (results.classesRun().contains(m.className())) {
+                    verdict = verdictOf(results.of(m.className(), m.method()));
+                } else {
+                    noReportEntry++;
+                    verdict = Verdict.MISSING;
+                }
+                observations.add(new Observation(m.testId(), name, m.className(), m.method(), verdict));
             }
         }
         Plan plan = AcceptanceStatusUpdater.plan(catalog, observations);
@@ -105,7 +112,7 @@ public final class AcceptanceStatus {
 
         int passing = (int) observations.stream().filter(o -> o.verdict() == Verdict.PASSED).count();
         out.println("annotated test methods observed: " + observations.size() + " (passing: " + passing
-                + "); markers of classes that did not run under surefire ignored: " + ignored);
+                + "); markers whose class has no entry in any surefire or failsafe report: " + noReportEntry);
         plan.changes().forEach(c -> out.println("change: " + c));
         regressions.forEach(r -> err.println("regression: " + r));
 
@@ -144,17 +151,26 @@ public final class AcceptanceStatus {
         return Verdict.PASSED;
     }
 
-    /** Module directories (the parent of a target/surefire-reports directory), searched to depth 3. */
+    /** The report directories of one module (surefire and failsafe), whether or not they exist. */
+    static List<Path> reportDirectories(Path module) {
+        return SurefireResults.REPORT_DIRECTORIES.stream().map(d -> module.resolve("target").resolve(d)).toList();
+    }
+
+    /**
+     * Module directories: the parent of a target/surefire-reports or target/failsafe-reports directory, searched to
+     * depth 3. A module that has both is listed once.
+     */
     static List<Path> findModules(Path root) throws IOException {
-        List<Path> out = new ArrayList<>();
+        Set<Path> out = new TreeSet<>();
         try (Stream<Path> walk = Files.walk(root, 3)) {
-            for (Path p : walk.filter(Files::isDirectory).filter(p -> p.getFileName().toString().equals("surefire-reports"))
+            for (Path p : walk.filter(Files::isDirectory)
+                    .filter(p -> SurefireResults.REPORT_DIRECTORIES.contains(p.getFileName().toString()))
                     .filter(p -> p.getParent() != null && p.getParent().getFileName().toString().equals("target"))
-                    .filter(p -> !pruned(root, p)).sorted().toList()) {
+                    .filter(p -> !pruned(root, p)).toList()) {
                 out.add(p.getParent().getParent());
             }
         }
-        return out;
+        return List.copyOf(out);
     }
 
     private static boolean pruned(Path root, Path p) {
