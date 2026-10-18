@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:open-workflow-agentic:schema:audit-event:v1",
+  "title": "AuditEvent",
+  "description": "One entry of the hash-chained audit log (M15). previousHash links to the preceding event (64 zeros for the first). hash is the SHA-256 of the canonical encoding of every other field (io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditHash). Chain integrity is verified by AuditHash.verifyChain, not by this schema. Mirrors AuditEvent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "sequence", "occurredAt", "actor", "action", "resourceType", "resourceId", "attributes", "previousHash", "hash"],
+  "properties": {
+    "id": { "$ref": "#/$defs/ulid" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "actor": { "$ref": "#/$defs/subject" },
+    "action": { "type": "string", "pattern": "\\S", "maxLength": 512 },
+    "resourceType": { "type": "string", "pattern": "\\S", "maxLength": 512 },
+    "resourceId": { "type": "string", "pattern": "\\S", "maxLength": 512 },
+    "attributes": {
+      "type": "object",
+      "maxProperties": 32,
+      "propertyNames": { "type": "string", "pattern": "\\S", "maxLength": 512 },
+      "additionalProperties": { "type": "string", "pattern": "\\S", "maxLength": 512 }
+    },
+    "previousHash": { "$ref": "#/$defs/sha256" },
+    "hash": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "ulid": { "type": "string", "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["USER", "AGENT", "WORKFLOW", "SERVICE"] },
+        "id": { "type": "string", "pattern": "\\S", "maxLength": 256 }
+      }
+    }
+  }
+}

@@ -6,8 +6,29 @@
   <groupId>io.github.bassemzohdy.openworkflow</groupId>
   <artifactId>open-workflow-agentic</artifactId>
   <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
   <name>open-workflow-agentic</name>
   <description>Agentic process platform: Quarkus Flow (OWS workflows) + LangGraph4j agents in one Quarkus runtime</description>
+
+  <!--
+    Module boundaries (ADR 0017, docs/plan/README.md section 2):
+      oa-contracts  pure Java, no framework dependency (checked by ArchUnit and the dependency policy)
+      oa-runtime    execution: agents, workflow glue, gateways, API conventions (must not depend on oa-control)
+      oa-control    administration: registry, publication, approvals (skeleton)
+      oa-eval       evaluation suites and gate (skeleton)
+      oa-testkit    test support for the other modules (skeleton)
+      app-runtime   deployable that serves execution (Quarkus application)
+      app-control   deployable that serves administration (skeleton)
+  -->
+  <modules>
+    <module>oa-contracts</module>
+    <module>oa-runtime</module>
+    <module>oa-control</module>
+    <module>oa-eval</module>
+    <module>oa-testkit</module>
+    <module>app-runtime</module>
+    <module>app-control</module>
+  </modules>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
@@ -18,6 +39,12 @@
     <langgraph4j.version>1.9.5</langgraph4j.version>
     <quarkus-db-scheduler.version>0.0.2</quarkus-db-scheduler.version>
     <surefire-plugin.version>3.5.3</surefire-plugin.version>
+    <compiler-plugin.version>3.14.0</compiler-plugin.version>
+    <enforcer-plugin.version>3.5.0</enforcer-plugin.version>
+    <dependency-plugin.version>3.8.1</dependency-plugin.version>
+    <jandex-plugin.version>3.2.5</jandex-plugin.version>
+    <archunit.version>1.4.1</archunit.version>
+    <json-schema-validator.version>2.0.8</json-schema-validator.version>
   </properties>
 
   <dependencyManagement>
@@ -50,62 +77,46 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+      <dependency>
+        <groupId>com.tngtech.archunit</groupId>
+        <artifactId>archunit-junit5</artifactId>
+        <version>${archunit.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <!-- Apache-2.0. Test scope only: validates the JSON Schemas of oa-contracts in tests (WP-101). -->
+      <dependency>
+        <groupId>com.networknt</groupId>
+        <artifactId>json-schema-validator</artifactId>
+        <version>${json-schema-validator.version}</version>
+        <scope>test</scope>
+      </dependency>
     </dependencies>
   </dependencyManagement>
-
-  <dependencies>
-    <!-- REST + JSON -->
-    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
-    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-smallrye-health</artifactId></dependency>
-    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-micrometer-registry-prometheus</artifactId></dependency>
-
-    <!-- Workflow engine (Control + Execution): OWS / CNCF Serverless Workflow on Quarkus -->
-    <dependency><groupId>io.quarkiverse.flow</groupId><artifactId>quarkus-flow</artifactId></dependency>
-    <dependency><groupId>io.quarkiverse.flow</groupId><artifactId>quarkus-flow-jpa</artifactId></dependency>
-
-    <!-- Persistence -->
-    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-postgresql</artifactId></dependency>
-    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-hibernate-orm</artifactId></dependency>
-
-    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-flyway</artifactId></dependency>
-    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-flyway-postgresql</artifactId></dependency>
-
-    <!-- Models, tools, memory (LangChain4j on Quarkus) -->
-    <dependency><groupId>io.quarkiverse.langchain4j</groupId><artifactId>quarkus-langchain4j-openai</artifactId></dependency>
-
-    <!-- Agent runtime: LangGraph4j embedded in the same Quarkus application -->
-    <dependency><groupId>org.bsc.langgraph4j</groupId><artifactId>langgraph4j-core</artifactId></dependency>
-    <dependency><groupId>org.bsc.langgraph4j</groupId><artifactId>langgraph4j-langchain4j</artifactId></dependency>
-    <dependency><groupId>org.bsc.langgraph4j</groupId><artifactId>langgraph4j-postgres-saver</artifactId></dependency>
-
-    <!-- Scheduler -->
-    <dependency>
-      <groupId>io.quarkiverse.db-scheduler</groupId>
-      <artifactId>quarkus-db-scheduler</artifactId>
-      <version>${quarkus-db-scheduler.version}</version>
-    </dependency>
-
-    <!-- Tests -->
-    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-junit5</artifactId><scope>test</scope></dependency>
-    <dependency><groupId>io.rest-assured</groupId><artifactId>rest-assured</artifactId><scope>test</scope></dependency>
-  </dependencies>
 
   <build>
     <plugins>
       <plugin>
-        <groupId>io.quarkus.platform</groupId>
-        <artifactId>quarkus-maven-plugin</artifactId>
-        <version>${quarkus.platform.version}</version>
-        <extensions>true</extensions>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${enforcer-plugin.version}</version>
         <executions>
           <execution>
-            <goals><goal>build</goal><goal>generate-code</goal><goal>generate-code-tests</goal></goals>
+            <id>enforce-build-rules</id>
+            <goals><goal>enforce</goal></goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion><version>[21,)</version></requireJavaVersion>
+                <requireMavenVersion><version>[3.9.0,)</version></requireMavenVersion>
+                <banDuplicatePomDependencyVersions/>
+              </rules>
+              <fail>true</fail>
+            </configuration>
           </execution>
         </executions>
       </plugin>
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.14.0</version>
+        <version>${compiler-plugin.version}</version>
         <configuration><parameters>true</parameters></configuration>
       </plugin>
       <plugin>
@@ -116,6 +127,26 @@
             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
           </systemPropertyVariables>
         </configuration>
+      </plugin>
+      <!--
+        Writes the resolved dependency list (groupId:artifactId:type:version:scope) of every module.
+        tools/check_dependency_policy.py reads these files to enforce the licence and scope policy.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>${dependency-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>record-dependencies</id>
+            <phase>verify</phase>
+            <goals><goal>list</goal></goals>
+            <configuration>
+              <outputFile>${project.build.directory}/dependency-list.txt</outputFile>
+              <sort>true</sort>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

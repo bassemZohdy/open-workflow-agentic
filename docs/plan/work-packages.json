@@ -21,7 +21,8 @@
    "exit": [
     "Multi-module build with enforced runtime/control boundary is green in CI",
     "Acceptance-test harness marks test status automatically",
-    "Spikes A to E are closed with an ADR each; unknowns are now decisions or accepted risks"
+    "Spikes A to E are closed with an ADR each; unknowns are now decisions or accepted risks",
+    "Acceptance status reporting includes Maven Failsafe reports for process-level integration tests"
    ]
   },
   {
@@ -1495,6 +1496,28 @@
    ],
    "reuse": [],
    "notes": "Lowest priority."
+  },
+  {
+   "id": "WP-008",
+   "phase": 0,
+   "title": "Failsafe acceptance reporting",
+   "size": "S",
+   "type": "build",
+   "goal": "Record acceptance tests that run as Maven integration tests.",
+   "requirements": [],
+   "tests": [],
+   "depends_on": [
+    "WP-002"
+   ],
+   "deliverables": [
+    "Collect acceptance markers and test outcomes from both Surefire and Failsafe reports",
+    "Fail CI when a previously automated integration test is missing, skipped or failing",
+    "Add generator tests for Failsafe success, failure, skip and missing-test cases"
+   ],
+   "reuse": [
+    "Maven Failsafe reports"
+   ],
+   "notes": "The process-restart test already runs in Failsafe; the current acceptance status collector scans Surefire reports only."
   }
  ],
  "deferred": [

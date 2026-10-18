@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:open-workflow-agentic:schema:human-task:v1",
+  "title": "HumanTask",
+  "description": "Work a person must do before an agent or workflow continues (M05, M32). Mirrors io.github.bassemzohdy.openworkflow.agentic.contracts.governance.HumanTask. An in-progress or completed task has an assignee. The due time must be after creation; the record enforces that, the schema cannot express it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "agentTaskId", "title", "instructions", "status", "assignee", "createdAt", "dueAt"],
+  "properties": {
+    "id": { "$ref": "#/$defs/ulid" },
+    "agentTaskId": { "anyOf": [{ "$ref": "#/$defs/ulid" }, { "type": "null" }] },
+    "title": { "type": "string", "pattern": "\\S", "maxLength": 200 },
+    "instructions": { "type": "string", "pattern": "\\S", "maxLength": 4000 },
+    "status": { "enum": ["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED", "EXPIRED"] },
+    "assignee": { "anyOf": [{ "$ref": "#/$defs/subject" }, { "type": "null" }] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "dueAt": { "anyOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "enum": ["IN_PROGRESS", "COMPLETED"] } }, "required": ["status"] },
+      "then": { "properties": { "assignee": { "type": "object" } } }
+    }
+  ],
+  "$defs": {
+    "ulid": { "type": "string", "pattern": "^[0-7][0-9A-HJKMNP-TV-Z]{25}$" },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["USER", "AGENT", "WORKFLOW", "SERVICE"] },
+        "id": { "type": "string", "pattern": "\\S", "maxLength": 256 }
+      }
+    }
+  }
+}
