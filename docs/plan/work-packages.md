@@ -40,8 +40,9 @@ Fix the repository structure and test harness, and answer the open technical que
 
 - Multi-module build with enforced runtime/control boundary is green in CI
 - Acceptance-test harness marks test status automatically
-- Spikes A to E are closed with an ADR each; unknowns are now decisions or accepted risks
+- Spikes A to E are closed with an ADR each; remaining unknowns have an owner and a validation point
 - Acceptance status reporting includes Maven Failsafe reports for process-level integration tests
+- Standalone spike tests have reproducible commands and an explicit CI or manual verification policy
 
 | WP | Title | Type | Size | Requirements | Owns tests | Depends on |
 |---|---|---|---|---|---|---|
@@ -92,12 +93,13 @@ Learn what Quarkus Flow 1.2 really provides for our requirements.
 
 Deliverables:
 
-- Written findings plus characterization tests
+- Written findings with evidence, confidence and explicit unknowns; standalone characterization tests with reproducible commands
 - ADR on how instances are started, queried, cancelled and resumed
+- Document which standalone tests run in CI and which require an isolated Postgres/database or process environment
 
 Reuse: quarkus-flow-jpa, quarkus-flow-durable-kubernetes, quarkus-flow-scheduler, quarkus-flow-messaging
 
-Notes: Questions: start by API with input; listen and emit events with durable resume after restart; timeouts and deadlines; two versions of one definition running together; instance query and cancel API; schema created by JPA module; Kubernetes lease durability; retries; calling a CDI bean as a function; how MDC and identity propagate.
+Notes: Questions: start by API with input; listen and emit events with durable resume after restart; timeouts and deadlines; two versions of one definition running together; instance query and cancel API; schema created by JPA module; Kubernetes lease durability; retries; calling a CDI bean as a function; how MDC and identity propagate. Process tests are opt-in and must only use the dedicated spike_a database; the root Maven build does not include this standalone project.
 
 ### WP-004 Spike B: LangGraph4j durability
 
@@ -168,7 +170,7 @@ Notes: The process-restart test already runs in Failsafe; the current acceptance
 
 ## Phase 1: Secure governed execution core
 
-A process that runs durably, authenticates people and agents, enforces policy outside the agent, involves humans, and survives failure with exactly-once business effects.
+A process that runs durably, authenticates people and agents, enforces policy outside the agent, involves humans, and survives failure with explicit idempotency and recovery semantics for business effects.
 
 **Milestone:** M1 Governed run (S1, S3 core)
 
@@ -216,6 +218,7 @@ Deliverables:
 - Delegation grants with scope and expiry; token exchange for short-lived credentials; no token passthrough
 - Re-authorization after long waits
 - Secret handling and rotation
+- Verify identity and correlation propagation through asynchronous Flow tasks and after resume; do not persist credentials in workflow or checkpoint state.
 
 Reuse: quarkus-oidc, Keycloak, quarkus-flow-oidc
 
@@ -246,19 +249,21 @@ Reuse: serverlessworkflow validators, JSON Schema
 
 ### WP-105 Run lifecycle and canonical progress
 
-Give every unit of work one authoritative progress model that survives crashes.
+Own the lifecycle registry and reconcile it with Flow instances and agent checkpoints so work recovers safely after crashes.
 
 Deliverables:
 
-- Start by API, event or schedule; instance registry
+- Idempotent start by API, event or schedule; platform-owned instance registry with definition id/version, input reference, request idempotency key and lifecycle status
 - agent_task state machine linked to the Flow instance and graph checkpoint
 - Transactional outbox feeding a task_view projection
-- Reconciler that detects and repairs orphaned or stuck work
+- Startup and periodic reconciler that waits for definition warmup, finds restored PENDING instances and explicitly resumes them
+- Reconciler handles duplicate starts and re-execution of unfinished work through the effect ledger
 - Operations API: inspect, cancel, retry, pause, recover (authorized)
+- Keep lifecycle history and version-scoped ownership in platform records; Flow JPA rows are execution state, not the sole source of truth
 
 Reuse: quarkus-flow-jpa, db-scheduler
 
-Notes: Design: the Flow instance is canonical for process progress, the effect ledger for external effects, the agent_task row for agent progress. Everything else is a projection.
+Notes: Flow 1.2.0 restores persisted instances into memory without starting them. The platform registry is authoritative for lifecycle and definition version; Flow executes the workflow. Flow can rerun the first unfinished task after restart, so outbound effects must use WP-108 idempotency semantics. WP-105 is already XL; revisit scope, estimate range and critical path with spike evidence instead of increasing the size label mechanically.
 
 ### WP-106 Human task service
 
@@ -267,6 +272,7 @@ Durable, auditable human work with separation of duties.
 Deliverables:
 
 - Tasks bound to workflow waits; assign, delegate, reassign, approve, reject, escalate
+- Persist human decisions before waking a Flow listener; replay pending decisions after restart
 - Separation-of-duties rules; agents cannot self-approve consequential actions
 - Audit of every transition
 
@@ -279,7 +285,8 @@ Route external events to the right instance exactly once in effect.
 Deliverables:
 
 - CloudEvents HTTP endpoint with correlation keys
-- Duplicate, late and out-of-order event handling; cancellation race rules
+- Persist received events in an idempotent inbox before waking listeners; replay eligible events after restart
+- Duplicate, early, late and out-of-order event handling; cancellation race rules
 
 Reuse: quarkus-flow-messaging
 
@@ -287,13 +294,16 @@ Notes: Kafka comes later in WP-406.
 
 ### WP-108 Effect ledger and compensation
 
-No duplicate business effect and visible handling of partial failure.
+Prevent duplicate external effects where target idempotency is available and make partial or uncertain outcomes visible.
 
 Deliverables:
 
-- Write-ahead intent with idempotency key, call, outcome record
+- Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution
+- Require an idempotent target or explicit reconciliation/manual resolution where exactly-once effects cannot be guaranteed
 - Reconciliation for unknown outcomes (lost acknowledgment)
 - Compensation steps and a manual-resolution queue
+
+Notes: The workflow HTTP client retries below OWS retry policy by default, and restart can re-run the first unfinished task. Disable unintended client retries and require the effect ledger/idempotency contract for every external effect; do not promise exactly-once delivery to arbitrary targets.
 
 ### WP-109 Timers, deadlines and durable failover
 
@@ -301,11 +311,13 @@ Deadlines and waits survive node loss.
 
 Deliverables:
 
-- Per-instance deadlines, maximum lifetime, escalation timers
+- Persist absolute per-instance deadlines and enforce them across restart; maximum lifetime and escalation timers
 - Duplicate timer delivery harmless
-- Kubernetes lease durable mode; failover test with two replicas
+- Kubernetes lease durable mode; failover test with two replicas and verify restored work starts after warmup
 
 Reuse: quarkus-flow-durable-kubernetes, quarkus-db-scheduler
+
+Notes: Flow listen deadlines re-arm from resume, so the platform deadline is absolute and stored outside Flow state. Kubernetes lease behavior is not experimentally verified by WP-003; close that evidence gap in the two-replica test.
 
 ### WP-110 Resilience and overload
 
@@ -517,16 +529,21 @@ Deliverables:
 - Runtime enforcement: only approved, inventoried artifacts and endpoints
 - Inventory queries and traceability of decisions to versions
 
+Notes: Operations history and status must come from platform-owned lifecycle/audit records because Flow deletes completed and cancelled rows and does not persist WAITING status.
+
 ### WP-302 Version pinning of in-flight work
 
 New releases never change the meaning of running work.
 
 Deliverables:
 
-- Instances pin definition, prompt, model, tool, policy and configuration versions
+- Instances pin definition id and version plus prompt, model, tool, policy and configuration versions
+- Every lookup, resume, cancel and recovery validates the instance's pinned definition id/version
 - v1 continues through v2 rollout and rollback
 
 Reuse: Flow definition versions
+
+Notes: Flow's persisted key does not scope instance ids by definition version. Store the full definition identity in the platform registry and validate it on each operation.
 
 ### WP-303 Governed publication and activation
 
@@ -625,8 +642,11 @@ Deliverables:
 
 - Expand/contract database migrations; API versioning; N-1 compatibility
 - Rolling upgrade test with in-flight instances and checkpoints
+- Re-run Flow characterization checks on upgrades for restore/start behavior, HTTP retry defaults, entity/DDL compatibility and definition warmup.
 
 Reuse: Flyway
+
+Notes: Keep engine-specific workarounds until upgrade evidence proves the relevant behavior changed; recheck before removing them.
 
 ### WP-403 Deployment and provider independence
 
@@ -779,10 +799,11 @@ Deliverables:
 
 - Technology decision (server-rendered or TypeScript SPA)
 - Runs, tasks, conversations, inventory, approvals, incidents
+- Show current status and history from the platform instance registry and audit/task records, not directly from transient Flow tables.
 
 Reuse: Qute or React
 
-Notes: Every action goes through an authorized, audited API.
+Notes: Every action goes through an authorized, audited API. Flow JPA is execution state and deletes completed/cancelled instances; the console reads the platform registry for durable history.
 
 ### WP-604 Governance assistant
 
