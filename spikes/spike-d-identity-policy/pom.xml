@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- WP-006 spike. Standalone on purpose: not part of the root <modules>.
+       The Quarkus BOM version is kept equal to the root pom.xml. -->
+  <groupId>io.github.bassemzohdy.openworkflow</groupId>
+  <artifactId>spike-d-identity-policy</artifactId>
+  <version>0.0.0-SPIKE</version>
+  <name>WP-006 spike: identity, policy and secrets</name>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <quarkus.platform.version>3.39.5</quarkus.platform.version>
+    <cedar-java.version>4.10.0</cedar-java.version>
+    <surefire-plugin.version>3.5.3</surefire-plugin.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.quarkus.platform</groupId>
+        <artifactId>quarkus-bom</artifactId>
+        <version>${quarkus.platform.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-security</artifactId></dependency>
+    <!-- The default cedar-java jar loads libcedar_java_ffi from a separate native artifact that is not on
+         Maven Central under that name; the "uber" classifier bundles the native libraries for all platforms. -->
+    <dependency>
+      <groupId>com.cedarpolicy</groupId>
+      <artifactId>cedar-java</artifactId>
+      <version>${cedar-java.version}</version>
+      <classifier>uber</classifier>
+    </dependency>
+    <!-- cedar-java declares Guava as runtime scope but exposes ImmutableList in its public API. -->
+    <dependency><groupId>com.google.guava</groupId><artifactId>guava</artifactId></dependency>
+
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-junit5</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-test-security</artifactId><scope>test</scope></dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${surefire-plugin.version}</version>
+        <configuration>
+          <systemPropertyVariables>
+            <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
