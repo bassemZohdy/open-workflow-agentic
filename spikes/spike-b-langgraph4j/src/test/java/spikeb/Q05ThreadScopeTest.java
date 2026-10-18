@@ -49,6 +49,7 @@ class Q05ThreadScopeTest {
         assertNotEquals(tenantA.threadId(), tenantB.threadId());
         assertEquals(tenantA.threadId().length(), new ThreadScope("a".repeat(500), "u", "i").threadId().length(),
                 "length does not depend on the input size");
+        assertEquals(68, new ThreadScope("a", "b", "c").threadId().length(), "ws1- prefix plus 64 hex digits");
         assertTrue(new ThreadScope("a".repeat(500), "u", "i").threadId().length() <= 255,
                 "fits the VARCHAR(255) thread name column of the V1 saver");
     }
