@@ -1,0 +1,1525 @@
+{
+ "meta": {
+  "title": "Governed Agentic Process Modernization — Outcome Requirements",
+  "date": "2026-10-18",
+  "version": "6.2 (proposed)",
+  "status": "Proposed requirements refactor, classification and scope changed; pending stakeholder acceptance",
+  "source": "supporting_data/agentic-modernization-v6.json",
+  "note": "Logical Design/Development, Control/Governance and Execution responsibilities; NOT three mandatory deployments"
+ },
+ "mandatory": [
+  {
+   "id": "M01",
+   "title": "Process semantics and definition validation",
+   "requirement": "Process or agent-driven behavior must have an inspectable, versioned definition or constrained execution contract; validate schemas, inputs, decision boundaries and expected transitions before publication.",
+   "origin": "M14,M17",
+   "scenarios": [
+    "S1",
+    "S5",
+    "S7"
+   ]
+  },
+  {
+   "id": "M02",
+   "title": "Bounded agent autonomy and risk controls",
+   "requirement": "Every agent task must have an approved goal, permitted tools/data, risk classification and limits on iterations, time and expenditure. AI cannot expand its own authority or bypass deterministic decisions and escalation controls.",
+   "origin": "M02,M15,M34",
+   "scenarios": [
+    "S1",
+    "S2",
+    "S5"
+   ]
+  },
+  {
+   "id": "M03",
+   "title": "Durable execution and checkpoint recovery",
+   "requirement": "Committed process and agent progress must survive worker, node and storage failover, including waiting tasks and partial completion. Resume or retry must not repeat completed business effects.",
+   "origin": "M03,M20,M42",
+   "scenarios": [
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "M04",
+   "title": "Durable triggers, timers and lifecycle",
+   "requirement": "Controlled API/event/schedule initiation, per-instance deadlines, timeouts, maximum lifetime, expiry and escalation must be recoverable after outage; duplicate timer delivery must not duplicate outcomes.",
+   "origin": "M04,M22,M41.5",
+   "scenarios": [
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "M05",
+   "title": "Authorized human interaction",
+   "requirement": "When a process requires human action, task assignment, delegation, reassignment, approval/rejection, escalation and authorization must be durable and auditable. Separation of duties follows approved risk policy; consequential agents cannot self-approve.",
+   "origin": "M08,M23",
+   "scenarios": [
+    "S1",
+    "S3"
+   ]
+  },
+  {
+   "id": "M06",
+   "title": "Events, business effects and compensation",
+   "requirement": "Correlate external events to the correct execution; external side effects must use idempotency or reconciliation, with visible compensation/manual-resolution on partial failures.",
+   "origin": "M16,M19",
+   "scenarios": [
+    "S1",
+    "S3",
+    "S6"
+   ]
+  },
+  {
+   "id": "M07",
+   "title": "Resilience under dependency failure and overload",
+   "requirement": "Apply bounded timeouts/retries, circuit breaking, backpressure and overload safety so committed work is neither silently lost nor duplicated.",
+   "origin": "M07,M20",
+   "scenarios": [
+    "S2",
+    "S4"
+   ]
+  },
+  {
+   "id": "M08",
+   "title": "Backup, restore and disaster recovery",
+   "requirement": "Back up required process/agent state, activity history, configuration and audit evidence; prove restore against agreed RTO/RPO and without replaying completed irreversible effects.",
+   "origin": "M28",
+   "scenarios": [
+    "S4"
+   ]
+  },
+  {
+   "id": "M09",
+   "title": "Version-safe in-flight work",
+   "requirement": "A running instance retains compatible or pinned process, policy, model and configuration semantics through new releases and rollback; no automatic migration is required.",
+   "origin": "M09,M25,M36",
+   "scenarios": [
+    "S3",
+    "S6",
+    "S7"
+   ]
+  },
+  {
+   "id": "M10",
+   "title": "Governed publication and activation",
+   "requirement": "Definitions, prompts, models, tools and configuration are validated, authorized, versioned, integrity-checked, auditable and activatable/rollbackable under explicit release policy. No specific bundle format, signing transport or GitOps product is prescribed.",
+   "origin": "M24,M25,M40",
+   "scenarios": [
+    "S4",
+    "S7"
+   ]
+  },
+  {
+   "id": "M11",
+   "title": "Authentication, delegation and secret handling",
+   "requirement": "Authenticate users, agents and services; authorize the *effective* user and acting workload with scoped, short-lived credentials and no blanket token passthrough. Secrets are stored, rotated, revoked and reacquired on long waits.",
+   "origin": "M05,M21",
+   "scenarios": [
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "M12",
+   "title": "External policy and safe denial",
+   "requirement": "Business/security policy is enforced outside agents or at non-bypassable boundaries; unavailable mandatory policy decisions fail closed while safe recovery remains possible, and decisions are attributable and versioned.",
+   "origin": "M18,M34",
+   "scenarios": [
+    "S1",
+    "S2",
+    "S4"
+   ]
+  },
+  {
+   "id": "M13",
+   "title": "Data security, privacy and location",
+   "requirement": "Protect process state, task/history records, memory, prompts and audit data in transit and at rest with policy-based retention/erasure and permitted processing or storage locations for models, tools and backups.",
+   "origin": "M27,M37",
+   "scenarios": [
+    "S2",
+    "S4"
+   ]
+  },
+  {
+   "id": "M14",
+   "title": "Untrusted inputs and optional code execution",
+   "requirement": "Validate model output, retrieved content and tool responses before consequential use. Agents cannot execute arbitrary generated code by default; if code execution is enabled, run it in an isolated resource-bounded sandbox with explicit grants.",
+   "origin": "M15,M35",
+   "scenarios": [
+    "S1",
+    "S2",
+    "S4"
+   ]
+  },
+  {
+   "id": "M15",
+   "title": "Auditability and AI decision provenance",
+   "requirement": "Maintain tamper-evident, queryable records of actors, decisions, state transitions, model/prompt/tool/policy versions and external effects, with sensitive payloads redacted or referenced according to retention rules.",
+   "origin": "M01,M30",
+   "scenarios": [
+    "S1",
+    "S2",
+    "S4"
+   ]
+  },
+  {
+   "id": "M16",
+   "title": "Observability and operational APIs",
+   "requirement": "Provide correlated traces/logs/metrics and authorized APIs to inspect, cancel, retry, pause and recover executions and human/agent tasks, without mandating a particular UI or database.",
+   "origin": "M06,M10",
+   "scenarios": [
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "M17",
+   "title": "AI change evaluation and model continuity",
+   "requirement": "Versioned quality, safety and security evaluations must gate material model/prompt/tool changes; model retirement and unavailable pinned models trigger controlled substitution, safe pause or approved fallback, never silent change.",
+   "origin": "M31,M36",
+   "scenarios": [
+    "S2",
+    "S4",
+    "S7"
+   ]
+  },
+  {
+   "id": "M18",
+   "title": "Supply-chain integrity and AI inventory",
+   "requirement": "Verify provenance of deployable code, packages, workflow definitions, models and tool registrations; keep a queryable inventory of agents, model bindings, prompts, tools and MCP servers with accountable owner, purpose, risk tier, version and status; permit only approved, inventoried artifacts and tool endpoints; and retain a traceable software/AI bill of materials as applicable.",
+   "origin": "M32",
+   "scenarios": [
+    "S4",
+    "S7"
+   ]
+  },
+  {
+   "id": "M19",
+   "title": "Agent context, memory and state governance",
+   "requirement": "Agent memory and checkpoints are scoped to the permitted user, instance and tenant, with data provenance, retention/erasure, bounded growth and sufficient state to recover or safely retry. Exact full/selective/compacted policy is configurable.",
+   "origin": "M33,M42",
+   "scenarios": [
+    "S2",
+    "S3"
+   ]
+  },
+  {
+   "id": "M20",
+   "title": "Emergency containment and AI incident handling",
+   "requirement": "Authorized emergency controls stop/revoke selected agent, tool or model bindings within a defined bound, including handling of in-flight work, without relying on an AI assistant or unavailable authoring service. AI incidents are recorded, classified by severity, reported where the applicable profile requires, and reviewed so that each review adds regression cases to the evaluation gate (M17).",
+   "origin": "M29,M43",
+   "scenarios": [
+    "S2",
+    "S4"
+   ]
+  },
+  {
+   "id": "M21",
+   "title": "Safe platform upgrades",
+   "requirement": "Upgrade or roll back code, runtime, database schemas and configuration without corrupting existing work, approvals or business-effects records; zero downtime is a separate preference.",
+   "origin": "M11",
+   "scenarios": [
+    "S4",
+    "S6"
+   ]
+  },
+  {
+   "id": "M22",
+   "title": "Provider-independent deployability",
+   "requirement": "The composed solution must be viable self-hosted across appropriate on-premises/cloud environments, with no unavoidable single-provider SaaS; a fully offline run is a gate only for an air-gapped deployment profile.",
+   "origin": "M12",
+   "scenarios": [
+    "S4"
+   ]
+  },
+  {
+   "id": "M23",
+   "title": "Enterprise and external-agent interoperability",
+   "requirement": "Integrate enterprise APIs and external agents through documented secured contracts with clear timeout/error handling and correlation. Tools exposed through MCP and agents exposing A2A must be consumable, natively or through a gateway, under the same identity and policy controls; native MCP/A2A support and broker plugins are preferences (H03, H07).",
+   "origin": "M13",
+   "scenarios": [
+    "S1",
+    "S2",
+    "S6"
+   ]
+  },
+  {
+   "id": "M24",
+   "title": "Tenant safety where used",
+   "requirement": "Support single-tenant operation; when multi-tenancy is enabled, enforce identity, task/history, state, secret, memory and telemetry isolation across tenants. Do not mandate dynamic tenant-mode switching.",
+   "origin": "M26",
+   "scenarios": [
+    "S4"
+   ]
+  },
+  {
+   "id": "M25",
+   "title": "Reproducible authoring and testable artifacts",
+   "requirement": "Reusable process/agent definitions, contracts and agent configurations must be accessible as versioned, inspectable artifacts that can be validated, tested, reviewed and delivered through a reproducible lifecycle. An IDE, visual editor or separate Development server is not mandatory.",
+   "origin": "M14,M17,M24;NEW",
+   "scenarios": [
+    "S7"
+   ]
+  },
+  {
+   "id": "M26",
+   "title": "Separation of authority",
+   "requirement": "Authoring, production change approval and execution actions must have separable, enforceable privileges with attributable transitions. No particular two-/three-plane physical deployment, shared database or separately deployed control service is required.",
+   "origin": "M38,M43",
+   "scenarios": [
+    "S4",
+    "S7"
+   ]
+  },
+  {
+   "id": "M27",
+   "title": "Safe autonomy during administration outages",
+   "requirement": "Execution and recovery must not depend on a live authoring or administration interface; continue on last approved state within a bounded freshness policy and fail closed for operations requiring fresh authorization or emergency revocation.",
+   "origin": "M39",
+   "scenarios": [
+    "S4"
+   ]
+  },
+  {
+   "id": "M28",
+   "title": "Recoverable canonical progress and reconciliation",
+   "requirement": "For every running unit of work there must be one clear authoritative progress/state model with queryable task status, dependency and outcome evidence; any replicas, projections or multiple runtimes must reconcile correctly after crashes. A universal stand-alone task-ledger database is not required.",
+   "origin": "M41;M03",
+   "scenarios": [
+    "S2",
+    "S3",
+    "S4"
+   ]
+  },
+  {
+   "id": "M29",
+   "title": "Goal-driven planning and adaptive execution",
+   "requirement": "Agents can take a business goal, decompose it into steps at runtime, choose among permitted tools and sub-agents, and re-plan when a step fails or new information arrives, within the bounds of M02 and with every plan and plan change recorded (M15).",
+   "origin": "H03;NEW agentic capability",
+   "scenarios": [
+    "S5",
+    "S8"
+   ]
+  },
+  {
+   "id": "M30",
+   "title": "Tool, knowledge and unstructured-input use",
+   "requirement": "Agents call registered tools (including MCP tools through M23), retrieve enterprise knowledge with source provenance and access control, and work from unstructured inputs such as documents, e-mails and conversations, with structured, validated outputs (M14).",
+   "origin": "NEW agentic capability",
+   "scenarios": [
+    "S2",
+    "S8"
+   ]
+  },
+  {
+   "id": "M31",
+   "title": "Multi-agent collaboration and delegation",
+   "requirement": "Agents hand off, delegate to and supervise other agents (internal or through A2A) with explicit task context, the delegating user's scoped authority (M11) and a shared view of task progress (M28); loops and circular delegation are bounded (M02).",
+   "origin": "NEW agentic capability",
+   "scenarios": [
+    "S2",
+    "S8"
+   ]
+  },
+  {
+   "id": "M32",
+   "title": "Interactive human-agent collaboration",
+   "requirement": "People converse with agents, see progress as it streams, answer clarifying questions, correct or redirect a running agent and take over a task; an agent can pause durably for human input and resume with the answer (M03, M05).",
+   "origin": "NEW agentic capability",
+   "scenarios": [
+    "S8"
+   ]
+  },
+  {
+   "id": "M33",
+   "title": "Agent quality monitoring in production",
+   "requirement": "Agent outputs and trajectories are evaluated continuously in production (sampled automatic evaluation, user feedback and human review queues) against agreed quality criteria, with alerts and a path to the evaluation gate (M17) and containment (M20). Advanced analytics stay High priority (H13).",
+   "origin": "H13 (minimum promoted)",
+   "scenarios": [
+    "S2",
+    "S8"
+   ]
+  },
+  {
+   "id": "M34",
+   "title": "Model choice and routing per agent task",
+   "requirement": "Each agent task can use a model chosen from approved providers, including self-hosted models, by configuration rather than code change, with routing by task type, risk tier or cost, and consistent evaluation (M17) of every model used.",
+   "origin": "H02 (model part promoted)",
+   "scenarios": [
+    "S8",
+    "S4"
+   ]
+  }
+ ],
+ "high": [
+  {
+   "id": "H01",
+   "title": "Open Workflow Specification alignment",
+   "requirement": "Prefer full authoring/import/export and verified semantic conformance to current OWS; model vendor extensions and round-trip loss.",
+   "origin": "H02"
+  },
+  {
+   "id": "H02",
+   "title": "Runtime and framework independence",
+   "requirement": "Reduce engine and agent-framework lock-in through documented adapters, usable process and agent artifacts and substitutable service contracts; model choice itself is Mandatory (M34).",
+   "origin": "H01"
+  },
+  {
+   "id": "H03",
+   "title": "Native MCP and A2A support",
+   "requirement": "Prefer native, secured MCP and A2A interoperability instead of only custom REST adapters.",
+   "origin": "H03"
+  },
+  {
+   "id": "H04",
+   "title": "High-volume scaling",
+   "requirement": "Support large numbers of concurrent/waiting processes, agents and due timers with measurable horizontal scale beyond minimum recovery guarantees.",
+   "origin": "H04,H15"
+  },
+  {
+   "id": "H05",
+   "title": "Administration and business task UI",
+   "requirement": "Useful operator console and approver inbox over stable APIs; not mandatory for engine eligibility.",
+   "origin": "H05,H06"
+  },
+  {
+   "id": "H06",
+   "title": "Advanced AI explanations",
+   "requirement": "Auditable and reviewer-facing reasons, confidence, alternatives and explanations beyond ordinary decision provenance; mandatory only where an agreed risk/legal profile requires them.",
+   "origin": "H07"
+  },
+  {
+   "id": "H07",
+   "title": "Event broker integration",
+   "requirement": "Prefer first-class Kafka and compatible messaging, reliable subscriptions and event-to-process correlation.",
+   "origin": "H08"
+  },
+  {
+   "id": "H08",
+   "title": "Advanced replay and simulation",
+   "requirement": "Support historical deterministic replay and safe what-if runs including bounded model/tool fixture replay.",
+   "origin": "H09"
+  },
+  {
+   "id": "H09",
+   "title": "Advanced cost and model-usage governance",
+   "requirement": "Usage/cost/latency budgets, estimation, attribution and optimization beyond the required hard per-task safety limits.",
+   "origin": "H10"
+  },
+  {
+   "id": "H10",
+   "title": "Automatic in-flight definition migration",
+   "requirement": "Optional mapped migration to newer definitions with rollback and proof; correct version pinning remains Mandatory.",
+   "origin": "H11"
+  },
+  {
+   "id": "H11",
+   "title": "Zero-downtime upgrade",
+   "requirement": "Achieve rolling upgrade availability SLO beyond required correctness of upgrade and rollback.",
+   "origin": "H12"
+  },
+  {
+   "id": "H12",
+   "title": "Developer lifecycle and packaging UX",
+   "requirement": "Reusable templates, test fixtures, contract validation, CI promotion, dependency inventory and developer APIs beyond baseline versioned artifact validation.",
+   "origin": "H13;NEW"
+  },
+  {
+   "id": "H13",
+   "title": "Advanced AI quality analytics",
+   "requirement": "Drift detection, prompt and model A/B comparison, trajectory analytics and quality dashboards beyond the mandatory production monitoring (M33).",
+   "origin": "H14"
+  },
+  {
+   "id": "H14",
+   "title": "Advanced scheduling calendars",
+   "requirement": "Complex calendar rules, schedule optimization, extreme timer volumes and timezone-safe business calendars beyond durable due dates.",
+   "origin": "H16"
+  },
+  {
+   "id": "H15",
+   "title": "Strong workload isolation and cells",
+   "requirement": "Isolate busy/failed tenants, runtimes and risk tiers with quotas, bulkheads or separate cells when the target scale warrants it.",
+   "origin": "H15,H25"
+  },
+  {
+   "id": "H16",
+   "title": "Advanced tenancy administration",
+   "requirement": "Self-service provisioning, quotas and guided migration between single and multi-tenant deployments where needed.",
+   "origin": "H17,H21"
+  },
+  {
+   "id": "H17",
+   "title": "Dynamic activation",
+   "requirement": "Apply more categories of approved changes without binary rebuild or workload restart, within controlled activation and version-safety rules.",
+   "origin": "H18"
+  },
+  {
+   "id": "H18",
+   "title": "AI-specific incident and red-team operations",
+   "requirement": "Automated AI incident triage and continuing adversarial (red-team) tests beyond the mandatory containment and incident handling (M20) and the evaluation gate (M17).",
+   "origin": "H19,H20"
+  },
+  {
+   "id": "H19",
+   "title": "Legacy transition and coexistence",
+   "requirement": "Shadow runs, reversible cutover, cohort migration, reconciliation and independent completion of old instances in modernization programs.",
+   "origin": "H22"
+  },
+  {
+   "id": "H20",
+   "title": "Multilingual experience",
+   "requirement": "Approvals, messages and explanations in languages actually served, with language-specific evaluation; may become a profile gate.",
+   "origin": "H23"
+  },
+  {
+   "id": "H21",
+   "title": "Multiple execution runtimes",
+   "requirement": "Consistent governance and observable task state for separate process/agent runtimes, if justified by matched scenarios.",
+   "origin": "H24"
+  },
+  {
+   "id": "H22",
+   "title": "Visual/non-developer authoring",
+   "requirement": "Allow process analysts to create, simulate and review workflows and agents through a visual UI or safe natural-language copilot, under the same approval controls.",
+   "origin": "NEW"
+  },
+  {
+   "id": "H23",
+   "title": "Open-source licensing and reuse freedom",
+   "requirement": "Prefer permissively licensed, auditable and redistributable open-source components with no mandatory managed-provider or commercial-production lock-in; score any license, support or redistribution restrictions and their total cost.",
+   "origin": "NEW: stated strategic preference"
+  },
+  {
+   "id": "H24",
+   "title": "Simple, clean and maintainable architecture",
+   "requirement": "Prefer cohesive abstractions, inspectable implementation, minimal bespoke framework code and infrastructure, low operating footprint, reproducible builds and long-term maintainability; score real implementation and support effort.",
+   "origin": "NEW: stated strategic preference"
+  },
+  {
+   "id": "H25",
+   "title": "Long-term agent memory and personalization",
+   "requirement": "Agents keep scoped, consented long-term memory of users and cases across sessions, with provenance, retention and erasure (M19), to improve continuity and personalization.",
+   "origin": "NEW agentic capability"
+  }
+ ],
+ "optional": [
+  {
+   "id": "O01",
+   "title": "Embedded governance assistant",
+   "requirement": "AI-assisted explanation, incident investigation and change proposals in an operator console; mandatory authorization constraints apply only when enabled.",
+   "origin": "H26,M43"
+  },
+  {
+   "id": "O02",
+   "title": "Separate hosted Development Plane",
+   "requirement": "Independent authoring portal/backend/deployment; only justified when authorship scale, tenant boundaries or team organization require it.",
+   "origin": "NEW"
+  },
+  {
+   "id": "O03",
+   "title": "Physical cell-based architecture",
+   "requirement": "Physical deployment cells, beyond performance isolation requirements; only when isolation/scale evidence justifies operational overhead.",
+   "origin": "H25"
+  },
+  {
+   "id": "O04",
+   "title": "Full hot-swap without restart",
+   "requirement": "Universal dynamic swapping of all artifact types; useful only when lifecycle costs justify it.",
+   "origin": "H18"
+  },
+  {
+   "id": "O05",
+   "title": "Full custom orchestration engine",
+   "requirement": "Building distributed scheduler, journal, coordination and process interpreter in-house rather than reusing proven components.",
+   "origin": "NEW"
+  }
+ ],
+ "profiles": [
+  {
+   "id": "P1",
+   "name": "Air-gapped",
+   "effect": "Offline artifact/image/model/credential dependency closure and offline execution under M22",
+   "activation": "Deployment has no external network"
+  },
+  {
+   "id": "P2",
+   "name": "Multi-tenant",
+   "effect": "M24 tenant isolation across state, agent memory, secrets, logs, keys and operational APIs",
+   "activation": "Deployment hosts more than one security tenant"
+  },
+  {
+   "id": "P3",
+   "name": "High-impact decisions",
+   "effect": "Extra oversight, reviewer explanations (H06) and appeal pathways as required by approved internal policy or law",
+   "activation": "Process has legal or similarly significant consequences"
+  },
+  {
+   "id": "P4",
+   "name": "UAE data protection",
+   "effect": "Data subject rights, residency/transfer and retention policy gates in M13",
+   "activation": "Applicable UAE personal-data legislation confirmed by Legal"
+  },
+  {
+   "id": "P5",
+   "name": "Dubai Government",
+   "effect": "Applicable DESC governance and Arabic/English support (H20) only where policy requires it",
+   "activation": "Dubai Government entity policy applies"
+  },
+  {
+   "id": "P6",
+   "name": "EU AI Act scope",
+   "effect": "Additional role/risk-specific record keeping, oversight and explanation controls validated by Legal",
+   "activation": "Specific EU jurisdiction and application scope applies"
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "S1",
+   "title": "Governed augmentation of an existing service",
+   "purpose": "Existing business process uses an AI evidence-review step, deterministic policy, authorized human action and idempotent fulfilment.",
+   "tests": [
+    {
+     "id": "T01",
+     "description": "Reject malformed agent output, forbidden action and unauthorized escalation",
+     "verifies": [
+      "M01",
+      "M02",
+      "M12",
+      "M14"
+     ]
+    },
+    {
+     "id": "T02",
+     "description": "Prove authorized human task cannot be approved by a forbidden initiator/agent",
+     "verifies": [
+      "M05",
+      "M11"
+     ]
+    },
+    {
+     "id": "T03",
+     "description": "Prove compensation and no duplicate side effect after acknowledgment loss",
+     "verifies": [
+      "M06",
+      "M07"
+     ]
+    },
+    {
+     "id": "T04",
+     "description": "Trace every decision to actor, model/prompt/tool versions, and workflow step",
+     "verifies": [
+      "M15",
+      "M16"
+     ]
+    },
+    {
+     "id": "T05",
+     "description": "Demonstrate existing enterprise-service adapters and timeout contracts, and consume an MCP tool and an A2A agent natively or through a gateway",
+     "verifies": [
+      "M23"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S2",
+   "title": "Bounded multi-agent task",
+   "purpose": "Agent delegation, bounded iterative plans, tools and memory; secure resume and emergency stop.",
+   "tests": [
+    {
+     "id": "T06",
+     "description": "Stop loops at agreed time, iteration, cost and tool limits",
+     "verifies": [
+      "M02"
+     ]
+    },
+    {
+     "id": "T07",
+     "description": "Reject agent-to-agent scope widening and expired/replayed delegated tokens",
+     "verifies": [
+      "M11",
+      "M12"
+     ]
+    },
+    {
+     "id": "T08",
+     "description": "Restart during partial agent work; preserve progress, scoped memory and exactly one business effect",
+     "verifies": [
+      "M03",
+      "M19",
+      "M28"
+     ]
+    },
+    {
+     "id": "T09",
+     "description": "Inject prompt/tool-result attacks and prohibited sandbox access",
+     "verifies": [
+      "M14"
+     ]
+    },
+    {
+     "id": "T10",
+     "description": "Demonstrate model/tool provenance, the AI inventory with owner and risk tier, rejection of an uninventoried tool endpoint, and the quality-evaluation gate",
+     "verifies": [
+      "M17",
+      "M18"
+     ]
+    },
+    {
+     "id": "T11",
+     "description": "Revoke a named agent/model/tool across active and waiting tasks; record, classify and report the incident and add a regression case to the evaluation suite",
+     "verifies": [
+      "M20",
+      "M17"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S3",
+   "title": "Long-running process with approval and timers",
+   "purpose": "Weeks-long wait, due timer, event correlation, definition pinning and restart/restore.",
+   "tests": [
+    {
+     "id": "T12",
+     "description": "Pod/node failover while awaiting human action or due timer; deliver intended outcome once",
+     "verifies": [
+      "M03",
+      "M04",
+      "M05"
+     ]
+    },
+    {
+     "id": "T13",
+     "description": "Duplicate/late external events, cancellation race and failed compensation",
+     "verifies": [
+      "M04",
+      "M06"
+     ]
+    },
+    {
+     "id": "T14",
+     "description": "Safe config/model/definition v1 continuation through v2 rollout and rollback",
+     "verifies": [
+      "M09",
+      "M10"
+     ]
+    },
+    {
+     "id": "T15",
+     "description": "Recover reauthorized delegated identity and correctly-scoped memory",
+     "verifies": [
+      "M11",
+      "M19"
+     ]
+    },
+    {
+     "id": "T16",
+     "description": "Inspect, cancel and retry individual tasks through authorized operations",
+     "verifies": [
+      "M16",
+      "M28"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S4",
+   "title": "Operations, security and deployment",
+   "purpose": "Production failure, backup/restore, tenancy, model routing, publisher outage and emergency revocation.",
+   "tests": [
+    {
+     "id": "T17",
+     "description": "Demonstrate overload/backpressure and no committed progress corruption",
+     "verifies": [
+      "M07",
+      "M28"
+     ]
+    },
+    {
+     "id": "T18",
+     "description": "Restore state, history, approvals and audit within agreed objectives",
+     "verifies": [
+      "M08",
+      "M03"
+     ]
+    },
+    {
+     "id": "T19",
+     "description": "Authorized staged publication, secret rotation, rollback and recorded evidence",
+     "verifies": [
+      "M10",
+      "M11",
+      "M18"
+     ]
+    },
+    {
+     "id": "T20",
+     "description": "Prove location-constrained encryption, retention, erase and tenant boundary",
+     "verifies": [
+      "M13",
+      "M24"
+     ]
+    },
+    {
+     "id": "T21",
+     "description": "Deployed in multiple self-hosted environments; offline under P1",
+     "verifies": [
+      "M22"
+     ]
+    },
+    {
+     "id": "T22",
+     "description": "Kill console/control services and prove controlled continuation/recovery with bounded staleness",
+     "verifies": [
+      "M26",
+      "M27"
+     ]
+    },
+    {
+     "id": "T23",
+     "description": "Revoke policies and enforce fail-closed regardless of control service outage",
+     "verifies": [
+      "M12",
+      "M20"
+     ]
+    },
+    {
+     "id": "T24",
+     "description": "Zero-data-loss upgrade/rollback for engine, schema and API in-flight",
+     "verifies": [
+      "M21"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S5",
+   "title": "Agent-generated bounded plan",
+   "purpose": "An agent constructs and revises an approved runtime plan; no silent promotion to reusable product configuration.",
+   "tests": [
+    {
+     "id": "T25",
+     "description": "Constrain dynamic plan to approved tools and policy and reject circular delegation",
+     "verifies": [
+      "M02",
+      "M14"
+     ]
+    },
+    {
+     "id": "T26",
+     "description": "Crash after partial plan, preserve task state and effect-safety",
+     "verifies": [
+      "M03",
+      "M19",
+      "M28"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S6",
+   "title": "Modernization and coexistence",
+   "purpose": "Deploy behind legacy facade, compare shadow decisions, switch cohort, reverse safely and preserve old instances.",
+   "tests": [
+    {
+     "id": "T27",
+     "description": "Shadow execution never causes live side effects; reconciliation and rollback work",
+     "verifies": [
+      "M06",
+      "M23"
+     ]
+    },
+    {
+     "id": "T28",
+     "description": "Existing versions finish while new versions activate and a release rollback occurs",
+     "verifies": [
+      "M09",
+      "M21"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S7",
+   "title": "Design-to-production lifecycle",
+   "purpose": "Build and simulate versioned workflow and agent artifacts; approve safe rollout; deny unauthorised authoring-to-execution shortcuts.",
+   "tests": [
+    {
+     "id": "T29",
+     "description": "Validate, simulate, test and reproduce development artifact definition/prompt/tool dependencies",
+     "verifies": [
+      "M01",
+      "M25"
+     ]
+    },
+    {
+     "id": "T30",
+     "description": "Unauthorized developer, agent or operator cannot activate/revoke protected production policy",
+     "verifies": [
+      "M10",
+      "M26"
+     ]
+    },
+    {
+     "id": "T31",
+     "description": "Approve evaluated release, verify integrity and rollback with audit and incident containment",
+     "verifies": [
+      "M10",
+      "M15",
+      "M17",
+      "M18",
+      "M20"
+     ]
+    },
+    {
+     "id": "T32",
+     "description": "Execution remains independent of the authoring/administration UI on a pinned version",
+     "verifies": [
+      "M27",
+      "M09"
+     ]
+    },
+    {
+     "id": "T33",
+     "description": "Runtime-generated agent plan cannot become production definition without controlled promotion",
+     "verifies": [
+      "M02",
+      "M25",
+      "M26"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "S8",
+   "title": "Agent-led case resolution",
+   "purpose": "An agent takes an unstructured customer request, plans the resolution, retrieves policy knowledge, calls tools, delegates to specialist agents, converses with the customer and a case officer, and uses deterministic workflow steps only where a business guarantee needs them.",
+   "tests": [
+    {
+     "id": "T34",
+     "description": "From an unstructured request the agent builds a plan, executes it with permitted tools and re-plans after an injected tool failure, with every plan version recorded",
+     "verifies": [
+      "M29",
+      "M02",
+      "M15"
+     ]
+    },
+    {
+     "id": "T35",
+     "description": "The agent answers from enterprise knowledge with source citations, respects document permissions and turns an e-mail attachment into a validated structured record",
+     "verifies": [
+      "M30",
+      "M14"
+     ]
+    },
+    {
+     "id": "T36",
+     "description": "A supervisor agent delegates to two specialist agents, one through A2A, passing scoped authority; a circular delegation is stopped and task progress is visible in one place",
+     "verifies": [
+      "M31",
+      "M11",
+      "M28"
+     ]
+    },
+    {
+     "id": "T37",
+     "description": "The customer and a case officer converse with the running agent, answer a clarifying question after a restart, redirect it, and the officer takes over the task",
+     "verifies": [
+      "M32",
+      "M03",
+      "M05"
+     ]
+    },
+    {
+     "id": "T38",
+     "description": "Sampled production evaluation and user feedback flag a quality drop, raise an alert and open an evaluation-gate review and containment",
+     "verifies": [
+      "M33",
+      "M17",
+      "M20"
+     ]
+    },
+    {
+     "id": "T39",
+     "description": "The same agent task switches between two approved providers and a self-hosted model by configuration and routes by risk tier; each model has evaluation evidence",
+     "verifies": [
+      "M34",
+      "M17",
+      "M22"
+     ]
+    }
+   ]
+  }
+ ],
+ "references": [
+  {
+   "id": "R01",
+   "title": "Open Workflow Specification",
+   "url": "https://open-workflow-specification.org/",
+   "why": "Declarative definitions and portability"
+  },
+  {
+   "id": "R02",
+   "title": "BPMN 2.0.2",
+   "url": "https://www.omg.org/spec/BPMN/2.0.2/",
+   "why": "Alternative open process modeling standard"
+  },
+  {
+   "id": "R03",
+   "title": "NIST AI RMF",
+   "url": "https://www.nist.gov/itl/ai-risk-management-framework",
+   "why": "Governance and risk tiers"
+  },
+  {
+   "id": "R04",
+   "title": "OWASP Agentic Applications",
+   "url": "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/",
+   "why": "Agent autonomy and tool security"
+  },
+  {
+   "id": "R05",
+   "title": "OAuth 2 Token Exchange (RFC 8693)",
+   "url": "https://www.rfc-editor.org/rfc/rfc8693",
+   "why": "Scoped identity delegation"
+  },
+  {
+   "id": "R06",
+   "title": "MCP specification",
+   "url": "https://modelcontextprotocol.io/specification/",
+   "why": "Tool integration security and registry"
+  },
+  {
+   "id": "R07",
+   "title": "A2A specification",
+   "url": "https://a2a-protocol.org/latest/",
+   "why": "Agent interoperability"
+  },
+  {
+   "id": "R08",
+   "title": "CloudEvents",
+   "url": "https://cloudevents.io/",
+   "why": "Typed event correlation envelopes"
+  },
+  {
+   "id": "R09",
+   "title": "OpenTelemetry",
+   "url": "https://opentelemetry.io/docs/",
+   "why": "Cross-component execution trace"
+  },
+  {
+   "id": "R10",
+   "title": "OpenGitOps",
+   "url": "https://opengitops.dev/",
+   "why": "Desired state and audited deployment"
+  },
+  {
+   "id": "R11",
+   "title": "SLSA provenance",
+   "url": "https://slsa.dev/spec/v1.1/",
+   "why": "Artifact supply chain"
+  },
+  {
+   "id": "R12",
+   "title": "AWS Static Stability",
+   "url": "https://aws.amazon.com/builders-library/static-stability-using-availability-zones/",
+   "why": "Control/worker failure independence"
+  },
+  {
+   "id": "R13",
+   "title": "Temporal workflow versioning",
+   "url": "https://docs.temporal.io/production-deployment/worker-deployments/worker-versioning",
+   "why": "Version-safe long-running process reference"
+  },
+  {
+   "id": "R14",
+   "title": "OWS Java SDK",
+   "url": "https://github.com/open-workflow-specification/sdk-java",
+   "why": "Reference parser and executable runtime limitations"
+  },
+  {
+   "id": "R15",
+   "title": "Quarkus Flow documentation",
+   "url": "https://docs.quarkiverse.io/quarkus-flow/dev/",
+   "why": "Potential implementation; not a preselection"
+  },
+  {
+   "id": "R16",
+   "title": "LangGraph persistence",
+   "url": "https://docs.langchain.com/oss/python/langgraph/persistence",
+   "why": "Agent checkpoint reference"
+  },
+  {
+   "id": "R17",
+   "title": "DBOS programming",
+   "url": "https://docs.dbos.dev/",
+   "why": "Optional durable toolkit"
+  },
+  {
+   "id": "R18",
+   "title": "ISO/IEC 42001",
+   "url": "https://www.iso.org/standard/81230.html",
+   "why": "AI management-system governance"
+  },
+  {
+   "id": "R19",
+   "title": "UAE data legislation",
+   "url": "https://uaelegislation.gov.ae/en/legislations/1972",
+   "why": "Regional regulatory applicability"
+  },
+  {
+   "id": "R20",
+   "title": "Dubai Electronic Security Center",
+   "url": "https://www.desc.gov.ae/",
+   "why": "Regional security policy"
+  },
+  {
+   "id": "R21",
+   "title": "NIST contingency planning",
+   "url": "https://csrc.nist.gov/pubs/sp/800/34/r1/upd1/final",
+   "why": "Disaster recovery"
+  },
+  {
+   "id": "R22",
+   "title": "MITRE ATLAS",
+   "url": "https://atlas.mitre.org/",
+   "why": "AI adversarial threat model"
+  },
+  {
+   "id": "R23",
+   "title": "Backstage",
+   "url": "https://backstage.io/docs/overview/what-is-backstage/",
+   "why": "Optional developer-experience portal"
+  },
+  {
+   "id": "R24",
+   "title": "Building effective agents",
+   "url": "https://www.anthropic.com/engineering/building-effective-agents",
+   "why": "Agent and workflow patterns: planning, tool use, orchestrator-workers, evaluator-optimizer"
+  },
+  {
+   "id": "R25",
+   "title": "OpenTelemetry semantic conventions for generative AI",
+   "url": "https://opentelemetry.io/docs/specs/semconv/gen-ai/",
+   "why": "Agent, model and tool spans for production quality monitoring"
+  }
+ ],
+ "migration": [
+  {
+   "old": "M01",
+   "target": [
+    "M15"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M02",
+   "target": [
+    "M02"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M03",
+   "target": [
+    "M03",
+    "M28"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M04",
+   "target": [
+    "M04"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M05",
+   "target": [
+    "M11"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M06",
+   "target": [
+    "M16"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M07",
+   "target": [
+    "M07"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M08",
+   "target": [
+    "M05"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M09",
+   "target": [
+    "M09"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M10",
+   "target": [
+    "M16"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M11",
+   "target": [
+    "M21"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M12",
+   "target": [
+    "M22"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M13",
+   "target": [
+    "M23"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M14",
+   "target": [
+    "M01",
+    "M25"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M15",
+   "target": [
+    "M02",
+    "M14"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M16",
+   "target": [
+    "M06"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M17",
+   "target": [
+    "M01",
+    "M25"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M18",
+   "target": [
+    "M12"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M19",
+   "target": [
+    "M06"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M20",
+   "target": [
+    "M03",
+    "M07"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M21",
+   "target": [
+    "M11"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M22",
+   "target": [
+    "M04"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M23",
+   "target": [
+    "M05"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M24",
+   "target": [
+    "M10",
+    "M25"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M25",
+   "target": [
+    "M09",
+    "M10"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M26",
+   "target": [
+    "M24"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M27",
+   "target": [
+    "M13"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M28",
+   "target": [
+    "M08"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M29",
+   "target": [
+    "M20"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M30",
+   "target": [
+    "M15"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M31",
+   "target": [
+    "M17"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M32",
+   "target": [
+    "M18"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M33",
+   "target": [
+    "M19"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M34",
+   "target": [
+    "M02",
+    "M12"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M35",
+   "target": [
+    "M14"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M36",
+   "target": [
+    "M09",
+    "M17"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M37",
+   "target": [
+    "M13"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M38",
+   "target": [
+    "M26"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M39",
+   "target": [
+    "M27"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M40",
+   "target": [
+    "M10"
+   ],
+   "action": "merge/rewrite",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M41",
+   "target": [
+    "M04",
+    "M28"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M42",
+   "target": [
+    "M03",
+    "M19"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  },
+  {
+   "old": "M43",
+   "target": [
+    "M20",
+    "M26"
+   ],
+   "action": "split/refocus",
+   "note": "Old wording superseded by outcome-based acceptance; compare existing v5 Git history if required."
+  }
+ ],
+ "principles": [
+  "Select outcomes and evidence before implementation strategy",
+  "Three logical responsibilities do not imply three deployed planes",
+  "Production promotion and execution authorization must be non-bypassable",
+  "Durability, effect safety and progress consistency are independent guarantees",
+  "A versioned OWS artifact is preferred, but not a Mandatory technology choice",
+  "Existing runtime state can be authoritative; no universal physical task-ledger mandate",
+  "Security controls are mandatory for capabilities deployed, not a mandate to deploy optional capabilities",
+  "Open source and avoidance of provider lock-in must be transparently scored",
+  "Agentic capability is the reason for the solution: agents must be able to plan, use tools and knowledge, collaborate and converse, and workflow guarantees bound them rather than replace them"
+ ],
+ "decisions": [
+  {
+   "id": "D01",
+   "topic": "Logical Development responsibility",
+   "decision": "Recognize authoring and reproducible lifecycle as logical responsibility, not a new deployment requirement",
+   "status": "proposed"
+  },
+  {
+   "id": "D02",
+   "topic": "State and task authority",
+   "decision": "One canonical execution progress model with crash-safe reconciliation, not one mandatory global database",
+   "status": "proposed"
+  },
+  {
+   "id": "D03",
+   "topic": "Integrity-protected activation",
+   "decision": "Accept suitable versioned, verified and audited publication; no prescribed signature transport",
+   "status": "proposed"
+  },
+  {
+   "id": "D04",
+   "topic": "Optional administrator assistant",
+   "decision": "UI assistant optional; when used all agent operations must be authorized and audited",
+   "status": "proposed"
+  },
+  {
+   "id": "D05",
+   "topic": "OSS and OWS priority",
+   "decision": "Strong High Priority scored dimensions, not automatic mandatory exclusions",
+   "status": "proposed"
+  },
+  {
+   "id": "D06",
+   "topic": "Gaps closed in review of 18 October",
+   "decision": "AI inventory added to M18, minimal AI incident handling added to M20, MCP and A2A consumability (native or through a gateway) added to M23; transition and multiple runtimes stay High Priority because S6 tests and M28 already gate their safety",
+   "status": "proposed"
+  },
+  {
+   "id": "D07",
+   "topic": "Agentic balance (review of 18 Oct)",
+   "decision": "Add six Mandatory agentic capability outcomes (M29 to M34), one scenario (S8) and six tests; promote minimum production quality monitoring and model choice; add long-term memory as High priority",
+   "status": "proposed"
+  }
+ ]
+}
