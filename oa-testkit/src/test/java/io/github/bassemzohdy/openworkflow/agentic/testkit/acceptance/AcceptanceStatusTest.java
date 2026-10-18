@@ -108,14 +108,27 @@ class AcceptanceStatusTest {
     }
 
     @Test
-    void markersOfClassesThatDidNotRunUnderSurefireAreIgnored() throws Exception {
+    void markerOfAClassWithNoReportEntryIsCountedAndAPlannedTestIsLeftAlone() throws Exception {
         setUp("{}", PASSING_TESTCASE, "");
         Files.createDirectories(module.resolve("target/acceptance-markers"));
         Files.writeString(module.resolve("target/acceptance-markers/demo.NotRun.tsv"), "passes\tT02\t\n");
         Run run = run("--root", root.toString());
         assertEquals(0, run.exit, run.err);
-        assertTrue(run.out.contains("ignored"), run.out);
+        assertTrue(run.out.contains("no entry in any surefire or failsafe report: 1"), run.out);
         assertFalse(statusRecorded("T02"));
+    }
+
+    @Test
+    void automatedTestWhoseClassHasNoReportEntryIsMissingAndARegression() throws Exception {
+        String before = "{\"T02\": {\"status\": \"automated\", \"where\": \"demo:NotRun#passes\"}}";
+        setUp(before, PASSING_TESTCASE, "");
+        Files.createDirectories(module.resolve("target/acceptance-markers"));
+        Files.writeString(module.resolve("target/acceptance-markers/demo.NotRun.tsv"), "passes\tT02\t\n");
+        Run run = run("--root", root.toString(), "--check");
+        assertEquals(1, run.exit);
+        assertTrue(run.err.contains("regression: T02 is recorded as automated but is not passing: demo:NotRun#passes MISSING"),
+                run.err);
+        assertEquals(before, Files.readString(root.resolve("docs/requirements/test-status.json")));
     }
 
     @Test

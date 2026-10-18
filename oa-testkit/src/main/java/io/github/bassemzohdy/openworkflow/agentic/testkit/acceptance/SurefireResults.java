@@ -17,8 +17,14 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-/** Reads the testcase outcomes from a module's surefire XML reports ({@code target/surefire-reports/TEST-*.xml}). */
+/**
+ * Reads the testcase outcomes from a module's JUnit XML reports: {@code target/surefire-reports} (unit tests) and
+ * {@code target/failsafe-reports} (integration tests), both {@code TEST-*.xml}. Both use the same format.
+ */
 public final class SurefireResults {
+
+    /** The report directories, relative to a module's {@code target} directory: unit tests, then integration tests. */
+    public static final List<String> REPORT_DIRECTORIES = List.of("surefire-reports", "failsafe-reports");
 
     public enum Outcome { PASSED, FAILED, SKIPPED }
 
@@ -36,17 +42,32 @@ public final class SurefireResults {
     private SurefireResults() {
     }
 
+    /** Reads one report directory. */
     public static Module read(Path reportsDir) throws IOException {
+        return readAll(List.of(reportsDir));
+    }
+
+    /**
+     * Reads several report directories as one module (for example surefire and failsafe). A directory that does not
+     * exist contributes nothing. A testcase that appears in more than one directory is kept once per appearance; the
+     * caller decides how to combine them.
+     */
+    public static Module readAll(List<Path> reportsDirs) throws IOException {
         List<Result> results = new ArrayList<>();
         Set<String> classes = new TreeSet<>();
-        try (Stream<Path> files = Files.list(reportsDir)) {
-            for (Path file : files.filter(p -> p.getFileName().toString().matches("TEST-.*\\.xml")).sorted().toList()) {
-                Element suite = parse(file).getDocumentElement();
-                String suiteName = suite.getAttribute("name");
-                classes.add(suiteName);
-                for (Element tc : children(suite, "testcase")) {
-                    String cls = tc.hasAttribute("classname") ? tc.getAttribute("classname") : suiteName;
-                    results.add(new Result(cls, tc.getAttribute("name"), outcomeOf(tc)));
+        for (Path reportsDir : reportsDirs) {
+            if (!Files.isDirectory(reportsDir)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.list(reportsDir)) {
+                for (Path file : files.filter(p -> p.getFileName().toString().matches("TEST-.*\\.xml")).sorted().toList()) {
+                    Element suite = parse(file).getDocumentElement();
+                    String suiteName = suite.getAttribute("name");
+                    classes.add(suiteName);
+                    for (Element tc : children(suite, "testcase")) {
+                        String cls = tc.hasAttribute("classname") ? tc.getAttribute("classname") : suiteName;
+                        results.add(new Result(cls, tc.getAttribute("name"), outcomeOf(tc)));
+                    }
                 }
             }
         }

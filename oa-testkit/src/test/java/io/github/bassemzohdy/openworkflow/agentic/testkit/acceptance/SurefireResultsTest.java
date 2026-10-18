@@ -47,6 +47,25 @@ class SurefireResultsTest {
     }
 
     @Test
+    void readAllCombinesSurefireAndFailsafeDirectoriesAndSkipsAMissingOne() throws IOException {
+        Path surefire = Files.createDirectories(reports.resolve("surefire-reports"));
+        Path failsafe = Files.createDirectories(reports.resolve("failsafe-reports"));
+        Path absent = reports.resolve("no-such-reports");
+        Files.writeString(surefire.resolve("TEST-a.Unit.xml"), """
+                <testsuite name="a.Unit"><testcase name="u" classname="a.Unit"/></testsuite>
+                """);
+        Files.writeString(failsafe.resolve("TEST-a.It.xml"), """
+                <testsuite name="a.It"><testcase name="i" classname="a.It"><skipped/></testcase></testsuite>
+                """);
+        Files.writeString(failsafe.resolve("failsafe-summary.xml"), "<not-a-test-report/>");
+        SurefireResults.Module module = SurefireResults.readAll(java.util.List.of(surefire, failsafe, absent));
+        assertEquals(List.of(
+                new Result("a.Unit", "u", Outcome.PASSED),
+                new Result("a.It", "i", Outcome.SKIPPED)), module.results());
+        assertEquals(java.util.Set.of("a.Unit", "a.It"), module.classesRun());
+    }
+
+    @Test
     void refusesDocumentTypeDeclarations() throws IOException {
         Files.writeString(reports.resolve("TEST-x.xml"), """
                 <?xml version="1.0"?>
