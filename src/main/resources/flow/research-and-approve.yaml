@@ -1,0 +1,38 @@
+# OWS / CNCF Serverless Workflow 1.0 definition.
+# Control + execution live here; the agent is one task inside the process.
+document:
+  dsl: '1.0.0'
+  namespace: agentic
+  name: research-and-approve
+  version: '0.1.0'
+  summary: Run the research agent, then wait for a human decision before publishing.
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      required: [topic]
+      properties:
+        topic: { type: string }
+do:
+  - runAgent:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: http://localhost:8080/agents/research
+        body:
+          topic: ${ .topic }
+  - waitForApproval:
+      listen:
+        to:
+          one:
+            with:
+              type: org.openworkflow.agentic.approval
+      timeout:
+        after:
+          PT24H
+  - publish:
+      set:
+        status: approved
+        draft: ${ $workflow.input.topic }
