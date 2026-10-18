@@ -61,8 +61,4 @@ final class AuditRows {
             throw new IllegalStateException("stored attributes are not a JSON object of strings", e);
         }
     }
-
-    static ObjectMapper json() {
-        return JSON;
-    }
 }

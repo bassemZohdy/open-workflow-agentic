@@ -5,8 +5,8 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
@@ -54,7 +54,7 @@ final class AuditTestDatabase {
 
     /** Attributes naming {@code chain}, plus any extra entries. */
     static Map<String, String> attributes(String chain, Map<String, String> extra) {
-        var map = new java.util.LinkedHashMap<String, String>();
+        Map<String, String> map = new LinkedHashMap<>();
         map.put(AuditKeys.CHAIN, chain);
         map.putAll(extra);
         return map;
@@ -63,10 +63,5 @@ final class AuditTestDatabase {
     /** A raw connection, for tests that run plain SQL against the audit tables. */
     static Connection connection() throws SQLException {
         return dataSource().getConnection();
-    }
-
-    /** A connection as another role, for privilege tests. */
-    static Connection connectionAs(String user, String password) throws SQLException {
-        return DriverManager.getConnection(URL, user, password);
     }
 }
