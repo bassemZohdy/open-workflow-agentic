@@ -411,6 +411,36 @@ class ProcessRestartTest {
     }
 
     /**
+     * Q06, Flyway ownership: the Flow DDL published in the docs (PostgreSQL tab, applied as a Flyway migration with
+     * Hibernate generation off) does NOT match the 1.2.0 entity mapping. The engine queries "workflowinstanceentity",
+     * the docs create "workflow_instance_entity", and the docs omit three tables the entities need. Observed in a
+     * scratch run; kept @Disabled because the spike's own schema must not carry the mismatch.
+     */
+    @Test
+    @org.junit.jupiter.api.Disabled("Q06 gap, observed: docs DDL applied by Flyway but the engine fails with "
+            + "'relation \"workflowinstanceentity\" does not exist' (docs use workflow_instance_entity)")
+    void Q06_docsPublishedDdlMatchesEngineEntities() throws Exception {
+        resetDatabase();
+        Map<String, String> none = new HashMap<>();
+        none.put("SPIKE_HIBERNATE_GENERATION", "none");
+        Process app = startApp("q06-docs-ddl", none);
+        try {
+            awaitTrue("warm-up failed or completed", Duration.ofSeconds(60), () -> {
+                try {
+                    return Files.readString(LOGS.resolve("q06-docs-ddl.log")).contains("warm up workflows")
+                            || Files.readString(LOGS.resolve("q06-docs-ddl.log")).contains("warmup complete");
+                } catch (IOException e) {
+                    return false;
+                }
+            });
+            String log = Files.readString(LOGS.resolve("q06-docs-ddl.log"));
+            assertFalse(log.contains("Failed to initialize and warm up workflows"), "docs DDL must satisfy the engine");
+        } finally {
+            app.destroyForcibly();
+        }
+    }
+
+    /**
      * Q06: the Flow JPA tables come only from Hibernate entities; the module ships no Flyway script. With Hibernate
      * generation off, Flyway alone leaves the Flow tables missing and the application does not finish starting its
      * workflows (the readiness marker never appears). Observed, not assumed.
