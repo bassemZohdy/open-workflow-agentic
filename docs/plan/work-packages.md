@@ -417,6 +417,7 @@ Implementation status: **not-started**.
 
 Remaining gates:
 
+- Complete the initial review gates in PR #35 before implementation; GPT design is in docs/handoffs/gpt/WP-108.md on its separate GPT branch.
 - Provide a durable implementation of EffectLedger; in-memory contract doubles are not production persistence.
 
 Notes: The workflow HTTP client retries below OWS retry policy by default, and restart can re-run the first unfinished task. Disable unintended client retries and require the effect ledger/idempotency contract for every external effect; do not promise exactly-once delivery to arbitrary targets.

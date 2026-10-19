@@ -12,7 +12,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 - [ ] **WP-102 Identity and delegated authority** — Run the real Keycloak test in docs/identity.md section 9; prove actor_token/act mapping, tenant/scope claims, audience narrowing and expiry bounds.
 - [ ] **WP-103 Policy enforcement points** — Wire policy and verified caller identity into the audit query/verification API.
-- [ ] **WP-108 Effect ledger and compensation** — Provide a durable implementation of EffectLedger; in-memory contract doubles are not production persistence.
+- [ ] **WP-108 Effect ledger and compensation** — Complete the initial review gates in PR #35 before implementation; GPT design is in docs/handoffs/gpt/WP-108.md on its separate GPT branch.
 - [ ] **WP-105 Run lifecycle and canonical progress** — Complete idempotent event/schedule initiation with WP-107 and WP-109.
 - [ ] **WP-109 Timers, deadlines and durable failover** — Complete persisted maximum lifetimes, escalation timers and deadline recovery across restart.
 - [ ] **WP-106 Human task service** — Tasks bound to workflow waits; assign, delegate, reassign, approve, reject, escalate
@@ -330,6 +330,7 @@ Requirements: M06, M07. Owned acceptance tests: T03. Start dependencies: WP-101,
 
 Additional closure/integration tasks:
 
+- [ ] Complete the initial review gates in PR #35 before implementation; GPT design is in docs/handoffs/gpt/WP-108.md on its separate GPT branch.
 - [ ] Provide a durable implementation of EffectLedger; in-memory contract doubles are not production persistence.
 
 Acceptance gates:

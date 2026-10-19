@@ -767,6 +767,7 @@
         "implemented": [],
         "completed_deliverables": [],
         "remaining_tasks": [
+          "Complete the initial review gates in PR #35 before implementation; GPT design is in docs/handoffs/gpt/WP-108.md on its separate GPT branch.",
           "Provide a durable implementation of EffectLedger; in-memory contract doubles are not production persistence."
         ],
         "evidence": []
