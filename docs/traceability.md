@@ -6,15 +6,16 @@ Requirement to test coverage and implementation status. Generated; do not edit.
 
 | Status | Tests |
 |---|---:|
-| not-started | 34 |
+| automated | 1 |
+| not-started | 33 |
 | planned | 5 |
 
 ## Requirement coverage
 
 | Requirement | Level | Tests | Work packages | Best test status |
 |---|---|---|---|---|
-| M01 Process semantics and definition validation | Mandatory | T01, T29 | WP-101, WP-104, WP-601 | not-started |
-| M02 Bounded agent autonomy and risk controls | Mandatory | T01, T06, T25, T33, T34 | WP-101, WP-104, WP-202, WP-301, WP-601 | planned |
+| M01 Process semantics and definition validation | Mandatory | T01, T29 | WP-101, WP-104, WP-601 | automated |
+| M02 Bounded agent autonomy and risk controls | Mandatory | T01, T06, T25, T33, T34 | WP-101, WP-104, WP-202, WP-301, WP-601 | automated |
 | M03 Durable execution and checkpoint recovery | Mandatory | T08, T12, T18, T26, T37 | WP-003, WP-004, WP-005, WP-109, WP-201, WP-208 | planned |
 | M04 Durable triggers, timers and lifecycle | Mandatory | T12, T13 | WP-003, WP-105, WP-107, WP-109 | planned |
 | M05 Authorized human interaction | Mandatory | T02, T12, T37 | WP-106, WP-208 | planned |
@@ -24,9 +25,9 @@ Requirement to test coverage and implementation status. Generated; do not edit.
 | M09 Version-safe in-flight work | Mandatory | T14, T28, T32 | WP-003, WP-302 | not-started |
 | M10 Governed publication and activation | Mandatory | T14, T19, T30, T31 | WP-303 | not-started |
 | M11 Authentication, delegation and secret handling | Mandatory | T02, T07, T15, T19, T36 | WP-005, WP-006, WP-102, WP-207 | not-started |
-| M12 External policy and safe denial | Mandatory | T01, T07, T23 | WP-006, WP-103 | not-started |
+| M12 External policy and safe denial | Mandatory | T01, T07, T23 | WP-006, WP-103 | automated |
 | M13 Data security, privacy and location | Mandatory | T20 | WP-306 | not-started |
-| M14 Untrusted inputs and optional code execution | Mandatory | T01, T09, T25, T35 | WP-104, WP-204, WP-205, WP-209 | not-started |
+| M14 Untrusted inputs and optional code execution | Mandatory | T01, T09, T25, T35 | WP-104, WP-204, WP-205, WP-209 | automated |
 | M15 Auditability and AI decision provenance | Mandatory | T04, T31, T34 | WP-101, WP-111, WP-203 | planned |
 | M16 Observability and operational APIs | Mandatory | T04, T16 | WP-105, WP-112 | planned |
 | M17 AI change evaluation and model continuity | Mandatory | T10, T11, T31, T38, T39 | WP-501, WP-503 | not-started |
