@@ -86,11 +86,11 @@ From [docs/plan/README.md](docs/plan/README.md), section 7:
 4. Audit events, metrics and traces exist for new decisions and effects.
 5. Configuration is documented and the defaults are safe (deny, off, bounded).
 6. An ADR is written or updated for any decision that is hard to reverse.
-7. The generated documents under `docs/` are regenerated and the traceability shows the new status.
+7. Update work-package progress/evidence and acceptance status in their JSON sources, regenerate TODO.md and the documents under docs/, and add delivered changes to CHANGELOG.md. A partial package keeps its remaining gates explicit.
 
 ## Generated documents
 
-`docs/requirements/README.md`, `docs/test-cases.md`, `docs/traceability.md` and `docs/plan/work-packages.md` are generated. Their sources are the JSON files next to them. Do not edit the generated Markdown by hand.
+`docs/requirements/README.md`, `docs/test-cases.md`, `docs/traceability.md` and `docs/plan/work-packages.md` are generated. `TODO.md` is generated too. Their sources are the requirements/status JSON and `docs/plan/work-packages.json`. Do not edit the generated Markdown by hand.
 
 After changing a JSON source, run:
 

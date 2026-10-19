@@ -54,7 +54,7 @@ Production failure, backup/restore, tenancy, model routing, publisher outage and
 | T20 | Prove location-constrained encryption, retention, erase and tenant boundary | M13, M24 | WP-404 | not-started | - |
 | T21 | Deployed in multiple self-hosted environments; offline under P1 | M22 | WP-403 | not-started | - |
 | T22 | Kill console/control services and prove controlled continuation/recovery with bounded staleness | M26, M27 | WP-304 | not-started | - |
-| T23 | Revoke policies and enforce fail-closed regardless of control service outage | M12, M20 | WP-103 | not-started | - |
+| T23 | Revoke policies and enforce fail-closed regardless of control service outage | M12, M20 | WP-305 | not-started | - |
 | T24 | Zero-data-loss upgrade/rollback for engine, schema and API in-flight | M21 | WP-402 | not-started | - |
 
 ## S5 · Agent-generated bounded plan
