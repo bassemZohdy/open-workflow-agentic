@@ -138,7 +138,8 @@ class DegradedModeTest {
         assertEquals("engine broke", d.reason());
         assertEquals(2, audit.records().size());
         assertTrue(Boolean.parseBoolean(audit.records().get(1).attributes().get("policy.recoveryPath")));
-        assertEquals("unknown recovery operation", audit.records().get(1).attributes().get("policy.reason"));
+        assertEquals("operation:delete", audit.records().get(1).resourceId());
+        assertEquals("DENY", audit.records().get(1).attributes().get("policy.outcome"));
     }
 
     @Test
