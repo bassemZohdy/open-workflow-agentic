@@ -24,8 +24,8 @@ public class WorkflowReferenceCheck {
     @PostConstruct
     void validateReferences() {
         try (InputStream input = Thread.currentThread().getContextClassLoader()
-                .getResourceAsStream("flow/references.json")) {
-            if (input == null) throw new IllegalStateException("Missing flow/references.json");
+                .getResourceAsStream("workflow-references.json")) {
+            if (input == null) throw new IllegalStateException("Missing workflow-references.json");
             var references = mapper.readValue(input,
                     new TypeReference<java.util.List<WorkflowReferenceValidator.References>>() {});
             var workflowNames = definitions.stream()
