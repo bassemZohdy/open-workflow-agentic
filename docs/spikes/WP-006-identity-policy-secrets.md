@@ -2,7 +2,7 @@
 
 **Status:** Findings, not a decision · **Date:** 2026-10-18 · **Work package:** [WP-006](../plan/work-packages.md) · **Requirements:** M11, M12 (with M02, M13, M19, M20, M26, M27)
 
-Code: [`spikes/spike-d-identity-policy`](../../spikes/spike-d-identity-policy) (standalone Maven project, 43 tests, not in the root `<modules>`). Decision record: [ADR 0021](../adr/0021-identity-delegation-policy-engine-and-secrets.md).
+Exploratory test project: temporary and removed after 43 tests were run; only findings and outcomes are retained here. Decision record: [ADR 0021](../adr/0021-identity-delegation-policy-engine-and-secrets.md).
 
 Confidence labels used below:
 

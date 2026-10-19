@@ -2,11 +2,11 @@
 
 **Status:** Closed for the questions below · **Date:** 2026-10-18 · **Version under test:** LangGraph4j 1.9.5 (same line as the root pom)
 
-Code: [spikes/spike-b-langgraph4j](../../spikes/spike-b-langgraph4j) (standalone Maven project, not in the root modules). Decision: [ADR-0020](../adr/0020-checkpoint-scoping-and-state-evolution.md).
+Exploratory test project: temporary and removed after findings were recorded. This document preserves outcomes and confidence labels. Decision: [ADR-0020](../adr/0020-checkpoint-scoping-and-state-evolution.md).
 
 ## How to read the evidence
 
-- **verified-by-test**: a test in the spike ran it on this machine (Java 21, Postgres 16 on localhost, database `spike_b`). Test names are given.
+- **verified-by-test**: a named test in the temporary spike project ran on this machine (Java 21, Postgres 16, database `spike_b`). Test names and outcomes are recorded here; source is not retained.
 - **read-in-source**: read in the 1.9.5 source jars (`langgraph4j-core`, `langgraph4j-postgres-saver`, `async-generator`) or the module POMs on Maven Central. Not run.
 - **unknown**: not tested and not settled by source reading.
 
@@ -94,7 +94,7 @@ Work packages are from [work-packages.md](../plan/work-packages.md). Nothing was
 8. The OpenTelemetry module's spans were not inspected (no exporter configured). The state-on-span behaviour is read in source only.
 9. The documentation pages are unread (blocked, see above).
 
-## Commands run
+## Historical verification record (temporary test project removed)
 
 ```
 cd spikes/spike-b-langgraph4j

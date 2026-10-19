@@ -3,7 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-10-18
 
-Evidence: [WP-006 spike report](../spikes/WP-006-identity-policy-secrets.md) and the code in `spikes/spike-d-identity-policy` (43 tests pass). Owner decisions D-1 and D-2 of the [plan](../plan/README.md) are the inputs; the secret store decision is D-9 in the plan, decided on 2026-10-19 (section 3 below).
+Evidence: [WP-006 findings report](../spikes/WP-006-identity-policy-secrets.md), which records outcomes from the temporary exploratory test harness (43 tests passed). The harness source is not retained in this repository. Owner decisions D-1 and D-2 of the [plan](../plan/README.md) are the inputs; the secret store decision is D-9 in the plan, decided on 2026-10-19 (section 3 below).
 
 Each part of the decision is marked **[verified]** (a test in the spike ran) or **[read-in-docs]** (taken from official documentation or from an artifact's own documentation, not executed). Parts marked **[unverified]** must not be relied on until the named check is done.
 

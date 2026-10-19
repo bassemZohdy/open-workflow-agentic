@@ -44,7 +44,7 @@ M23 requires that tools exposed through MCP and agents exposed through A2A are c
 
 The owner recorded two points on 2026-10-19. The Decision and Consequences text above now states them. The earlier wording is kept in this file's git history.
 
-1. **A2A reference server.** Was: the in-process reference server is not proven until "the spike follow-up closes its wiring", with no date. Now: the wiring is done before WP-207, and the disabled tests of the spike (`spikes/spike-e-protocols`, the `@Disabled` tests in Q04 to Q06) are re-enabled then. Status: decided, not yet implemented. Tracked in issue #25.
+1. **A2A reference server.** The temporary spike established protocol findings, but its source and disabled tests are not retained. WP-207 must implement and test the A2A server wiring; no exploratory code is carried forward. Status: decided, not yet implemented. Tracked in issue #25.
 2. **Langchain4j versions (D-8).** Was: the plan said "Quarkus LangChain4j 1.14.2" and implied langchain4j 1.14. Now: the plan says the 1.14.2 BOM brings langchain4j 1.20.2, and D-8 is decided: stay on Quarkus 3.39 and Quarkus LangChain4j 1.14 until finals ship. Checked on 2026-10-19 in the local Maven repository: `quarkus-langchain4j-bom` 1.14.2 imports `dev.langchain4j:langchain4j-bom` 1.20.2. On Maven Central that day the Quarkus 4 platform line had only 4.0.0.Beta1 and the quarkus-langchain4j 2 line only 2.0.0.Beta1, so neither had a final release. Revisit when finals ship (issue #26).
 
 Nothing else in this ADR is changed by the owner's decisions.

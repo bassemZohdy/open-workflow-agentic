@@ -1,6 +1,6 @@
 # WP-007 Spike E: MCP, A2A and agent protocols
 
-**Status:** Findings · **Date:** 2026-10-18 · **Owner:** WP-007 · **Code:** `spikes/spike-e-protocols/` (standalone Maven project, not in the root build)
+**Status:** Findings · **Date:** 2026-10-18 · **Owner:** WP-007 · **Exploratory project:** temporary test harness, removed after results were recorded; only outcomes are retained here
 
 Confidence labels:
 
@@ -45,7 +45,7 @@ Confidence labels:
 
 ## Test status
 
-Default build (`mvn test` in `spikes/spike-e-protocols`): 12 run, 10 pass, 2 `@Disabled`. Under `-Pa2a`: 21 run, 11 pass, 10 `@Disabled`. Both builds BUILD SUCCESS.
+Historical test result from the removed temporary project (default build): 12 run, 10 pass, 2 `@Disabled`. Under `-Pa2a`: 21 run, 11 pass, 10 `@Disabled`. Both builds BUILD SUCCESS.
 
 ## Commands and results
 

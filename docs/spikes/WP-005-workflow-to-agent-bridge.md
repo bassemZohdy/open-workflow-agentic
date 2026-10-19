@@ -2,11 +2,11 @@
 
 **Version:** 0.1 · **Date:** 2026-10-18 · **Status:** Findings, not yet reviewed by the owner
 
-Code: `spikes/spike-c-bridge/` on branch `wp-005-spike-bridge`. Decision: [ADR 0023](../adr/0023-workflow-to-agent-bridge.md). Builds on [WP-003](WP-003-quarkus-flow.md) (Quarkus Flow 1.2.0) and [WP-004](WP-004-langgraph4j-durability.md) (LangGraph4j 1.9.5, V2 saver, derived ThreadId).
+Exploratory test project: temporary and removed after findings were recorded. This document preserves outcomes and confidence labels. Decision: [ADR 0023](../adr/0023-workflow-to-agent-bridge.md). Builds on [WP-003](WP-003-quarkus-flow.md) (Quarkus Flow 1.2.0) and [WP-004](WP-004-langgraph4j-durability.md) (LangGraph4j 1.9.5, V2 saver, derived ThreadId).
 
 ## How to read the evidence
 
-- **verified-by-test**: a test in `spikes/spike-c-bridge` runs against the packaged application in separate JVMs (killed with `kill -9`) and passes, or is kept as a characterization of an observed failure. The test name is given.
+- **verified-by-test**: a named test in the temporary project ran against the packaged application in separate JVMs (killed with `kill -9`) and passed, or recorded an observed failure. Test names and outcomes are recorded here; source is not retained.
 - **measured-by-hand**: a number from a manual run against a running process, not a test. The count is given.
 - **read-in-source** or **read-in-docs**: taken from the Quarkus Flow or Serverless Workflow 7.35.3 source jars, or the WP-003 findings. Not run here.
 - **unknown**: not established.
@@ -123,7 +123,7 @@ Two failure paths in the spike, fixed on branch `issue-9-wp005-hardening`. Each 
 
 The 21 original tests are unchanged in meaning; the new tests add 7. Not covered: a kill -9 during the resume itself, a real database outage (only injected faults), and a retry after a failure in the middle of an attempt, which the retry rule allows but no test forces.
 
-## Commands run
+## Historical verification record (temporary test project removed)
 
 ```
 git merge --no-edit wp-003-spike-flow            # fast-forward, already contained in HEAD

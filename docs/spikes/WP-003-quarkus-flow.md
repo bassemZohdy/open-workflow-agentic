@@ -2,11 +2,11 @@
 
 **Version:** 0.1 · **Date:** 2026-10-18 · **Status:** Findings, not yet reviewed by the owner
 
-Code: `spikes/spike-a-flow/` on branch `wp-003-spike-flow`. Decision: [ADR 0019](../adr/0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md).
+Exploratory test project: temporary and removed after findings were recorded. This document preserves outcomes and confidence labels. Decision: [ADR 0019](../adr/0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md).
 
 ## How to read the evidence
 
-- **verified-by-test**: a test in the spike runs against the real engine and passes (or is `@Disabled` with the observed failure). The test name is given.
+- **verified-by-test**: a named test in the temporary spike project ran against the real engine and passed (or was disabled with the observed failure). Test names and outcomes are recorded here; source is not retained.
 - **read-in-docs**: taken from the Quarkus Flow documentation or from the Serverless Workflow SDK source code. Not run here.
 - **unknown**: not established by test or documentation.
 

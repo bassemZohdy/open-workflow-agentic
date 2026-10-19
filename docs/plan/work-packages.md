@@ -42,7 +42,7 @@ Fix the repository structure and test harness, and answer the open technical que
 - Acceptance-test harness marks test status automatically
 - Spikes A to E are closed with an ADR each; remaining unknowns have an owner and a validation point
 - Acceptance status reporting includes Maven Failsafe reports for process-level integration tests
-- Standalone spike tests have reproducible commands and an explicit CI or manual verification policy
+- Spike reports preserve findings, evidence and confidence; experimental code and test harnesses are not retained in this repository
 
 | WP | Title | Type | Size | Requirements | Owns tests | Depends on |
 |---|---|---|---|---|---|---|

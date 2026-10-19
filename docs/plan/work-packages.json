@@ -23,7 +23,7 @@
     "Acceptance-test harness marks test status automatically",
     "Spikes A to E are closed with an ADR each; remaining unknowns have an owner and a validation point",
     "Acceptance status reporting includes Maven Failsafe reports for process-level integration tests",
-    "Standalone spike tests have reproducible commands and an explicit CI or manual verification policy"
+    "Spike reports preserve findings and evidence; experimental spike code is not retained in this repository"
    ]
   },
   {
@@ -168,7 +168,7 @@
     "WP-001"
    ],
    "deliverables": [
-    "Written findings with evidence, confidence and explicit unknowns; standalone characterization tests with reproducible commands",
+    "Written findings with evidence, confidence and explicit unknowns; no spike source or test harness retained in this repository",
     "ADR on how instances are started, queried, cancelled and resumed",
     "Document which standalone tests run in CI and which require an isolated Postgres/database or process environment"
    ],
@@ -178,7 +178,7 @@
     "quarkus-flow-scheduler",
     "quarkus-flow-messaging"
    ],
-   "notes": "Questions: start by API with input; listen and emit events with durable resume after restart; timeouts and deadlines; two versions of one definition running together; instance query and cancel API; schema created by JPA module; Kubernetes lease durability; retries; calling a CDI bean as a function; how MDC and identity propagate. Process tests are opt-in and must only use the dedicated spike_a database; the root Maven build does not include this standalone project."
+   "notes": "Questions: start by API with input; listen and emit events with durable resume after restart; timeouts and deadlines; two versions of one definition running together; instance query and cancel API; schema created by JPA module; Kubernetes lease durability; retries; calling a CDI bean as a function; how MDC and identity propagate. Exploratory tests were run outside the root build; only their outcomes and open questions are retained in this repository."
   },
   {
    "id": "WP-004",
