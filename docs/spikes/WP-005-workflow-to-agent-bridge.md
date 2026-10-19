@@ -2,7 +2,7 @@
 
 **Version:** 0.1 · **Date:** 2026-10-18 · **Status:** Findings, not yet reviewed by the owner
 
-Code: `spikes/spike-c-bridge/` on branch `wp-005-spike-bridge`. Decision: [ADR 0023](../adr/0023-workflow-to-agent-bridge.md). Builds on [WP-003](WP-003-quarkus-flow.md) (Quarkus Flow 1.2.0) and [WP-004](WP-004-langgraph4j-durability.md) (LangGraph4j 1.9.5, V2 saver, derived ThreadId).
+Code: removed (issue #30). The spike was temporary, was never part of the root build or the product, and only its outcomes are kept here; the code is in git history at `b76181d` under `spikes/`. The product work package builds and tests the real implementation. Decision: [ADR 0023](../adr/0023-workflow-to-agent-bridge.md). Builds on [WP-003](WP-003-quarkus-flow.md) (Quarkus Flow 1.2.0) and [WP-004](WP-004-langgraph4j-durability.md) (LangGraph4j 1.9.5, V2 saver, derived ThreadId).
 
 ## How to read the evidence
 
@@ -124,6 +124,8 @@ Two failure paths in the spike, fixed on branch `issue-9-wp005-hardening`. Each 
 The 21 original tests are unchanged in meaning; the new tests add 7. Not covered: a kill -9 during the resume itself, a real database outage (only injected faults), and a retry after a failure in the middle of an attempt, which the retry rule allows but no test forces.
 
 ## Commands run
+
+*Historical: these ran against the spike code, since removed (issue #30).*
 
 ```
 git merge --no-edit wp-003-spike-flow            # fast-forward, already contained in HEAD

@@ -2,7 +2,7 @@
 
 **Version:** 0.1 · **Date:** 2026-10-18 · **Status:** Findings, not yet reviewed by the owner
 
-Code: `spikes/spike-a-flow/` on branch `wp-003-spike-flow`. Decision: [ADR 0019](../adr/0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md).
+Code: removed (issue #30). The spike was temporary, was never part of the root build or the product, and only its outcomes are kept here; the code is in git history at `b76181d` under `spikes/`. The product work package builds and tests the real implementation. Decision: [ADR 0019](../adr/0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md).
 
 ## How to read the evidence
 

@@ -3,7 +3,7 @@
 **Status:** Accepted  
 **Date:** 2026-10-18
 
-Evidence: [WP-006 spike report](../spikes/WP-006-identity-policy-secrets.md) and the code in `spikes/spike-d-identity-policy` (43 tests pass). Owner decisions D-1 and D-2 of the [plan](../plan/README.md) are the inputs; the secret store decision is D-9 in the plan, decided on 2026-10-19 (section 3 below).
+Evidence: [WP-006 spike report](../spikes/WP-006-identity-policy-secrets.md) (its code was removed in issue #30 and is in git history at `b76181d`). Owner decisions D-1 and D-2 of the [plan](../plan/README.md) are the inputs; the secret store decision is D-9 in the plan, decided on 2026-10-19 (section 3 below).
 
 Each part of the decision is marked **[verified]** (a test in the spike ran) or **[read-in-docs]** (taken from official documentation or from an artifact's own documentation, not executed). Parts marked **[unverified]** must not be relied on until the named check is done.
 
