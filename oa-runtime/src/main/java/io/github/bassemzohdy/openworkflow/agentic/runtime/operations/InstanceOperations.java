@@ -106,7 +106,7 @@ public class InstanceOperations {
     private final InstanceInspection inspection;
     private final Clock clock;
 
-    /** The audit trail is injected by its concrete type, for the same reason as in {@code PolicyDecisionAudit}. */
+    /** The audit trail is injected by its concrete type, because {@code AuditProducers} also produces the sink interface, so injecting by interface would be ambiguous. */
     @Inject
     public InstanceOperations(InstanceStore store, Reconciler reconciler, Pep pep, AuditTrail audit,
                               OperationKeys keys, InstanceInspection inspection) {

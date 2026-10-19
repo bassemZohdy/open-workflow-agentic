@@ -411,7 +411,7 @@ The relay runs in each process on a single-thread executor (`OutboxRelayService`
 
 ## 11. Operations API (WP-105d)
 
-Code: `InstanceOperations`, `InstanceInspection`, `OperationKeys`, `OperationsProducers` (package `runtime.operations`); `OperationsResource` and `ProblemException` (`runtime.api`); `PolicyDecisionAudit` (`runtime.audit`); `Pep.instanceOperation` (`runtime.policy`). Schema: V40 (`task.operation_request`). Policy: `oa-runtime/src/main/resources/policy/operations`.
+Code: `InstanceOperations`, `InstanceInspection`, `OperationKeys`, `OperationsProducers` (package `runtime.operations`); `OperationsResource` and `ProblemException` (`runtime.api`); `Pep.instanceOperation` (`runtime.policy`). Schema: V40 (`task.operation_request`). Policy: `oa-runtime/src/main/resources/policy/operations`.
 
 ### 11.1 Endpoints
 
@@ -485,7 +485,7 @@ Errors are RFC 9457 problem documents with `correlationId`. The detail is writte
 
 Every attempt writes events through the trail (WP-111), with the operator as actor:
 
-1. `policy.decision`: written by the policy enforcement point through `PolicyDecisionAudit` for every decision, including the recovery rule's decision when it applies. Its version stamps carry the policy id and the policy-set version.
+1. `policy.decision`: written by the policy enforcement point (through the shared audit sink) for every decision, including the recovery rule's decision when it applies. Its version stamps carry the policy id and the policy-set version.
 2. `operation.attempt`: written before any change, with `oa.outcome` `allowed`, `denied` or `error`, and the same stamps. If it cannot be written, the call is 503 and nothing changes.
 3. `operation.result`: written after the call, with the outcome label: `inspected`, `cancel-requested`, `already-requested`, `already-terminal` (recorded as `noop-terminal`), `retry-requested`, `recover-requested`, `replayed`, `not-implemented`, `not-found`, `stale`, `busy`, `key-reused`, `in-progress`, `refused-status`, `refused-terminal`, `nothing-retried`, `illegal-transition`, `store-unavailable` or `failed`.
 

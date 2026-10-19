@@ -68,7 +68,8 @@ class PepInstanceOperationTest {
         }
         // Each refused decision still reaches the audit sink; the recovery attempt is recorded as a refusal too.
         long recoveryRefusals = audit.records().stream()
-                .filter(r -> r.recoveryPath() && r.decision().outcome() == DecisionOutcome.DENY)
+                .filter(r -> "true".equals(r.attributes().get("policy.recoveryPath"))
+                        && "DENY".equals(r.attributes().get("policy.outcome")))
                 .count();
         assertEquals(3, recoveryRefusals);
     }

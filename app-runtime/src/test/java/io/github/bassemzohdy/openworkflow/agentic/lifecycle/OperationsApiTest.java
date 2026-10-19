@@ -88,7 +88,7 @@ class OperationsApiTest {
         assertEquals(0, auditCount(dataSource, "operation.result", id, "inspected"));
         assertTrue(LifecycleSupport.count(dataSource,
                 "select count(*) from audit.event where event_type = 'policy.decision' and resource_id = 'operation:inspect'"
-                        + " and attributes ->> 'oa.outcome' = 'DENY' and attributes ->> 'oa.recovery-path' = 'false'") >= 1,
+                        + " and attributes ->> 'policy.outcome' = 'DENY' and attributes ->> 'policy.recoveryPath' = 'false'") >= 1,
                 "the refusal is also a recorded policy decision");
         assertEquals("RUNNING", status(dataSource, id));
     }

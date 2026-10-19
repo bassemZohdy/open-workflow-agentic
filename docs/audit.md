@@ -19,6 +19,8 @@ The contract has no chain, instance, correlation, version or payload fields. The
 | `oa.payload.ref`, `oa.payload.digest` | Reference id and SHA-256 digest (reference form only). |
 | `field.<path>` | A payload field, inline or as a salted digest (section 4). |
 
+The shared `runtime.audit.AuditSink` is the write port for the trail and for policy decisions. WP-103 converts each PEP decision to an `AuditEvent` with action `policy.decision`; the event records the actor and resource, outcome, deciding component, policy id/version, action kind, task id when present, and whether safe recovery produced it. Policy context and free-form decision reasons are not copied into event attributes.
+
 Rules that follow from the encoding:
 
 - `occurredAt` is stored and hashed at microsecond precision, the precision of PostgreSQL. The trail truncates it before sealing, so the hash verifies after a round trip.
@@ -171,11 +173,11 @@ Each attempt on the operations API (`docs/lifecycle.md`, section 11) writes thes
 
 | Action | Written | Attributes beyond the stamps |
 |---|---|---|
-| `policy.decision` (resource type `policy-request`) | Once per policy decision, by `PolicyDecisionAudit` | `oa.outcome`, `oa.decided-by`, `oa.recovery-path` |
+| `policy.decision` (resource type `policy-resource`) | Once per policy decision, by the PEP (section 3, WP-103) | `policy.outcome`, `policy.decidedBy`, `policy.id`, `policy.version`, `policy.action`, `policy.recoveryPath` |
 | `operation.attempt` (resource type `instance`) | Before any change; if it cannot be written, the call is refused | `oa.tenant`, `oa.instance`, `oa.operation`, `oa.outcome` (`allowed`, `denied` or `error`) |
 | `operation.result` (resource type `instance`) | After the call | the same, with `oa.outcome` set to the result label |
 
-Each event carries the version stamps of its decision (`stamp.policy`, `stamp.policy-set`). The attributes are inline, not by reference, so the outcome is readable without the payload store.
+The operation events carry the version stamps of their decision (`stamp.policy`, `stamp.policy-set`). The attributes are inline, not by reference, so the outcome is readable without the payload store.
 
 ## 10. Gaps and what remains
 
@@ -183,7 +185,7 @@ Each event carries the version stamps of its decision (`stamp.policy`, `stamp.po
 |---|---|---|
 | External anchor of the chain head (write-once storage, periodic export of the last hash per chain) | Out of scope for WP-111; list it in the operations work (WP-401) | Without it, an owner who rewrites events and head records together is not detected |
 | Identity of actors (`Subject` is supplied by the caller today) | WP-102 | `AuditAccess` uses an anonymous subject |
-| Policy decision point bound for the audit API; decisions recorded by the policy library | WP-103 | The library calls `AuditSink.record(AuditEvent)` |
+| Policy decision point bound for the audit API | WP-103 | The PEP and audit API use the shared audit port; policy decision events are recorded as `AuditEvent` |
 | Recording effects and reconciler actions | WP-108, WP-105 | Use `AuditRecorder` or `AuditSink` |
 | Acceptance tests T04, T31, T34 | WP-301, WP-501, WP-203 | Not owned here |
 | Head log growth (one row per event) and archival of old chains | Operations (WP-401) | Verification reads the whole chain in memory; large chains need paged verification |

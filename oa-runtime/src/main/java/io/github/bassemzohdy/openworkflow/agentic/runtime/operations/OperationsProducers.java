@@ -1,6 +1,6 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.operations;
 
-import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.PolicyDecisionAudit;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.CedarPolicyDecisionPoint;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.ManifestPolicySnapshotSource;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
@@ -29,7 +29,7 @@ public class OperationsProducers {
 
     @Produces
     @Singleton
-    public Pep operationsPep(PolicyDecisionAudit audit) {
+    public Pep operationsPep(AuditTrail audit) {
         CedarPolicyDecisionPoint engine = new CedarPolicyDecisionPoint();
         CedarPolicyDecisionPoint.RefreshOutcome outcome = engine.refresh(
                 ManifestPolicySnapshotSource.ofClasspath(Thread.currentThread().getContextClassLoader(), policyFolder));

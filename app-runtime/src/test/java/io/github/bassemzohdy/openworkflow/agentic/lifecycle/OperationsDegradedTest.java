@@ -42,7 +42,7 @@ class OperationsDegradedTest {
         assertEquals(1, auditCount(dataSource, "operation.attempt", id, "allowed"));
         assertTrue(LifecycleSupport.count(dataSource,
                 "select count(*) from audit.event where event_type = 'policy.decision' and resource_id = 'operation:cancel'"
-                        + " and attributes ->> 'oa.recovery-path' = 'true' and attributes ->> 'oa.outcome' = 'ALLOW'") >= 1,
+                        + " and attributes ->> 'policy.recoveryPath' = 'true' and attributes ->> 'policy.outcome' = 'ALLOW'") >= 1,
                 "the recovery allow is a recorded decision");
     }
 
