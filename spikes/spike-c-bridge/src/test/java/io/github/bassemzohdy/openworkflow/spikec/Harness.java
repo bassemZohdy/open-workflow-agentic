@@ -24,13 +24,13 @@ import java.util.function.BooleanSupplier;
 
 /**
  * Process-level harness. Each application run is a separate JVM started from the packaged jar, killed with
- * SIGKILL ({@code kill -9}) and started again on the same database, as spike-a and spike-b do. Only the spike_c
- * database is used. The HTTP port is 18195 (8081 is used by other sessions).
+ * SIGKILL ({@code kill -9}) and started again on the same database, as spike-a and spike-b do. Only the database
+  * named by SPIKEC_JDBC_URL is used (default spike_c). The HTTP port is 18196; 8081 and 18195 belong to other sessions.
  */
 final class Harness {
 
-    static final String BASE = "http://127.0.0.1:18195";
-    static final String JDBC = "jdbc:postgresql://localhost:5432/spike_c";
+    static final String BASE = "http://127.0.0.1:18196";
+    static final String JDBC = System.getenv().getOrDefault("SPIKEC_JDBC_URL", "jdbc:postgresql://localhost:5432/spike_c");
     static final Path JAR = Path.of("target/quarkus-app/quarkus-run.jar");
     static final Path LOGS = Path.of("target/process-logs");
     static final ObjectMapper JSON = new ObjectMapper();
@@ -116,6 +116,33 @@ final class Harness {
         }
     }
 
+    /** A raw answer: status, media type and body. */
+    record Raw(int status, String contentType, String body) {
+    }
+
+    /** POST that returns the status and media type instead of failing on 3xx and above. */
+    static Raw postRaw(String path, Object body) throws IOException, InterruptedException {
+        HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(BASE + path))
+                .timeout(Duration.ofSeconds(30))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
+                .build(), HttpResponse.BodyHandlers.ofString());
+        return new Raw(r.statusCode(), r.headers().firstValue("Content-Type").orElse(""), r.body());
+    }
+
+    /** HTTP status of a GET, or -1 when nothing answers. */
+    static int status(String path) {
+        try {
+            return HTTP.send(HttpRequest.newBuilder(URI.create(BASE + path))
+                    .timeout(Duration.ofSeconds(5)).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode();
+        } catch (IOException e) {
+            return -1;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return -1;
+        }
+    }
+
     static void await(String what, Duration timeout, BooleanSupplier condition) throws InterruptedException {
         long deadline = System.nanoTime() + timeout.toNanos();
         while (System.nanoTime() < deadline) {
@@ -148,7 +175,7 @@ final class Harness {
             Files.createDirectories(LOGS);
             List<String> cmd = new ArrayList<>();
             cmd.add(System.getProperty("java.home") + "/bin/java");
-            cmd.add("-Dquarkus.http.port=18195");
+            cmd.add("-Dquarkus.http.port=18196");
             props.forEach((k, v) -> cmd.add("-D" + k + "=" + v));
             cmd.add("-jar");
             cmd.add(JAR.toString());
@@ -188,6 +215,17 @@ final class Harness {
 
         String logText() throws IOException {
             return Files.exists(log) ? Files.readString(log) : "";
+        }
+
+        /** Waits until the process log contains the text. */
+        void awaitLog(String text, Duration timeout) throws InterruptedException {
+            await(name + " log contains: " + text, timeout, () -> {
+                try {
+                    return logText().contains(text);
+                } catch (IOException e) {
+                    return false;
+                }
+            });
         }
     }
 }

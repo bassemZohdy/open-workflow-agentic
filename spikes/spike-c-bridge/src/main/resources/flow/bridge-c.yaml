@@ -15,7 +15,7 @@ do:
       with:
         method: post
         endpoint:
-          uri: http://localhost:18195/agents/research/start
+          uri: http://localhost:18196/agents/research/start
         headers:
           X-Correlation-Id: ${ $workflow.input.correlationId }
         body: ${ $workflow.input }
@@ -34,7 +34,7 @@ do:
       with:
         method: post
         endpoint:
-          uri: http://localhost:18195/agents/research/acks
+          uri: http://localhost:18196/agents/research/acks
         body: '${ { instanceId: ((if type == "array" then .[0] else . end) | (.instanceId // .data.instanceId)), type: "spikec.agent.started" } }'
   - awaitApproval:
       listen:
@@ -51,7 +51,7 @@ do:
       with:
         method: post
         endpoint:
-          uri: http://localhost:18195/agents/research/resume-async
+          uri: http://localhost:18196/agents/research/resume-async
         body: '${ { instanceId: ((if type == "array" then .[0] else . end) | (.instanceId // .data.instanceId)) } }'
   - awaitAgentCompleted:
       listen:
@@ -68,5 +68,5 @@ do:
       with:
         method: post
         endpoint:
-          uri: http://localhost:18195/agents/research/acks
+          uri: http://localhost:18196/agents/research/acks
         body: '${ { instanceId: ((if type == "array" then .[0] else . end) | (.instanceId // .data.instanceId)), type: "spikec.agent.completed" } }'

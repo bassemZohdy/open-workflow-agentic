@@ -45,6 +45,17 @@
       <version>${quarkus-db-scheduler.version}</version>
     </dependency>
 
+    <!-- Policy decision point (WP-103, ADR 0021): Cedar embedded. The default jar has no native library; the uber
+         classifier bundles the native libraries for all platforms. cedar-java declares Guava at runtime scope but
+         exposes its types, so the consumer declares it (see docs/policy.md). -->
+    <dependency>
+      <groupId>com.cedarpolicy</groupId>
+      <artifactId>cedar-java</artifactId>
+      <version>${cedar-java.version}</version>
+      <classifier>uber</classifier>
+    </dependency>
+    <dependency><groupId>com.google.guava</groupId><artifactId>guava</artifactId></dependency>
+
     <!-- Metrics: outbox lag gauges (WP-105b); the registry is chosen in app-runtime -->
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-micrometer</artifactId></dependency>
 
