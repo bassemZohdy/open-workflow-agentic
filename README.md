@@ -58,6 +58,9 @@ Unit tests live with the library they test. Quarkus boot tests and packaged-proc
 
 ## Documentation and implementation status
 
+[CHANGELOG.md](CHANGELOG.md) records shipped capabilities and requirement evidence.
+[TODO.md](TODO.md) tracks every work package, deliverable, acceptance gate, open decision and deferred requirement.
+
 - [Architecture](docs/architecture.md) and [repository structure](docs/repository-structure.md).
 - [Lifecycle and recovery](docs/lifecycle.md), [identity and delegation](docs/identity.md), [policy](docs/policy.md), [audit](docs/audit.md), and [contracts](docs/contracts.md).
 - [Requirements](docs/requirements/README.md), [acceptance tests](docs/test-cases.md), and [traceability](docs/traceability.md).
@@ -73,6 +76,7 @@ Only spike findings, measurements and decisions are retained in `docs/spikes` an
 Experimental spike implementations are not part of this repository. Product code and regression tests belong
 in the application or library responsible for that capability.
 
+Implementation progress is maintained in `docs/plan/work-packages.json`; TODO.md and the progress pages are generated.
 After editing a requirements, status or work-package JSON source, run `python3 tools/render_requirements.py`.
 CI checks that generated Markdown matches the source data.
 

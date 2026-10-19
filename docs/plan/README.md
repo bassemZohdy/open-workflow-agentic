@@ -1,8 +1,29 @@
 # Implementation plan
 
-**Version:** 0.1 · **Date:** 2026-10-18 · **Status:** Proposed
+**Version:** 0.2 · **Date:** 2026-10-19 · **Status:** Active implementation tracking
 
 This plan turns the 64 requirements and 39 acceptance tests ([requirements](../requirements/README.md), [test cases](../test-cases.md)) into an ordered build. The exact work packages, sizes, dependencies and critical path are in [work-packages.md](work-packages.md), generated from [work-packages.json](work-packages.json). A checker fails the build if a Mandatory requirement has no work package, a test has no single owner, or a dependency points to a later phase.
+
+## Current progress and next work
+
+The plan contains **53 work packages**: **11 completed**, **10 partial**, and **32 not started**. Five completed
+packages are research outcomes; their prototype code is removed. Only **T01 and T07 (2 of 39 acceptance cases)**
+are recorded as automated. [TODO.md](../../TODO.md) is the complete generated checklist;
+[CHANGELOG.md](../../CHANGELOG.md) records shipped scope and requirement evidence.
+
+The merged code includes foundation/testkit work, contracts, policy and audit components, workflow/output validation,
+lifecycle registry/outbox/recovery/operator APIs and identity/delegation. Full requirement coverage remains partial.
+WP-102 cannot close until the real Keycloak integration in identity.md section 9 is run and recorded; the passing
+T07 suite uses in-process stand-ins. Audit caller/PDP wiring also remains open.
+
+Next: close the real-IdP and policy integration gates, implement the durable WP-108 effect ledger, then close
+WP-105's complete recovery/T16 proof. Finish timers/two-replica recovery (WP-109), human tasks (WP-106),
+idempotent inbox/event correlation (WP-107) and general resilience (WP-110). T23 belongs to WP-305 because
+it tests emergency revocation across active/waiting tasks, not only the policy library.
+
+Work-package progress, evidence, completed deliverables, remaining gates and decisions are maintained in
+work-packages.json. The size table and critical path remain original full-scope estimates; they include completed
+work and must be re-estimated before making remaining-delivery commitments.
 
 ## 1. What the requirements really ask for
 
@@ -171,7 +192,7 @@ Principles:
 
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
-| R1 | Quarkus Flow is young (1.0 in August 2026); persistence or recovery gaps appear late | Medium | High | Spike A first; characterization tests kept; contribute fixes upstream; keep the workflow-to-agent contract narrow so the engine can be replaced |
+| R1 | Quarkus Flow is young (1.0 in August 2026); persistence or recovery gaps appear late | Medium | High | Spike A first; findings retained; product characterization tests maintained in the owning work packages; contribute fixes upstream; keep the workflow-to-agent contract narrow so the engine can be replaced |
 | R2 | No official Flow to LangGraph4j bridge; our bridge is the weakest point | High | High | Spike C; ADR; keep agent behind a port; test crash-mid-step explicitly |
 | R3 | Two engines diverge after a crash | Medium | High | Canonical progress model and reconciler built before agent features (WP-105) |
 | R4 | Checkpoint state classes change between versions and break resume | Medium | High | State-schema versioning in WP-201; pinning in WP-302; upgrade drill in WP-402 |
@@ -184,26 +205,26 @@ Principles:
 | R11 | Development environment limits (no container daemon, network allow-list) hide integration problems | Medium | Medium | CI with real services; documented dev compose; nightly drills |
 | R12 | Data location and encryption rules differ by deployment | Medium | Medium | Configurable constraints from WP-306; deployment profiles in WP-403 |
 
-## 9. Decisions needed from the owner
+## 9. Decisions and conditional follow-ups
 
 Each has a recommended default so work is not blocked. Rows marked decided were settled by the owner, and their text is the decision.
 
-| # | Decision | Recommended default | Needed by |
+| Decision | Status | Current decision / proposed default | Owner |
 |---|---|---|---|
-| D-1 | Identity provider | Keycloak (OIDC, token exchange) | WP-006 |
-| D-2 | Policy engine | OPA sidecar if the organization already runs it; otherwise Cedar embedded. Decided by the spike | WP-006 |
-| D-3 | Target platform | OpenShift and plain Kubernetes; Helm | WP-403 |
-| D-4 | Console technology | Server-rendered Quarkus (Qute) unless a TypeScript SPA is required | WP-603 |
-| D-5 | Model access | Quarkus LangChain4j bindings in the app, optional external gateway | WP-503 |
-| D-6 | Tenancy | Single tenant first; row-level security when needed | WP-404 |
-| D-7 | Reporting duties for AI incidents | Hook only; content depends on the applicable profile | WP-305 |
-| D-8 | Quarkus 4 and LangChain4j 2 | **Decided 2026-10-19:** stay on Quarkus 3.39.5 and Quarkus LangChain4j 1.14.2 until finals ship. The 1.14.2 BOM brings langchain4j 1.20.2 (see the note in section 3) | WP-402 |
-| D-9 | Secret store | **Decided 2026-10-19 (ADR 0021):** Vault where the organization runs it; Kubernetes Secrets for static values. `quarkus-vault` stays on the BOM's 4.9.0, and a Vault integration test on 4.9.0 is required before the Vault path is chosen | WP-102 |
+| D-1 Identity provider | open | Recommended: Keycloak OIDC/token exchange; confirm the deployment issuer and complete real integration. | WP-102 |
+| D-2 Policy engine | decided | Cedar embedded; OPA sidecar remains an organizational alternative (ADR 0021). | WP-103 |
+| D-3 Target platform | open | Recommended: OpenShift and plain Kubernetes, packaged with Helm. | WP-403 |
+| D-4 Console technology | open | Recommended: Qute unless the console needs a TypeScript SPA. | WP-603 |
+| D-5 Model access | open | Current implementation: Quarkus LangChain4j through LlmClient. Confirm governed bindings and optional external gateway for WP-503. | WP-503 |
+| D-6 Tenancy | open | Recommended: single tenant first; introduce row-level security when multi-tenancy is enabled. | WP-404 |
+| D-7 AI incident reporting | open | Recommended: reporting hook; content and obligations follow the activated deployment profile. | WP-305 |
+| D-8 Quarkus 4 and LangChain4j 2 | decided | Stay on the current stable lines; revisit only when final releases are evaluated (issue #26). | WP-402 |
+| D-9 Secret store | decided | Mounted Kubernetes Secrets for static values. Vault where already operated; validate the BOM-pinned 4.9.0 binding before selecting that path. | WP-102 |
 
-## 10. First two weeks
+## 10. Tracking and closure
 
-1. WP-001: restructure into modules, add boundary rules and CI.
-2. WP-002: acceptance annotation, status generator, scripted model, fault injection.
-3. WP-003 and WP-004 in parallel; start WP-006 and WP-007.
-4. Close WP-005 with an ADR replacing ADR 0014 or confirming it.
-5. Re-plan: update sizes and the critical path with what the spikes taught.
+1. Use TODO.md for the active backlog and every remaining deliverable; keep deferred requirements visible.
+2. Update work-packages.json progress and evidence when code lands; update test-status.json only from passing acceptance evidence.
+3. A completed component does not close a whole requirement. Keep integration gates and evidence limits explicit.
+4. Run tools/render_requirements.py after changing any source JSON. CI checks generated progress and TODO.md.
+5. Record shipped changes in CHANGELOG.md. Re-estimate incomplete work before assigning calendar dates.

@@ -184,7 +184,7 @@ The operation events carry the version stamps of their decision (`stamp.policy`,
 | Item | Owner | Note |
 |---|---|---|
 | External anchor of the chain head (write-once storage, periodic export of the last hash per chain) | Out of scope for WP-111; list it in the operations work (WP-401) | Without it, an owner who rewrites events and head records together is not detected |
-| Identity of actors (`Subject` is supplied by the caller today) | WP-102 | `AuditAccess` uses an anonymous subject |
+| Verified caller identity for audit access | WP-102 / WP-103 | Identity verification exists, but `AuditAccess` still supplies an anonymous subject; bind the verified caller and PDP before treating this API as a production-authorized query path |
 | Policy decision point bound for the audit API | WP-103 | The PEP and audit API use the shared audit port; policy decision events are recorded as `AuditEvent` |
 | Recording effects and reconciler actions | WP-108, WP-105 | Use `AuditRecorder` or `AuditSink` |
 | Acceptance tests T04, T31, T34 | WP-301, WP-501, WP-203 | Not owned here |

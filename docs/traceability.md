@@ -2,6 +2,8 @@
 
 Requirement to test coverage and implementation status. Generated; do not edit.
 
+The best test status below is not full requirement closure. See [TODO.md](../TODO.md#requirement-coverage) for implemented scope and remaining work.
+
 ## Coverage summary
 
 | Status | Tests |
