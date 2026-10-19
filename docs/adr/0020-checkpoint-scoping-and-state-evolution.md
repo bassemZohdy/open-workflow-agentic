@@ -1,6 +1,6 @@
 # ADR-0020: Checkpoint scoping and state evolution
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2026-10-18
 
 ## Context
@@ -26,7 +26,7 @@ The current `ResearchAgent` uses V1 with `ObjectStreamStateSerializer` and no th
    - Rename a key: expand (write both, read either), then contract in a later release.
    - Never rename or move a value class without an upcaster.
    These rules must be verified for JSON in WP-201 (the Jackson variant was not tested in WP-004).
-4. **Pin in-flight runs.** `agent_task` records the graph version and state schema version of each run (WP-302). A new version starts new threads only. Old graph and state classes stay deployable until their threads are released or upcast.
+4. **Pin in-flight runs.** `agent_task` records the graph version and state schema version of each run (WP-302). The two fields are added to the `AgentTaskRecord` contract at WP-302, not earlier. A new version starts new threads only. Old graph and state classes stay deployable until their threads are released or upcast.
 5. **Bound growth.** Large content (documents, long drafts, retrieved sources) is stored outside state, referenced by id, and written through the memory or effect store. The runtime keeps the latest checkpoint and the interrupt points for each thread. A scheduled job deletes checkpoint rows of released threads after a retention period, because the saver never deletes them. Growth is measured per release with the Q3 test.
 6. **Nodes are idempotent under re-execution.** A node that calls a system of record does so through the effect ledger (WP-108), keyed by thread name and node id.
 7. **Cancellation.** A hard cancel uses `cancel(true)` and only for nodes that handle interruption. A soft cancel stops subsequent nodes but lets the running node finish.
@@ -35,7 +35,7 @@ The current `ResearchAgent` uses V1 with `ObjectStreamStateSerializer` and no th
 
 - Scope collisions by thread name are not possible by construction, and the ownership check is in the runtime, where audit can see it (identity and data requirements M11 and M24 in the plan's grouping).
 - The `agent_task` table is the single place for thread ownership, pinning and status. It is also the place to find threads for retention.
-- Replacing the serializer changes how every new checkpoint is written, and old Java-serialized checkpoints stay readable only through a compatibility reader. The owner needs to confirm that no checkpoint written by the current serializer must be kept. If one must, the compatibility reader is part of WP-201.
+- Replacing the serializer changes how every new checkpoint is written, and old Java-serialized checkpoints stay readable only through a compatibility reader. Some checkpoints written by the current Java serializer must stay readable, so the compatibility reader is part of WP-201 (owner decision, 2026-10-19).
 - JSON state has to be designed as data. Typed value classes are not stored inside state. This is a restriction on agent authors, enforced by the state schema.
 - Subgraph composition is limited for interruptible agents. Multi-agent designs (WP-207) use flat graphs or one thread per specialist, coordinated by the workflow.
 - Growth needs a retention job and an external store for large content. This adds work to WP-105 and WP-206.
@@ -47,3 +47,12 @@ The current `ResearchAgent` uses V1 with `ObjectStreamStateSerializer` and no th
 - **One database schema or database per tenant now.** Deferred. It is compatible with this decision (ADR-0011 allows splitting later), but it does not fix collisions inside a schema, and it costs operations work the proof of concept does not need.
 - **Use subgraphs for specialists and rely on their interrupts.** Rejected for now. The subgraph resume failure (Q8) is observed on both savers.
 - **Keep all state in the checkpointer, with no external store.** Rejected. Quadratic growth (Q3) makes large content in state too expensive.
+
+## Amendments (2026-10-19)
+
+The owner decided the two points below on 2026-10-19. The Decision and Consequences text above now states them. The earlier wording is kept in this file's git history.
+
+7. **Compatibility reader.** Was: the owner was to confirm whether any checkpoint written by the current serializer must be kept, and the reader would be part of WP-201 only if so. Now: some such checkpoints must stay readable, so the compatibility reader is part of WP-201. Status: decided, not yet implemented (WP-201).
+8. **Pinning fields.** Was: decision 4 placed the graph version and state schema version on `agent_task` at WP-302, without saying when the contract record carries them. Now: the two fields are added to `AgentTaskRecord` at WP-302, not earlier. Status: decided, not yet implemented (WP-302). The columns are nullable and are written by later slices, as `docs/lifecycle.md` section 1 describes.
+
+Decisions 1 to 3 and 5 to 7 are unchanged by the owner's decisions. Decision 4 gained the sentence described in item 8.

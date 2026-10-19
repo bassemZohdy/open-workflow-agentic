@@ -22,10 +22,10 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 | [0016](0016-deliver-in-vertical-slices-with-spikes-first.md) | Deliver in vertical slices by scenario, spikes first | Proposed |
 | [0017](0017-one-codebase-two-deployable-roles-with-enforced-boundaries.md) | One codebase, two deployable roles, boundaries enforced by the build | Proposed |
 | [0018](0018-plan-is-data-and-checked.md) | Keep the implementation plan as validated data | Proposed |
-| [0019](0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md) | How workflow instances are started, queried, cancelled and resumed (spike WP-003) | Proposed |
-| [0020](0020-checkpoint-scoping-and-state-evolution.md) | Checkpoint scoping and state evolution (spike WP-004) | Proposed |
-| [0021](0021-identity-delegation-policy-engine-and-secrets.md) | Identity delegation, policy engine and secret store (spike WP-006) | Proposed |
-| [0022](0022-protocol-choices-for-tools-and-agent-interop.md) | Protocol choices for tools and agent interoperability (spike WP-007) | Proposed |
-| [0023](0023-workflow-to-agent-bridge.md) | Workflow-to-agent bridge: HTTP call confirmed, async callback for long steps (spike WP-005) | Proposed |
+| [0019](0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md) | How workflow instances are started, queried, cancelled and resumed (spike WP-003) | Accepted |
+| [0020](0020-checkpoint-scoping-and-state-evolution.md) | Checkpoint scoping and state evolution (spike WP-004) | Accepted |
+| [0021](0021-identity-delegation-policy-engine-and-secrets.md) | Identity delegation, policy engine and secret store (spike WP-006) | Accepted |
+| [0022](0022-protocol-choices-for-tools-and-agent-interop.md) | Protocol choices for tools and agent interoperability (spike WP-007) | Accepted |
+| [0023](0023-workflow-to-agent-bridge.md) | Workflow-to-agent bridge: HTTP call confirmed, async callback for long steps (spike WP-005) | Accepted |
 
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.

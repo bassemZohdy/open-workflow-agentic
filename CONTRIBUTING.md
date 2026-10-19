@@ -67,7 +67,7 @@ These apply to every REST endpoint. The types live in `oa-contracts`, the HTTP m
 ## Dependencies and licences
 
 - Add a dependency only with a clear need. Prefer the Quarkus BOM and the versions already managed in the parent POM.
-- Licences: Apache-2.0, MIT, MIT-0, BSD, EPL-2.0 and Public Domain (including CC0) are allowed in any scope. CDDL, GPL-2.0 with the Classpath Exception, UPL, MPL-2.0 and LGPL are allowed in test scope only. GPL, AGPL and EPL-1.0 are not allowed. A dual-licensed component passes when one of its licences is allowed. The check reads each POM's licence and tells you which name it could not classify.
+- Licences: Apache-2.0, MIT, MIT-0 (also written MIT No Attribution), BSD, EPL-2.0 and Public Domain (including CC0) are allowed in any scope. A name that only begins with MIT, such as MIT-NOT, is not MIT and fails. CDDL, GPL-2.0 with the Classpath Exception, UPL, MPL-2.0 and LGPL are allowed in test scope only. GPL, AGPL and EPL-1.0 are not allowed. A dual-licensed component passes when one of its licences is allowed. The check reads each POM's licence and tells you which name it could not classify.
 - An artifact whose POM declares no licence can be added to `tools/dependency-policy-exceptions.json` after its licence is verified from its own metadata. Entries are reviewed, scoped, and fail the build when stale or marked `unverified`.
 - The Maven enforcer enforces Java 21, Maven 3.9 and no duplicate dependency declarations.
 

@@ -9,7 +9,8 @@ The parent POM makes maven-dependency-plugin write each module's resolved depend
 
 2. Licence allow-list, decided per scope. Licence names are read from each artifact's POM in the local Maven
    repository (inherited from the parent POM when the artifact declares none) and normalised to identifiers:
-     - Apache-2.0, MIT, BSD, EPL-2.0, Public-Domain (also CC0) may be used in any scope.
+     - Apache-2.0, MIT, MIT-0 (also named "MIT No Attribution"), BSD, EPL-2.0, Public-Domain (also CC0) may be
+       used in any scope. Names such as "MIT-NOT" or "MIT-LIKE" are not MIT and are unrecognised.
      - CDDL, GPL-2.0-with-classpath-exception, UPL, MPL-2.0 and LGPL may be used in test scope only.
      - GPL, AGPL, EPL-1.0 and anything unrecognised fail.
    A component that declares several licences passes when one of them is allowed for the scope.
@@ -47,8 +48,9 @@ LICENCE_PATTERNS = [
     (r"public domain|\bcc0\b", "Public-Domain"),
     (r"apache.*(2\.0|version 2)|apache-2\.0", "Apache-2.0"),
     (r"^apache 2$", "Apache-2.0"),  # the short name used by fizzed/maven-parent (jne), which links the Apache 2.0 text
-    (r"\bmit-0\b", "MIT-0"),
-    (r"\bmit\b", "MIT"),
+    # A hyphen or word character right after the name means another name (MIT-NOT, MIT-0-NOT), so it is not matched.
+    (r"\bmit(?:-0| no attribution)(?![\w-])", "MIT-0"),
+    (r"\bmit(?![\w-])|\bmit-licen[cs]e(?![\w-])", "MIT"),  # "MIT-License" is a spelling of MIT, not a look-alike
     (r"^edl\b|eclipse distribution", "BSD"),  # EDL 1.0 is the BSD-3-Clause text (Eclipse, edl-v10)
     (r"\bbsd\b", "BSD"),
     (r"epl[- ]?2\.0|eclipse public license.*(2\.0|v ?2)", "EPL-2.0"),

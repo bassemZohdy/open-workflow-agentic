@@ -1,6 +1,6 @@
 # ADR-0023: Workflow-to-agent bridge
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2026-10-18
 
 ## Context
@@ -28,7 +28,7 @@ The brief for this ADR also has to answer ADR 0010 (agent loops stay in LangGrap
 4. **Effects use a deterministic key `<thread id>:<node id>`** and are written through the effect ledger (WP-108). The ledger keeps an intent record before the call and an outcome after it. The key is only as good as the target's acceptance of it; a target that does not accept keys is not used for effects.
 5. **Long-running agent steps use the asynchronous pattern (bridge C) only when one step can exceed the acceptable call timeout.** That pattern requires an outbox in the agent, redelivery until the workflow acknowledges each callback, and an acknowledgement task in the workflow definition. A plain callback without an outbox is not allowed.
 6. **Approvals and callbacks are correlated per instance,** on the `instanceId` field of the event data (`correlate` with `from: ${ .data.instanceId }`). An approval is sent only after the instance reports its approval `listen` has started, until the inbox of WP-107 stores events before listeners exist.
-7. **The reconciler (ADR 0019) starts restored instances and restarts agent runs that are recorded as `RUNNING` or `RESUMING`.** For bridge A the reconciler does not restart the agent itself; the workflow's re-run of the in-flight call does that.
+7. **The reconciler (ADR 0019) starts restored instances, and agent runs have liveness by lease.** An asynchronous agent run (bridge C, decision 5) is alive while it holds a lease that its worker renews by heartbeat. A run recorded as `RUNNING` or `RESUMING` whose lease has expired, or that holds none, is eligible for the reconciler to restart it. For bridge A the reconciler does not restart the agent itself; the workflow's re-run of the in-flight call does that.
 
 This ADR **confirms** ADR 0014's call shape and HTTP contract. It **does not** adopt the planned replacement by an in-process step (bridge B), because that replacement would couple the workflow definition to the agent class and cannot move the agent out of process later without changing the definition (criterion 6). ADR 0014 is not edited here.
 
@@ -49,3 +49,10 @@ This ADR **confirms** ADR 0014's call shape and HTTP contract. It **does not** a
 - **Synchronous HTTP with the agent in another process from the start.** Rejected for the spike. It needs a deployed second process and a reliable network path before the recovery behaviour can be tested, and the spike has not run that case (open question 2 in the findings).
 - **Plain callbacks without an outbox.** Rejected. Measured: 3 of 10 normal starts lost the callback and waited forever.
 - **Rely on the engine's restore and periodic scan to restart instances.** Rejected in ADR 0019 and confirmed again here: the restored instance is not started without a call to `start()`.
+
+## Amendments (2026-10-19)
+
+The owner decided the liveness rule for decision 7 on 2026-10-19. The Decision text above now states it. The earlier wording was "restarts agent runs that are recorded as `RUNNING` or `RESUMING`", which did not say when such a run stops being alive. That wording is kept in this file's git history.
+
+1. **Liveness of an agent run (decision 7).** Was: a run recorded as `RUNNING` or `RESUMING` is restarted by the reconciler, with no rule for when it is no longer alive. Now: an asynchronous run is alive while it holds a lease that its worker renews by heartbeat. An expired lease, or no lease, makes the run eligible for the reconciler.
+   Status: decided, not yet implemented. The lease columns (`lease_owner` and `lease_until`) are in migration V36 (WP-105c, merged in PR #20). The agent path that writes the lease and renews it by heartbeat is not built yet (WP-201). Until then no run can hold a lease, so the rule cannot yet tell a live run from a dead one.

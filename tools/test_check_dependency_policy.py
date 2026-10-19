@@ -238,6 +238,32 @@ class DependencyPolicyTest(unittest.TestCase):
     def test_unknown_names_are_not_classified(self):
         self.assertIsNone(policy.classify_licence("Some Bespoke Licence"))
 
+    def test_mit_0_and_its_other_name_are_allowed_in_any_scope(self):
+        for licence in ("MIT-0", "MIT No Attribution", "mit no attribution"):
+            for scope in ("compile", "test"):
+                with self.subTest(licence=licence, scope=scope):
+                    self.assertEqual("MIT-0", policy.classify_licence(licence))
+                    self.assertTrue(policy.allowed_for_scope("MIT-0", scope))
+                    self.fx.artifact("org.example", "m0", "1.0", [licence])
+                    self.fx.deps("oa-runtime", [real("org.example:m0:jar:1.0", scope)])
+                    self.assertEqual([], self.fx.run()[0])
+
+    def test_mit_look_alikes_are_not_mit_and_fail(self):
+        # Names that only start with "MIT" must not be read as MIT, which is allowed.
+        for licence in ("MIT-NOT", "MIT-LIKE", "MIT-0-NOT", "mit-not", "MIT-LICENSE-NOT"):
+            with self.subTest(licence=licence):
+                self.assertIsNone(policy.classify_licence(licence))
+                self.fx.artifact("org.example", "lookalike", "1.0", [licence])
+                self.fx.deps("oa-runtime", [real("org.example:lookalike:jar:1.0", "compile")])
+                violations, _ = self.fx.run()
+                self.assertEqual(1, len(violations), violations)
+                self.assertIn(f"unrecognised licence {licence!r}", violations[0])
+
+    def test_mit_semantics_are_unchanged_for_real_mit_names(self):
+        for licence in ("MIT", "MIT License", "MIT-License", "The MIT License", "The MIT License (MIT)", "MIT/X11"):
+            with self.subTest(licence=licence):
+                self.assertEqual("MIT", policy.classify_licence(licence))
+
     def test_new_permissive_names_pass_in_any_scope(self):
         for licence in ("Public Domain, per Creative Commons CC0", "EDL 1.0", "EPL 2.0", "MIT-0"):
             with self.subTest(licence=licence):
