@@ -283,10 +283,7 @@ class SchemaContractTest {
             "2026-10-18T10:00:00.123Z",
             "2026-10-18T10:00:00.123456789-05:30");
 
-    /**
-     * Strings that a format-aware validator must reject in a date-time field. The space separator and lower-case
-     * t and z are not listed: the validator accepts them (see {@link #leniencyOfTheDateTimeValidatorIsPinned}).
-     */
+    /** Strings outside the supported canonical date-time profile. */
     private static final List<String> INVALID_DATE_TIMES = List.of(
             "",
             "yesterday",
@@ -296,7 +293,13 @@ class SchemaContractTest {
             "2026-13-18T10:00:00Z",
             "2026-02-30T10:00:00Z",
             "2026-10-18T25:00:00Z",
-            "2026-10-18T10:61:00Z");
+            "2026-10-18T10:61:00Z",
+            "2026-10-18 10:00:00Z",
+            "2026-10-18t10:00:00Z",
+            "2026-10-18T10:00:00z",
+            "2026-10-18T10:00:60Z",
+            "2026-10-18T10:00:00+24:00",
+            "2026-10-18T10:00:00+04:60");
 
     @Test
     void dateTimeFieldsAcceptRfc3339TimestampsWithAnOffset() {
@@ -316,17 +319,15 @@ class SchemaContractTest {
         }
     }
 
-    /**
-     * Known gap (docs/contracts.md): RFC 3339 section 5.6 permits a space for the T and lower-case t and z, and the
-     * validator accepts them. The writers in this project emit only the upper-case form, so the contract cannot
-     * tell them apart. This test pins the behaviour, so a change in the validator is noticed.
-     */
+    /** The schema contract requires the canonical upper-case separators and rejects leap seconds. */
     @Test
-    void leniencyOfTheDateTimeValidatorIsPinned() {
+    void nonCanonicalSeparatorsAndLeapSecondsAreRejected() {
         TimestampField decidedAt = new TimestampField("decision.schema.json", "decidedAt",
                 () -> WireFormat.decision(Samples.decision()));
-        assertValid(decidedAt.schema(), decidedAt.with("2026-10-18 10:00:00Z"));
-        assertValid(decidedAt.schema(), decidedAt.with("2026-10-18t10:00:00z"));
+        assertInvalid(decidedAt.schema(), decidedAt.with("2026-10-18 10:00:00Z"), "space separator");
+        assertInvalid(decidedAt.schema(), decidedAt.with("2026-10-18t10:00:00Z"), "lower-case t");
+        assertInvalid(decidedAt.schema(), decidedAt.with("2026-10-18T10:00:00z"), "lower-case z");
+        assertInvalid(decidedAt.schema(), decidedAt.with("2026-10-18T10:00:60Z"), "leap second");
     }
 
     @Test
