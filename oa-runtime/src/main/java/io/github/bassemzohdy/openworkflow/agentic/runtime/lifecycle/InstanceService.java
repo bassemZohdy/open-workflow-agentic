@@ -16,7 +16,7 @@ import org.jboss.logging.Logger;
 
 /**
  * Starts and reads workflow instances (ADR 0019, Start and Query). It is the only writer of the registry's lifecycle
- * status; the engine is an executor it calls.
+ * status on the start path; the engine is an executor it calls.
  *
  * <p>Start, in order:
  * <ol>
@@ -26,7 +26,11 @@ import org.jboss.logging.Logger;
  *   <li>Start the engine instance. Return when it is accepted, never when it finishes. Record RUNNING.</li>
  * </ol>
  * A failure in step 2 or 3 is recorded as a start attempt: the row stays STARTING, with the attempt count and the
- * class name of the error. The reconciler (WP-105c) finds such rows; this service never starts them again.
+ * class name of the error. The reconciler ({@link Reconciler}) finds such rows and repairs them.
+ *
+ * <p>The engine's observer ({@link EngineStatusSync}) can move the row while this service is still in step 3, because
+ * the engine may finish or wait before {@code start()} returns. When the row has moved, this service keeps the state
+ * the observer recorded and does not overwrite it (WP-105c).
  */
 @ApplicationScoped
 public class InstanceService {
@@ -43,17 +47,20 @@ public class InstanceService {
 
     private final InstanceStore store;
     private final WorkflowEngine engine;
+    private final LifecycleFaults faults;
     private final Clock clock;
     private final UlidGenerator ids;
 
     @Inject
-    public InstanceService(InstanceStore store, WorkflowEngine engine) {
-        this(store, engine, Clock.systemUTC(), UlidGenerator.shared());
+    public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults) {
+        this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared());
     }
 
-    InstanceService(InstanceStore store, WorkflowEngine engine, Clock clock, UlidGenerator ids) {
+    InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, Clock clock,
+                    UlidGenerator ids) {
         this.store = Objects.requireNonNull(store, "store");
         this.engine = Objects.requireNonNull(engine, "engine");
+        this.faults = Objects.requireNonNull(faults, "faults");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.ids = Objects.requireNonNull(ids, "ids");
     }
@@ -79,6 +86,7 @@ public class InstanceService {
             }
             return new StartResult(row, false);
         }
+        faults.hit(LifecycleFaults.AFTER_INSERT);
         return launch(row, request);
     }
 
@@ -99,20 +107,42 @@ public class InstanceService {
         } catch (RuntimeException e) {
             return new StartResult(recordStartFailure(row, e), true);
         }
-        InstanceRecord prepared = store.replace(
-                row.successor(now(), InstanceStatus.STARTING, launch.engineInstanceId(), row.startAttempts(),
-                        row.lastError(), row.waitDeadline()),
-                row.version(), REASON_PREPARED, RUNTIME_ACTOR);
+        InstanceRecord prepared;
+        try {
+            prepared = store.replace(
+                    row.successor(now(), InstanceStatus.STARTING, launch.engineInstanceId(), row.startAttempts(),
+                            row.lastError(), row.waitDeadline()),
+                    row.version(), REASON_PREPARED, RUNTIME_ACTOR);
+        } catch (StaleVersionException moved) {
+            // An operator changed the row while the engine was being prepared (WP-105d, a cancel). The prepared
+            // instance is never started: the row says what the operator decided. The response reports that state.
+            LOG.infof("instance %s changed while its engine instance was prepared; not started", row.id());
+            return new StartResult(store.find(row.tenant(), row.id()).orElse(row), true);
+        }
+        faults.hit(LifecycleFaults.AFTER_PREPARE);
         try {
             launch.start();
         } catch (RuntimeException e) {
             return new StartResult(recordStartFailure(prepared, e), true);
         }
-        InstanceRecord running = store.replace(
-                prepared.successor(now(), InstanceStatus.RUNNING, prepared.engineInstanceId(),
-                        prepared.startAttempts(), null, prepared.waitDeadline()),
-                prepared.version(), REASON_ACCEPTED, RUNTIME_ACTOR);
+        faults.hit(LifecycleFaults.BEFORE_ACCEPT);
+        InstanceRecord running = recordAccepted(prepared);
         return new StartResult(running, true);
+    }
+
+    /**
+     * Records RUNNING for an accepted start. If the engine observer already moved the row, its state stands. The
+     * returned record is the state this request accepted, so the response reports the acceptance (202, RUNNING).
+     */
+    private InstanceRecord recordAccepted(InstanceRecord prepared) {
+        InstanceRecord next = prepared.successor(now(), InstanceStatus.RUNNING, prepared.engineInstanceId(),
+                prepared.startAttempts(), null, prepared.waitDeadline());
+        try {
+            store.replace(next, prepared.version(), REASON_ACCEPTED, RUNTIME_ACTOR);
+        } catch (StaleVersionException moved) {
+            LOG.debugf("instance %s moved by the engine observer before the start was recorded", prepared.id());
+        }
+        return next;
     }
 
     private InstanceRecord recordStartFailure(InstanceRecord row, RuntimeException cause) {
@@ -123,7 +153,12 @@ public class InstanceService {
         LOG.warnf(cause, "engine start attempt %d failed for instance %s", row.startAttempts() + 1, row.id());
         InstanceRecord next = row.successor(now(), InstanceStatus.STARTING, row.engineInstanceId(),
                 row.startAttempts() + 1, truncate(error), row.waitDeadline());
-        return store.replace(next, row.version(), REASON_START_FAILED, RUNTIME_ACTOR);
+        try {
+            return store.replace(next, row.version(), REASON_START_FAILED, RUNTIME_ACTOR);
+        } catch (StaleVersionException moved) {
+            LOG.debugf("instance %s moved by the engine observer before the failure was recorded", row.id());
+            return next;
+        }
     }
 
     private Instant now() {

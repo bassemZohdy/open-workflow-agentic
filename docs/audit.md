@@ -167,6 +167,18 @@ Operational rules:
 
 These tests are plain JUnit or `@QuarkusTest` classes. None of them is annotated with `@Acceptance`: no test in [test-cases.md](test-cases.md) describes this package's behaviour in full (T04, T31 and T34 depend on other packages).
 
+## 9a. Events of the operations API (WP-105d)
+
+Each attempt on the operations API (`docs/lifecycle.md`, section 11) writes these events, with the operator as actor:
+
+| Action | Written | Attributes beyond the stamps |
+|---|---|---|
+| `policy.decision` (resource type `policy-resource`) | Once per policy decision, by the PEP (section 3, WP-103) | `policy.outcome`, `policy.decidedBy`, `policy.id`, `policy.version`, `policy.action`, `policy.recoveryPath` |
+| `operation.attempt` (resource type `instance`) | Before any change; if it cannot be written, the call is refused | `oa.tenant`, `oa.instance`, `oa.operation`, `oa.outcome` (`allowed`, `denied` or `error`) |
+| `operation.result` (resource type `instance`) | After the call | the same, with `oa.outcome` set to the result label |
+
+The operation events carry the version stamps of their decision (`stamp.policy`, `stamp.policy-set`). The attributes are inline, not by reference, so the outcome is readable without the payload store.
+
 ## 10. Gaps and what remains
 
 | Item | Owner | Note |

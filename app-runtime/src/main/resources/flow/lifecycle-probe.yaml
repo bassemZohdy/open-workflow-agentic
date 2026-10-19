@@ -1,0 +1,31 @@
+# OWS / CNCF Serverless Workflow 1.0 definition used to test the run lifecycle (WP-105c).
+# It makes one HTTP "effect" call to a URL given in its input, then waits for one event, then finishes. It has no
+# external dependency: the process tests give it the URL of the dev probe endpoint (agentic.dev.lifecycle-probes).
+# Flow reads definitions at build time, so a test-only copy cannot reach a packaged child process; this one ships.
+document:
+  dsl: '1.0.0'
+  namespace: agentic
+  name: lifecycle-probe
+  version: '0.1.0'
+  summary: One effect call, then wait for a decision event. Used to test restart, repair and status sync.
+do:
+  - effect:
+      call: http
+      with:
+        method: post
+        endpoint:
+          uri: ${ .effectUrl }
+        body:
+          mode: ${ .mode }
+  - awaitDecision:
+      listen:
+        to:
+          one:
+            with:
+              type: org.openworkflow.agentic.lifecycle.probe
+      timeout:
+        after:
+          PT24H
+  - finish:
+      set:
+        status: decided

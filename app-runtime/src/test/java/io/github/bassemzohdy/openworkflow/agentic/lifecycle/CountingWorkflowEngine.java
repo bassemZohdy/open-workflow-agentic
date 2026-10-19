@@ -7,8 +7,13 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Test engine: delegates to the real Quarkus Flow adapter, and counts calls. It can fail the next starts, so the
@@ -26,6 +31,7 @@ public class CountingWorkflowEngine implements WorkflowEngine {
     private final AtomicInteger prepares = new AtomicInteger();
     private final AtomicInteger starts = new AtomicInteger();
     private final AtomicInteger failStarts = new AtomicInteger();
+    private final AtomicReference<CountDownLatch[]> holdNextPrepare = new AtomicReference<>();
 
     @Override
     public boolean hasDefinition(DefinitionRef definition) {
@@ -35,6 +41,11 @@ public class CountingWorkflowEngine implements WorkflowEngine {
     @Override
     public EngineLaunch prepare(DefinitionRef definition, Map<String, Object> input) {
         prepares.incrementAndGet();
+        CountDownLatch[] hold = holdNextPrepare.getAndSet(null);
+        if (hold != null) {
+            hold[0].countDown();
+            awaitQuietly(hold[1]);
+        }
         EngineLaunch inner = real.prepare(definition, input);
         return new EngineLaunch() {
             @Override
@@ -53,11 +64,53 @@ public class CountingWorkflowEngine implements WorkflowEngine {
         };
     }
 
-    /** Resets the counters and the pending failures. */
+    @Override
+    public Optional<ActiveInstance> activeInstance(DefinitionRef definition, String engineInstanceId) {
+        return real.activeInstance(definition, engineInstanceId);
+    }
+
+    @Override
+    public List<String> activeInstanceIds(DefinitionRef definition) {
+        return real.activeInstanceIds(definition);
+    }
+
+    @Override
+    public List<DefinitionRef> definitions() {
+        return real.definitions();
+    }
+
+    @Override
+    public boolean startRestored(DefinitionRef definition, String engineInstanceId) {
+        return real.startRestored(definition, engineInstanceId);
+    }
+
+    @Override
+    public boolean cancel(DefinitionRef definition, String engineInstanceId) {
+        return real.cancel(definition, engineInstanceId);
+    }
+
+    /** Resets the counters, the pending failures and any held prepare. */
     public void reset() {
         prepares.set(0);
         starts.set(0);
         failStarts.set(0);
+        holdNextPrepare.set(null);
+    }
+
+    /**
+     * The next {@code prepare} counts down {@code entered} and waits for {@code release} before it prepares, so a test can
+     * change the registry row while the start is between its insert and its engine id (WP-105d).
+     */
+    public void holdNextPrepare(CountDownLatch entered, CountDownLatch release) {
+        holdNextPrepare.set(new CountDownLatch[] {entered, release});
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await(60, TimeUnit.SECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     public int prepares() {
