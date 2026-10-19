@@ -43,6 +43,7 @@ class OutboxKillIT {
         int port;
         try (ManagedProcess first = ManagedProcess.jar(jar).logFile(log)
                 .property("agentic.dev.trust-caller-headers", "true")
+                .property("agentic.dev.lifecycle-probes", "true")
                 .property("agentic.outbox.relay.interval", "1h")
                 .build()) {
             first.start();
@@ -63,6 +64,7 @@ class OutboxKillIT {
 
         try (ManagedProcess second = ManagedProcess.jar(jar).logFile(log).httpPort(port)
                 .property("agentic.dev.trust-caller-headers", "true")
+                .property("agentic.reconciler.enabled", "false")
                 .property("agentic.outbox.relay.interval", "200ms")
                 .build()) {
             second.start();
@@ -86,11 +88,16 @@ class OutboxKillIT {
                 + " on i.id = o.partition_key where i.tenant = ? and o.failed_at is not null", tenant));
     }
 
+    /**
+     * Starts the lifecycle probe with a held effect call, so the instance stays RUNNING. The earlier definition
+     * (research-and-approve) calls a server that does not exist in the child process, faults within milliseconds,
+     * and the engine observer's FAULTED row raced the count of unpublished rows.
+     */
     private static int start(HttpClient http, int port, String tenant) throws Exception {
         String body = """
-                {"definitionId":"agentic/research-and-approve","definitionVersion":"0.1.0",
-                 "input":{"topic":"outbox kill"},"idempotencyKey":"k-%s"}
-                """.formatted(UUID.randomUUID());
+                {"definitionId":"agentic/lifecycle-probe","definitionVersion":"0.1.0",
+                 "input":{"effectUrl":"http://127.0.0.1:%d/dev/lifecycle/effects","mode":"hold"},"idempotencyKey":"k-%s"}
+                """.formatted(port, UUID.randomUUID());
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/instances"))
                 .header("Content-Type", "application/json")
                 .header("X-Tenant", tenant)
