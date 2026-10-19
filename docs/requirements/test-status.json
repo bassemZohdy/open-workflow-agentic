@@ -18,5 +18,9 @@
   "T13": {
     "status": "planned",
     "where": "poc item 5"
+  },
+  "T01": {
+    "status": "automated",
+    "where": "app-runtime:AgenticAppTest#structuredAgentOutputRejectsMalformedActionsAndUnauthorizedEscalation"
   }
 }
