@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-GPT WP-108 design/handoff prepared in docs/handoffs/gpt/WP-108.md; implementation is blocked on Claude plan review and GPT review of Claude initial WP-102 design/evidence. Implementation and reciprocal reviews have not started.
+Assignments planned; implementation and reciprocal reviews have not started.
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-19).
 
