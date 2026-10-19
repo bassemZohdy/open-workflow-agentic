@@ -81,6 +81,11 @@ public class Reconciler {
             return counts.getOrDefault(key, 0);
         }
 
+        /** Every count of the pass, by key, in key order. Read-only. */
+        public Map<String, Integer> counts() {
+            return java.util.Collections.unmodifiableMap(counts);
+        }
+
         @Override
         public String toString() {
             return counts.toString();

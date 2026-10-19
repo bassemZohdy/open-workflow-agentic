@@ -45,12 +45,15 @@ public class ProblemDetailMapper implements ExceptionMapper<Throwable> {
     static ProblemDetail toProblem(Throwable error) {
         int status = 500;
         String detail = GENERIC_SERVER_DETAIL;
-        if (error instanceof WebApplicationException web && web.getResponse() != null
+        if (error instanceof ProblemException problem && problem.getResponse() != null) {
+            status = problem.getResponse().getStatus();
+            detail = problem.getMessage();
+        } else if (error instanceof WebApplicationException web && web.getResponse() != null
                 && web.getResponse().getStatus() >= 400) {
             status = web.getResponse().getStatus();
             detail = web.getMessage();
         }
-        if (status >= 500) {
+        if (status >= 500 && !(error instanceof ProblemException)) {
             detail = GENERIC_SERVER_DETAIL;
         }
         Response.Status known = Response.Status.fromStatusCode(status);

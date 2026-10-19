@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import javax.sql.DataSource;
 
 /**
@@ -68,6 +69,13 @@ public class TaskViewQuery {
         List<TaskViewRow> items = more ? rows.subList(0, page.limit()) : rows;
         String next = more ? encodeCursor(items.get(items.size() - 1).instanceId()) : null;
         return new TaskViewPage(List.copyOf(items), next);
+    }
+
+    /** The view row of one instance in one tenant, or empty. Another tenant's instance is empty. */
+    public Optional<TaskViewRow> byInstance(String tenant, String instanceId) {
+        List<TaskViewRow> rows = Transactions.inTransaction(dataSource, connection -> read(connection,
+                COLUMNS + " where tenant = ? and instance_id = ?", List.of(tenant, instanceId)));
+        return rows.stream().findFirst();
     }
 
     /**

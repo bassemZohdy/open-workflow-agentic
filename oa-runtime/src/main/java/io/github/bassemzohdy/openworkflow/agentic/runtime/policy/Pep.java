@@ -124,6 +124,40 @@ public final class Pep {
                 new PolicyContext(operatorScopes, null, null, null, null, null));
     }
 
+    /**
+     * Operator operations that are not safe-recovery operations (WP-105d): inspect, retry and recover. They take the
+     * same path as {@link #operation}, but {@link SafeRecovery} does not name them, so when the main policy is
+     * unavailable they are refused (ERROR) and nothing changes. {@link RecoveryOperation} is deliberately not extended.
+     */
+    public enum InstanceOperation {
+        INSPECT("operation:inspect"),
+        RETRY("operation:retry"),
+        RECOVER("operation:recover");
+
+        private final String resource;
+
+        InstanceOperation(String resource) {
+            this.resource = resource;
+        }
+
+        /** The resource string a request for this operation carries. */
+        public String resource() {
+            return resource;
+        }
+    }
+
+    /**
+     * An operator acts on one registry instance. The request's task id carries the instance id, because the request
+     * shape has no instance field (docs/lifecycle.md, section 11, and docs/policy.md).
+     */
+    public Decision instanceOperation(InstanceOperation operation, Subject operator, Set<String> operatorScopes,
+                                      Ulid instanceId) {
+        Objects.requireNonNull(operation, "operation");
+        Objects.requireNonNull(instanceId, "instanceId");
+        return decide(operator, ActionKind.OPERATION, operation.resource(), instanceId,
+                new PolicyContext(operatorScopes, null, null, null, null, null));
+    }
+
     /** Decides any request through the full path: engine, audit, and the recovery rule when the engine is unavailable. */
     public Decision decide(AuthorizationRequest request) {
         Objects.requireNonNull(request, "request");
