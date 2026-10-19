@@ -5,9 +5,10 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import java.util.Objects;
 
 /**
- * One decision as handed to the {@link AuditSink}: the request it answers, the decision, and whether it came from the
- * safe-recovery rule. When the main policy is unavailable and an operation is retried under the recovery rule, two
- * records are written: the main ERROR (with {@code recoveryPath} false) and the recovery decision (true).
+ * A policy decision before it is converted to the shared audit event contract: the request it answers, the decision,
+ * and whether it came from the safe-recovery rule. When the main policy is unavailable and an operation is retried
+ * under the recovery rule, two events are written: the main ERROR (with {@code recoveryPath} false) and the recovery
+ * decision (true).
  *
  * @param request      the request that was decided
  * @param decision     the decision, with its attribution

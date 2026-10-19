@@ -11,6 +11,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.HumanTask
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyContext;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.FailClosedPolicyDecisionPoint;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.PolicyDecisionPoint;
@@ -49,20 +50,27 @@ public final class Pep {
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(1);
     /** Name of the component in decisions this class produces itself. */
     public static final String DECIDED_BY = "pep";
+    /** Maximum concurrent policy evaluations admitted by the PEP; excess calls fail closed immediately. */
+    public static final int POLICY_DECISION_MAX_IN_FLIGHT = 64;
 
     private final PolicyDecisionPoint decisions;
     private final AuditSink audit;
     private final Clock clock;
 
     public Pep(PolicyDecisionPoint engine, AuditSink audit, Duration timeout, Clock clock) {
+        this(engine, audit, timeout, clock, POLICY_DECISION_MAX_IN_FLIGHT);
+    }
+
+    /** Creates the enforcement point with an explicit policy-decision bulkhead bound. */
+    public Pep(PolicyDecisionPoint engine, AuditSink audit, Duration timeout, Clock clock, int maxInFlight) {
         Objects.requireNonNull(engine, "engine");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.decisions = new FailClosedPolicyDecisionPoint(engine, timeout, clock);
+        this.decisions = new FailClosedPolicyDecisionPoint(engine, timeout, clock, maxInFlight);
     }
 
     public Pep(PolicyDecisionPoint engine, AuditSink audit) {
-        this(engine, audit, DEFAULT_TIMEOUT, Clock.systemUTC());
+        this(engine, audit, DEFAULT_TIMEOUT, Clock.systemUTC(), POLICY_DECISION_MAX_IN_FLIGHT);
     }
 
     /**
@@ -147,7 +155,7 @@ public final class Pep {
     /** Writes the decision to the audit sink. A failed write turns the decision into a refusal. */
     private Decision record(AuthorizationRequest request, Decision decision, boolean recoveryPath) {
         try {
-            audit.record(new PolicyDecisionRecord(request, decision, recoveryPath));
+            audit.record(PolicyDecisionAuditEvent.from(new PolicyDecisionRecord(request, decision, recoveryPath)));
             return decision;
         } catch (RuntimeException e) {
             return new Decision(DECIDED_BY, DecisionOutcome.ERROR,

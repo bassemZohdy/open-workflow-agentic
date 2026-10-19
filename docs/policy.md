@@ -6,7 +6,7 @@ This document describes the policy enforcement point (PEP), the Cedar decision p
 
 ## 1. The model
 
-Every boundary where the runtime lets something happen asks the PEP first. The PEP builds the request from the approved contract and the call, asks the policy decision point (PDP) through a fail-closed wrapper, records the decision, and only then releases the call.
+Every boundary where the runtime lets something happen asks the PEP first. The PEP builds the request from the approved contract and the call, asks the policy decision point (PDP) through a fail-closed wrapper with a 64-call bulkhead, records the decision as the shared `AuditEvent`, and only then releases the call.
 
 | Boundary | Entry point | Request resource | Action kind |
 |---|---|---|---|
@@ -86,6 +86,7 @@ A snapshot is a set of Cedar texts plus a version and a content hash.
 | Cedar evaluation error (for example a missing context attribute) | ERROR, even when a permit also matched |
 | Engine throws, or `LinkageError` from the native library | ERROR |
 | Engine slower than the timeout (default 1 s, at most 5 min) | ERROR (`FailClosedPolicyDecisionPoint`); the slow call is abandoned, not stopped |
+| 64 policy evaluations already in flight | Immediate ERROR from the PEP bulkhead; the delegate is not called. The global decorator supports bounds up to 1,024, while the PEP explicitly selects 64. |
 | Engine returns null | ERROR |
 | Audit sink throws while recording | The decision becomes ERROR, so a call is never released without a record |
 | No policy matches | DENY, `oa.default-deny` |
@@ -107,7 +108,7 @@ Each operation stops or holds work and never starts or widens it. Cancel stops o
 
 **A deliberate DENY is final.** If the main policy answers DENY, the recovery rule is not consulted. An operator without the scope gets DENY, not a recovery allow.
 
-**Audit.** A recovery allow is written as a second audit record with `recoveryPath=true`, after the main ERROR it followed. If the audit write for the recovery decision fails, the operation is refused.
+**Audit.** The policy package uses the same `io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink` port as every other audit producer. `Pep` converts each policy decision to an `AuditEvent` (`policy.decision`); stable policy metadata and the recovery-path flag are attributes; request context and free-form decision reasons are omitted. A recovery allow is written as a second event with `policy.recoveryPath=true`, after the main ERROR it followed. If the audit write for the recovery decision fails, the operation is refused.
 
 ## 7. Latency
 
@@ -134,7 +135,7 @@ The WP-006 spike measured Cedar at 387 to 525 µs p50 and 4.5 to 6 ms p99 in thr
 - Default deny for uncovered HTTP paths (WP-006 Q16) is still unverified.
 
 **For WP-111 (audit):**
-- `AuditSink` is a port. `LoggingAuditSink` is a default for development: it is neither durable nor tamper-evident. WP-111 provides the hash-chained, durable implementation.
+- The PEP and other runtime components share one `runtime.audit.AuditSink` port. WP-111 supplies the hash-chained durable implementation; a local logging sink remains available for development and is neither durable nor tamper-evident.
 
 **For WP-304 (separation of authority and outage safety):**
 - The snapshot source is a port. The production source (the approved-state store the control side publishes to, with a freshness policy) is not built. The file and classpath sources are for development and tests.
@@ -156,7 +157,7 @@ The WP-006 spike measured Cedar at 387 to 525 µs p50 and 4.5 to 6 ms p99 in thr
 | `PolicySnapshotTest` | The documented hash layout, sensitivity of the hash, version format, immutability |
 | `ManifestPolicySnapshotSourceTest` | Directory and classpath sources, name refusal, strict UTF-8, size limits, missing keys |
 | `CedarPolicyDecisionPointTest` | Attribution by stable id, forbid precedence, default deny, evaluation error as ERROR, rejected snapshots, template and id rules, revocation and tightening on the next decision, atomic swap under concurrent decisions, quoting in resource names |
-| `PepTest` | Request construction at each boundary, `guard`, refusals from throw, null and timeout, audit of every decision, audit failure refusing a release |
+| `PepTest` | Request construction at each boundary, `guard`, refusals from throw, null and timeout, audit of every decision through the shared event port, explicit one-call bulkhead behavior, audit failure refusing a release |
 | `DegradedModeTest` | Exactly which operations are allowed with the main policy unavailable, the agent-is-never-operator rule, DENY finality, audit ordering |
 | `PolicyRevocationAndOutageTest` | Revocation on the next decision, control-source outage keeps the last snapshot, rejected refresh never rolls back a revocation, tamper rejection, no snapshot ever loaded, operator-only stop during outage |
 | `PepLatencyTest` | Latency at the three measured paths (printed, not asserted) |
