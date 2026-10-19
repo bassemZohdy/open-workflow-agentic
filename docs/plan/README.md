@@ -19,7 +19,7 @@ T07 suite uses in-process stand-ins. Audit caller/PDP wiring also remains open.
 Execution now uses [two backlogs in TODO.md](../../TODO.md#two-agent-delivery-plan): **GPT owns 21 unfinished
 packages** across execution/platform/evaluation; **Claude owns 21** across identity/policy/agents/governance.
 Each reviews the other's implementation PRs at the current commit. GPT starts with WP-108's durable effect
-ledger; Claude starts with WP-102's real-IdP and audit-caller gates after the initial plan/design review.
+ledger independently of a WP-102 design handoff; Claude starts with WP-102's audit-caller binding and real-IdP evidence. Consumers gate on their required merged interface, not whole WP-102 closure. Claude review of each exact implementation head and passing CI remain mandatory before merge.
 Both queues specify merged prerequisite handoffs and outcomes, while the detailed package checklists retain
 all closure gates. WP-105's existing core can support new work; its full T16 recovery proof follows ledger,
 inbox and timer integration. T23 stays with WP-305 for cross-task emergency revocation.

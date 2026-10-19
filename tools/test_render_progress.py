@@ -40,6 +40,32 @@ class ProgressValidationTest(unittest.TestCase):
         self.assertEqual('GPT', owned['WP-108']['owner'])
         self.assertEqual('Claude', owned['WP-102']['owner'])
 
+    def test_domain_fixtures_and_caller_tests_have_their_domain_owner(self):
+        prefixes = ('modules/oa-testkit/src/main/java/', 'modules/oa-testkit/src/test/java/')
+        suffix = 'io/github/bassemzohdy/openworkflow/agentic/testkit/'
+        expected = {prefix + suffix + domain + '/Fixture.java': 'Claude'
+                    for prefix in prefixes for domain in ('idp', 'policy', 'model')}
+        expected.update({prefix + suffix + domain + '/Fixture.java': 'GPT'
+                         for prefix in prefixes for domain in ('acceptance', 'fault', 'process', 'time')})
+        expected['modules/oa-testkit/pom.xml'] = 'GPT'
+        api = 'modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/'
+        expected[api + 'caller/CallerContextResolverTest.java'] = 'Claude'
+        expected[api + 'problem/ProblemDetailMapperTest.java'] = 'GPT'
+        for path, owner in expected.items():
+            writers = [area['owner'] for area in self.plan['execution_plan']['write_areas']
+                       for reserved in area['paths']
+                       if path == reserved or reserved.endswith('/') and path.startswith(reserved)]
+            self.assertEqual([owner], writers, path)
+
+    def test_start_here_follows_the_remaining_queue(self):
+        self.plan['execution_plan']['agents'][0]['backlog'].pop(0)
+        for agent in self.plan['execution_plan']['agents']:
+            for task in agent['backlog']:
+                task['after'] = [dep for dep in task['after'] if dep != 'WP-108']
+        rendered = '\n'.join(progress.agent_backlogs_md(self.plan))
+        self.assertIn('**GPT:** WP-107', rendered)
+        self.assertNotIn("review Claude's WP-102 design/evidence", rendered)
+
     def test_a_package_cannot_be_silently_duplicated_between_agents(self):
         gpt, claude = self.plan['execution_plan']['agents']
         claude['backlog'].append(copy.deepcopy(gpt['backlog'][0]))

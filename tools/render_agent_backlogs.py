@@ -81,17 +81,18 @@ def agent_backlogs_md(plan):
     execution = plan['execution_plan']
     out = ['## Two-agent delivery plan', '', execution['status'] + '.', '',
            f"Assignment baseline: `{execution['baseline_commit']}` ({execution['date']}).", '',
-           'GPT is the agent in this conversation. Each backlog below owns the remaining scope of its packages; '
+           'Each backlog below owns the remaining scope of its packages; '
            'the detailed checklists later in this file remain the acceptance contract. Priority numbers can shift '
            'when completed rows are removed; use the stable WP ID in branches and handoffs.', '',
            '### Start here', '',
-           '- [ ] **Claude:** review this plan and its write boundaries, then take **Claude-01 / WP-102** '
-           '(real Keycloak evidence and verified audit callers).',
-           '- [ ] **GPT:** review Claude\'s WP-102 design/evidence, then take **GPT-01 / WP-108** '
-           '(durable effect ledger on the existing lifecycle core).',
-           '- [ ] Each implementation PR is reviewed by the other agent at its current head before merge. '
-           'These two first implementation tasks can proceed concurrently after the initial plan/design review.', '',
+           '- GPT and Claude may start their first owned packages concurrently on the merged baseline APIs. '
+           'WP-108 does not require a WP-102 design handoff.', '',
            '### Working and review agreement', '']
+    for agent in execution['agents']:
+        if agent['backlog']:
+            task = agent['backlog'][0]
+            out.insert(out.index('### Working and review agreement') - 1,
+                       f"- [ ] **{agent['id']}:** {task['wp']} — {task['outcome']}")
     out += [f'{i}. {rule}' for i, rule in enumerate(execution['rules'], 1)]
     for agent in execution['agents']:
         out += ['', f"### {agent['id']} backlog — {len(agent['backlog'])} packages", '',
@@ -101,7 +102,7 @@ def agent_backlogs_md(plan):
         for task in agent['backlog']:
             w = packages[task['wp']]
             gates = ', '.join(f"{dep} ({owned[dep]['owner']})" for dep in task['after'])
-            gates = gates or 'Initial plan/design review; merged baseline APIs'
+            gates = gates or 'Merged baseline APIs; no WP-102 design prerequisite'
             escape = lambda s: str(s).replace('|', '\\|').replace('\n', ' ')
             out.append(f"| [ ] **{owned[w['id']]['ticket']} / {w['id']}** {escape(w['title'])} "
                        f"({w['progress']['status']}) | {gates} | {escape(task['outcome'])} | {escape(task['handoff'])} |")
