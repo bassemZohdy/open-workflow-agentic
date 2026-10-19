@@ -61,7 +61,9 @@ Goal, requesting subject and delegation grant are carried over unchanged. A chai
 - `policy` is a `PolicyRef(policyId, policySetVersion)`. The policy id is the platform's stable id. Engine-assigned names such as `policy0` are not stable and must be mapped first.
 - `decidedBy` names the component that decided. The built-in rule for failures is `PolicyRef.FAIL_CLOSED` (`oa.fail-closed`, version `1`).
 
-`AuthorizationRequest(subject, action, resource, taskId)` is the input to a decision. `ActionKind` is `TOOL_CALL`, `MODEL_CALL`, `DATA_ACCESS`, `EFFECT_COMMIT`, `RESUME` or `DELEGATE`. `taskId` is null only for requests made outside an agent task.
+`AuthorizationRequest(subject, action, resource, taskId, context)` is the input to a decision. `ActionKind` is `TOOL_CALL`, `MODEL_CALL`, `DATA_ACCESS`, `EFFECT_COMMIT`, `RESUME`, `DELEGATE`, `HUMAN_TASK_ACTION`, `PUBLICATION` or `OPERATION` (WP-103 added the last three). `taskId` is null only for requests made outside an agent task.
+
+`PolicyContext(scopes, riskTier, budgetRemainingMicros, onBehalfOf, delegationGrantId, permittedByContract)` holds the facts a policy may read besides the request (WP-103). Every field is optional except `scopes`, which defaults to none; a null field means the fact does not apply to the call. The enforcement point fills it from the approved task, so the policy engine never reads the task store itself. The four-argument `AuthorizationRequest` constructor uses `PolicyContext.EMPTY`.
 
 ## 4. Effects (M03, M06, ADR 0020 decision 6)
 
