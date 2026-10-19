@@ -11,6 +11,8 @@ import jakarta.inject.Inject;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import javax.sql.DataSource;
 import org.bsc.async.AsyncGenerator;
 import org.bsc.langgraph4j.CompileConfig;
@@ -21,6 +23,7 @@ import org.bsc.langgraph4j.NodeOutput;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.action.InterruptionMetadata;
+import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.PostgresSaverV2;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.MDC;
@@ -61,7 +64,17 @@ public class ResearchGraph {
     @ConfigProperty(name = "spikec.effect.keyed", defaultValue = "true")
     boolean effectKeyed;
 
+    /**
+     * Test seams, package-private and never set in production: wrap the checkpoint saver, replace the serializer,
+     * and throw from a node by name before it does its work. The defaults change nothing.
+     */
+    UnaryOperator<BaseCheckpointSaver> saverDecorator = saver -> saver;
+    JsonSpikeSerializer serializer = new JsonSpikeSerializer();
+    Consumer<String> nodeFault = node -> {
+    };
+
     private CompiledGraph<SpikeState> graph;
+    private BaseCheckpointSaver checkpoints;
 
     /** Result of driving the graph: the status it stopped in, and the thread. */
     public record Result(String status, String threadId) {
@@ -69,10 +82,12 @@ public class ResearchGraph {
 
     @PostConstruct
     void build() throws Exception {
-        var ser = new JsonSpikeSerializer();
-        var saver = PostgresSaverV2.builder().stateSerializer(ser).datasource(dataSource).createTables(true).build();
+        var ser = serializer;
+        BaseCheckpointSaver saver = saverDecorator.apply(
+                PostgresSaverV2.builder().stateSerializer(ser).datasource(dataSource).createTables(true).build());
         var g = new StateGraph<>(ser)
                 .addNode("draft", node_async(s -> {
+                    nodeFault.accept("draft");
                     Ctx ctx = Ctx.fromJson(s.text(SpikeState.CTX));
                     store.recordStep(ctx.threadId().value(), "draft", ctx, MDC.get("correlationId"));
                     sleep(draftDelayMs);
@@ -80,6 +95,7 @@ public class ResearchGraph {
                             "Topic: " + ctx.topic()));
                 }))
                 .addNode("publish", node_async(s -> {
+                    nodeFault.accept("publish");
                     Ctx ctx = Ctx.fromJson(s.text(SpikeState.CTX));
                     String thread = ctx.threadId().value();
                     store.recordStep(thread, "publish", ctx, MDC.get("correlationId"));
@@ -91,6 +107,7 @@ public class ResearchGraph {
                 .addEdge(START, "draft")
                 .addEdge("draft", "publish")
                 .addEdge("publish", END);
+        this.checkpoints = saver;
         this.graph = g.compile(CompileConfig.builder()
                 .checkpointSaver(saver)
                 .interruptsBefore(Set.of("publish"))
@@ -99,7 +116,9 @@ public class ResearchGraph {
 
     /**
      * Starts the run for a context, or continues it when the run record already exists (an earlier attempt was
-     * interrupted or killed). A continuation that finds no checkpoint starts again from the input.
+     * interrupted or killed). A continuation starts again from the input only when the checkpoint is positively
+     * missing (see {@link #checkpointExists}). Every other failure propagates: a fresh start would replay the
+     * nodes that already ran, which repeats the model call and, after an approval, the effect.
      */
     public Result run(Ctx ctx, String bridge, String headerCorrelation) {
         String thread = ctx.threadId().value();
@@ -108,17 +127,21 @@ public class ResearchGraph {
             store.noteReceived(bridge, ctx, headerCorrelation, "RUNNING");
         }
         Result result;
-        if (existed) {
-            try {
-                result = drive(GraphInput.resume(), ctx);
-            } catch (RuntimeException noCheckpoint) {
-                result = drive(GraphInput.args(Map.of(SpikeState.CTX, ctx.toJson())), ctx);
-            }
+        if (existed && checkpointExists(thread)) {
+            result = drive(GraphInput.resume(), ctx);
         } else {
             result = drive(GraphInput.args(Map.of(SpikeState.CTX, ctx.toJson())), ctx);
         }
         store.setRunStatus(thread, result.status());
         return result;
+    }
+
+    /**
+     * True when the saver has a checkpoint for the thread. The saver answers {@code Optional.empty()} only when
+     * there is none; a store, serializer or other error is thrown, and the caller must not treat it as absence.
+     */
+    private boolean checkpointExists(String thread) {
+        return checkpoints.get(RunnableConfig.builder().threadId(thread).build()).isPresent();
     }
 
     /** Resumes an interrupted run after the approval, using the context stored with the run. */

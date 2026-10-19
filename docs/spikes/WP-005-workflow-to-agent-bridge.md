@@ -55,7 +55,7 @@ Each cell: result, then test (confidence).
 | 6 | Move the agent to a separate process later without changing the workflow | Likely yes. The workflow only holds a URL. Requires an authenticated endpoint and a reachable address. Not run: the agent was never separated. (read-in-source) | **No.** The definition binds to the bean class through the Java DSL; a separate process needs a new task type. (read-in-source: `InProcessFlow`, `InProcessBridge`) | Likely yes. Moving needs the callback to be an inbound HTTP endpoint (CloudEvents) and the outbox to stay with the agent. Not run. (read-in-source) |
 | 7 | Glue lines and moving parts | Workflow YAML 37 lines; agent endpoints in `AgentApi` (about 30 for `run` and `resume`). Moving parts: the HTTP hop, the auth it needs, the run record. | Java DSL 36 lines; bridge bean 39 lines. Moving parts: the CDI bean and the function binding. No hop, no serialization of the call. | YAML 72 lines; `AsyncAgent` 135 lines (callbacks and outbox); acknowledgement endpoint; outbox table; redelivery timer; acknowledgement tasks in the workflow. Most moving parts. |
 
-Shared glue, needed by all three: `ResearchGraph` 154 lines, `Store` 246 lines (spike-owned tables), `Lifecycle` (reconciler) 111 lines, `Ctx` 48 lines, `Events` 37 lines.
+Shared glue, needed by all three: `ResearchGraph` 177 lines (154 before issue #9), `Store` 246 lines (spike-owned tables), `Lifecycle` (reconciler) 161 lines (111 before issue #9), `Ctx` 48 lines, `Events` 37 lines.
 
 ### Engine facts found while building the bridges
 
@@ -109,6 +109,20 @@ Work packages whose assumptions change. Nothing in `docs/plan/` was edited; thes
 6. **Callback redelivery bounds.** The outbox redelivers every 300 ms with no limit or backoff. A real version needs a limit, a dead-letter path, and a test for an agent that never completes.
 7. **The listen output shape.** The array-or-object output of a listen task (engine fact 1) needs a check in WP-003's successor test suite, so an upgrade does not change it silently.
 
+## Hardening (issue #9)
+
+Two failure paths in the spike, fixed on branch `issue-9-wp005-hardening`. Each fix was preceded by a failing test.
+
+1. **Readiness after a failed recovery.** The reconciler set `ready` in a `finally` block, so a failed recovery still opened the API. Readiness is now set only when an attempt completes. Recovery is retried at most `spikec.reconcile.max-attempts` times (default 3), `spikec.reconcile.retry-ms` apart (default 2000). A retry skips the instances and runs an earlier attempt already handled. After the last failed attempt readiness stays false and nothing retries again; a restart is needed. A new instance is refused with 503 and an RFC 9457 problem body, before any registry row is written. `spikec.reconcile.fail-attempts` forces the first attempts to fail; it is for tests and is zero by default.
+   - Tests, `ReadinessHardeningIT` (process level): `forcedRecoveryErrorKeepsReadinessDownAndRejectsNewInstances` checks readiness 503 after every attempt and later, the refused POST and that no row exists; `readinessOpensOnlyAfterARetrySucceeds` forces one failure and checks that attempt 2 of 3 opens readiness and a start is then accepted.
+   - Before the fix: `expected: <503> but was: <200>`, and the retry test timed out waiting for a retry that never ran.
+2. **Resume failures replayed the graph.** `ResearchGraph.run` caught every `RuntimeException` from the resume and started the graph again from its input, so a checkpoint-store, serializer or node failure re-ran the draft (a model call and a step). The saver is now asked first with `BaseCheckpointSaver.get`. Only `Optional.empty()` means the checkpoint is missing, and only then does the fresh start run. Every other failure propagates.
+   - Tests, `ResearchGraphResumeIT` (in process, against the database in `SPIKEC_JDBC_URL`): `CheckpointStoreFailureOnResumeIsPropagatedWithoutReplay`, `SerializerFailureOnResumeIsPropagatedWithoutReplay` and `NodeFailureOnResumeIsPropagatedWithoutReplay` each inject one fault and assert that the exception surfaces and that the draft and publish step counts and the effect count do not change. The saver and serializer faults are transient on purpose: a persistent fault also breaks the fresh start, which hides the replay. Controls `ResumeWithoutFaultCompletesWithoutReplay` and `PositivelyMissingCheckpointStartsFresh` pass before and after.
+   - Before the fix all three failed with `Expected java.lang.RuntimeException to be thrown, but nothing was thrown`. The fallback had swallowed the failure and run the graph again.
+3. **Configuration.** The spike listens on port 18196 (the YAML callbacks and the harness were moved from 18195). `SPIKEC_JDBC_URL` selects the database, default `spike_c`. The test seams (`saverDecorator`, `serializer`, `nodeFault`) are package-private and have no effect in production.
+
+The 21 original tests are unchanged in meaning; the new tests add 7. Not covered: a kill -9 during the resume itself, a real database outage (only injected faults), and a retry after a failure in the middle of an attempt, which the retry rule allows but no test forces.
+
 ## Commands run
 
 ```
@@ -122,4 +136,4 @@ mvn -B verify -f spikes/spike-c-bridge/pom.xml                             # exi
 
 Earlier full verify runs in this session, before the final code change, failed as follows: run 1 with 2 bridge C failures (lost callback); run 2 with 6 bridge C failures (HTTP 202 with empty body); run 3 with 1 failure (the reconciler log check in open question 1). Each was fixed in code and rerun. The final run covers the code as committed.
 
-Database: `spike_c` on localhost:5432, schemas `public` (Flow tables) and `spikec` (spike tables). Databases `agentic`, `spike_a` and `spike_b` were not touched. Port: 18195 (8081 not used).
+Database: `spike_c` on localhost:5432, schemas `public` (Flow tables) and `spikec` (spike tables). Databases `agentic`, `spike_a` and `spike_b` were not touched. Port: 18195 (8081 not used). Both values are the original run's; issue #9 moved the port to 18196 and made the database configurable (see Hardening below).
