@@ -2300,6 +2300,18 @@
         "docs/policy.md"
       ]
     },
+    "M13": {
+      "status": "partial",
+      "summary": "Audit redaction/reference retention and secure secret-file handling exist; platform-wide encryption, erasure and processing-location controls remain open.",
+      "implemented_by": [
+        "WP-102",
+        "WP-111"
+      ],
+      "evidence": [
+        "docs/audit.md",
+        "docs/identity.md"
+      ]
+    },
     "M14": {
       "status": "partial",
       "summary": "Malformed output, forbidden actions and unauthorized escalation are rejected by T01; retrieval/tool defense and optional sandboxing remain open.",
@@ -2350,6 +2362,31 @@
       ],
       "evidence": [
         "README.md"
+      ]
+    },
+    "M24": {
+      "status": "partial",
+      "summary": "Verified tenant context, tenant-scoped grants and lifecycle ownership filters exist; multi-tenant RLS, memory/state/telemetry isolation and the complete isolation suite remain open.",
+      "implemented_by": [
+        "WP-102",
+        "WP-105"
+      ],
+      "evidence": [
+        "docs/identity.md",
+        "docs/lifecycle.md"
+      ]
+    },
+    "M25": {
+      "status": "partial",
+      "summary": "Version-controlled workflow/contract artifacts and build/load validation exist; reusable authoring, packaging and governed promotion remain open.",
+      "implemented_by": [
+        "WP-001",
+        "WP-101",
+        "WP-104"
+      ],
+      "evidence": [
+        "README.md",
+        "docs/contracts.md"
       ]
     },
     "M26": {

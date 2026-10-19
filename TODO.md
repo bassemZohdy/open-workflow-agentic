@@ -39,7 +39,7 @@ All requirements are listed below. `partial` means a concrete capability is impl
 | M10 Governed publication and activation | planned | 0/4 | WP-303 |
 | M11 Authentication, delegation and secret handling | partial | 1/5 | WP-005, WP-006, WP-102, WP-207 |
 | M12 External policy and safe denial | partial | 2/3 | WP-006, WP-103 |
-| M13 Data security, privacy and location | planned | 0/1 | WP-306 |
+| M13 Data security, privacy and location | partial | 0/1 | WP-306 |
 | M14 Untrusted inputs and optional code execution | partial | 1/4 | WP-104, WP-204, WP-205, WP-209 |
 | M15 Auditability and AI decision provenance | partial | 0/3 | WP-101, WP-111, WP-203 |
 | M16 Observability and operational APIs | partial | 0/2 | WP-105, WP-112 |
@@ -50,8 +50,8 @@ All requirements are listed below. `partial` means a concrete capability is impl
 | M21 Safe platform upgrades | planned | 0/2 | WP-402 |
 | M22 Provider-independent deployability | partial | 0/2 | WP-001, WP-403, WP-503 |
 | M23 Enterprise and external-agent interoperability | planned | 0/2 | WP-007, WP-113, WP-204, WP-207, WP-602 |
-| M24 Tenant safety where used | planned | 0/1 | WP-404 |
-| M25 Reproducible authoring and testable artifacts | planned | 0/2 | WP-601 |
+| M24 Tenant safety where used | partial | 0/1 | WP-404 |
+| M25 Reproducible authoring and testable artifacts | partial | 0/2 | WP-601 |
 | M26 Separation of authority | partial | 0/3 | WP-001, WP-304, WP-601 |
 | M27 Safe autonomy during administration outages | partial | 0/2 | WP-304 |
 | M28 Recoverable canonical progress and reconciliation | partial | 0/5 | WP-005, WP-105, WP-203 |
