@@ -130,7 +130,9 @@ The WP-006 spike measured Cedar at 387 to 525 µs p50 and 4.5 to 6 ms p99 in thr
 ## 8. What remains
 
 **For WP-102 (identity and delegation):**
-- The `delegationGrantId` and `onBehalfOf` context fields come from the approved contract. Verifying that the grant is current, unexpired and not revoked is WP-102's job, and the PEP does not check it.
+- The `delegationGrantId` and `onBehalfOf` context fields come from the approved contract. Verifying that the grant is current, unexpired and not revoked is done by WP-102 (`ResourceTokenGuard`, the token exchange and the resume gate, see `docs/identity.md`); the PEP still does not check it.
+- **Scopes.** Operator scopes (`oa.inspect`, `oa.recover`, ...) now come from the `scope` claim of a verified token. The development header seam (`X-Scopes`) is honoured only with `agentic.dev.trust-caller-headers=true` in a profile listed in `agentic.dev.header-seam-profiles` (default `dev,test`); the application refuses to start otherwise. The rule trusts the scopes it is given, so the caller must take them from the verified token.
+- T07 uses this boundary with the embedded Cedar engine for a delegated tool call outside its scope (`DelegatedAuthorityAcceptanceTest`).
 
 **For WP-204 (tool gateway and MCP):**
 - The tool gateway must call `Pep.toolCall` before every invocation, and must use `Pep.guard` (or check `allows()`) before calling the tool. Nothing yet enforces this.

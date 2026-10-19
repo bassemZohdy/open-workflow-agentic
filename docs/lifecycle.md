@@ -138,7 +138,7 @@ Points that matter:
 | `POST /instances` with `{definitionId, definitionVersion, input, idempotencyKey}` and headers `X-Tenant`, `X-Subject` | 202 and `Location` for a new instance; 200 with the same body for a repeated key; 409 for a key used with a different request; 422 unknown definition; 400 malformed; 401 no caller |
 | `GET /instances/{id}` | 200 with `{id, definitionId, definitionVersion, status, engineInstanceId, startAttempts, version, createdAt, updatedAt}`; 404 unknown, malformed or another tenant's id; 401 no caller |
 
-Errors are RFC 9457 problem documents with the correlation id. The caller comes from `CallerContextResolver`. It reads `X-Tenant` and `X-Subject` only when `agentic.dev.trust-caller-headers=true`. The default is false, so every instance endpoint answers 401 until WP-102 provides authentication. The flag must not be enabled in a deployment.
+Errors are RFC 9457 problem documents with the correlation id. The caller comes from `CallerContextResolver`. It reads `X-Tenant` and `X-Subject` only when `agentic.dev.trust-caller-headers=true`. The default is false, and the flag is refused outside the profiles in `agentic.dev.header-seam-profiles`. With neither the seam nor a verified token, every instance endpoint answers 401.
 
 ## 5. Failure modes
 
@@ -186,7 +186,7 @@ Seams that exist now:
 
 **105d (operations API, built: section 11)**
 - Inspect, cancel, retry, pause and recover, authorized. Cancel moves `RUNNING`, `WAITING` or `STARTING` (with an engine id) to `CANCEL_REQUESTED`, and a `STARTING` row with no engine id to `CANCELLED` (ADR 0019, amendment 4, issue #24). Retry restarts a `STARTING` row, and creates a new linked instance for a `FAILED` row (ADR 0019, amendment 3, issue #23). Each call writes history with the operator as actor (section 11.3).
-- Authentication depends on WP-102. Until then the caller comes from development headers that are refused unless `agentic.dev.trust-caller-headers=true` (section 11.8).
+- Authentication is a verified bearer token (WP-102). The development headers are a profile-guarded seam (section 11.8).
 
 **Outside the four slices but needed by the plan**
 - The code that inserts `agent_task` rows and sets `graph_version` and `state_schema_version` (WP-201, WP-302). `AgentTaskRecord` has no pinning fields, so the columns are written by SQL there, or the record is extended with a decision.
@@ -517,12 +517,18 @@ The history row and its outbox row are written by `InstanceStore.replace`, in on
 
 ### 11.8 Caller and scopes
 
-- `X-Tenant` and `X-Subject` identify the caller, and `X-Scopes` lists its scopes (comma separated). All three are read only when `agentic.dev.trust-caller-headers=true`. Otherwise every operation is 401, so a scope claim in an untrusted request is never read.
-- The development flag must never be set in a deployment. Authentication and the real scopes come from WP-102.
+- The caller comes from a verified bearer token (WP-102, `docs/identity.md` section 2): the tenant, the subject and the scopes
+  are claims of a token whose signature, issuer, audience and expiry were checked. `X-Tenant`, `X-Subject` and `X-Scopes` are
+  ignored on this path.
+- The development header seam still exists for tests. It is honoured only if `agentic.dev.trust-caller-headers=true` **and** the
+  active profile is in `agentic.dev.header-seam-profiles` (default `dev,test`); in any other profile the application refuses to
+  start with the flag set. Without a verified token and without the seam, every operation is 401.
+- `POST /instances` accepts an optional `delegationGrantId` (the caller's own active grant). The instance then runs for the
+  caller, and `POST /instances/{id}/reauthorize` renews it after `reauthorization.required` (`docs/identity.md` section 5).
 
 ### 11.9 Not done, and open points for the owner
 
-- **Authentication (WP-102).** The caller and its scopes come from development headers. This is not authorization in the sense of T16 until WP-102 provides them.
+- **Authentication (WP-102).** Built, and run against the testkit's fake issuer only, not a real identity provider (`docs/identity.md` section 12). Owner-scoped reads and T16 are not covered by it.
 - **Pause and resume.** Need checkpoint states that do not exist (WP-201). Pause answers 501; resume is not offered.
 - **Retry from FAILED (issue #23, implemented).** The failed row is not reopened, so the engine instance rule of section 9.9 (items 1 and 6) does not apply to the new instance. The rule of one live retry per failed instance, and the 409 while one is live, are the implementer's choice for the owner to confirm (11.3). Also to confirm: a chain of retries is not bounded by the start attempt limit (11.3).
 - **Cancel of a row with no engine id (issue #24, implemented).** It goes straight to `CANCELLED` (11.3). A row that was left in `CANCEL_REQUESTED` with no engine id before this change is not finished automatically; the reconciler audits it.
@@ -541,7 +547,7 @@ T16 reads: "Inspect, cancel and retry individual tasks through authorized operat
 
 They do not cover the following, so **T16 is not annotated** (`@Acceptance` is not applied):
 
-- Authorization by an authenticated identity: the caller comes from development headers (WP-102 is not built).
+- Authorization by an authenticated identity is verified against the testkit's fake issuer only (WP-102, docs/identity.md section 12).
 - "Individual tasks" in the sense of agent tasks: the operations act on registry instances. Agent tasks have no insert path yet (WP-201).
 
 ### 11.11 Tests

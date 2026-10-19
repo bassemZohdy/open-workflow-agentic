@@ -43,6 +43,9 @@ class OutboxKillIT {
         int port;
         try (ManagedProcess first = ManagedProcess.jar(jar).logFile(log)
                 .property("agentic.dev.trust-caller-headers", "true")
+                // The packaged jar runs in the production profile, which refuses the header seam (WP-102).
+                .property("quarkus.profile", "itest")
+                .property("agentic.dev.header-seam-profiles", "itest")
                 .property("agentic.dev.lifecycle-probes", "true")
                 .property("agentic.outbox.relay.interval", "1h")
                 .build()) {
@@ -64,6 +67,9 @@ class OutboxKillIT {
 
         try (ManagedProcess second = ManagedProcess.jar(jar).logFile(log).httpPort(port)
                 .property("agentic.dev.trust-caller-headers", "true")
+                // The packaged jar runs in the production profile, which refuses the header seam (WP-102).
+                .property("quarkus.profile", "itest")
+                .property("agentic.dev.header-seam-profiles", "itest")
                 .property("agentic.reconciler.enabled", "false")
                 .property("agentic.outbox.relay.interval", "200ms")
                 .build()) {

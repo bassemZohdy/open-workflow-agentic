@@ -106,6 +106,9 @@ class LifecycleRecoveryIT {
                 .logFile(LOGS.resolve(label + ".log"))
                 .property("quarkus.datasource.jdbc.url", dbUrl)
                 .property("agentic.dev.trust-caller-headers", "true")
+                // The packaged jar runs in the production profile, which refuses the header seam (WP-102).
+                .property("quarkus.profile", "itest")
+                .property("agentic.dev.header-seam-profiles", "itest")
                 .property("agentic.dev.lifecycle-probes", "true")
                 .property("agentic.reconciler.enabled", String.valueOf(reconciler))
                 .property("agentic.reconciler.interval", "PT2S")

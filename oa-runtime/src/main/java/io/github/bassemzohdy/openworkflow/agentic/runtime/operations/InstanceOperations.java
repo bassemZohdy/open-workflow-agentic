@@ -410,6 +410,7 @@ public class InstanceOperations {
         out.put("taskView", inspection.taskView(row.tenant(), row.id().value()));
         out.put("outbox", inspection.outbox(row.id().value()));
         out.put("repairs", inspection.repairs(row.id().value()));
+        out.put("authority", inspection.authority(row.id().value()));
         return out;
     }
 

@@ -2,12 +2,17 @@ package io.github.bassemzohdy.openworkflow.agentic.lifecycle;
 
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityScope;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InstanceAuthorities;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.SecretProvider;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.SecretUnavailableException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.RegistryScan;
 import io.serverlessworkflow.impl.WorkflowApplication;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -34,6 +39,9 @@ import org.jboss.logging.Logger;
  *       for that instance, and the mode. Mode {@code fail} answers 500. Mode {@code hold} sleeps on epoch 0 only, so a
  *       test can kill the process while the effect is in flight.</li>
  *   <li>{@code GET /dev/lifecycle/effects}: the calls this process received, for in-process tests.</li>
+ *   <li>{@code GET /dev/lifecycle/secret-probe?name=}: reads a secret through the {@link SecretProvider} and answers its
+ *       length only (never the value), so a process test can show that a secret was read, rotated, and never persisted
+ *       or logged (WP-102, docs/identity.md section 7).</li>
  *   <li>{@code POST /dev/lifecycle/events}: publishes a CloudEvent to the engine's event publishers, which wakes the
  *       listen task of the lifecycle-probe definition.</li>
  * </ul>
@@ -60,6 +68,12 @@ public class DevLifecycleResource {
     @Inject
     RegistryScan scan;
 
+    @Inject
+    InstanceAuthorities authorities;
+
+    @Inject
+    SecretProvider secrets;
+
     @POST
     @Path("/effects")
     @Consumes(MediaType.APPLICATION_JSON)
@@ -71,6 +85,14 @@ public class DevLifecycleResource {
         String mode = String.valueOf(body == null ? "ok" : body.getOrDefault("mode", "ok"));
         long epoch = instanceId == null ? -1 : scan.resumeEpochOfEngineInstance(instanceId).orElse(-1);
         LOG.infof("probe-effect received instance=%s epoch=%d mode=%s", instanceId, epoch, mode);
+        // The identity of the instance comes back from the registry by the engine instance id; nothing about it travelled
+        // in the workflow state. The log line is what the kill/restart test reads.
+        try (AuthorityScope ignored = authorities.restore(instanceId).orElse(null)) {
+            AuthorityScope.current().ifPresentOrElse(
+                    a -> LOG.infof("probe-effect authority instance=%s subject=%s grant=%s correlation=%s state=%s epoch=%d",
+                            instanceId, a.subject().id(), a.grantId(), a.correlationId(), a.state(), epoch),
+                    () -> LOG.infof("probe-effect authority instance=%s none", instanceId));
+        }
         if ("hold".equals(mode) && epoch == 0) {
             sleep(HOLD_MILLIS);
         }
@@ -87,6 +109,20 @@ public class DevLifecycleResource {
             return Response.status(404).build();
         }
         return Response.ok(new ArrayList<>(CALLS)).build();
+    }
+
+    @GET
+    @Path("/secret-probe")
+    public Response secretProbe(@QueryParam("name") String name) {
+        if (!enabled) {
+            return Response.status(404).build();
+        }
+        try {
+            int length = secrets.current(name).reveal().length();
+            return Response.ok(Map.of("length", length)).build();
+        } catch (SecretUnavailableException unavailable) {
+            return Response.status(503).entity(Map.of("error", "unavailable")).build();
+        }
     }
 
     @POST

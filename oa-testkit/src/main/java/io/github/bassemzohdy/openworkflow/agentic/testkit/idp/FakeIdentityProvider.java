@@ -84,10 +84,15 @@ public final class FakeIdentityProvider implements AutoCloseable {
 
     /** Starts the HTTP endpoints on 127.0.0.1 with a free port. */
     public synchronized FakeIdentityProvider start() throws IOException {
+        return start(0);
+    }
+
+    /** Starts the HTTP endpoints on 127.0.0.1 on {@code port} (0 chooses a free one). */
+    public synchronized FakeIdentityProvider start(int port) throws IOException {
         if (http != null) {
             throw new IllegalStateException("already started");
         }
-        http = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        http = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
         http.createContext("/jwks.json", this::handleJwks);
         http.createContext("/token", this::handleToken);
         http.setExecutor(java.util.concurrent.Executors.newCachedThreadPool(r -> {
@@ -128,6 +133,36 @@ public final class FakeIdentityProvider implements AutoCloseable {
         claims.put("exp", now.plus(spec.lifetime()).getEpochSecond());
         claims.put("jti", UUID.randomUUID().toString());
         return sign(claims);
+    }
+
+    /**
+     * Claims of a token as {@link #issue} would write them, as a mutable map: {@code iss}, {@code sub}, {@code aud}
+     * (when not null), {@code iat}, {@code exp} (from the clock and {@code lifetime}) and {@code jti}. A test changes
+     * or removes entries (a missing {@code exp}, an {@code act} chain, an array audience, a tenant) and signs the
+     * result with {@link #signClaims}.
+     */
+    public Map<String, Object> baseClaims(String subject, String audience, Duration lifetime) {
+        Instant now = clock.instant();
+        Map<String, Object> claims = new java.util.LinkedHashMap<>();
+        claims.put("iss", issuerOrPlaceholder());
+        claims.put("sub", subject);
+        if (audience != null) {
+            claims.put("aud", audience);
+        }
+        claims.put("iat", now.getEpochSecond());
+        claims.put("exp", now.plus(lifetime).getEpochSecond());
+        claims.put("jti", UUID.randomUUID().toString());
+        return claims;
+    }
+
+    /** Signs exactly these claims with this issuer's key (RS256, key id {@link #KEY_ID}). Nothing is added or checked. */
+    public String signClaims(Map<String, Object> claims) throws Exception {
+        return sign(JSON.valueToTree(claims));
+    }
+
+    /** The clock this issuer reads for {@code iat} and {@code exp}. */
+    public Clock clock() {
+        return clock;
     }
 
     /** Checks the signature with this issuer's key and returns the claims, or throws if it does not verify. */

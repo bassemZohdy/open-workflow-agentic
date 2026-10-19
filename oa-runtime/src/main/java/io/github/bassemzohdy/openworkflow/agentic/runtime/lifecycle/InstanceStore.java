@@ -1,6 +1,8 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,8 +34,18 @@ public interface InstanceStore {
      *
      * @throws LiveRetryExistsException if the candidate retries a FAILED instance that already has a live retry
      */
+    default Insertion insertIfAbsent(InstanceRecord candidate, String reason,
+                                     io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject actor) {
+        return insertIfAbsent(candidate, reason, actor, null);
+    }
+
+    /**
+     * The full form: the actor of the history and outbox rows, and work to run in the insert transaction (see
+     * {@link #insertIfAbsent(InstanceRecord, String, InsertHook)}). {@code hook} may be null.
+     */
     Insertion insertIfAbsent(InstanceRecord candidate, String reason,
-                             io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject actor);
+                             io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject actor,
+                             InsertHook hook);
 
     /** The row this tenant stored for an idempotency key, or empty. */
     Optional<InstanceRecord> findByKey(String tenant, String idempotencyKey);
@@ -43,6 +55,17 @@ public interface InstanceStore {
 
     /** The ids of the instances created to retry this one, oldest first. */
     List<Ulid> retriesOf(String tenant, Ulid id);
+
+    /**
+     * As {@link #insertIfAbsent(InstanceRecord, String)}, and when this call creates the row, also runs {@code hook} on
+     * the same connection, in the same transaction, after the row and its history are written. If the hook throws, the
+     * whole insert is rolled back. The hook is not run when the key already had a row. Used to write the identity of the
+     * instance atomically with the instance (docs/identity.md section 7).
+     *
+     */
+    default Insertion insertIfAbsent(InstanceRecord candidate, String reason, InsertHook hook) {
+        return insertIfAbsent(candidate, reason, candidate.owner(), hook);
+    }
 
     /** The instance with this id in this tenant. Another tenant's id is empty, not forbidden, so ids do not leak. */
     Optional<InstanceRecord> find(String tenant, Ulid id);
@@ -59,6 +82,12 @@ public interface InstanceStore {
 
     /** The history of one instance, oldest first. Append-only in the database. */
     List<HistoryEntry> history(Ulid id);
+
+    /** Work done in the transaction that creates an instance row. */
+    @FunctionalInterface
+    interface InsertHook {
+        void afterInsert(Connection connection, Ulid instanceId) throws SQLException;
+    }
 
     /** The result of {@link #insertIfAbsent}. */
     record Insertion(InstanceRecord record, boolean created) {

@@ -82,8 +82,17 @@ public class InstanceService {
      * @throws StoreUnavailableException      if the registry cannot be written; the outcome is then unknown
      */
     public StartResult start(StartRequest request) {
+        return start(request, null);
+    }
+
+    /**
+     * As {@link #start(StartRequest)}. When this call creates the row, {@code onCreate} runs in the same transaction as
+     * the insert (see {@link InstanceStore#insertIfAbsent(InstanceRecord, String, InstanceStore.InsertHook)}); if it
+     * fails, no instance is created. It does not run when the key already had a row.
+     */
+    public StartResult start(StartRequest request, InstanceStore.InsertHook onCreate) {
         Objects.requireNonNull(request, "request");
-        return startAs(request, REASON_REQUESTED, request.owner());
+        return startAs(request, REASON_REQUESTED, request.owner(), onCreate);
     }
 
     /**
@@ -123,7 +132,7 @@ public class InstanceService {
         if (store.liveRetryOf(failed.tenant(), failed.id()).isPresent()) {
             throw new LiveRetryExistsException(failed.id());
         }
-        return startAs(request, REASON_RETRIED, operator);
+        return startAs(request, REASON_RETRIED, operator, null);
     }
 
     /**
@@ -143,12 +152,13 @@ public class InstanceService {
         }
     }
 
-    private StartResult startAs(StartRequest request, String reason, Subject actor) {
+    private StartResult startAs(StartRequest request, String reason, Subject actor,
+                                InstanceStore.InsertHook onCreate) {
         if (!engine.hasDefinition(request.definition())) {
             throw new DefinitionNotFoundException(request.definition());
         }
         InstanceRecord candidate = InstanceRecord.starting(ids.next(), request, now());
-        InstanceStore.Insertion insertion = store.insertIfAbsent(candidate, reason, actor);
+        InstanceStore.Insertion insertion = store.insertIfAbsent(candidate, reason, actor, onCreate);
         InstanceRecord row = insertion.record();
         if (!insertion.created()) {
             if (!row.requestFingerprint().equals(request.fingerprint())) {
