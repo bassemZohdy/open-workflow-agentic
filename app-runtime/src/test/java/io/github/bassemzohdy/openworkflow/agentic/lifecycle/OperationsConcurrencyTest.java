@@ -5,6 +5,7 @@ import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSup
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.post;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.startRunning;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.status;
+import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -103,14 +104,16 @@ class OperationsConcurrencyTest {
                     "select id from task.instance where tenant = ? and idempotency_key = ?", tenant, key);
             assertEquals("STARTING", status(dataSource, id));
 
-            post(tenant, OPERATE, "cancel-during-prepare", id, "cancel").statusCode(202);
+            // No engine instance id is recorded yet, so the cancel is direct (ADR 0019, amendment 4).
+            post(tenant, OPERATE, "cancel-during-prepare", id, "cancel").statusCode(200)
+                    .body("outcome", equalTo("cancelled"));
             release.countDown();
 
             Response response = start.get(60, TimeUnit.SECONDS);
             assertEquals(202, response.statusCode(), response.asString());
-            assertEquals("CANCEL_REQUESTED", response.path("status"));
+            assertEquals("CANCELLED", response.path("status"));
             assertEquals(0, engine.starts(), "the prepared instance is never started");
-            assertEquals("CANCEL_REQUESTED", status(dataSource, id));
+            assertEquals("CANCELLED", status(dataSource, id));
         } finally {
             pool.shutdownNow();
         }

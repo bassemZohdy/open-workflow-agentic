@@ -17,11 +17,32 @@ public interface InstanceStore {
 
     /**
      * Inserts the row for a request, unless a row with the same tenant and idempotency key exists. The candidate must
-     * be in status STARTING with version 0. The insert and its history row are one transaction.
+     * be in status STARTING with version 0. The insert and its history row are one transaction. The history row and
+     * its outbox row name the request's owner as the actor.
      *
      * @return the row now stored for the key, and whether this call created it
      */
-    Insertion insertIfAbsent(InstanceRecord candidate, String reason);
+    default Insertion insertIfAbsent(InstanceRecord candidate, String reason) {
+        return insertIfAbsent(candidate, reason, candidate.owner());
+    }
+
+    /**
+     * The same insert, with the actor of the history row and the outbox row given. A retry of a FAILED instance names
+     * the operator here, although the new instance keeps the owner of the old one (ADR 0019, amendment 3).
+     *
+     * @throws LiveRetryExistsException if the candidate retries a FAILED instance that already has a live retry
+     */
+    Insertion insertIfAbsent(InstanceRecord candidate, String reason,
+                             io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject actor);
+
+    /** The row this tenant stored for an idempotency key, or empty. */
+    Optional<InstanceRecord> findByKey(String tenant, String idempotencyKey);
+
+    /** The non-terminal retry of a FAILED instance, if one exists (at most one, ADR 0019, amendment 3). */
+    Optional<InstanceRecord> liveRetryOf(String tenant, Ulid failedId);
+
+    /** The ids of the instances created to retry this one, oldest first. */
+    List<Ulid> retriesOf(String tenant, Ulid id);
 
     /** The instance with this id in this tenant. Another tenant's id is empty, not forbidden, so ids do not leak. */
     Optional<InstanceRecord> find(String tenant, Ulid id);

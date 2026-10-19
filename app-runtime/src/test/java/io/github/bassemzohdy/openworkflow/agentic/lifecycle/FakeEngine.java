@@ -28,6 +28,8 @@ final class FakeEngine implements WorkflowEngine {
     volatile RuntimeException failNextStart;
     volatile CountDownLatch startEntered;
     volatile CountDownLatch startRelease;
+    /** Runs inside {@code prepare}, after the engine instance exists and before it is returned (a race test hook). */
+    volatile Runnable duringPrepare;
 
     @Override
     public boolean hasDefinition(DefinitionRef definition) {
@@ -39,6 +41,10 @@ final class FakeEngine implements WorkflowEngine {
         prepares.incrementAndGet();
         String id = "fake-" + ids.incrementAndGet() + "-" + System.nanoTime();
         active.put(id, EngineStatus.PENDING);
+        Runnable hook = duringPrepare;
+        if (hook != null) {
+            hook.run();
+        }
         return new EngineLaunch() {
             @Override
             public String engineInstanceId() {

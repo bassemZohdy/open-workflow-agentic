@@ -97,6 +97,27 @@ class ReconcilerRepairTest {
         return store.find(tenant, row.id()).orElseThrow();
     }
 
+    /**
+     * A cancel that lands while the reconciler prepares the engine instance (ADR 0019, amendment 4): the row changed, so
+     * the prepared instance is never started and the row keeps the operator's decision.
+     */
+    @Test
+    void aRowCancelledWhileThePreparedInstanceIsBeingMadeIsNeverStarted() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        InstanceRecord row = newRow(tenant);
+        engine.duringPrepare = () -> store.replace(
+                row.successor(Instant.now().truncatedTo(ChronoUnit.MICROS), InstanceStatus.CANCELLED, null, 0,
+                        null, null),
+                row.version(), "operator.cancel", InstanceService.RUNTIME_ACTOR);
+
+        reconciler(engine, tenant, 3).reconcileOnce();
+
+        assertEquals(InstanceStatus.CANCELLED, reload(tenant, row).status());
+        assertEquals(1, engine.prepares.get());
+        assertEquals(0, engine.starts.get(), "the prepared instance is never started");
+    }
+
     @Test
     void aStartingRowWithNoEngineIdIsPreparedAndStarted() {
         String tenant = newTenant();

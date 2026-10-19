@@ -13,13 +13,18 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditKeys;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.VersionStamps;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.DefinitionNotFoundException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.HistoryEntry;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.IdempotencyKeyReusedException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.IllegalTransitionException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceRecord;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceService;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceStatus;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceStore;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.LiveRetryExistsException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Reconciler;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StaleVersionException;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StartResult;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.SafeRecovery;
@@ -104,23 +109,25 @@ public class InstanceOperations {
     private final AuditSink audit;
     private final OperationKeys keys;
     private final InstanceInspection inspection;
+    private final InstanceService service;
     private final Clock clock;
 
     /** The audit trail is injected by its concrete type, because {@code AuditProducers} also produces the sink interface, so injecting by interface would be ambiguous. */
     @Inject
     public InstanceOperations(InstanceStore store, Reconciler reconciler, Pep pep, AuditTrail audit,
-                              OperationKeys keys, InstanceInspection inspection) {
-        this(store, reconciler, pep, audit, keys, inspection, Clock.systemUTC());
+                              OperationKeys keys, InstanceInspection inspection, InstanceService service) {
+        this(store, reconciler, pep, audit, keys, inspection, service, Clock.systemUTC());
     }
 
     InstanceOperations(InstanceStore store, Reconciler reconciler, Pep pep, AuditSink audit, OperationKeys keys,
-                       InstanceInspection inspection, Clock clock) {
+                       InstanceInspection inspection, InstanceService service, Clock clock) {
         this.store = Objects.requireNonNull(store, "store");
         this.reconciler = Objects.requireNonNull(reconciler, "reconciler");
         this.pep = Objects.requireNonNull(pep, "pep");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.keys = Objects.requireNonNull(keys, "keys");
         this.inspection = Objects.requireNonNull(inspection, "inspection");
+        this.service = Objects.requireNonNull(service, "service");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -233,7 +240,7 @@ public class InstanceOperations {
                     new Refusal("not-found", Response.Status.NOT_FOUND.getStatusCode(), "no such instance"));
             Done done = switch (operation) {
                 case CANCEL -> cancel(row, caller.subject());
-                case RETRY -> retry(row, caller.subject());
+                case RETRY -> retry(row, caller.subject(), key);
                 case RECOVER -> recover(row, caller.subject());
                 default -> throw new IllegalStateException("not a mutating operation: " + operation);
             };
@@ -246,9 +253,13 @@ public class InstanceOperations {
     }
 
     /**
-     * Cancel (ADR 0019): RUNNING, WAITING and STARTING move to CANCEL_REQUESTED. The engine's own report completes the
-     * cancel, so the reconciler sends the engine cancel now, or leaves it to its next pass when the engine is not
-     * reached. The response is 202 either way. A terminal instance is a no-op with an explicit result.
+     * Cancel (ADR 0019): RUNNING, WAITING and STARTING move to CANCEL_REQUESTED. A STARTING row with no engine instance
+     * id goes straight to CANCELLED (ADR 0019, amendment 4, issue #24): the engine never started that instance, so there
+     * is nothing for the engine's report to confirm. The version read here decides that case. A start that prepares
+     * the engine instance at the same moment writes the row first, so this write is refused as stale (409) and the
+     * cancel is decided again. For every other row the engine's own report completes the cancel, so the reconciler sends
+     * the engine cancel now, or leaves it to its next pass when the engine is not reached. A terminal instance is a no-op
+     * with an explicit result.
      */
     private Done cancel(InstanceRecord row, Subject operator) {
         if (row.status().isTerminal()) {
@@ -258,6 +269,12 @@ public class InstanceOperations {
         if (row.status() == InstanceStatus.CANCEL_REQUESTED) {
             return new Done("already-requested", new Outcome(Response.Status.OK.getStatusCode(),
                     body(Operation.CANCEL, "already-requested", row, null)));
+        }
+        if (row.status() == InstanceStatus.STARTING && row.engineInstanceId() == null) {
+            InstanceRecord cancelled = write(row.successor(now(), InstanceStatus.CANCELLED, null, row.startAttempts(),
+                    row.lastError(), null), row.version(), "operator.cancel", operator);
+            return new Done("cancelled", new Outcome(Response.Status.OK.getStatusCode(),
+                    body(Operation.CANCEL, "cancelled", cancelled, null)));
         }
         InstanceRecord requested = write(row.successor(now(), InstanceStatus.CANCEL_REQUESTED, row.engineInstanceId(),
                 row.startAttempts(), row.lastError(), row.waitDeadline()), row.version(), "operator.cancel", operator);
@@ -276,15 +293,16 @@ public class InstanceOperations {
     }
 
     /**
-     * Retry (ADR 0019, bounded by the attempt limit): applies to a STARTING row only. FAILED is terminal in the state
-     * machine, so it is refused here (docs/lifecycle.md, section 11). The reconciler's own attempt limit still applies.
+     * Retry. A FAILED instance gets a new linked instance ({@link #retryFailed}, ADR 0019, amendment 3). A STARTING row
+     * is started again now, bounded by the reconciler's attempt limit. Any other status is refused with 409.
      */
-    private Done retry(InstanceRecord row, Subject operator) {
+    private Done retry(InstanceRecord row, Subject operator, String key) {
+        if (row.status() == InstanceStatus.FAILED) {
+            return retryFailed(row, operator, key);
+        }
         if (row.status() != InstanceStatus.STARTING) {
-            String why = row.status() == InstanceStatus.FAILED
-                    ? "retry applies to STARTING rows; FAILED is terminal"
-                    : "retry applies to STARTING rows; this instance is " + row.status();
-            throw new Refusal("refused-status", Response.Status.CONFLICT.getStatusCode(), why);
+            throw new Refusal("refused-status", Response.Status.CONFLICT.getStatusCode(),
+                    "retry applies to STARTING rows and to FAILED rows; this instance is " + row.status());
         }
         InstanceRecord requested = write(row.successor(now(), InstanceStatus.STARTING, row.engineInstanceId(),
                 row.startAttempts(), row.lastError(), row.waitDeadline()), row.version(), "operator.retry", operator);
@@ -301,6 +319,34 @@ public class InstanceOperations {
         }
         return new Done("retry-requested", new Outcome(Response.Status.ACCEPTED.getStatusCode(),
                 body(Operation.RETRY, "retry-requested", after, null)));
+    }
+
+    /**
+     * Retry of a FAILED instance (ADR 0019, amendment 3, issue #23). The failed row is not changed. A new instance with
+     * the same tenant, owner, definition, pinned version and input is inserted, linked by {@code retriedFrom}, and
+     * started through the normal start path. A repeat of the same call returns the instance its first call created
+     * (200, outcome {@code retry-existing}) and starts nothing. At most one retry of a failed instance is non-terminal:
+     * another retry while one is live is refused with 409.
+     */
+    private Done retryFailed(InstanceRecord failed, Subject operator, String key) {
+        StartResult result;
+        try {
+            result = service.retryFailed(failed, operator, key);
+        } catch (LiveRetryExistsException live) {
+            throw new Refusal("refused-live-retry", Response.Status.CONFLICT.getStatusCode(),
+                    "this FAILED instance already has a retry that is not terminal; a new retry is allowed once it is");
+        } catch (DefinitionNotFoundException missing) {
+            throw new Refusal("refused-definition", 422,
+                    "the engine does not hold the pinned definition of this instance; no retry was created");
+        } catch (IdempotencyKeyReusedException reused) {
+            throw new Refusal("key-reused", Response.Status.CONFLICT.getStatusCode(),
+                    "the Idempotency-Key was used for a different request");
+        }
+        String outcome = result.created() ? "retry-created" : "retry-existing";
+        Map<String, Object> body = body(Operation.RETRY, outcome, result.record(), null);
+        body.put("retriedFrom", failed.id().value());
+        int status = result.created() ? Response.Status.ACCEPTED.getStatusCode() : Response.Status.OK.getStatusCode();
+        return new Done(outcome, new Outcome(status, body));
     }
 
     /**
@@ -344,6 +390,11 @@ public class InstanceOperations {
     private Map<String, Object> inspect(InstanceRecord row) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("instance", instance(row));
+        List<String> retries = new ArrayList<>();
+        for (Ulid retry : store.retriesOf(row.tenant(), row.id())) {
+            retries.add(retry.value());
+        }
+        out.put("retries", retries);
         List<Map<String, Object>> history = new ArrayList<>();
         for (HistoryEntry entry : store.history(row.id())) {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -379,6 +430,7 @@ public class InstanceOperations {
         out.put("definitionId", row.definition().definitionId());
         out.put("definitionVersion", row.definition().version());
         out.put("status", row.status().name());
+        out.put("retriedFrom", row.retriedFrom() == null ? null : row.retriedFrom().value());
         out.put("engineInstanceId", row.engineInstanceId());
         out.put("startAttempts", row.startAttempts());
         out.put("lastError", row.lastError());

@@ -222,8 +222,8 @@ class InstanceApiTest {
         InstanceRecord row = store.find(tenant, Ulid.parse(startedId(tenant, newKey()))).orElseThrow();
         InstanceRecord renamed = new InstanceRecord(row.id(), tenant, row.owner(), row.idempotencyKey(),
                 row.requestFingerprint(), row.definition(), Map.of("topic", "changed"), row.status(),
-                row.engineInstanceId(), row.startAttempts(), null, null, row.version() + 1, row.createdAt(),
-                Instant.now());
+                row.engineInstanceId(), row.startAttempts(), null, null, row.retriedFrom(), row.version() + 1,
+                row.createdAt(), Instant.now());
         assertThrows(IllegalStateException.class,
                 () -> store.replace(renamed, row.version(), "test.identity", InstanceService.RUNTIME_ACTOR));
     }

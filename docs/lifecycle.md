@@ -8,7 +8,7 @@ This slice makes the platform's own record of a run authoritative for lifecycle 
 
 | Table | Row | Notes |
 |---|---|---|
-| `task.instance` | One workflow instance | Id is our ULID. Unique `(tenant, idempotency_key)` and unique `engine_instance_id`. Index on `(status, updated_at)` for the reconciler. |
+| `task.instance` | One workflow instance | Id is our ULID. Unique `(tenant, idempotency_key)` and unique `engine_instance_id`. Index on `(status, updated_at)` for the reconciler. `retried_from` (V50, nullable, a foreign key to the same table, indexed) names the FAILED instance this one retries. A partial unique index allows at most one non-terminal retry per failed instance (section 11.3). |
 | `task.agent_task` | One agent task (ownership row, ADR 0020) | Id is the task contract id. Unique `thread_name` (the derived `ThreadId`). FK to the instance. Holds the contract as JSON. `graph_version`, `state_schema_version` and `latest_checkpoint_id` are nullable and written by later slices. |
 | `task.instance_event` | One history row per change of an instance | Primary key `(instance_id, version)`. `version` is the row version after the change, so history runs 0, 1, 2 with no gaps. |
 | `task.agent_task_event` | One history row per change of an agent task | Same shape, keyed by `(agent_task_id, version)`. |
@@ -28,7 +28,8 @@ stateDiagram-v2
     [*] --> STARTING: request accepted (row inserted)
     STARTING --> RUNNING: engine accepted the start
     STARTING --> FAILED: start abandoned (reconciler, WP-105c)
-    STARTING --> CANCEL_REQUESTED: cancel before the start was confirmed
+    STARTING --> CANCEL_REQUESTED: cancel before the start was confirmed (engine id recorded)
+    STARTING --> CANCELLED: cancel with no engine instance id recorded (issue #24)
     RUNNING --> WAITING: listen or human task registered
     RUNNING --> COMPLETED
     RUNNING --> FAILED
@@ -51,7 +52,7 @@ stateDiagram-v2
 | `RUNNING` | The engine accepted the start. Waiting and completion are reported by the engine observer (105b). |
 | `WAITING` | The instance waits for an event or a human decision. Written by 105b. |
 | `CANCEL_REQUESTED` | A cancel was asked for; the engine removal is asynchronous (WP-003 Q05). |
-| `CANCELLED`, `COMPLETED`, `FAILED` | Terminal. |
+| `CANCELLED`, `COMPLETED`, `FAILED` | Terminal. `CANCELLED` comes from `CANCEL_REQUESTED` on the engine's report, or directly from `STARTING` when no engine instance id is recorded (`InstanceStateMachine`; the store checks the engine id rule on every write). A `FAILED` row is never reopened: a retry creates a new instance linked to it (section 11.3). |
 
 ### 2.2 Agent task status
 
@@ -127,6 +128,7 @@ Points that matter:
 - **The engine id is recorded before the engine runs anything.** `definition.instance(input)` already has the id, so tx2 stores it before `start()`. A crash after `start()` therefore leaves a row that names the engine instance the engine may already have persisted.
 - **Our id, not the engine's.** The external instance id is our ULID, generated before the engine is involved, so that the idempotent insert can happen first. The engine id is kept in `engine_instance_id`. ADR 0019, amended on 2026-10-19, makes our ULID the external id; see section 7.
 - **Start never waits.** `start()` is called and its future is not awaited. The request returns when the engine has accepted the instance.
+- **A cancel before the engine id is recorded is final.** A `STARTING` row with no engine instance id goes to `CANCELLED` directly (section 11.3). The start's own write of the engine id is a version change, so a start that loses the race to the cancel does not run the prepared instance; the response reports the row as the operator left it.
 - **Reads come from the registry only.** `GET /instances/{id}` never reads the Flow tables and returns 404 for another tenant's id.
 
 ## 4. REST contract
@@ -154,6 +156,11 @@ Errors are RFC 9457 problem documents with the correlation id. The caller comes 
 | Stale version | Nothing | `StaleVersionException`, reload and decide again | `InstanceApiTest.aStaleVersionIsRejected...` |
 | Edit of history | Refused by trigger | SQL error | `InstanceApiTest.historyIsAppendOnlyInTheDatabase` |
 | Another tenant reads an id | Nothing | 404; the id is not revealed | `InstanceApiTest.anotherTenant...` |
+| Cancel of a `STARTING` row with no engine id | Row `CANCELLED` with history and outbox row, operator as actor | Start that prepared at the same moment is not run; a racing cancel that read an older version gets 409 `stale` | `RetryAndDirectCancelTest.aCancelOfAStartingRowWithNoEngineIdGoesStraightToCancelled`, `OperationsConcurrencyTest.aCancelThatLandsWhileTheStartIsPreparedStopsTheStartBeforeItRuns`, `ReconcilerRepairTest.aRowCancelledWhileThePreparedInstanceIsBeingMadeIsNeverStarted` |
+| Cancel of a `STARTING` row with an engine id | `CANCEL_REQUESTED` with the operator's history row | The reconciler sends the engine cancel; `CANCELLED` only on the engine's report | `RetryAndDirectCancelTest.aCancelOfAStartingRowWithAnEngineIdStillGoesThroughCancelRequested` |
+| Retry of a `FAILED` row | Failed row unchanged; new row with `retried_from` and the operator's history row | New instance started through the normal start path; response names both ids | `RetryAndDirectCancelTest.aRetryOfAFailedInstanceCreatesALinkedInstanceWithTheSameDefinitionAndInput` |
+| Repeat of the same retry call | Nothing new | Same new instance; nothing started again | `RetryAndDirectCancelTest.aRepeatOfTheSameRetryCallReturnsTheSameInstanceAndStartsNothingAgain`, `theDerivedKeyMakesTheRetryIdempotentBelowTheOperationsLayer` |
+| Second retry while the first is not terminal | Nothing new | 409 `refused-live-retry` | `RetryAndDirectCancelTest.aSecondRetryWhileTheFirstIsLiveIsRefusedAndCreatesNothing` |
 
 Failure of a registry write after a successful engine start is the case that needs the reconciler most. The engine then runs an instance the registry does not show as running. That gap is closed in 105c, and until then the row stays `STARTING`, which is visible to any reader.
 
@@ -178,8 +185,7 @@ Seams that exist now:
 - Retries: set `quarkus.flow.http.client.resilience.retry.max-retries=0` (ADR 0019 Retries, ADR 0023 decision 3). Not done in 105a; it changes the behavior of the shipped definition's HTTP call and belongs with the reconciler's tests.
 
 **105d (operations API, built: section 11)**
-- Inspect, cancel, retry, pause and recover, authorized. Cancel moves `RUNNING`, `WAITING` or `STARTING` to `CANCEL_REQUESTED`; retry applies to `STARTING` rows only (section 11.3, which differs from the earlier wording here). Each call writes history with the operator as actor.
-- Decided on 2026-10-19 and not yet built: a cancel of a row with no engine instance id goes straight to `CANCELLED` (ADR 0019, issue #24; the state machine has no such edge yet), and a retry of a `FAILED` row creates a new instance linked to the old one (ADR 0019, issue #23; until then a retry of a `FAILED` row gets 409).
+- Inspect, cancel, retry, pause and recover, authorized. Cancel moves `RUNNING`, `WAITING` or `STARTING` (with an engine id) to `CANCEL_REQUESTED`, and a `STARTING` row with no engine id to `CANCELLED` (ADR 0019, amendment 4, issue #24). Retry restarts a `STARTING` row, and creates a new linked instance for a `FAILED` row (ADR 0019, amendment 3, issue #23). Each call writes history with the operator as actor (section 11.3).
 - Authentication depends on WP-102. Until then the caller comes from development headers that are refused unless `agentic.dev.trust-caller-headers=true` (section 11.8).
 
 **Outside the four slices but needed by the plan**
@@ -239,6 +245,8 @@ Not observable with Flow 1.2.0: whether a side effect inside a task completed wh
 | Engine instance with no registry row | Audit `engine.unregistered`; not cancelled (9.9) | `ReconcilerRepairTest.anEngineInstanceNoRowRegistersIsReportedAndNeverCancelled` |
 | `CANCEL_REQUESTED` unchanged for `cancel-reissue-after`, engine holds it | Send cancel again. Move to CANCELLED only when the engine reports it. | `ReconcilerRepairTest.aStuckCancelIsSentAgainAndCompletesOnlyWhenTheEngineReports` |
 | `CANCEL_REQUESTED`, engine holds nothing | Audit `cancel.unconfirmed`; wait for the report | `ReconcilerRepairTest.aCancelTheEngineNoLongerHoldsWaitsForItsReport` |
+| `CANCEL_REQUESTED` with no engine id (rows written before amendment 4 only) | Audit `cancel.unconfirmed`; not finished automatically. No new row can reach this state (issue #24) | Not covered by a test |
+| `STARTING`, no engine id, row changed while the reconciler prepared the engine instance | The prepared instance is not started; audit `start` `superseded`; the row keeps the operator's state | `ReconcilerRepairTest.aRowCancelledWhileThePreparedInstanceIsBeingMadeIsNeverStarted` |
 | `WAITING` with `wait_deadline` in the past, engine holds it | Record `CANCEL_REQUESTED` first (so the engine's CANCELLED report finds it), then ask the engine to cancel | `ReconcilerRepairTest.aWaitPastItsDeadlineIsCancelledAndTheRequestIsRecordedFirst` |
 | `WAITING` past its deadline, engine holds nothing | `FAILED` with `deadline.no-engine-instance` | `ReconcilerRepairTest.aWaitPastItsDeadlineWithNoEngineInstanceFailsTheRow` |
 | Agent run `RUNNING` or `RESUMING`, lease missing or expired | `AgentRunPolicy`: bridge A or B left to the workflow; bridge C would be restarted, but no restarter is registered in 105c (WP-201); unknown bridge reported; live lease untouched. Audited as `agent.run`. | `AgentRunPolicyTest` (the rule). Not run against `agent_task` rows: there is no insert path yet. |
@@ -321,7 +329,7 @@ Results on the committed tree (`mvn -B verify` exit 0, `BUILD SUCCESS`):
 
 These are for the owner. The ADRs were not edited.
 
-- ADR 0019, Cancel: "a reconciler moves rows stuck in `CANCEL_REQUESTED`". This is incomplete. When the engine holds no instance and sends no report, CANCELLED and COMPLETED cannot be told apart, and the ADR needs a rule for that outcome.
+- ADR 0019, Cancel: "a reconciler moves rows stuck in `CANCEL_REQUESTED`". This is incomplete. When the engine holds no instance and sends no report, CANCELLED and COMPLETED cannot be told apart, and the ADR needs a rule for that outcome. Amendment 4 (2026-10-19) gives the rule for a row with no engine id (`CANCELLED` directly, issue #24). The rule for a `CANCEL_REQUESTED` row whose engine holds nothing is still open.
 - ADR 0019, Deadlines: says the reconciler enforces the deadline without saying how. Implemented: record the request, then cancel the engine instance; `FAILED` when the engine holds nothing.
 - ADR 0019, Start: records RUNNING after `start()` returns. The engine's report can arrive first, so the registry follows the engine's report when both happen. The ADR should say so.
 - ADR 0019, Resume: the epoch must be incremented before the restart for WP-108 to key on it. The ADR does not say this.
@@ -421,12 +429,12 @@ All routes act on one instance named in the path. The caller comes from `CallerC
 | Method and path | Operation | Scope when the policy is available | Main policy unavailable (ERROR) | Success | Idempotency-Key |
 |---|---|---|---|---|---|
 | `GET /operations/instances/{id}` | inspect | `oa.inspect` | refused, 503 | 200 | not used |
-| `POST /operations/instances/{id}/cancel` | cancel | `oa.operate` or `oa.recover` | allowed with `oa.recover` (safe recovery) | 202; 200 for a no-op | required |
-| `POST /operations/instances/{id}/retry` | retry | `oa.operate` | refused, 503 | 202 | required |
+| `POST /operations/instances/{id}/cancel` | cancel | `oa.operate` or `oa.recover` | allowed with `oa.recover` (safe recovery) | 202; 200 for a no-op, and 200 for a direct cancel of a `STARTING` row with no engine id | required |
+| `POST /operations/instances/{id}/retry` | retry | `oa.operate` | refused, 503 | 202 (a `STARTING` row restarted, or a new linked instance for a `FAILED` row); 200 for a repeat of a retry of a `FAILED` row | required |
 | `POST /operations/instances/{id}/pause` | pause | `oa.operate` or `oa.recover` | allowed with `oa.recover` | 501, see 11.3 | required |
 | `POST /operations/instances/{id}/recover` | recover | `oa.operate` | refused, 503 | 200 | required |
 
-Inspect returns the registry row, the full history, the task view row (`taskView`, null until the projector has applied the instance), the outbox summary (`outbox`: unpublished rows, failed rows, the last failure's event type and exception class), and the latest 100 repair events (`repairs`). It writes nothing except its audit events.
+Inspect returns the registry row, the full history, the task view row (`taskView`, null until the projector has applied the instance), the outbox summary (`outbox`: unpublished rows, failed rows, the last failure's event type and exception class), and the latest 100 repair events (`repairs`). It writes nothing except its audit events. The `instance` of the response carries `retriedFrom`: the id of the FAILED instance this one retries, or null. `retries` lists the ids of the instances created to retry this one, oldest first.
 
 Resume from pause is not offered. The state machine has no paused state, so there is nothing to resume.
 
@@ -442,14 +450,23 @@ Each call builds one `AuthorizationRequest`: the subject is the operator (kind `
 
 ### 11.3 Semantics
 
-**Cancel.** `STARTING`, `RUNNING` and `WAITING` move to `CANCEL_REQUESTED`. The history row has the operator as actor and the reason `operator.cancel`, and its outbox row is written in the same transaction. The reconciler's `recover` then sends the engine cancel, or leaves it to the next pass if the engine does not answer. The row becomes `CANCELLED` only on the engine's report (ADR 0019). The response is 202 in both cases.
+**Cancel.** `STARTING`, `RUNNING` and `WAITING` move to `CANCEL_REQUESTED`, except that a `STARTING` row with no engine instance id goes straight to `CANCELLED` (ADR 0019, amendment 4, issue #24). The history row has the operator as actor and the reason `operator.cancel`, and its outbox row is written in the same transaction.
+- **Direct cancel.** The engine never started a row with no engine instance id, so the engine's report has nothing to confirm. The cancel is decided on the row version it read. A start that records the engine instance id at the same moment changes the row first, so the cancel's write is refused as stale (409 `stale`), and the cancel must be sent again; it then takes the `CANCEL_REQUESTED` path. If the cancel lands first, the start's own write is stale, so the prepared engine instance is never started (`InstanceService`, and the reconciler for a row it prepares). The response is 200 with `outcome` `cancelled`.
+- **Cancel through the engine.** For a row with an engine instance id, the reconciler's `recover` sends the engine cancel now, or leaves it to the next pass if the engine does not answer. The row becomes `CANCELLED` only on the engine's report (ADR 0019). The response is 202.
 - A terminal instance is a no-op: 200 with `outcome` `already-terminal`, and no history row.
 - An instance already in `CANCEL_REQUESTED` is a no-op: 200 with `already-requested`.
-- A `STARTING` row without an engine id stays in `CANCEL_REQUESTED`. The reconciler's existing rule audits `cancel.unconfirmed` and waits for a report that never comes (section 9.9, item 3). This is an open point for the owner (11.9).
 
-**Retry.** Applies to `STARTING` rows only. The history row has the operator as actor and the reason `operator.retry`, and the reconciler's `retry` then starts the row now, skipping backoff. The reconciler's attempt limit (`agentic.reconciler.start-max-attempts`) still applies, so a retry cannot exceed it. If the reconciler does nothing, the response is 409 `nothing-retried`, and the history row stays as the record of the request.
-- `FAILED` is refused with 409. It is terminal in the state machine, and a retry from it would need a new `FAILED -> STARTING` edge. That is an owner decision; this slice does not invent it.
-- Any other status is refused with 409.
+**Retry of a `STARTING` row.** The history row has the operator as actor and the reason `operator.retry`, and the reconciler's `retry` then starts the row now, skipping backoff. The reconciler's attempt limit (`agentic.reconciler.start-max-attempts`) still applies, so a retry cannot exceed it. If the reconciler does nothing, the response is 409 `nothing-retried`, and the history row stays as the record of the request.
+
+**Retry of a `FAILED` instance (ADR 0019, amendment 3, issue #23).** `FAILED` stays terminal, and the failed row is not changed. The operation creates a new instance:
+- It has the same tenant, owner, definition id and version, and input (the stored canonical input), its own ULID, and `retried_from` set to the failed instance. Its status is `STARTING`, and it is then started through the normal start path (`InstanceService`): the engine instance is prepared, its id recorded, and the start accepted, as for `POST /instances`.
+- The response is 202 with `outcome` `retry-created`, the new `instance` (its `retriedFrom` names the failed one) and the top-level `retriedFrom`, which names the failed instance. The new row's first history row and its outbox row carry the reason `operator.retry` and name the operator as actor.
+- Its idempotency key is `retry-` followed by the SHA-256 hex digest of the failed instance id and the operation's Idempotency-Key (70 characters, within the key rule). A repeat of the same call finds the row its first call created: 200 with `outcome` `retry-existing`, and nothing starts. This holds even when the operations reservation is gone.
+- **One live retry per failed instance (the rule chosen for issue #23).** A retry is live while its status is not terminal (`COMPLETED`, `FAILED` and `CANCELLED` are terminal). While one is live, a retry with another key is refused with 409 `refused-live-retry`, and nothing is created. The service checks this before it inserts. The partial unique index `instance_one_live_retry_uk` (V50) also refuses a concurrent second insert, which the store reports as the same 409, so two concurrent retries cannot both be created. Once the first retry is terminal, a new retry may be created, and the links form a chain.
+- The start attempt limit counts per instance. A new instance starts its count at zero, so the limit does not bound a chain of retries. Each retry is an operator decision, recorded in history and audit.
+- A retry whose pinned definition the engine no longer holds is refused with 422 `refused-definition`, and nothing is created.
+- **Effects.** A retry re-runs the definition from its start with the same input. An effect that the failed run had already completed runs again, and the engine does not record which effects completed. Every outbound effect of a definition must therefore be idempotent through the effect ledger (WP-108). A definition that does not meet this must not be retried (ADR 0019, Retries). The engine does not enforce this rule.
+- A retry of any other status (`RUNNING`, `WAITING`, `COMPLETED`, `CANCELLED`, `CANCEL_REQUESTED`) is refused with 409 `refused-status`, and nothing changes.
 
 **Pause.** Authorized and audited, then answered with 501 `pause is not available`. No state holds work at a checkpoint: agent checkpoints are not built (WP-201). Nothing changes.
 
@@ -469,7 +486,8 @@ Errors are RFC 9457 problem documents with `correlationId`. The detail is writte
 | 401 | No trusted caller (the default) | none; not audited |
 | 403 | The policy denied the operation | none |
 | 404 | No instance with this id in the caller's tenant, or a malformed id (not audited when malformed) | none |
-| 409 | `stale`, `busy`, `key-reused`, `in-progress`, `refused-status`, `refused-terminal`, `nothing-retried`, `illegal-transition` | a history row may exist for a retry or recover that could not act (see 11.3) |
+| 409 | `stale`, `busy`, `key-reused`, `in-progress`, `refused-status`, `refused-terminal`, `refused-live-retry`, `nothing-retried`, `illegal-transition` | a history row may exist for a retry or recover that could not act (see 11.3); nothing is created for `refused-live-retry` |
+| 422 | A retry of a FAILED instance whose pinned definition the engine does not hold (`refused-definition`) | none; no row is created |
 | 501 | Pause | none |
 | 503 | The policy decision is ERROR; the audit trail cannot record the attempt; or the registry is unavailable (the same key may be repeated) | none for the first two |
 
@@ -480,6 +498,7 @@ Errors are RFC 9457 problem documents with `correlationId`. The detail is writte
 - The key is reserved in `task.operation_request` before the operation runs. A repeat of a completed request returns the stored status and body, and writes an audit event with outcome `replayed`. A repeat while the first call is still running is 409 `in-progress`.
 - A call that is refused or fails releases its reservation, so the key can be used again. A call that completes stores its response and is never changed again.
 - Pause does not store its response, because 501 is not a success.
+- A retry of a FAILED instance derives the new instance's key from this key (section 11.3), so the start is idempotent in the registry itself, not only in the reservation.
 - A crash after the reservation and before the response is stored leaves the row `PENDING`. The key then answers 409 `in-progress` until an operator removes that row. This is an open point (11.9).
 
 ### 11.6 Audit
@@ -488,7 +507,7 @@ Every attempt writes events through the trail (WP-111), with the operator as act
 
 1. `policy.decision`: written by the policy enforcement point (through the shared audit sink) for every decision, including the recovery rule's decision when it applies. Its version stamps carry the policy id and the policy-set version.
 2. `operation.attempt`: written before any change, with `oa.outcome` `allowed`, `denied` or `error`, and the same stamps. If it cannot be written, the call is 503 and nothing changes.
-3. `operation.result`: written after the call, with the outcome label: `inspected`, `cancel-requested`, `already-requested`, `already-terminal` (recorded as `noop-terminal`), `retry-requested`, `recover-requested`, `replayed`, `not-implemented`, `not-found`, `stale`, `busy`, `key-reused`, `in-progress`, `refused-status`, `refused-terminal`, `nothing-retried`, `illegal-transition`, `store-unavailable` or `failed`.
+3. `operation.result`: written after the call, with the outcome label: `inspected`, `cancel-requested`, `cancelled`, `already-requested`, `already-terminal` (recorded as `noop-terminal`), `retry-requested`, `retry-created`, `retry-existing`, `recover-requested`, `replayed`, `not-implemented`, `not-found`, `stale`, `busy`, `key-reused`, `in-progress`, `refused-status`, `refused-terminal`, `refused-live-retry`, `refused-definition`, `nothing-retried`, `illegal-transition`, `store-unavailable` or `failed`.
 
 Attributes of the operation events: `oa.tenant`, `oa.instance`, `oa.operation`, `oa.outcome`, `oa.decided-by`, and `oa.correlation` when the request has one. The instance is `audit.event.instance_id`, and the type is `event_type`. A failed result event is logged; the attempt event is the record of intent. A failed attempt event refuses the call.
 
@@ -505,12 +524,12 @@ The history row and its outbox row are written by `InstanceStore.replace`, in on
 
 - **Authentication (WP-102).** The caller and its scopes come from development headers. This is not authorization in the sense of T16 until WP-102 provides them.
 - **Pause and resume.** Need checkpoint states that do not exist (WP-201). Pause answers 501; resume is not offered.
-- **Retry from FAILED.** Needs the edge `FAILED -> STARTING`, and a rule for an engine instance that was already recorded on the failed row (section 9.9, items 1 and 6). The brief asked for it; this slice refuses it. Owner decision.
-- **Cancel of a row with no engine id.** Stays `CANCEL_REQUESTED`, because the rule of section 9 waits for an engine report. A rule that moves it to a terminal state is an owner decision.
+- **Retry from FAILED (issue #23, implemented).** The failed row is not reopened, so the engine instance rule of section 9.9 (items 1 and 6) does not apply to the new instance. The rule of one live retry per failed instance, and the 409 while one is live, are the implementer's choice for the owner to confirm (11.3). Also to confirm: a chain of retries is not bounded by the start attempt limit (11.3).
+- **Cancel of a row with no engine id (issue #24, implemented).** It goes straight to `CANCELLED` (11.3). A row that was left in `CANCEL_REQUESTED` with no engine id before this change is not finished automatically; the reconciler audits it.
 - **Stale idempotency reservations.** A crash leaves a `PENDING` row. There is no expiry and no operator endpoint for it.
 - **The request shape.** `AuthorizationRequest` has no instance field, so the instance id travels as the task id (11.2). The policy docs should name it.
 - **Outbox requeue** is not exposed through the API.
-- **ADR statements.** ADR 0019 says the cancel API returns 202 and that a reconciler moves stuck `CANCEL_REQUESTED` rows, but it does not say what a retry is for a `FAILED` row, nor what happens to a cancel of a row with no engine id. ADR 0021 does not name instance operations among its enforcement points. The ADRs were not edited.
+- **ADR statements.** ADR 0019 says the cancel API returns 202 and that a reconciler moves stuck `CANCEL_REQUESTED` rows. Its amendments 3 and 4 (2026-10-19) now say what a retry of a `FAILED` row and a cancel of a row with no engine id do; its Decision text does not yet. ADR 0021 does not name instance operations among its enforcement points. The ADRs were not edited beyond the status lines of amendments 3 and 4.
 - **Inspect history** is not paged. Instance histories are short; repair events are capped at 100.
 
 ### 11.10 Acceptance (T16)
@@ -524,7 +543,6 @@ They do not cover the following, so **T16 is not annotated** (`@Acceptance` is n
 
 - Authorization by an authenticated identity: the caller comes from development headers (WP-102 is not built).
 - "Individual tasks" in the sense of agent tasks: the operations act on registry instances. Agent tasks have no insert path yet (WP-201).
-- Retry of a `FAILED` instance, which is refused (11.9).
 
 ### 11.11 Tests
 
@@ -536,12 +554,27 @@ They do not cover the following, so **T16 is not annotated** (`@Acceptance` is n
 | `OperationsDegradedTest` (app-runtime) | With no policy snapshot, cancel and pause with `oa.recover` are allowed and recorded as recovery decisions; the other operations are 503 and change nothing |
 | `OperationsConcurrencyTest` (app-runtime) | Eight cancels with distinct keys apply the cancel once; a cancel racing a retry never undoes an accepted cancel; a cancel during the engine prepare stops the start before it runs |
 | `OperationsCallerDefaultsTest` (app-runtime) | Without the trusted headers, scope claims are not read and every operation is 401 with no audit |
+| `RetryAndDirectCancelTest` (app-runtime) | Direct cancel of a `STARTING` row with no engine id (history, outbox, audit, the prepared instance never started); cancel of a row with an engine id still via `CANCEL_REQUESTED`; retry of a FAILED row creates a linked instance with the same tenant, owner, definition, pinned version and input; the links in both directions in inspect; a repeat of the same call and of the derived key starts nothing; one live retry per failed instance (409), and a new one once the first is terminal; retry of any other status is 409 with no row; the operator is the actor of the new instance's first history row |
+| `RetryLinkTest` (oa-runtime) | The derived retry key is deterministic, depends on the call and on the failed instance, and fits the key rule; a retry request has its own fingerprint; the link is carried by new rows and kept by a status change |
+| `StateMachineTest` (oa-runtime) | The edge `STARTING -> CANCELLED` exists only while no engine instance id is recorded; no other edge depends on the engine id |
+| `OperationsConcurrencyTest` (app-runtime) | A cancel during the engine prepare is direct (`CANCELLED`), and the prepared instance is never started |
+| `OperationsDegradedTest` (app-runtime) | With the policy engine down, a retry of a FAILED instance is refused (503) and creates no linked instance |
+| `ReconcilerRepairTest` (app-runtime) | A row cancelled while the reconciler prepares its engine instance is never started |
 
 ### 11.12 Verification
 
-Run after the last code change, with `DB_URL=jdbc:postgresql://localhost:5432/wp105d` and `-Dquarkus.http.test-port=18475`:
+Run after the last code change, with `DB_URL=jdbc:postgresql://localhost:5432/wp105d` and `-Dquarkus.http.test-port=18475`. Results of the WP-105d run above are kept as they were; the issues #23 and #24 run is in section 11.13.
 
 - `mvn -B verify`: `BUILD SUCCESS`, exit 0. Reactor results: oa-contracts 157 tests, oa-runtime 187, oa-testkit 96, app-runtime 109 (surefire) and a further 4 in the app-runtime reactor step, all with 0 failures and 0 errors.
+
+### 11.13 Verification (issues #23 and #24)
+
+Run after the last code change, with `DB_URL=jdbc:postgresql://localhost:5432/wp2324` and `-Dquarkus.http.test-port=18481`:
+
+- `mvn -B verify`: `BUILD SUCCESS`, exit 0. Reactor results: oa-contracts 157 tests, oa-runtime 193, oa-testkit 96, app-runtime 123 (surefire) and a further 4 in the app-runtime reactor step, all with 0 failures and 0 errors.
+- `python3 tools/check_dependency_policy.py`: `dependency policy: holds (oa-contracts is dependency-free on the main classpath; all licences allowed for their scope)`, exit 0.
+- `python3 tools/render_requirements.py --check`: `requirements docs up to date`, exit 0.
+- `AcceptanceStatus --check`: `annotated test methods observed: 0 (passing: 0); markers whose class has no entry in any surefire or failsafe report: 0`, `test-status.json is consistent with the build`, exit 0.
 - `python3 tools/check_dependency_policy.py`: `dependency policy: holds (oa-contracts is dependency-free on the main classpath; all licences allowed for their scope)`, exit 0.
 - `python3 tools/render_requirements.py --check`: `requirements docs up to date`, exit 0.
 - `AcceptanceStatus --check`: `annotated test methods observed: 0 (passing: 0); markers whose class has no entry in any surefire or failsafe report: 0`, `test-status.json is consistent with the build`, exit 0. No test is annotated, so T16 is not recorded as passing.

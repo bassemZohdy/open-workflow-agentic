@@ -37,6 +37,16 @@ public interface WorkflowEngine {
 
         /** Starts the instance. Returns when the engine has accepted it, not when it finishes. */
         void start();
+
+        /**
+         * Discards a prepared instance that the registry could not accept. The default reports that the engine has no
+         * discard operation; implementations should cancel the still-pending instance when they support it.
+         *
+         * @return true when the engine accepted the discard request
+         */
+        default boolean discard() {
+            return false;
+        }
     }
 
     /** An instance the engine holds in memory, with its status as the engine reports it. */
