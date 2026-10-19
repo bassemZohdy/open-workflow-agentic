@@ -6,6 +6,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectKey
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectState;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget.Reply;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -27,6 +28,7 @@ public class DurableEffects {
     private static final Logger LOG = Logger.getLogger(DurableEffects.class);
     private final JdbcEffectLedger ledger;
     private final Clock clock;
+    @Inject MeterRegistry metrics;
     // Each active call uses a claim connection and short transaction connections. Avoid unbounded pool claims.
     private final Semaphore slots = new Semaphore(4);
 
@@ -46,6 +48,11 @@ public class DurableEffects {
     private Effect executeLocked(EffectCommand command, EffectTarget target) {
         Duration window = Objects.requireNonNull(target.replayWindow(), "replayWindow");
         JdbcEffectLedger.Prepared prepared = ledger.prepare(command, window, clock.instant());
+        return executePrepared(command, target, prepared);
+    }
+
+    private Effect executePrepared(EffectCommand command, EffectTarget target, JdbcEffectLedger.Prepared prepared) {
+        Duration window = Objects.requireNonNull(target.replayWindow(), "replayWindow");
         Effect intent = prepared.effect();
         if (intent.state().isResolved()) return intent;
         Reply result;
@@ -63,11 +70,14 @@ public class DurableEffects {
         }
         if (result.outcome() == EffectTarget.Outcome.UNKNOWN) {
             ledger.requireManualResolution(command.key(), "effect.outcome.unknown");
+            count("unknown");
             LOG.warnf("Effect awaits reconciliation: thread=%s node=%s", command.key().threadId(), command.key().nodeId());
             return ledger.find(command.key()).orElseThrow();
         }
-        return ledger.recordOutcome(command.key(), result.outcome() == EffectTarget.Outcome.CONFIRMED
+        Effect resultEffect = ledger.recordOutcome(command.key(), result.outcome() == EffectTarget.Outcome.CONFIRMED
                 ? EffectState.CONFIRMED : EffectState.FAILED, result.detail());
+        count(resultEffect.state() == EffectState.CONFIRMED ? "confirmed" : "failed");
+        return resultEffect;
     }
 
     /** Compensation has its own durable intent/key; loss of its acknowledgment is recovered like any other effect. */
@@ -81,17 +91,26 @@ public class DurableEffects {
             return ledger.exclusively(original, () -> {
                 Effect before = ledger.find(original).orElseThrow();
                 if (before.state() == EffectState.INTENDED) throw new IllegalStateException("resolve original first");
-                ledger.prepare(compensation, target.replayWindow(), clock.instant());
-                ledger.linkCompensation(original, compensation.key());
+                Effect undo = ledger.exclusively(compensation.key(), () -> {
+                    JdbcEffectLedger.Prepared prepared = ledger.prepareCompensation(original, compensation,
+                            target.replayWindow(), clock.instant());
+                    if (before.state() == EffectState.COMPENSATED) return prepared.effect();
+                    return executePrepared(compensation, target, prepared);
+                });
                 if (before.state() == EffectState.COMPENSATED) return before;
-                Effect undo = ledger.exclusively(compensation.key(), () -> executeLocked(compensation, target));
                 if (undo.state() == EffectState.CONFIRMED) {
-                    return ledger.recordOutcome(original, EffectState.COMPENSATED, "compensation.confirmed");
+                    Effect result = ledger.recordOutcome(original, EffectState.COMPENSATED, "compensation.confirmed");
+                    count("compensated");
+                    return result;
                 }
                 ledger.requireManualResolution(original, "effect.compensation.unresolved");
                 return ledger.find(original).orElseThrow();
             });
         } finally { slots.release(); }
+    }
+
+    private void count(String outcome) {
+        if (metrics != null) metrics.counter("agentic.effects.outcomes", "outcome", outcome).increment();
     }
 
     private static void requireTarget(EffectCommand command, EffectTarget target) {

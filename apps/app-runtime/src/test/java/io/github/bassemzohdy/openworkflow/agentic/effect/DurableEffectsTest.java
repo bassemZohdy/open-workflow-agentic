@@ -22,6 +22,28 @@ class DurableEffectsTest {
     @Inject JdbcEffectLedger ledger;
     @Inject DataSource dataSource;
     @Inject DurableEffects effects;
+    @Inject jakarta.transaction.UserTransaction transaction;
+
+    @Test
+    void callerRollbackCannotEraseAnAlreadyDispatchedIntentOrOutcome() throws Exception {
+        EffectCommand command = JdbcEffectLedgerTest.command("ambient-rollback"); Target target = new Target();
+        transaction.begin();
+        try { assertEquals(EffectState.CONFIRMED, effects.execute(command, target).state()); }
+        finally { transaction.rollback(); }
+        assertEquals(EffectState.CONFIRMED, ledger.find(command.key()).orElseThrow().state());
+        assertEquals(1, target.applied.size());
+    }
+
+    @Test
+    void crashBeforeDispatchResumesOnceAndConflictingRequestCannotDispatch() {
+        EffectCommand command = JdbcEffectLedgerTest.command("prepared-only"); Target target = new Target();
+        ledger.prepare(command, target.replayWindow(), Instant.now());
+        assertEquals(EffectState.CONFIRMED, new DurableEffects(new JdbcEffectLedger(dataSource))
+                .execute(command, target).state());
+        EffectCommand changed = new EffectCommand(command.key(), command.target(), "a".repeat(64));
+        assertThrows(IllegalStateException.class, () -> effects.execute(changed, target));
+        assertEquals(1, target.calls.get());
+    }
 
     static class Target implements EffectTarget {
         final Set<String> applied = ConcurrentHashMap.newKeySet();
@@ -143,5 +165,19 @@ class DurableEffectsTest {
         assertEquals(EffectState.CONFIRMED, effects.compensate(other.key(), refused, rejectedUndo).state());
         assertEquals(EffectState.FAILED, ledger.find(refused.key()).orElseThrow().state());
         assertEquals(1, ledger.manualQueue(other.key().threadId(), 10).size());
+    }
+
+    @Test
+    void unrelatedConfirmedEffectCannotBeReusedAsProofOfCompensation() {
+        EffectCommand original = JdbcEffectLedgerTest.command("original"); Target target = new Target();
+        effects.execute(original, target);
+        EffectCommand unrelated = EffectCommand.of(original.key().threadId(), "another-charge", "1",
+                target.target(), "amount=10");
+        effects.execute(unrelated, target);
+        assertThrows(IllegalStateException.class, () -> effects.compensate(original.key(), unrelated, target));
+        assertEquals(EffectState.CONFIRMED, ledger.find(original.key()).orElseThrow().state());
+        EffectCommand undo = EffectCommand.of(original.key().threadId(), "refund", "1", target.target(), "refund=10");
+        effects.compensate(original.key(), undo, target);
+        assertThrows(IllegalStateException.class, () -> effects.execute(undo, target));
     }
 }

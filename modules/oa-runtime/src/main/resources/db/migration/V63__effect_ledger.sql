@@ -13,6 +13,7 @@ create table effect.ledger (
     request_fingerprint varchar(64) check (request_fingerprint ~ '^[0-9a-f]{64}$'),
     attempted boolean not null default false,
     replay_until timestamptz,
+    purpose varchar(16) not null default 'EFFECT' check (purpose in ('EFFECT','COMPENSATION')),
     primary key (thread_name, node_id, idempotency_key)
 );
 create index effect_unresolved on effect.ledger (thread_name, created_at) where state = 'INTENDED';

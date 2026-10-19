@@ -54,7 +54,7 @@ public class JdbcEffectLedger implements EffectLedger {
         if (intent.state() != EffectState.INTENDED) {
             throw new IllegalArgumentException("an intent must be INTENDED");
         }
-        return Transactions.inTransaction(dataSource, c -> insert(c, intent, null, null).effect());
+        return Transactions.inTransaction(dataSource, c -> insert(c, intent, null, null, "EFFECT").effect());
     }
 
     /** Fingerprint is bound atomically on first creation and cannot be changed on recovery. */
@@ -69,20 +69,43 @@ public class JdbcEffectLedger implements EffectLedger {
         EffectKey key = command.key();
         Effect intent = new Effect(key.threadId(), key.nodeId(), key.idempotencyKey(), command.target(),
                 EffectState.INTENDED, null, now);
-        return Transactions.inTransaction(dataSource, c -> insert(c, intent, command.requestFingerprint(), until));
+        return Transactions.inTransaction(dataSource, c -> insert(c, intent, command.requestFingerprint(), until, "EFFECT"));
     }
 
-    private Prepared insert(Connection c, Effect intent, String fingerprint, Instant replayUntil) throws SQLException {
+    /** A compensation intent and its original link commit together, before any refund can be sent. */
+    public Prepared prepareCompensation(EffectKey original, EffectCommand command, Duration window, Instant now) {
+        if (!original.threadId().equals(command.key().threadId()) || original.equals(command.key())) {
+            throw new IllegalArgumentException("compensation requires another key in the original scope");
+        }
+        if (window.isNegative() || window.compareTo(Duration.ofDays(30)) > 0) {
+            throw new IllegalArgumentException("replay window must be between zero and 30 days");
+        }
+        EffectKey key = command.key();
+        Effect intent = new Effect(key.threadId(), key.nodeId(), key.idempotencyKey(), command.target(),
+                EffectState.INTENDED, null, now);
+        return Transactions.inTransaction(dataSource, c -> {
+            if (locked(c, original).effect().state() == EffectState.INTENDED) {
+                throw new IllegalStateException("resolve original outcome first");
+            }
+            Prepared result = insert(c, intent, command.requestFingerprint(),
+                    window.isZero() ? null : now.plus(window), "COMPENSATION");
+            linkCompensation(c, original, key);
+            return result;
+        });
+    }
+
+    private Prepared insert(Connection c, Effect intent, String fingerprint, Instant replayUntil, String purpose) throws SQLException {
         int inserted;
         try (PreparedStatement s = c.prepareStatement("""
                 insert into effect.ledger (thread_name, node_id, idempotency_key, target, state, detail, recorded_at,
-                    request_fingerprint, replay_until)
-                values (?, ?, ?, ?, 'INTENDED', ?, ?, ?, ?) on conflict do nothing
+                    request_fingerprint, replay_until, purpose)
+                values (?, ?, ?, ?, 'INTENDED', ?, ?, ?, ?, ?) on conflict do nothing
                 """)) {
             bind(s, intent.key());
             s.setString(4, intent.target()); s.setString(5, intent.detail());
             s.setTimestamp(6, Timestamp.from(intent.recordedAt())); s.setString(7, fingerprint);
             s.setTimestamp(8, replayUntil == null ? null : Timestamp.from(replayUntil));
+            s.setString(9, purpose);
             inserted = s.executeUpdate();
         }
         // Separate statement: at READ COMMITTED it sees a concurrent winner even when INSERT's snapshot did not.
@@ -91,6 +114,9 @@ public class JdbcEffectLedger implements EffectLedger {
             try (ResultSet r = s.executeQuery()) {
                 if (!r.next()) throw new IllegalStateException("committed effect intent is missing");
                 Prepared stored = prepared(r);
+                if (fingerprint != null && !purpose.equals(r.getString("purpose"))) {
+                    throw new IllegalStateException("ordinary effect and compensation identities cannot be reused");
+                }
                 if (!stored.effect().target().equals(intent.target())) {
                     throw new IllegalStateException("effect key is already bound to another target");
                 }
@@ -202,14 +228,7 @@ public class JdbcEffectLedger implements EffectLedger {
     }
 
     /** Links exactly one persisted compensation to an original. Both effects share the original scope. */
-    public void linkCompensation(EffectKey original, EffectKey compensation) {
-        if (!original.threadId().equals(compensation.threadId()) || original.equals(compensation)) {
-            throw new IllegalArgumentException("compensation needs a different key in the same thread");
-        }
-        Transactions.inTransaction(dataSource, c -> {
-            Effect state = locked(c, original).effect();
-            if (state.state() == EffectState.INTENDED) throw new IllegalStateException("resolve original outcome first");
-            locked(c, compensation);
+    private static void linkCompensation(Connection c, EffectKey original, EffectKey compensation) throws SQLException {
             try (PreparedStatement s = c.prepareStatement("""
                     insert into effect.compensation (thread_name, node_id, idempotency_key, compensation_node,
                         compensation_key) values (?, ?, ?, ?, ?) on conflict do nothing
@@ -227,8 +246,6 @@ public class JdbcEffectLedger implements EffectLedger {
                     }
                 }
             }
-            return null;
-        });
     }
 
     /** Session lock, not a network-spanning transaction. Competing workers fail without waiting. */

@@ -419,9 +419,9 @@ Implementation status: **partial**.
 
 Remaining gates:
 
-- Run PostgreSQL boot and process-death T03 tests in CI and record passing acceptance evidence; obtain Claude review of the exact head.
+- Obtain passing CI and Claude review of the current head; T03 passed in CI run 39259523945 on the initial component head.
 - Integrate governed adapters and effect-aware Flow re-execution through the new execution boundary with WP-105/WP-113.
-- Integrate policy-verified manual decisions and central audit projection through Claude-owned handoffs; add telemetry and CDI ambient-rollback proof.
+- Integrate policy-verified manual decisions and central audit projection through Claude-owned handoffs; add distributed trace spans. Low-cardinality metrics and CDI ambient-rollback tests are included.
 
 Evidence: [docs/handoffs/gpt/WP-108.md](../../docs/handoffs/gpt/WP-108.md), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java](../../modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java), [apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java](../../apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java)
 

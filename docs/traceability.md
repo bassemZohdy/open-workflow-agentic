@@ -8,8 +8,8 @@ The best test status below is not full requirement closure. See [TODO.md](../TOD
 
 | Status | Tests |
 |---|---:|
-| automated | 2 |
-| not-started | 32 |
+| automated | 3 |
+| not-started | 31 |
 | planned | 5 |
 
 ## Requirement coverage
@@ -21,8 +21,8 @@ The best test status below is not full requirement closure. See [TODO.md](../TOD
 | M03 Durable execution and checkpoint recovery | Mandatory | T08, T12, T18, T26, T37 | WP-003, WP-004, WP-005, WP-109, WP-201, WP-208 | planned |
 | M04 Durable triggers, timers and lifecycle | Mandatory | T12, T13 | WP-003, WP-105, WP-107, WP-109 | planned |
 | M05 Authorized human interaction | Mandatory | T02, T12, T37 | WP-106, WP-208 | planned |
-| M06 Events, business effects and compensation | Mandatory | T03, T13, T27 | WP-107, WP-108, WP-602 | planned |
-| M07 Resilience under dependency failure and overload | Mandatory | T03, T17 | WP-108, WP-110 | not-started |
+| M06 Events, business effects and compensation | Mandatory | T03, T13, T27 | WP-107, WP-108, WP-602 | automated |
+| M07 Resilience under dependency failure and overload | Mandatory | T03, T17 | WP-108, WP-110 | automated |
 | M08 Backup, restore and disaster recovery | Mandatory | T18 | WP-401 | not-started |
 | M09 Version-safe in-flight work | Mandatory | T14, T28, T32 | WP-003, WP-302 | not-started |
 | M10 Governed publication and activation | Mandatory | T14, T19, T30, T31 | WP-303 | not-started |
