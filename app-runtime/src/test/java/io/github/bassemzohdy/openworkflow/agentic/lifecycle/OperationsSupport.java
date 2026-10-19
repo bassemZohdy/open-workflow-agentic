@@ -2,11 +2,18 @@ package io.github.bassemzohdy.openworkflow.agentic.lifecycle;
 
 import static io.restassured.RestAssured.given;
 
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceRecord;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceService;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceStatus;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcInstanceStore;
 import io.restassured.response.ValidatableResponse;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import javax.sql.DataSource;
 
 /** Helpers for the operations API tests (WP-105d): calls with headers, and SQL checks of history, outbox and audit. */
@@ -95,5 +102,21 @@ final class OperationsSupport {
     /** The registry status of an instance. */
     static String status(DataSource dataSource, String instanceId) {
         return scalar(dataSource, "select status from task.instance where id = ?", instanceId);
+    }
+
+    /** How many instances were created to retry this one (ADR 0019, amendment 3). */
+    static long retriesOf(DataSource dataSource, String instanceId) {
+        return LifecycleSupport.count(dataSource, "select count(*) from task.instance where retried_from = ?", instanceId);
+    }
+
+    /**
+     * Moves a row to another status through the registry, as the engine observer or the reconciler would, keeping its
+     * engine instance id. The reconciler is off in the boot tests, so the row stays where the test puts it.
+     */
+    static void moveTo(JdbcInstanceStore store, String tenant, String instanceId, InstanceStatus status) {
+        InstanceRecord row = store.find(tenant, Ulid.parse(instanceId)).orElseThrow();
+        store.replace(row.successor(Instant.now().truncatedTo(ChronoUnit.MICROS), status, row.engineInstanceId(),
+                        row.startAttempts(), row.lastError(), null),
+                row.version(), "test.move", InstanceService.RUNTIME_ACTOR);
     }
 }
