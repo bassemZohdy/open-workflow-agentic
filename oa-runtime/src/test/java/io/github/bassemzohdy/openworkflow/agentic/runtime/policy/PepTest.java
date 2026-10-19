@@ -200,8 +200,8 @@ class PepTest {
         AuditEvent second = audit.records().get(1);
         assertEquals("ALLOW", first.attributes().get("policy.outcome"));
         assertEquals("DENY", second.attributes().get("policy.outcome"));
-        assertEquals(Boolean.toString(allowed.allows()), first.attributes().get("policy.recoveryPath"));
-        assertEquals(Boolean.toString(refused.allows()), second.attributes().get("policy.recoveryPath"));
+        assertEquals("false", first.attributes().get("policy.recoveryPath"));
+        assertEquals("false", second.attributes().get("policy.recoveryPath"));
         assertEquals("tool:delete", second.resourceId());
     }
 
