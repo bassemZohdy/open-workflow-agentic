@@ -108,7 +108,7 @@ Each operation stops or holds work and never starts or widens it. Cancel stops o
 
 **A deliberate DENY is final.** If the main policy answers DENY, the recovery rule is not consulted. An operator without the scope gets DENY, not a recovery allow.
 
-**Audit.** The policy package uses the same `io...runtime.audit.AuditSink` port as every other audit producer. `Pep` converts each policy decision to an `AuditEvent` (`policy.decision`); stable policy metadata and the recovery-path flag are attributes. A recovery allow is written as a second event with `policy.recoveryPath=true`, after the main ERROR it followed. If the audit write for the recovery decision fails, the operation is refused.
+**Audit.** The policy package uses the same `io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink` port as every other audit producer. `Pep` converts each policy decision to an `AuditEvent` (`policy.decision`); stable policy metadata and the recovery-path flag are attributes; request context and free-form decision reasons are omitted. A recovery allow is written as a second event with `policy.recoveryPath=true`, after the main ERROR it followed. If the audit write for the recovery decision fails, the operation is refused.
 
 ## 7. Latency
 
