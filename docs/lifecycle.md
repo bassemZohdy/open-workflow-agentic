@@ -297,7 +297,7 @@ Each returns counts. The operator's identity is not recorded by these methods; 1
 
 ### 9.8 HTTP retry rule
 
-`quarkus.flow.http.client.resilience.retry.max-retries=0` is set in `app-runtime/src/main/resources/application.properties`. `FlowStatusSyncTest.aFailedEffectIsRecordedAsFailedAndTheCallIsNotRetriedByTheClient` shows one call to a failing endpoint. `FlowHttpRetryDefaultTest` runs the same flow with the Flow default of three retries and shows more than one call, so the property has the effect. The default retries also repeat a 500 response, which ADR 0019 does not say.
+`quarkus.flow.http.client.resilience.retry.max-retries=0` is set in `apps/app-runtime/src/main/resources/application.properties`. `FlowStatusSyncTest.aFailedEffectIsRecordedAsFailedAndTheCallIsNotRetriedByTheClient` shows one call to a failing endpoint. `FlowHttpRetryDefaultTest` runs the same flow with the Flow default of three retries and shows more than one call, so the property has the effect. The default retries also repeat a 500 response, which ADR 0019 does not say.
 
 ### 9.9 Limits
 
@@ -339,7 +339,7 @@ These are for the owner. The ADRs were not edited.
 
 ### 9.12 Deviations from the brief
 
-- The probe definition ships under `app-runtime/src/main/resources/flow`, not under `src/test`. Flow reads definitions at build time, so a test-only copy cannot reach the packaged child process the process test runs.
+- The probe definition ships under `apps/app-runtime/src/main/resources/flow`, not under `src/test`. Flow reads definitions at build time, so a test-only copy cannot reach the packaged child process the process test runs.
 - The 105a boot tests start the probe definition instead of `research-and-approve`. The latter calls an agent endpoint that does not exist here and fails within milliseconds, which made its status race the tests once the registry follows the engine.
 - `%test.quarkus.http.test-port=0` replaces the fixed test port (8081), so parallel Maven runs do not collide.
 - The observer covers the engine transitions the brief put in 105c (WAITING, RUNNING, COMPLETED, FAILED, CANCELLED). The 105b branch was merged into this one (`wp-105b-outbox-projection`). Its changes did not touch `FlowWorkflowEngine` or `InstanceService`, so those merged without conflict. The outbox row is written in `JdbcInstanceStore.replace`, which the observer and the reconciler use, so every transition they make writes its outbox row in the same transaction. The one write that bypasses `replace`, the resume epoch, writes its own outbox row in the same transaction (`ReconcilerRepairTest.everyRepairThatChangesARowWritesItsOutboxRowInTheSameTransaction`). Audit rows (`task.repair_event`) are not changes of state and have no outbox row.
@@ -420,7 +420,7 @@ The relay runs in each process on a single-thread executor (`OutboxRelayService`
 
 ## 11. Operations API (WP-105d)
 
-Code: `InstanceOperations`, `InstanceInspection`, `OperationKeys`, `OperationsProducers` (package `runtime.operations`); `OperationsResource` and `ProblemException` (`runtime.api`); `Pep.instanceOperation` (`runtime.policy`). Schema: V40 (`task.operation_request`). Policy: `oa-runtime/src/main/resources/policy/operations`.
+Code: `InstanceOperations`, `InstanceInspection`, `OperationKeys`, `OperationsProducers` (package `runtime.operations`); `OperationsResource` and `ProblemException` (`runtime.api`); `Pep.instanceOperation` (`runtime.policy`). Schema: V40 (`task.operation_request`). Policy: `modules/oa-runtime/src/main/resources/policy/operations`.
 
 ### 11.1 Endpoints
 

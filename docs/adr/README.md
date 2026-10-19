@@ -28,4 +28,6 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 | [0022](0022-protocol-choices-for-tools-and-agent-interop.md) | Protocol choices for tools and agent interoperability (spike WP-007) | Accepted |
 | [0023](0023-workflow-to-agent-bridge.md) | Workflow-to-agent bridge: HTTP call confirmed, async callback for long steps (spike WP-005) | Accepted |
 
+| [0024](0024-group-applications-and-library-modules.md) | Group applications and library modules | Accepted |
+
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.

@@ -42,7 +42,7 @@ Fix the repository structure and test harness, and answer the open technical que
 - Acceptance-test harness marks test status automatically
 - Spikes A to E are closed with an ADR each; remaining unknowns have an owner and a validation point
 - Acceptance status reporting includes Maven Failsafe reports for process-level integration tests
-- Spike reports preserve findings, evidence and confidence; experimental code and test harnesses are not retained in this repository
+- Spike reports preserve findings and evidence; experimental spike code is not retained in this repository
 
 | WP | Title | Type | Size | Requirements | Owns tests | Depends on |
 |---|---|---|---|---|---|---|
@@ -93,13 +93,13 @@ Learn what Quarkus Flow 1.2 really provides for our requirements.
 
 Deliverables:
 
-- Written findings with evidence, confidence and explicit unknowns; standalone characterization tests with reproducible commands
+- Written findings with evidence, confidence and explicit unknowns; no spike source or test harness retained in this repository
 - ADR on how instances are started, queried, cancelled and resumed
 - Document which standalone tests run in CI and which require an isolated Postgres/database or process environment
 
 Reuse: quarkus-flow-jpa, quarkus-flow-durable-kubernetes, quarkus-flow-scheduler, quarkus-flow-messaging
 
-Notes: Questions: start by API with input; listen and emit events with durable resume after restart; timeouts and deadlines; two versions of one definition running together; instance query and cancel API; schema created by JPA module; Kubernetes lease durability; retries; calling a CDI bean as a function; how MDC and identity propagate. Process tests are opt-in and must only use the dedicated spike_a database; the root Maven build does not include this standalone project.
+Notes: Questions: start by API with input; listen and emit events with durable resume after restart; timeouts and deadlines; two versions of one definition running together; instance query and cancel API; schema created by JPA module; Kubernetes lease durability; retries; calling a CDI bean as a function; how MDC and identity propagate. Exploratory tests were run outside the root build; only their outcomes and open questions are retained in this repository.
 
 ### WP-004 Spike B: LangGraph4j durability
 

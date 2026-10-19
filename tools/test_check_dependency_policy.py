@@ -70,6 +70,37 @@ class DependencyPolicyTest(unittest.TestCase):
     def tearDown(self):
         self._tmp.cleanup()
 
+    def test_grouped_layout_still_enforces_contracts_purity(self):
+        write(self.fx.root / "pom.xml", """
+            <project><modules><module>modules/oa-contracts</module>
+              <module>modules/oa-runtime</module></modules></project>""")
+        self.fx.artifact("org.example", "lib", "1.0", ["MIT License"])
+        self.fx.deps("modules/oa-contracts", ["org.example:lib:jar:1.0:compile"])
+        self.fx.deps("modules/oa-runtime", [])
+        violations, missing = self.fx.run()
+        self.assertEqual([], missing)
+        self.assertTrue(any("modules/oa-contracts must have no main-classpath dependency" in v for v in violations))
+
+    def test_internal_dependency_cannot_bypass_contracts_purity(self):
+        self.fx.deps("oa-contracts", [f"{policy.PROJECT_GROUP}:oa-runtime:jar:0.1.0-SNAPSHOT:compile"])
+        self.assertTrue(any("oa-contracts must have no main-classpath dependency" in v for v in self.fx.run()[0]))
+
+    def test_runtime_cannot_depend_on_control(self):
+        self.fx.deps("oa-runtime", [f"{policy.PROJECT_GROUP}:oa-control:jar:0.1.0-SNAPSHOT:compile"])
+        self.assertTrue(any("must not depend on oa-control" in v for v in self.fx.run()[0]))
+
+    def test_testkit_is_only_allowed_in_test_scope(self):
+        for scope in policy.KNOWN_SCOPES:
+            with self.subTest(scope=scope):
+                self.fx.deps("oa-runtime", [f"{policy.PROJECT_GROUP}:oa-testkit:jar:0.1.0-SNAPSHOT:{scope}"])
+                violations, missing = self.fx.run()
+                self.assertEqual([], missing)
+                self.assertEqual(scope != "test", bool(violations), violations)
+
+    def test_deployable_cannot_be_consumed_as_a_library(self):
+        self.fx.deps("oa-runtime", [f"{policy.PROJECT_GROUP}:app-runtime:jar:0.1.0-SNAPSHOT:compile"])
+        self.assertTrue(any("must not depend on deployable app-runtime" in v for v in self.fx.run()[0]))
+
     # ---- the rules from the original 12 tests (plain line format, unchanged assertions)
 
     def test_permissive_runtime_dependency_passes(self):

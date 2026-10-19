@@ -30,7 +30,7 @@ Rules that follow from the encoding:
 
 ## 2. Tables (schema `audit`)
 
-Migrations `V30` to `V34` in `oa-runtime/src/main/resources/db/migration`.
+Migrations `V30` to `V34` in `modules/oa-runtime/src/main/resources/db/migration`.
 
 | Table | Content | Append-only |
 |---|---|---|

@@ -21,6 +21,6 @@
   },
   "T01": {
     "status": "automated",
-    "where": "app-runtime:AgenticAppTest#structuredAgentOutputRejectsMalformedActionsAndUnauthorizedEscalation"
+    "where": "apps/app-runtime:AgenticAppTest#structuredAgentOutputRejectsMalformedActionsAndUnauthorizedEscalation"
   }
 }
