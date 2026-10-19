@@ -184,8 +184,18 @@ public class InstanceService {
                             row.lastError(), row.waitDeadline()),
                     row.version(), REASON_PREPARED, RUNTIME_ACTOR);
         } catch (StaleVersionException moved) {
-            // An operator changed the row while the engine was being prepared (WP-105d, a cancel). The prepared
-            // instance is never started: the row says what the operator decided. The response reports that state.
+            // An operator changed the row while the engine was being prepared (WP-105d, a cancel). Do not start the
+            // prepared instance; ask the engine to discard it so the cancellation does not leave an unregistered
+            // pending instance behind.
+            try {
+                if (!launch.discard()) {
+                    LOG.warnf("prepared engine instance %s for %s could not be discarded after a registry race",
+                            launch.engineInstanceId(), row.id());
+                }
+            } catch (RuntimeException discardFailed) {
+                LOG.warnf(discardFailed, "could not discard prepared engine instance %s after a registry race",
+                        launch.engineInstanceId());
+            }
             LOG.infof("instance %s changed while its engine instance was prepared; not started", row.id());
             return new StartResult(store.find(row.tenant(), row.id()).orElse(row), true);
         }
