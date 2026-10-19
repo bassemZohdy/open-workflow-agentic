@@ -26,5 +26,6 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 | [0020](0020-checkpoint-scoping-and-state-evolution.md) | Checkpoint scoping and state evolution (spike WP-004) | Proposed |
 | [0021](0021-identity-delegation-policy-engine-and-secrets.md) | Identity delegation, policy engine and secret store (spike WP-006) | Proposed |
 | [0022](0022-protocol-choices-for-tools-and-agent-interop.md) | Protocol choices for tools and agent interoperability (spike WP-007) | Proposed |
+| [0023](0023-workflow-to-agent-bridge.md) | Workflow-to-agent bridge: HTTP call confirmed, async callback for long steps (spike WP-005) | Proposed |
 
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.

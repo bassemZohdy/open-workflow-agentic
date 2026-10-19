@@ -1,0 +1,120 @@
+<?xml version="1.0"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- WP-005 spike. Standalone on purpose: not a module of the root build. Versions mirror the root pom. -->
+  <groupId>io.github.bassemzohdy.openworkflow</groupId>
+  <artifactId>spike-c-bridge</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>spike-c-bridge</name>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <quarkus.platform.version>3.39.5</quarkus.platform.version>
+    <quarkus-flow.version>1.2.0</quarkus-flow.version>
+    <langgraph4j.version>1.9.5</langgraph4j.version>
+    <jackson.version>2.21.1</jackson.version>
+    <failsafe-plugin.version>3.5.3</failsafe-plugin.version>
+    <compiler-plugin.version>3.14.0</compiler-plugin.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.quarkus.platform</groupId>
+        <artifactId>quarkus-bom</artifactId>
+        <version>${quarkus.platform.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.quarkiverse.flow</groupId>
+        <artifactId>quarkus-flow-bom</artifactId>
+        <version>${quarkus-flow.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.bsc.langgraph4j</groupId>
+        <artifactId>langgraph4j-bom</artifactId>
+        <version>${langgraph4j.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- Quarkus Flow 1.2.0 with JPA persistence (same as spike-a) -->
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-rest-jackson</artifactId></dependency>
+    <dependency><groupId>io.quarkiverse.flow</groupId><artifactId>quarkus-flow</artifactId></dependency>
+    <dependency><groupId>io.quarkiverse.flow</groupId><artifactId>quarkus-flow-jpa</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-postgresql</artifactId></dependency>
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-hibernate-orm</artifactId></dependency>
+
+    <!-- LangGraph4j 1.9.5 with the V2 Postgres saver (same line as spike-b) -->
+    <dependency><groupId>org.bsc.langgraph4j</groupId><artifactId>langgraph4j-core</artifactId></dependency>
+    <dependency><groupId>org.bsc.langgraph4j</groupId><artifactId>langgraph4j-postgres-saver</artifactId></dependency>
+    <dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId><version>${jackson.version}</version></dependency>
+
+    <!-- Reused from the repository: ThreadId (oa-contracts), LlmClient port (oa-runtime), ScriptedLlmClient (oa-testkit).
+         Installed to the local Maven repository from the main build (mvn install -pl oa-contracts,oa-runtime,oa-testkit -am). -->
+    <dependency><groupId>io.github.bassemzohdy.openworkflow</groupId><artifactId>oa-contracts</artifactId><version>0.1.0-SNAPSHOT</version></dependency>
+    <!-- Only the LlmClient port and the scripted double are used. The OpenAI extension, Flyway and db-scheduler that
+         oa-runtime brings are excluded: this spike owns its schema and does not run oa-runtime beans (see application.properties). -->
+    <dependency>
+      <groupId>io.github.bassemzohdy.openworkflow</groupId><artifactId>oa-runtime</artifactId><version>0.1.0-SNAPSHOT</version>
+      <exclusions>
+        <exclusion><groupId>io.quarkiverse.langchain4j</groupId><artifactId>*</artifactId></exclusion>
+        <exclusion><groupId>io.quarkus</groupId><artifactId>quarkus-flyway</artifactId></exclusion>
+        <exclusion><groupId>io.quarkus</groupId><artifactId>quarkus-flyway-postgresql</artifactId></exclusion>
+        <exclusion><groupId>*</groupId><artifactId>quarkus-db-scheduler</artifactId></exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>io.github.bassemzohdy.openworkflow</groupId><artifactId>oa-testkit</artifactId><version>0.1.0-SNAPSHOT</version>
+      <exclusions>
+        <exclusion><groupId>io.quarkiverse.langchain4j</groupId><artifactId>*</artifactId></exclusion>
+        <exclusion><groupId>io.quarkus</groupId><artifactId>quarkus-flyway</artifactId></exclusion>
+        <exclusion><groupId>io.quarkus</groupId><artifactId>quarkus-flyway-postgresql</artifactId></exclusion>
+        <exclusion><groupId>*</groupId><artifactId>quarkus-db-scheduler</artifactId></exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>io.quarkus.platform</groupId>
+        <artifactId>quarkus-maven-plugin</artifactId>
+        <version>${quarkus.platform.version}</version>
+        <extensions>true</extensions>
+        <executions>
+          <execution>
+            <goals><goal>build</goal><goal>generate-code</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>${compiler-plugin.version}</version>
+        <configuration><parameters>true</parameters></configuration>
+      </plugin>
+      <!-- Process-level bridge tests run after package: they start target/quarkus-app/quarkus-run.jar and kill -9 it. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>${failsafe-plugin.version}</version>
+        <executions>
+          <execution>
+            <goals><goal>integration-test</goal><goal>verify</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
