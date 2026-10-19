@@ -19,7 +19,7 @@ The contract has no chain, instance, correlation, version or payload fields. The
 | `oa.payload.ref`, `oa.payload.digest` | Reference id and SHA-256 digest (reference form only). |
 | `field.<path>` | A payload field, inline or as a salted digest (section 4). |
 
-The shared `runtime.audit.AuditSink` is the write port for the trail and for policy decisions. WP-103 converts each PEP decision to an `AuditEvent` with action `policy.decision`; the event records the actor and resource, outcome, deciding component, policy id/version, action kind, task id when present, and whether safe recovery produced it. Free-form policy context is not copied into event attributes.
+The shared `runtime.audit.AuditSink` is the write port for the trail and for policy decisions. WP-103 converts each PEP decision to an `AuditEvent` with action `policy.decision`; the event records the actor and resource, outcome, deciding component, policy id/version, action kind, task id when present, and whether safe recovery produced it. Policy context and free-form decision reasons are not copied into event attributes.
 
 Rules that follow from the encoding:
 
