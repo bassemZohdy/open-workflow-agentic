@@ -6,6 +6,49 @@ Code: `oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runti
 Tags used below follow ADR 0021: **[verified]** was run and passed here, **[fake]** was run only against an in-process
 stand-in, **[unverified]** was not run.
 
+## 1. Model
+
+Three kinds of subject act in the platform: a **user** (a person, authenticated by the identity provider), an **agent**
+(a workload with its own identity), and the **runtime** itself. Authority always starts with a user. It reaches an agent only
+through a **delegation grant** that the user gave. It reaches a tool or another system only through a **short-lived token**
+that the identity provider issued for exactly that audience, after the platform checked the grant.
+
+| Piece | Where | Kept |
+|---|---|---|
+| Verified caller (who is calling the API) | `CallerContextResolver`, `JwtTokenVerifier` | nothing; verified per request |
+| Delegation grant (what a user lets an agent do, and for how long) | `DelegationGrants`, `identity.delegation_grant` | PostgreSQL, append-only history |
+| Token exchange (a token for one tool, one audience) | `Rfc8693TokenExchanger` | nothing; the token is returned and used |
+| Resource guard (what a tool accepts) | `ResourceTokenGuard`, `ReplayCache` | `identity.token_use` (token id and expiry only) |
+| Instance authority (who an instance runs for) | `InstanceAuthorities`, `identity.instance_authority` | identifiers only |
+| Secrets (client secret of the exchange) | `SecretProvider`, `FileSecretProvider` | files mounted by the platform |
+
+There is no token passthrough. A token the user presented to the API is never forwarded to a tool: the API's audience is
+`agentic.identity.audience`, a tool's token is exchanged for the tool's audience, and the resource guard refuses a token whose
+audience is not exactly its own.
+
+## 2. Verified caller
+
+`CallerContextResolver` builds the caller from a bearer token. `JwtTokenVerifier` checks the signature (keys from
+`agentic.identity.jwks-uri`), the issuer, the audience, expiry and not-before with the configured clock skew, and requires
+`sub`, `exp` and the tenant claim. The scopes are the `scope` claim; a scope that does not have the policy syntax is dropped,
+which can only narrow authority. A token with an `act` claim (a delegated token) is refused at the API: delegated tokens are
+for tools, not for this API. `X-Tenant`, `X-Subject` and `X-Scopes` are ignored on this path.
+
+The **development header seam** (`agentic.dev.trust-caller-headers=true`) is honoured only when the active profile is in
+`agentic.dev.header-seam-profiles` (default `dev,test`). In any other profile the application refuses to start with the flag
+set. `HeaderSeamProductionIT` runs the packaged jar to show it. Without issuer settings, every bearer token is refused.
+
+## 3. Delegation grants
+
+A root grant is given by the user to one agent: tenant, user, agent, a set of scopes, and an expiry (at most
+`agentic.identity.grant-max-lifetime`, default 30 days). An agent that holds a grant can delegate a part of it to another
+agent: a **child grant** with a subset of the scopes, an expiry no later than the parent's, a new agent that is not already in
+the chain, and at most `DelegationGrant.MAX_DEPTH` (8) levels. Widening is refused by the service
+(`PermissionWideningException`) and again by a database trigger, so code that bypasses the service cannot widen either.
+Grants are never edited: they are revoked (the subtree goes with the root) or they expire. Creation, revocation and expiry
+write audit events. Creation is fail-closed (a grant whose event cannot be written is revoked again); revocation stays in
+force even if its event cannot be written, and the failure is logged at ERROR.
+
 ## 4. Token exchange (RFC 8693)
 
 `TokenExchanger` is the port; `Rfc8693TokenExchanger` is the client. It turns an active delegation grant into one token
@@ -147,6 +190,28 @@ engine's persistence tables in the same database; the scan covers them as part o
 scanned (it appears in connection settings by design). The live in-process path is not gated by a grant check; the check is
 available to steps (`InstanceAuthorities.recheck`) and is wired at resume. Verified against the testkit's fake issuer only.
 
+## 8. Threat notes
+
+- **No passthrough.** The API refuses delegated tokens, tools refuse the user's token (audience), and the exchange is the only
+  way from one to the other. The exchanger refuses to send a refresh token, and refuses an issued token equal to its input.
+- **Audience binding.** The exchanger asks for one audience and verifies that the issued token names exactly that audience;
+  the resource guard requires the audience set to equal its own name.
+- **Lifetime.** A delegated token lives at most 300 seconds: the exchanger and the guard both refuse longer ones. The guard
+  also refuses a token with no `jti` or `iat`.
+- **Replay.** Each token id is accepted `max-uses` times (default once). The in-memory cache is bounded and refuses new tokens
+  when full; the JDBC cache is shared by all processes and survives a restart. A failing cache refuses the token. The replay
+  count is taken last, so a token refused for another reason does not use up its single use.
+- **Clock skew.** `agentic.identity.clock-skew` (default 30 s, at most 5 minutes) is accepted on `exp` and `nbf`. A token can
+  therefore be used up to the skew after its expiry. Keep the skew small and the clocks synchronised.
+- **Revocation latency.** A revoked grant stops new exchanges at once and stops tokens at the guard on the next call (the guard
+  looks the grant up). A resource server that does not use the guard keeps accepting a token until it expires, at most 300 s plus
+  the skew. Revocation of the user's session at the identity provider is not seen by the platform.
+- **The last five minutes of a grant.** The identity provider cannot know the grant's expiry, so the exchanger discards any
+  issued token that would outlive the grant. In the last 300 seconds of a grant, exchanges therefore fail (section 4).
+- **Stored state.** Only identifiers are stored (section 7). The database refuses values that look like a token.
+- **Audit.** Every exchange is audited before the token is returned; if the audit fails, the token is discarded. Refusals are
+  audited on a best-effort basis. Events carry names, ids and reasons, never a token or a secret.
+
 ## 9. Keycloak 26.2+ integration test (unverified)
 
 This test has not been run. No container runtime is available where WP-102 was built, so no Keycloak was started. It is
@@ -203,3 +268,70 @@ Steps and what must hold:
 Run it with the runtime's `TokenExchanger` pointed at the real endpoint; a JUnit test can use `Rfc8693TokenExchanger`
 directly, with a `SecretProvider` that returns the client secret. Until this has run, every statement about Keycloak in this
 file is **[unverified]**.
+
+## 10. Configuration
+
+| Property | Default | Meaning |
+|---|---|---|
+| `agentic.identity.issuer` | none | accepted `iss`; without it every bearer token is refused |
+| `agentic.identity.jwks-uri` | none | key set of the issuer; https, or http on loopback |
+| `agentic.identity.audience` | none | the audience of this API |
+| `agentic.identity.tenant-claim` | `tenant` | claim holding the tenant; a user token without it is refused |
+| `agentic.identity.subject-kind-claim` | `sub_kind` | claim holding the subject kind; absent means USER |
+| `agentic.identity.clock-skew` | `PT30S` | at most 5 minutes |
+| `agentic.identity.jwks-timeout` | `PT5S` | connect and read timeout of the key fetch |
+| `agentic.identity.grant-max-lifetime` | `P30D` | longest grant |
+| `agentic.identity.expiry-sweep-cron` | `0 */5 * * * ?` | sweep that marks expired grants |
+| `agentic.identity.token-endpoint` | none | RFC 8693 endpoint; https or loopback http. Without it, exchange is refused |
+| `agentic.identity.exchange.client-id` | none | client of the agent runtime |
+| `agentic.identity.exchange.client-secret-name` | none | file name in the secrets directory |
+| `agentic.identity.exchange.timeout` | `PT5S` | one exchange request |
+| `agentic.secrets.dir` | none | directory of secret files |
+| `agentic.secrets.ttl` | `PT30S` | an unchanged file is re-read at least this often |
+| `agentic.secrets.max-stale` | `PT2M` | a cached secret may be used this long after the ttl while the file cannot be read |
+| `agentic.dev.trust-caller-headers` | `false` | development header seam; see section 2 |
+| `agentic.dev.header-seam-profiles` | `dev,test` | profiles where the seam may be on |
+
+## 11. Operations
+
+**Rotating the exchange client secret.** Write the new secret into the mounted file. The provider notices a changed file at
+once and an unchanged one within the ttl; the next exchange uses the new value. Rotate the secret at the identity provider so
+that both are valid for one overlap period, then retire the old one. A missing file revokes the secret immediately; a file
+that cannot be read is served from cache for at most ttl plus max-stale, then exchanges fail. `identity.secret.rotated` and
+`identity.secret.unavailable` events are written (name and generation or reason only).
+
+**Rotating the issuer's signing keys.** Publish the new key in the JWKS before the issuer signs with it; remove the old one
+after the longest token lifetime of the issuer.
+
+**Revoking a grant.** The user, the agent that holds the grant, or its creator calls `DelegationGrants.revoke`; an operator uses
+`revokeByOperator`. The subtree is revoked together. New exchanges fail at once; tokens already issued stop at the guard
+(section 8). Instances that run under the grant are held at their next resume with `reauthorization.required` (section 5); the
+user renews with `POST /instances/{id}/reauthorize`. There is no HTTP endpoint for grants in this work package.
+
+**An instance held for re-authorization.** Inspect shows the `authority` section (state, reason, since). If nobody renews it,
+the wait deadline (`agentic.reconciler.wait-deadline`) cancels it.
+
+## 12. What is verified, what is a fake, what is unverified
+
+| Statement | Status |
+|---|---|
+| Token verification, grants, narrowing (service and database triggers), replay cache, instance authority, resume gate, reauthorization, secret provider | **[verified]** against PostgreSQL and the real code, with tokens of the fake issuer |
+| Token exchange and resource guard | **[fake]**: the testkit's in-process authorization server and issuer (`DelegationAuthorizationServer`, `FakeIdentityProvider`). It follows the behaviour documented for Keycloak 26.2+, but is not Keycloak |
+| Kill/restart: identity restored, a held instance, no credential stored | **[verified]** with real child JVMs and the real engine (`IdentityRecoveryIT`), tokens from the fake issuer |
+| T07 | `DelegatedAuthorityAcceptanceTest`: widening, expiry and replay with two scripted agents against the fake issuer; policy boundary with the embedded Cedar engine. Real multi-agent flows are WP-207 |
+| A real Keycloak (standard token exchange, `act`/`may_act` delegation preview, JWKS rotation, session revocation) | **[unverified]** (section 9) |
+| A live step gated by the grant check | **not built**: only resume is wired; `InstanceAuthorities.recheck` exists for the agent bridge (WP-2xx) |
+| `TokenExchanger` used by a running flow | **not built**: the bean exists, nothing in the runtime injects it yet |
+| Identity carried through asynchronous tasks | the `AuthorityScope` wrappers exist and are unit tested; no runtime component uses them yet except resume |
+
+### Statements in the ADR and the plan that the implementation shows to be wrong or unsupported
+
+Listed, not edited, as agreed.
+
+1. ADR 0021 says the issuer limits a token "never beyond the grant's expiry". An identity provider does not know our grants.
+   The client has to discard such a token, which the exchanger does (and which is why the last 300 s of a grant fail).
+2. ADR 0021 cites `TokenExchangeTest`, 11 tests, as verification. Those ran against the spike's own server, not Keycloak.
+3. `docs/lifecycle.md` section 11.9 said authentication depends on WP-102 and that scopes come from headers. This work package
+   updated 11.8 and 11.9.
+4. `docs/policy.md` section 8 said verifying the grant is WP-102's job. It is done in the exchanger, the guard and the resume
+   gate; the PEP still does not check it. Updated.
