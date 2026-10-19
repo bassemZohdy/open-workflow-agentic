@@ -119,6 +119,7 @@ class RetryAndDirectCancelTest {
             assertEquals("CANCELLED", response.path("status"));
             assertEquals(0, engine.starts(), "the prepared engine instance is never started");
             assertEquals(1, engine.prepares());
+            assertEquals(1, engine.discards(), "the prepared instance is removed from Flow after the cancel wins");
             assertEquals("CANCELLED", status(dataSource, id), "the late start does not undo the cancel");
         } finally {
             pool.shutdownNow();
