@@ -224,12 +224,14 @@ Additional closure/integration tasks:
 - [ ] Resolve any issuer mismatch, record the real-IdP evidence, and add the repeatable integration test to an appropriate CI profile.
 - [ ] Bind verified caller identity to audit API access instead of its anonymous subject.
 - [ ] If the Vault path is selected, implement and run the quarkus-vault 4.9.0 integration/renewal/rotation test required by ADR 0021; mounted static secrets remain the implemented path.
+- [ ] Implement ADR 0021 H1 strict native Keycloak delegation compatibility without an actorless fallback; retain all user/actor/tenant/scope/audience/expiry/replay checks.
+- [ ] Supply KeycloakStandardIT and KeycloakDelegationIT under the Claude-owned identity test package and pass the H2 real-Java evidence matrix; missing or skipped tests do not close WP-102.
 
 Acceptance gates:
 
 - [x] T07: automated
 
-Evidence: [docs/identity.md](docs/identity.md), [docs/audit.md](docs/audit.md)
+Evidence: [docs/identity.md](docs/identity.md), [docs/audit.md](docs/audit.md), [docs/handoffs/gpt/WP-102.md](docs/handoffs/gpt/WP-102.md)
 
 ### WP-103 Policy enforcement points — partial
 
@@ -888,7 +890,7 @@ Requirements: H08, H06. Owned acceptance tests: Component/build verification. St
 
 ## Decisions and conditional follow-ups
 
-- [ ] **D-1 Identity provider** (WP-102): Recommended: Keycloak OIDC/token exchange; confirm the deployment issuer and complete real integration.
+- [ ] **D-1 Identity provider** (WP-102): Keycloak for authentication; delegated authority requires strict actor-bearing token exchange and real-Java evidence. Native Keycloak delegation remains an explicit preview test profile, not a production acceptance claim.
 - [x] **D-2 Policy engine** (WP-103): Cedar embedded; OPA sidecar remains an organizational alternative (ADR 0021).
 - [ ] **D-3 Target platform** (WP-403): Recommended: OpenShift and plain Kubernetes, packaged with Helm.
 - [ ] **D-4 Console technology** (WP-603): Recommended: Qute unless the console needs a TypeScript SPA.

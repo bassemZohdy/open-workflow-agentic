@@ -511,11 +511,14 @@
           "Run the real Keycloak test in docs/identity.md section 9; prove actor_token/act mapping, tenant/scope claims, audience narrowing and expiry bounds.",
           "Resolve any issuer mismatch, record the real-IdP evidence, and add the repeatable integration test to an appropriate CI profile.",
           "Bind verified caller identity to audit API access instead of its anonymous subject.",
-          "If the Vault path is selected, implement and run the quarkus-vault 4.9.0 integration/renewal/rotation test required by ADR 0021; mounted static secrets remain the implemented path."
+          "If the Vault path is selected, implement and run the quarkus-vault 4.9.0 integration/renewal/rotation test required by ADR 0021; mounted static secrets remain the implemented path.",
+          "Implement ADR 0021 H1 strict native Keycloak delegation compatibility without an actorless fallback; retain all user/actor/tenant/scope/audience/expiry/replay checks.",
+          "Supply KeycloakStandardIT and KeycloakDelegationIT under the Claude-owned identity test package and pass the H2 real-Java evidence matrix; missing or skipped tests do not close WP-102."
         ],
         "evidence": [
           "docs/identity.md",
-          "docs/audit.md"
+          "docs/audit.md",
+          "docs/handoffs/gpt/WP-102.md"
         ]
       }
     },
@@ -2498,7 +2501,7 @@
       "id": "D-1",
       "title": "Identity provider",
       "status": "open",
-      "decision": "Recommended: Keycloak OIDC/token exchange; confirm the deployment issuer and complete real integration.",
+      "decision": "Keycloak for authentication; delegated authority requires strict actor-bearing token exchange and real-Java evidence. Native Keycloak delegation remains an explicit preview test profile, not a production acceptance claim.",
       "owner": "WP-102"
     },
     {

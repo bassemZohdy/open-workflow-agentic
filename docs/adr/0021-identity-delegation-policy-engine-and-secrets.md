@@ -22,12 +22,12 @@ Constraints in this environment: no container runtime, so no Keycloak, Vault or 
 ### 1. Delegation: our grant, standard token exchange, short-lived tokens
 
 - A user's request creates a **delegation grant** in our own store: subject user, agent, scopes, expiry. The grant is not a token and is not in the identity provider.
-- When an agent or a workflow acts, the runtime exchanges the user's access token and its own workload token for a new token with the RFC 8693 request (`grant_type` token-exchange, `subject_token`, `actor_token`, `audience`, `scope`). The issuer narrows audience and scope and never widens them. The result lives at most 300 seconds and never beyond the grant's expiry.
+- When an agent or a workflow acts, the runtime exchanges the user's access token and its own workload token for a new token with the RFC 8693 request (`grant_type` token-exchange, `subject_token`, `actor_token`, `audience`, `scope`). The runtime verifies the issuer-signed result against the requested audience/scope and rejects any widening. The accepted JWT itself expires no later than the minimum of 300 seconds from issue, the verified subject token expiry and the active grant-chain expiry; the issuer does not know our grants.
 - Agent-to-agent delegation repeats the exchange; the scope can only narrow and the chain is recorded in `act`.
 - No refresh token is used. After a long wait the runtime re-checks the grant and exchanges again; if the grant has expired, the step waits for re-authorization.
 - Resource servers accept a token only for their own audience. A user's gateway token is refused by tools.
 - Verified: all of the above, against our in-process authorization server (`TokenExchangeTest`, 11 tests). **[verified]** for our server; the client and resource checks are ours and are what the runtime will use.
-- Keycloak as issuer (decision D-1, recommended default): standard token exchange is supported from Keycloak 26.2 and narrows audience and scope **[read-in-docs]**. Impersonation is not implemented, delegation (`act`/`may_act`) is preview and requires FGAP v2 **[read-in-docs]**. Therefore delegation grants are ours and Keycloak only issues the narrowed token. **[unverified]** Keycloak's actual behaviour: no Keycloak was run. Check: an integration test against a real Keycloak 26.2+ in CI before WP-102 closes.
+- Keycloak as issuer (D-1): supported for authentication, with delegation capability separately gated. Standard exchange without a signed `act` is not accepted for delegated effects. Native actor-bearing Keycloak delegation is a separately enabled preview integration profile, not an automatic production default. See the H1 amendment below; real product-client interoperability remains an open WP-102 gate.
 - Workflow tasks: quarkus-flow-oidc 1.2.0 maps only the client-credentials and password grants **[read-in-docs, artifact inspection]**. Exchange from workflow tasks needs a custom auth provider, or a direct `quarkus-oidc-client` exchange grant (`quarkus.oidc-client.grant.type=exchange`, documented in the artifact **[read-in-docs]**). **[unverified]** the second option is not run.
 
 ### 2. Policy: a PDP port with Cedar embedded by default; OPA sidecar where OPA already runs
@@ -60,7 +60,7 @@ Constraints in this environment: no container runtime, so no Keycloak, Vault or 
 
 ## Alternatives considered
 
-- **Keycloak delegation and impersonation** (token exchange V1 or preview delegation): rejected for now. Preview, FGAP v2 required, impersonation is risky and not part of standard V2 **[read-in-docs]**.
+- **Actorless standard exchange as delegated authority:** rejected. An authenticated exchange client and a platform grant do not add issuer-signed actor proof to an actorless bearer token. Native preview delegation is permitted only in the isolated interoperability profile until the real product path is evidenced; it is not promoted to production by this ADR.
 - **Pass the user's token through to tools:** rejected by M11. The spike shows the tool-side check refuses it **[verified]**.
 - **OPA sidecar as the default:** not chosen as default. It works and is as fast over localhost, but it adds a process, a hop and bundle delivery, and it is harder to keep running during a control-plane outage (M27). It stays the alternative where OPA is already the organization's standard.
 - **OPA Wasm in process:** fastest, verified for our module, but licence, ABI and maintenance are unknown **[unverified]**. Not adopted yet.
@@ -75,4 +75,63 @@ The owner decided D-9 on 2026-10-19. Section 3 above now states the decision. Th
 1. **Secret store (D-9).** Was: proposed, with the choice open. Now: Vault where the organization runs it; Kubernetes Secrets for static values; `quarkus-vault` stays on the BOM's 4.9.0; a Vault integration test on 4.9.0 is required before the secret store is chosen. Status: decided. The Vault integration test is not written or run yet, so the Vault path is not implemented.
 2. **Version of the Vault binding.** The docs read in section 3 describes `quarkus-vault` 5.0.0.Beta1, but the BOM pins 4.9.0. The decision keeps 4.9.0. The lease and renewal behaviour of 4.9.0 is therefore still unverified, and the integration test is the check.
 
-Nothing else in this ADR is changed by the owner's decisions.
+### H1: Keycloak compatibility without weakening delegation (2026-10-19)
+
+**Decision:** retain native, issuer-verified actor proof as the delegation baseline.
+Do not relax `Rfc8693TokenExchanger` or `ResourceTokenGuard` when `act` is absent;
+do not invent an `act` value from request headers, `azp`, an unverified workload
+JWT, or a locally shortened `IssuedToken` expiry. This resolves H1 by choosing
+strict native delegation over the proposed actorless fallback. Keycloak remains
+the authentication recommendation; standard exchange alone is insufficient for
+the delegated-runtime guarantee.
+
+The stable-standard baseline is a **negative compatibility test**: real user
+JWT verification succeeds, but an exchanged token without actor proof is
+refused. The native-delegation profile is an **explicit preview test profile**
+using Keycloak 26.8.1 with `token-exchange-delegation` and `parameterized-scopes`.
+It is not an implicit deployment upgrade or an approval to use preview features
+in production. If production requires stable-only native delegation, select an
+issuer that satisfies the same contract or keep that capability disabled until
+Keycloak's required feature is accepted. No new custom STS is introduced here.
+
+For the native path, the subject authorizes the particular actor through the
+provider's permission/consent flow and the platform's durable delegation grant.
+A production hardcoded `may_act` mapper is not a replacement for consent or
+permission. Keycloak actor subjects are issuer-scoped service-account user IDs;
+bind the grant to the exact verified actor subject, with an immutable registry
+mapping if a display/client ID is used. Never assume service-account UUID and
+OAuth client ID are interchangeable.
+
+The implementation owner (Claude) must preserve these checks:
+
+1. Verify both input tokens before using their identity or expiry. Require the
+   subject/tenant and authenticated workload actor to match the active grant;
+   verify each token for its configured issuer and intended audience.
+2. Check the whole grant chain before exchange and again after the response.
+   A revoked, expired or widened grant never issues usable authority.
+3. Verify the response signature/JWKS, exact issuer, one requested audience,
+   effective user, tenant, exact expected nearest actor and required ancestor
+   chain, request-bounded non-empty scopes, `jti`, issue/expiry times and no
+   refresh token. An unsupported multi-hop chain is refused, never flattened.
+4. Reject an actual signed JWT whose expiry exceeds any verified bound above.
+   Do not merely shorten the returned Java object's metadata while retaining a
+   longer-lived bearer. Near-expiry exchanges may therefore fail and require
+   reauthorization. Server client lifespan is at most 300 seconds.
+5. Treat every non-success HTTP status as failure, independently of the OAuth
+   error string; classify retryable transport/5xx failures separately. Responses
+   containing an OAuth error or missing required fields cannot count as success.
+6. Each resource keeps signature/actor/audience/scope validation, an active
+   grant-chain check, fail-closed dependency handling and an atomic one-use replay
+   check. Provider access-token revocation is not a substitute for grant checks.
+   Required policy and audit checks remain outside the agent.
+
+**Implementation and acceptance:** this amendment changes no Claude-owned
+identity code. H2 supplies an isolated, repeatable CI harness and an evidence
+checker. Missing/skipped Java tests fail that gate. The current in-process T07
+result and script probes do not close the real-provider gate. WP-102 stays
+partial until the product exchanger, verifier and guard pass the required real
+Java cases, receive GPT review and green CI, and the remaining deliverables are
+verified. See [GPT handoff](../handoffs/gpt/WP-102.md).
+
+References: [Keycloak token exchange and native delegation](https://www.keycloak.org/securing-apps/token-exchange),
+[RFC 8693 delegation semantics](https://www.rfc-editor.org/rfc/rfc8693.html#section-1.1).

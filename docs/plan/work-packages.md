@@ -292,8 +292,10 @@ Remaining gates:
 - Resolve any issuer mismatch, record the real-IdP evidence, and add the repeatable integration test to an appropriate CI profile.
 - Bind verified caller identity to audit API access instead of its anonymous subject.
 - If the Vault path is selected, implement and run the quarkus-vault 4.9.0 integration/renewal/rotation test required by ADR 0021; mounted static secrets remain the implemented path.
+- Implement ADR 0021 H1 strict native Keycloak delegation compatibility without an actorless fallback; retain all user/actor/tenant/scope/audience/expiry/replay checks.
+- Supply KeycloakStandardIT and KeycloakDelegationIT under the Claude-owned identity test package and pass the H2 real-Java evidence matrix; missing or skipped tests do not close WP-102.
 
-Evidence: [docs/identity.md](../../docs/identity.md), [docs/audit.md](../../docs/audit.md)
+Evidence: [docs/identity.md](../../docs/identity.md), [docs/audit.md](../../docs/audit.md), [docs/handoffs/gpt/WP-102.md](../../docs/handoffs/gpt/WP-102.md)
 
 Reuse: quarkus-oidc, Keycloak, quarkus-flow-oidc
 

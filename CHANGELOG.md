@@ -9,6 +9,10 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ### Tracking
 
+- **WP-102 H1/H2 (partial):** retain strict signed actor proof, reject actorless standard exchange,
+  and add an isolated real-Keycloak Java CI matrix with missing/skipped-evidence rejection. The Java
+  identity tests remain Claude-owned; harness availability does not complete provider interoperability.
+
 - Reconcile all 53 work packages and 64 requirements with merged code and evidence. Keep component completion,
   partial integration and unstarted work explicit. Generate TODO.md and progress pages from the plan JSON;
   CI checks for stale documents and unsupported completion claims.
