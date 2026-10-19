@@ -52,6 +52,10 @@ public interface IdentitySettings {
     @WithDefault("P30D")
     Duration grantMaxLifetime();
 
+    /** Cron expression of the sweep that marks expired grants (used by {@code GrantExpiryJob}). */
+    @WithDefault("0 */5 * * * ?")
+    String expirySweepCron();
+
     /** The token endpoint used for the RFC 8693 exchange. */
     Optional<String> tokenEndpoint();
 
