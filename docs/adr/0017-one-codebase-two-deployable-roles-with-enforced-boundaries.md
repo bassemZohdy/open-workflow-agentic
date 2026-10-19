@@ -11,7 +11,7 @@ M26 and M27 require separable authority and execution that does not depend on th
 
 Keep one repository with two roles, execution and administration, and two deployables (`app-runtime`, `app-control`) that can run together or apart. ArchUnit forbids runtime-to-control dependencies. Database roles give the runtime read-only access to approved activations and the control application no write access to execution state. The runtime keeps the last approved snapshot with a freshness policy.
 
-### Module layout (as built in WP-001)
+### Module responsibilities (WP-001; physical paths updated by ADR 0024)
 
 | Module | Role |
 |---|---|
@@ -19,9 +19,11 @@ Keep one repository with two roles, execution and administration, and two deploy
 | `oa-runtime` | Execution: agents, workflow glue, REST conventions |
 | `oa-control` | Administration (skeleton) |
 | `oa-eval` | Evaluation suites and gate (skeleton) |
-| `oa-testkit` | Test support (skeleton) |
+| `oa-testkit` | Test support |
 | `app-runtime` | Deployable serving execution |
 | `app-control` | Deployable serving administration (skeleton) |
+
+Physical locations are `modules/<oa-artifact>` and `apps/<app-artifact>`, as described in [repository structure](../repository-structure.md). Only `app-runtime` is runnable today. Database roles, approved snapshots and administration-outage controls in this decision remain planned work (WP-304).
 
 Two rules are enforced by ArchUnit tests in the build:
 
@@ -32,8 +34,8 @@ A dependency policy check (`tools/check_dependency_policy.py`) also requires tha
 
 ## Consequences
 
-- Separation is enforced by code structure and database privileges rather than by convention.
-- Small deployments run both roles in one pod set; large ones split them.
+- Code dependencies are enforced by the build; database privilege enforcement remains a WP-304 deliverable.
+- When the administration application is implemented, deployments may colocate the roles or run them separately.
 - Extra care is needed for the shared database (privileges, migrations).
 
 ## Alternatives considered

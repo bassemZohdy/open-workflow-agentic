@@ -23,12 +23,12 @@ Without Docker, any local PostgreSQL 16 with the same database and credentials w
 Run these from the repository root:
 
 ```bash
-mvn -B verify                                              # all modules: compile, unit and boot tests
+mvn -B clean verify                                        # all modules: compile, unit and boot tests
 python3 tools/render_requirements.py --check               # generated documents match their JSON source
 python3 tools/check_dependency_policy.py                   # after mvn verify: contracts purity, licence allow-list
 python3 -m unittest discover -s tools -p 'test_*.py' -v    # tests for the policy check
 docker compose -f docker-compose.yml config --quiet        # the dev compose file is valid
-java -cp "oa-testkit/target/classes:$(cat oa-testkit/target/classpath.txt)" \
+java -cp "modules/oa-testkit/target/classes:$(cat modules/oa-testkit/target/classpath.txt)" \
   io.github.bassemzohdy.openworkflow.agentic.testkit.acceptance.AcceptanceStatus --check   # after mvn verify: status matches the build
 ```
 
@@ -38,22 +38,26 @@ To run the application locally:
 
 ```bash
 mvn -B install -DskipTests          # once, so app-runtime can resolve oa-runtime
-cd app-runtime && mvn quarkus:dev
+cd apps/app-runtime && mvn quarkus:dev
 ```
 
 ## Modules and their relationships
 
+Applications live under `apps/`; libraries and test support live under `modules/`. These are source groups,
+not extra services or Maven aggregation layers. Artifact IDs stay unchanged. Only `apps/app-runtime` is
+runnable today; control and evaluation remain skeletons. See [repository structure](docs/repository-structure.md).
+
 | Module | Packages | May depend on | Rule |
 |---|---|---|---|
 | `oa-contracts` | `...agentic.contracts` | JDK only (test dependencies allowed) | No compile-time framework dependency. Checked by ArchUnit and by the dependency policy. |
-| `oa-runtime` | `...agentic.runtime` | `oa-contracts` and framework libraries | Never depends on `oa-control`. Checked by ArchUnit. |
+| `oa-runtime` | `...agentic.runtime` | `oa-contracts` and framework libraries | Never depends on `oa-control`. Checked by ArchUnit and resolved-dependency policy. |
 | `oa-control` | `...agentic.control` | `oa-contracts` | Administration (skeleton). |
 | `oa-eval` | `...agentic.eval` | `oa-contracts` | Evaluation (skeleton). |
 | `oa-testkit` | `...agentic.testkit` | `oa-contracts`, `oa-runtime` | Test support: acceptance annotation and status generator, scripted model, fault injection, fake IdP and policy service. Used from tests only; never depends on `oa-control`, and does not start Quarkus. See [docs/testing.md](docs/testing.md). |
 | `app-runtime` | (deployable) | `oa-runtime`; `oa-testkit` (test) | Runnable Quarkus application: configuration, workflow definitions, boot tests (`*Test`), and process-level tests run after package (`*IT`, failsafe). |
 | `app-control` | (deployable) | `oa-control` | Administration deployable (skeleton). |
 
-The runtime keeps working without the control application (ADR 0017). Keep it that way: a runtime class must not reference a control class, even indirectly through a shared type.
+The target requires runtime operation without the control application (ADR 0017). Keep the dependency boundary: a runtime class must not reference a control class, even indirectly through a shared type.
 
 ## API conventions
 
@@ -66,6 +70,7 @@ These apply to every REST endpoint. The types live in `oa-contracts`, the HTTP m
 
 ## Dependencies and licences
 
+- Production code cannot depend on `oa-testkit`; consume it only in test scope. Application artifacts cannot be consumed as libraries. CI checks both rules and the execution/control artifact boundary.
 - Add a dependency only with a clear need. Prefer the Quarkus BOM and the versions already managed in the parent POM.
 - Licences: Apache-2.0, MIT, MIT-0 (also written MIT No Attribution), BSD, EPL-2.0 and Public Domain (including CC0) are allowed in any scope. A name that only begins with MIT, such as MIT-NOT, is not MIT and fails. CDDL, GPL-2.0 with the Classpath Exception, UPL, MPL-2.0 and LGPL are allowed in test scope only. GPL, AGPL and EPL-1.0 are not allowed. A dual-licensed component passes when one of its licences is allowed. The check reads each POM's licence and tells you which name it could not classify.
 - An artifact whose POM declares no licence can be added to `tools/dependency-policy-exceptions.json` after its licence is verified from its own metadata. Entries are reviewed, scoped, and fail the build when stale or marked `unverified`.

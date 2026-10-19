@@ -11,23 +11,23 @@
   <description>Agentic process platform: Quarkus Flow (OWS workflows) + LangGraph4j agents in one Quarkus runtime</description>
 
   <!--
-    Module boundaries (ADR 0017, docs/plan/README.md section 2):
+    Module boundaries (ADR 0017) and grouped source layout (ADR 0024):
       oa-contracts  pure Java, no framework dependency (checked by ArchUnit and the dependency policy)
       oa-runtime    execution: agents, workflow glue, gateways, API conventions (must not depend on oa-control)
       oa-control    administration: registry, publication, approvals (skeleton)
       oa-eval       evaluation suites and gate (skeleton)
-      oa-testkit    test support for the other modules (skeleton)
+      oa-testkit    test support, consumed only in test scope
       app-runtime   deployable that serves execution (Quarkus application)
       app-control   deployable that serves administration (skeleton)
   -->
   <modules>
-    <module>oa-contracts</module>
-    <module>oa-runtime</module>
-    <module>oa-control</module>
-    <module>oa-eval</module>
-    <module>oa-testkit</module>
-    <module>app-runtime</module>
-    <module>app-control</module>
+    <module>modules/oa-contracts</module>
+    <module>modules/oa-runtime</module>
+    <module>modules/oa-control</module>
+    <module>modules/oa-eval</module>
+    <module>modules/oa-testkit</module>
+    <module>apps/app-runtime</module>
+    <module>apps/app-control</module>
   </modules>
 
   <properties>
