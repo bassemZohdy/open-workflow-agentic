@@ -21,6 +21,9 @@ import org.junit.jupiter.api.Test;
 class AgenticAppTest {
 
     @Inject
+    AgentOutputValidator outputValidator;
+
+    @Inject
     @Any
     Instance<WorkflowDefinition> definitions;
 
@@ -40,6 +43,16 @@ class AgenticAppTest {
                 "the required topic must be rejected before the workflow starts");
         assertThrows(WorkflowException.class, () -> definition.instance(Map.of("topic", 42)),
                 "topic must conform to the declared string type");
+    }
+
+    @Test
+    @Acceptance(value = "T01", requirements = {"M01", "M02", "M12", "M14"})
+    void structuredAgentOutputRejectsMalformedActionsAndUnauthorizedEscalation() {
+        assertThrows(IllegalArgumentException.class, () -> outputValidator.validateText("not json"));
+        assertThrows(IllegalArgumentException.class, () -> outputValidator.validateText(
+                "{\"text\":\"ok\",\"actions\":[\"publish\"],\"escalation\":null}"));
+        assertThrows(IllegalArgumentException.class, () -> outputValidator.validateText(
+                "{\"text\":\"ok\",\"actions\":[],\"escalation\":\"approver\"}"));
     }
 
     @Test
