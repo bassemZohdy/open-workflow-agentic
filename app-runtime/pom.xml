@@ -16,6 +16,9 @@
   <dependencies>
     <dependency><groupId>io.github.bassemzohdy.openworkflow</groupId><artifactId>oa-runtime</artifactId><version>${project.version}</version></dependency>
 
+    <!-- Quarkus Flow 1.2 needs the SDK validation module to enforce declared workflow input schemas. -->
+    <dependency><groupId>io.serverlessworkflow</groupId><artifactId>serverlessworkflow-impl-validation</artifactId></dependency>
+
     <!-- Operations endpoints of the deployable -->
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-smallrye-health</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-micrometer-registry-prometheus</artifactId></dependency>
