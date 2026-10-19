@@ -11,6 +11,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.api.problem.ProblemExc
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditDraft;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditKeys;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.VersionStamps;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.HistoryEntry;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.IllegalTransitionException;
@@ -105,9 +106,10 @@ public class InstanceOperations {
     private final InstanceInspection inspection;
     private final Clock clock;
 
+    /** The audit trail is injected by its concrete type, for the same reason as in {@code PolicyDecisionAudit}. */
     @Inject
-    public InstanceOperations(InstanceStore store, Reconciler reconciler, Pep pep, AuditSink audit, OperationKeys keys,
-                              InstanceInspection inspection) {
+    public InstanceOperations(InstanceStore store, Reconciler reconciler, Pep pep, AuditTrail audit,
+                              OperationKeys keys, InstanceInspection inspection) {
         this(store, reconciler, pep, audit, keys, inspection, Clock.systemUTC());
     }
 
@@ -158,6 +160,7 @@ public class InstanceOperations {
             writeResult(refused.result, operation, operator, caller.tenant(), instanceId, decision);
             throw new ProblemException(refused.status(), refused.getMessage());
         } catch (StoreUnavailableException unavailable) {
+            LOG.errorf(unavailable, "operation %s on %s failed in the registry", operation.wire(), instanceId);
             writeResult("store-unavailable", operation, operator, caller.tenant(), instanceId, decision);
             throw new ProblemException(Response.Status.SERVICE_UNAVAILABLE,
                     "the registry is unavailable; the operation may be repeated with the same Idempotency-Key");
@@ -209,7 +212,7 @@ public class InstanceOperations {
     /** A mutating call: reserve the key, run the operation, store the response. A refusal releases the key. */
     private Done mutate(Operation operation, CallerContext caller, Ulid instanceId, String key) {
         String tenant = caller.tenant();
-        OperationKeys.Reservation reservation = keys.reserve(tenant, key, operation.wire(), instanceId,
+        OperationKeys.Reservation reservation = keys.reserve(tenant, key, operation.name(), instanceId,
                 caller.subject(), OperationKeys.fingerprint(operation.wire(), instanceId));
         switch (reservation.state()) {
             case REPLAY -> {

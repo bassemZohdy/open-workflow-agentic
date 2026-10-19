@@ -32,8 +32,12 @@ public class PolicyDecisionAudit implements io.github.bassemzohdy.openworkflow.a
     private final AuditSink trail;
     private final Clock clock;
 
+    /**
+     * The trail is injected by its concrete type: {@code AuditTrail} is the only bean that is also an
+     * {@link AuditSink} without ambiguity, because {@code AuditProducers} produces both.
+     */
     @Inject
-    public PolicyDecisionAudit(AuditSink trail) {
+    public PolicyDecisionAudit(AuditTrail trail) {
         this(trail, Clock.systemUTC());
     }
 
