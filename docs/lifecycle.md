@@ -1,8 +1,8 @@
 # Run lifecycle and the instance registry (WP-105, slice 105a)
 
-**Status:** WP-105a implemented; WP-105b (outbox and projection) implemented, see section 9 · **Decisions:** [ADR 0019](adr/0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md), [ADR 0020](adr/0020-checkpoint-scoping-and-state-evolution.md), [ADR 0023](adr/0023-workflow-to-agent-bridge.md) · **Plan:** [section 2, canonical progress](plan/README.md)
+**Status:** WP-105a, WP-105b and WP-105c implemented (105d not built; the reconciler is section 9, the outbox and projection are section 10) · **Decisions:** [ADR 0019](adr/0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md), [ADR 0020](adr/0020-checkpoint-scoping-and-state-evolution.md), [ADR 0023](adr/0023-workflow-to-agent-bridge.md) · **Plan:** [section 2, canonical progress](plan/README.md)
 
-This slice makes the platform's own record of a run authoritative for lifecycle status, definition version and request idempotency. Quarkus Flow executes the pinned definition; it is not the record of what was asked for or what state the run is in. Slices 105c (reconciler) and 105d (operations API) are not built here; the outbox and projection of 105b are in section 9. Section 6 lists the seams they use.
+This slice makes the platform's own record of a run authoritative for lifecycle status, definition version and request idempotency. Quarkus Flow executes the pinned definition; it is not the record of what was asked for or what state the run is in. Slice 105d (operations API) is not built here. The reconciler (105c) is section 9; the outbox and projection (105b) are section 10. Section 6 lists the seams they use.
 
 ## 1. Tables (schema `task`, migrations V10 to V13)
 
@@ -148,8 +148,8 @@ Errors are RFC 9457 problem documents with the correlation id. The caller comes 
 | Engine `prepare` throws | Row `STARTING`, attempt 1, `last_error` class, no engine id | 202 with `STARTING`. Repeats do not retry. The reconciler finds the row (WP-105c) | `EngineFailureTest` |
 | Engine `start` throws | Row `STARTING`, engine id set, attempt 1, `last_error` | Same. The engine may have persisted the instance, so the reconciler must check before it starts again | `EngineFailureTest` |
 | Registry write fails before the engine is prepared | Row `STARTING` may exist with no engine id, or no row | The response is 500 with the correlation id. The reconciler can find a `STARTING` row with no engine id and prepare it | not tested (fault injection, WP-110 and later) |
-| Crash between tx2 and `start()` | `STARTING` with engine id, Flow has no instance | Reconciler starts the prepared instance by id rather than preparing a new one | not built (105c) |
-| Crash after `start()` but before tx3 | `STARTING` with engine id, Flow may have persisted it | Reconciler checks the engine and sets `RUNNING`, or starts it. It must never call `prepare` again for that row | not built (105c) |
+| Crash between tx2 and `start()` | `STARTING` with engine id, Flow has no instance | The engine id cannot be prepared again, and nothing in memory can be started. Each pass counts an attempt; at the limit the row is `FAILED` (`start.exhausted`) and the client resubmits with a new key. Section 9 | `ReconcilerRepairTest.aStartingRowTheEngineNeverHeardOfIsFailedAfterTheLimit` |
+| Crash after `start()` but before tx3 | `STARTING` with engine id, Flow may have persisted it | Reconciler checks the engine. A running instance moves the row to `RUNNING`; a pending one is started. It never calls `prepare` again for that row | `ReconcilerRepairTest.aStartingRowTheEngineHoldsAsPendingIsStartedWithoutAnEpochChange` |
 | Illegal status change | Nothing | `IllegalTransitionException`, no history row | `InstanceApiTest.anIllegalTransitionIsRejected...` |
 | Stale version | Nothing | `StaleVersionException`, reload and decide again | `InstanceApiTest.aStaleVersionIsRejected...` |
 | Edit of history | Refused by trigger | SQL error | `InstanceApiTest.historyIsAppendOnlyInTheDatabase` |
@@ -171,7 +171,7 @@ Seams that exist now:
 - Transactional outbox: a row written in the same transaction as each history row. The writer is `JdbcInstanceStore.replace` and `JdbcTaskStore.replace`. Add a hook to the transaction so the outbox row and the history row commit together. 105a does not add it.
 - `task_view` projection fed from the outbox, redelivered until acknowledged. The projection is never a source of truth.
 
-**105c (reconciler)**
+**105c (reconciler, built: section 9)**
 - Wait for definition warm-up at startup. Then, periodically and at startup: rows `STARTING` older than a threshold; rows `RUNNING` or `WAITING` whose engine instance is not active in memory, started through `activeInstance(id)` and `start()` (ADR 0019, resume; WP-003 Q02, Q11); rows `CANCEL_REQUESTED` that are stuck; `wait_deadline` passed.
 - Agent runs in `RUNNING` or `RESUMING` restarted by the reconciler (ADR 0023, decision 7). Bridge A runs are restarted by the workflow instead.
 - Every repair is audited. A repair never calls `prepare` for a row that has an engine id.
@@ -204,11 +204,143 @@ These are not ADR edits. The ADRs were left unchanged, as the brief asks.
 - The real engine is used for start only. Whether the registry reflects the engine's later states is not tested, because 105b does not exist yet.
 - The concurrency test uses twenty threads against one Postgres database on one machine; it shows the unique key works, not behavior under a multi-node deployment.
 
-## 9. Outbox and projection (WP-105b)
+## 9. Reconciler (WP-105c)
+
+Code: `Reconciler`, `EngineStatusSync`, `FlowEngineObserver`, `RegistryScan`, `RepairStore`, `AgentRunPolicy`, `LifecycleSettings`, `LifecycleFaults` in `oa-runtime`; the probe and its switches in `app-runtime`. Schema: V35 (`task.instance.resume_epoch`), V36 (`agent_task` bridge and lease), V37 (`task.repair_event`, append-only), V38 (wait-deadline index).
+
+### 9.1 What Flow can and cannot report
+
+| Topic | Observable | Used for | Evidence |
+|---|---|---|---|
+| Definitions warmed up and restored | Yes. Flow fires the CDI event `WorkflowApplicationReadyEvent` after warm-up. Its restore observes that event at the default observer priority. | The reconciler starts only after this event, observed at a later priority, so the restore has finished. A missing event is reported after `agentic.reconciler.warmup-timeout`. | Bytecode of `WorkflowApplicationInitializer` and `FlowPersistenceRestore` (1.2.0). Process test scenario A. |
+| Restored instance | Yes, as active and PENDING, not started (WP-003, fact 1). `WorkflowDefinition.activeInstance(id)` returns it. | `startRestored` calls `start()` on it. | WP-003 Q02, Q11; process test scenario A. |
+| Status transitions RUNNING, WAITING, COMPLETED, FAULTED, CANCELLED | Yes. Every CDI bean of type `WorkflowExecutionListener` is bound into the application when it is built (bytecode of `WorkflowApplicationCreator`). `onWorkflowStatusChanged`, `onWorkflowCompleted`, `onWorkflowFailed`, `onWorkflowCancelled`. | `FlowEngineObserver` feeds `EngineStatusSync`. | `FlowStatusSyncTest`: WAITING, COMPLETED and FAILED reach the registry with the reconciler off. |
+| Persisted waiting status | No. Only SUSPENDED is written (WP-003, fact 2). | The observer is the only source of WAITING. | WP-003. |
+| Completed or cancelled instances after the fact | No. The row is deleted (WP-003, fact 3). | A row whose engine instance is gone, with no report, stays as it is and is audited (`instance.absent`, `cancel.unconfirmed`). | WP-003; `ReconcilerRepairTest.aCancelTheEngineNoLongerHoldsWaitsForItsReport`. |
+| Cancel timing | Asynchronous, about 100 to 250 ms (WP-003, Q05). | The registry records CANCELLED only on the engine's report. | `ReconcilerRepairTest.aStuckCancelIsSentAgainAndCompletesOnlyWhenTheEngineReports`. |
+| Listen events | Not buffered (WP-003, Q02). | The reconciler never replays an event; the probe sends its event after WAITING. | WP-003. |
+| Instance id seen by a task | Yes. HTTP tasks send `X-Flow-Instance-Id` (WP-003, Q10). | The probe looks up the epoch of the instance from this header. | `DevLifecycleResource`; process test scenario A. |
+| SUSPENDED | Reported, no registry state. | Ignored. | `EngineStatusSyncMappingTest`. |
+
+Not observable with Flow 1.2.0: whether a side effect inside a task completed when the process died (the task reruns, WP-003 Q11); completion versus cancellation of an instance the engine no longer holds. Both are handled by audit, not by guessing (see 9.9).
+
+### 9.2 Repairs
+
+| Condition | Action | Test |
+|---|---|---|
+| `STARTING`, no engine id, unchanged for `start-stale-after` | Prepare, record the engine id, start, record RUNNING | `ReconcilerRepairTest.aStartingRowWithNoEngineIdIsPreparedAndStarted`; process scenario B (kill after the insert) |
+| `STARTING`, engine start threw | Count the attempt, keep the engine id, retry after backoff (doubling, capped at 10 minutes); the engine's instance is adopted if it exists | `ReconcilerRepairTest.aStartThatFailedOnceIsRetriedAndThenAccepted` |
+| `STARTING`, engine holds the instance PENDING | Start it (no epoch change: the first start) | `ReconcilerRepairTest.aStartingRowTheEngineHoldsAsPendingIsStartedWithoutAnEpochChange` |
+| `STARTING`, engine holds nothing for the engine id | Count the attempt; at `start-max-attempts` the row is `FAILED` with `start.exhausted`. Never prepared again. | `ReconcilerRepairTest.aStartingRowTheEngineNeverHeardOfIsFailedAfterTheLimit` |
+| `RUNNING` or `WAITING`, engine instance PENDING (restored) | Increment `resume_epoch` (history row written), then `startRestored`. The task runs again with the new epoch. | `ReconcilerRepairTest.aPendingRestoredInstanceIsStartedAndItsEpochGoesUp`; process scenario A |
+| `RUNNING` or `WAITING`, engine holds the instance in another state | Record the engine's status (poll; catches a missed report) | `ReconcilerRepairTest.theEngineStatusIsWrittenToTheRowThroughTheObserverPath` |
+| `RUNNING` or `WAITING`, engine holds nothing | Audit `instance.absent` once an hour; status unchanged | Not covered by a test |
+| Engine instance with no registry row | Audit `engine.unregistered`; not cancelled (9.9) | `ReconcilerRepairTest.anEngineInstanceNoRowRegistersIsReportedAndNeverCancelled` |
+| `CANCEL_REQUESTED` unchanged for `cancel-reissue-after`, engine holds it | Send cancel again. Move to CANCELLED only when the engine reports it. | `ReconcilerRepairTest.aStuckCancelIsSentAgainAndCompletesOnlyWhenTheEngineReports` |
+| `CANCEL_REQUESTED`, engine holds nothing | Audit `cancel.unconfirmed`; wait for the report | `ReconcilerRepairTest.aCancelTheEngineNoLongerHoldsWaitsForItsReport` |
+| `WAITING` with `wait_deadline` in the past, engine holds it | Record `CANCEL_REQUESTED` first (so the engine's CANCELLED report finds it), then ask the engine to cancel | `ReconcilerRepairTest.aWaitPastItsDeadlineIsCancelledAndTheRequestIsRecordedFirst` |
+| `WAITING` past its deadline, engine holds nothing | `FAILED` with `deadline.no-engine-instance` | `ReconcilerRepairTest.aWaitPastItsDeadlineWithNoEngineInstanceFailsTheRow` |
+| Agent run `RUNNING` or `RESUMING`, lease missing or expired | `AgentRunPolicy`: bridge A or B left to the workflow; bridge C would be restarted, but no restarter is registered in 105c (WP-201); unknown bridge reported; live lease untouched. Audited as `agent.run`. | `AgentRunPolicyTest` (the rule). Not run against `agent_task` rows: there is no insert path yet. |
+
+Every repair writes a row in `task.repair_event` (actor `agentic-runtime`). Conditions that repeat without change are audited once per hour per subject, not on every pass.
+
+### 9.3 Locking and concurrency
+
+- Each repair runs under a session advisory lock on the key of the registry row (first eight bytes of SHA-256 of `instance:<id>`). The lock is taken on a connection of its own and released after the repair. A reconciler that cannot take it counts `busy` and skips the row.
+- The engine is never called while a row lock is held, and the lock never blocks the observer: the observer writes with the optimistic version check of `InstanceStore.replace`. On a stale version it reads the row again and plans again (`EngineStatusSync`).
+- `InstanceService` keeps the state the observer recorded when `start()` returns late, and does not overwrite it (it returns the state it accepted).
+- Test: `ReconcilerRepairTest.twoReconcilersNeverActOnTheSameRowAtOnce` holds one start in progress and runs a second reconciler: the second skips the row and no second engine instance is made.
+- Scope: this covers reconcilers on one database. It does not stop two nodes from restoring the same live instance (9.9, item 1).
+
+### 9.4 Warm-up
+
+No sleep. The reconciler's startup pass is started by Flow's `WorkflowApplicationReadyEvent`, observed after Flow's restore. If the event does not come within `agentic.reconciler.warmup-timeout`, the state becomes `WARMUP_TIMED_OUT`, an error is logged, and no repair runs. The periodic pass starts after the startup pass and runs every `agentic.reconciler.interval`.
+
+### 9.5 Settings
+
+| Key | Default | Meaning |
+|---|---|---|
+| `agentic.reconciler.enabled` | `true` | Off in the boot tests (`%test`), which call `reconcileOnce()` themselves |
+| `agentic.reconciler.interval` | `PT30S` | Pause between periodic passes |
+| `agentic.reconciler.warmup-timeout` | `PT120S` | Wait for Flow's warm-up before giving up |
+| `agentic.reconciler.start-stale-after` | `PT60S` | A `STARTING` row is repaired only when it has not changed for this long |
+| `agentic.reconciler.start-max-attempts` | `3` | Engine start attempts before `FAILED` |
+| `agentic.reconciler.start-backoff` | `PT5S` | Wait after the first failed attempt; doubles per attempt |
+| `agentic.reconciler.cancel-reissue-after` | `PT30S` | A `CANCEL_REQUESTED` row is sent to the engine again after this time |
+| `agentic.reconciler.wait-deadline` | `PT24H` | Wait given to a `WAITING` instance when the observer records it |
+| `agentic.reconciler.batch-size` | `100` | Rows per page of the scans |
+| `agentic.dev.fault.crash-at` | unset | Dev only: halt the process (`137`) at `after-insert`, `after-prepare` or `before-accept` |
+| `agentic.dev.lifecycle-probes` | `false` | Dev only: expose `/dev/lifecycle/*` (probe effect, event injection). Never in a deployment. |
+
+### 9.6 Entry points for 105d
+
+Java methods on `Reconciler`, to be exposed by the operations API with its own authorization:
+
+- `retry(tenant, instanceId)`: starts a `STARTING` row now, skipping the staleness and backoff checks.
+- `recover(tenant, instanceId)`: repairs one row by its status, as a pass would, without the staleness checks.
+- `reconcileOnce()`: one full pass.
+
+Each returns counts. The operator's identity is not recorded by these methods; 105d must write its own history with the operator as actor before it calls them. No HTTP endpoint exists in 105c.
+
+### 9.7 The resume epoch seam (WP-108)
+
+`task.instance.resume_epoch` counts the restarts the reconciler performed. It is incremented before `startRestored`, so the task that runs again sees the new value. A task reads it from its engine instance id through `RegistryScan.resumeEpochOfEngineInstance`. In YAML, the probe sends the engine id in `X-Flow-Instance-Id` and the endpoint looks the epoch up. Whether a YAML expression can read the epoch directly was not tested; the call above is the verified path. WP-108 keys its effect ledger on (engine instance id, epoch, node id).
+
+### 9.8 HTTP retry rule
+
+`quarkus.flow.http.client.resilience.retry.max-retries=0` is set in `app-runtime/src/main/resources/application.properties`. `FlowStatusSyncTest.aFailedEffectIsRecordedAsFailedAndTheCallIsNotRetriedByTheClient` shows one call to a failing endpoint. `FlowHttpRetryDefaultTest` runs the same flow with the Flow default of three retries and shows more than one call, so the property has the effect. The default retries also repeat a 500 response, which ADR 0019 does not say.
+
+### 9.9 Limits
+
+1. **Two nodes may restore one live instance.** A node that restarts restores every instance in the Flow tables, including one another node is still running. The reconciler's locks do not prevent this. The fix is a lease held by the running node, which is WP-109 (failover). Single-node resume is the only case verified.
+2. **Unregistered engine instances are reported, not cancelled.** An engine instance carries no tenant or idempotency key, so cancelling it by its input could cancel another tenant's identical request.
+3. **Completion and cancellation of an instance the engine no longer holds are not decided.** The registry keeps the row and audits it. Only the engine's report decides, and Flow does not keep that report after the row is deleted.
+4. **Deadlines use the platform default.** `agentic.reconciler.wait-deadline` is recorded when the observer sees WAITING. The definition's own timeout is not read; Flow's timeout remains a second guard. A deadline with no engine instance is set `FAILED`, which assumes the instance did not complete unobserved.
+5. **Agent runs are decided, not restarted.** `AgentRunPolicy` is the rule. There is no `agent_task` insert path, no lease writer and no restarter yet (WP-201). The rule is not exercised against rows.
+6. **The window between the engine id and `start()` cannot be repaired by re-preparing.** The engine id is fixed once recorded, and the prepared object is in memory only. The row fails after the attempt limit.
+7. **The unregistered-instance report can name an instance that was just prepared** and is not yet recorded. It is an audit row, not an action.
+8. **Dev switches.** `agentic.dev.fault.crash-at` and `agentic.dev.lifecycle-probes` exist for tests. They are off by default and must never be set in a deployment.
+
+### 9.10 Verification
+
+Commands, run from the worktree root with `DB_URL=jdbc:postgresql://localhost:5432/wp105c`:
+
+- `mvn -B verify`, the full build, including the `*IT` process tests (`LifecycleRecoveryIT`).
+- `python3 tools/check_dependency_policy.py`, `python3 tools/render_requirements.py --check`, and the generator check from `docs/testing.md`.
+
+Results on the committed tree (`mvn -B verify` exit 0, `BUILD SUCCESS`):
+
+- oa-contracts 141 tests, oa-runtime 38, oa-testkit 96, app-runtime surefire 54, all passing. ArchUnit: `ArchitectureTest` passing in oa-contracts and oa-runtime.
+- app-runtime failsafe: `LifecycleRecoveryIT`, 2 tests, 0 failures, 60.5 s. It starts child JVMs on the same database and kills them with SIGKILL. Scenario A (kill during the effect): without the reconciler the instance stays RUNNING and no epoch-1 call is logged; with it the effect runs again with epoch 1, the instance waits, the event completes it, and the key has one registry row and one resume repair. Scenario B (kill after the registry insert, dev fault point `after-insert`): the process halts with the row in STARTING and no engine id; a later process with the reconciler starts it and the key has one row.
+- `python3 tools/check_dependency_policy.py`: `dependency policy: holds`, exit 0.
+- `python3 tools/render_requirements.py --check`: `requirements docs up to date`, exit 0.
+- `AcceptanceStatus --check`: `annotated test methods observed: 0 (passing: 0)`, `test-status.json is consistent with the build`, exit 0. No test is annotated `@Acceptance` in this slice; T16 belongs to 105d.
+
+### 9.11 ADR statements that are wrong or incomplete
+
+These are for the owner. The ADRs were not edited.
+
+- ADR 0019, Cancel: "a reconciler moves rows stuck in `CANCEL_REQUESTED`". This is incomplete. When the engine holds no instance and sends no report, CANCELLED and COMPLETED cannot be told apart, and the ADR needs a rule for that outcome.
+- ADR 0019, Deadlines: says the reconciler enforces the deadline without saying how. Implemented: record the request, then cancel the engine instance; `FAILED` when the engine holds nothing.
+- ADR 0019, Start: records RUNNING after `start()` returns. The engine's report can arrive first, so the registry follows the engine's report when both happen. The ADR should say so.
+- ADR 0019, Resume: the epoch must be incremented before the restart for WP-108 to key on it. The ADR does not say this.
+- ADR 0019, Retries: states the rule for the OWS retry. It does not say that the Flow default also repeats a 500 response (9.8).
+- ADR 0023, decision 7: requires the reconciler to restart agent runs "recorded as RUNNING or RESUMING", but does not define when such a run is no longer alive. 105c adds the lease columns for that (V17); the agent path that writes them does not exist yet.
+- ADR 0019, Query: "scoped by definition id and version" is still open (section 7, item 3).
+
+### 9.12 Deviations from the brief
+
+- The probe definition ships under `app-runtime/src/main/resources/flow`, not under `src/test`. Flow reads definitions at build time, so a test-only copy cannot reach the packaged child process the process test runs.
+- The 105a boot tests start the probe definition instead of `research-and-approve`. The latter calls an agent endpoint that does not exist here and fails within milliseconds, which made its status race the tests once the registry follows the engine.
+- `%test.quarkus.http.test-port=0` replaces the fixed test port (8081), so parallel Maven runs do not collide.
+- The observer covers the engine transitions the brief put in 105c (WAITING, RUNNING, COMPLETED, FAILED, CANCELLED). The 105b branch was merged into this one (`wp-105b-outbox-projection`). Its changes did not touch `FlowWorkflowEngine` or `InstanceService`, so those merged without conflict. The outbox row is written in `JdbcInstanceStore.replace`, which the observer and the reconciler use, so every transition they make writes its outbox row in the same transaction. The one write that bypasses `replace`, the resume epoch, writes its own outbox row in the same transaction (`ReconcilerRepairTest.everyRepairThatChangesARowWritesItsOutboxRowInTheSameTransaction`). Audit rows (`task.repair_event`) are not changes of state and have no outbox row.
+- `retry` and `recover` are Java entry points only, as the brief asked.
+
+## 10. Outbox and projection (WP-105b)
 
 Every change of an instance or an agent task writes an outbox row in the same transaction as its history row. A relay delivers the rows to consumers in order. The consumer `TaskViewProjector` keeps `task.task_view`, a read model with one row per instance. The projection is never a source of truth.
 
-### 9.1 Tables (migrations V14 and V15)
+### 10.1 Tables (migrations V14 and V15)
 
 | Table | Row | Notes |
 |---|---|---|
@@ -217,7 +349,7 @@ Every change of an instance or an agent task writes an outbox row in the same tr
 
 Writes: `JdbcInstanceStore` (insert and replace) and `JdbcTaskStore` (insert and replace) call `OutboxEntry.writeTo` in their transaction. No other path writes outbox rows. `JdbcTaskStore` first locks the instance row, which serializes the writes of one instance, so the outbox id order of an instance is its commit order.
 
-### 9.2 Sequence
+### 10.2 Sequence
 
 ```mermaid
 sequenceDiagram
@@ -235,7 +367,7 @@ sequenceDiagram
 
 The relay runs in each process on a single-thread executor (`OutboxRelayService`, every `agentic.outbox.relay.interval`, default 500 ms). db-scheduler is not used: the relay polls a table, it does not fire at a time, and several processes may poll at once because the claim skips locked rows. Configuration keys: `agentic.outbox.relay.enabled`, `.batch-size` (20), `.max-attempts` (5), `.backoff-base` (1 s), `.backoff-max` (1 min), `.interval`.
 
-### 9.3 Ordering and delivery guarantees
+### 10.3 Ordering and delivery guarantees
 
 - **Order within an instance.** The relay claims a row only when no earlier row of its partition is unpublished. "Unpublished" includes rows in backoff, failed rows, and rows another relay holds. So a later event of an instance is never delivered before an earlier one. Other instances are not blocked by it.
 - **No two relays on one instance.** Two relays cannot claim two rows of one partition at once, for the reason above. `OutboxRelayTest.fourRelaysDeliverEveryRowOnceAndInOrderWithinAnInstance` runs four relays over 300 events of 60 instances and checks that each event is delivered once and each instance's events in version order.
@@ -243,26 +375,26 @@ The relay runs in each process on a single-thread executor (`OutboxRelayService`
 - **Idempotent projection.** Each view row stores `last_outbox_id`. An event is applied only when its id is greater, in the same statement as the change. A duplicate or an older event changes nothing (`TaskViewProjectionTest`, `OutboxRelayTest.aRowDeliveredTwiceChangesNothingTheSecondTime`).
 - **Agent event before its instance.** Not possible in order. If it happens anyway (for example a manual edit), the projector refuses it, the relay retries with backoff, and the row stays unpublished.
 
-### 9.4 Failure and poison rows
+### 10.4 Failure and poison rows
 
 - A consumer that throws has its writes for that event rolled back to a savepoint. The row gets `attempts + 1`, and `next_attempt_at` moves by `backoff-base × 2^(attempts−1)`, capped at `backoff-max`.
 - After `max-attempts` the row gets `failed_at` and `last_error`. The row stays in the table and is never dropped. It blocks the later rows of its own instance, so the view never shows a later state over an unapplied earlier one. Other instances continue.
 - **Operator procedure.** `OutboxAdmin.failures(limit)` lists failed rows (class name of the last error, the time, the event). Fix the cause, then `OutboxAdmin.requeue(id)`. The row's attempts are reset and it is delivered again, in order. `requeue` returns false for a row that is not failed. The HTTP operations API comes in WP-105d.
 - **Lag.** Micrometer gauges, read at most once a second: `agentic.outbox.unpublished` (count, failed rows included), `agentic.outbox.unpublished.oldest.age.seconds`, `agentic.outbox.failed`.
 
-### 9.5 The projection
+### 10.5 The projection
 
 - `TaskViewProjector` is the only consumer in this slice. Instance events set the instance fields. Agent task events set the current agent task fields, so the current agent task of an instance is the one with the latest agent event.
 - `updated_at` and `last_transition_at` are the time of the event, not the projector's clock. That is what makes a rebuild comparable with the live view.
 - `TaskViewQuery` reads one tenant at a time, filters by status and definition, and pages by instance id (a ULID, so creation order). The cursor is the encoded last instance id. `snapshot()` is for verification.
 
-### 9.6 Rebuild
+### 10.6 Rebuild
 
 `TaskViewRebuilder.rebuild()` deletes the view and recreates it in one transaction. It takes `share row exclusive` locks on the outbox and the view, so relays and the projector wait while it runs. It folds the **published** events from the history tables, the same set the projector has applied. An event that is not published yet (in backoff, failed, or still in flight) is in neither the live view nor the rebuild, and it appears in both once it is published.
 
 `TaskViewRebuildTest` deletes every row and rebuilds, then compares the live rows with the rebuilt rows, field by field. `OutboxKillIT` checks the same against the registry after a process restart.
 
-### 9.7 What 105c and 105d may rely on
+### 10.7 What 105c and 105d may rely on
 
 - `task.outbox` holds every change of an instance and an agent task, in order, from the first insert. Rows are not deleted in this slice (no retention yet).
 - `task.task_view` is for reading and for dashboards. Repairs and decisions read the registry and history (ADR 0002). The view may lag by the relay interval plus the backlog, shown by the lag gauges.
@@ -270,9 +402,9 @@ The relay runs in each process on a single-thread executor (`OutboxRelayService`
 - 105d may call `OutboxAdmin.requeue` and `TaskViewRebuilder.rebuild`. Rebuild takes locks, so it is a maintenance action, not a request-path action.
 - Any new writer of a registry or agent task row must go through the stores and hold the instance row lock, or the partition order breaks.
 
-### 9.8 Not in this slice
+### 10.8 Not in this slice
 
 - Retention of published outbox rows.
 - Consumers outside the database. A consumer must be local to the relay's transaction.
-- The engine observer that writes `WAITING`, `COMPLETED` and `FAILED` from engine events (listed in section 6 under 105b; the WP-105b brief did not include it, so `task_view` only shows the states the stores write today).
+- The engine observer that writes `WAITING`, `COMPLETED` and `FAILED` from engine events is built in 105c (section 9). Its changes go through the same store, so they also write outbox rows.
 - A multi-node deployment test. The kill test runs one process at a time against one Postgres. The four-relay test shares one JVM.

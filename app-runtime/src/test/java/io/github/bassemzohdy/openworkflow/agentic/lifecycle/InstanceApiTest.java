@@ -92,7 +92,9 @@ class InstanceApiTest {
         assertEquals(InstanceStatus.STARTING, history.get(1).toStatus());
         assertEquals("engine.instance.prepared", history.get(1).reason());
         assertEquals(InstanceStatus.RUNNING, history.get(2).toStatus());
-        assertEquals("engine.start.accepted", history.get(2).reason());
+        // Either the start path or the engine observer records RUNNING first (WP-105c); both are the runtime's writes.
+        assertTrue(List.of("engine.start.accepted", "engine.observed.RUNNING").contains(history.get(2).reason()),
+                history.get(2).reason());
         assertEquals("agentic-runtime", history.get(2).actor().id());
     }
 
