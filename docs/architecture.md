@@ -1,34 +1,44 @@
 # Architecture
 
-```
-            +--------------------------- Quarkus application ---------------------------+
- client --> | REST / control API                                                         |
-            |   |                                                                        |
-            |   v                                                                        |
-            | Quarkus Flow  (OWS YAML: sequence, switch, listen, timers, retries)        |
-            |   | call: http / function                                                  |
-            |   v                                                                        |
-            | LangGraph4j agent graphs  --> LangChain4j ChatModel / tools / memory       |
-            |                                                                            |
-            | db-scheduler (time triggers)                                               |
-            +--------------------------------+-------------------------------------------+
-                                             |
-                                       PostgreSQL
-                    (workflow state, agent checkpoints, scheduled_tasks)
-```
+## Current implementation and planned roles
 
-## Responsibilities
+The runnable application is `apps/app-runtime`. It embeds Quarkus Flow, LangGraph4j and db-scheduler in one
+Quarkus process. PostgreSQL stores durable execution state, checkpoints, lifecycle records, audit events,
+projections and scheduled work. Models are accessed through the `LlmClient` port.
 
-| Plane | Where |
-|---|---|
-| Development (author definitions) | `src/main/resources/flow/*.yaml`, agent graphs in `agent/` |
-| Control (start, observe, approve, pause) | REST endpoints in `api/` (UI and assistant agent are planned) |
-| Execution (durable run) | Quarkus Flow instances, LangGraph4j runs under a thread id |
+| Responsibility | Current location | Deployment status |
+|---|---|---|
+| Execution and operational APIs | `modules/oa-runtime`, wired by `apps/app-runtime` | One runnable application |
+| Governance administration: registry, publication and approvals | `modules/oa-control`, wired by `apps/app-control` | Skeletons; planned |
+| Evaluation suites and release gates | `modules/oa-eval` | Library skeleton; no service |
+| Authoring workflow definitions and agent graphs | Workflow resources in the execution app; graphs in the runtime library | Source/build responsibility; future lifecycle tooling is planned |
+| Shared contracts and test support | `modules/oa-contracts`, `modules/oa-testkit` | Libraries; no services |
 
-## Design rules
+The target remains two separable application roles that may be deployed together or separately
+([ADR 0017](adr/0017-one-codebase-two-deployable-roles-with-enforced-boundaries.md)).
+Administrative-outage safety, database privilege separation and approved-state snapshots are planned controls,
+not consequences of the current folder structure.
 
-1. Process shape lives in OWS YAML, so it stays portable and readable.
-2. Agent loops live in LangGraph4j graphs, never inside workflow tasks.
-3. The only coupling is a narrow contract (HTTP body in, JSON out) so either side can be replaced.
-4. Models are reached only through the `LlmClient` port, so tests need no network.
-5. One database, one runtime, one build.
+## Execution path
+
+A workflow definition controls process steps, waits and agent invocation. The current bridge invokes the
+embedded agent through a narrow HTTP contract. LangGraph4j owns the agent reasoning loop and checkpoints;
+Quarkus LangChain4j supplies model access. Lifecycle records and reconciliation coordinate recovery between
+the workflow and agent engines. See [lifecycle](lifecycle.md) and [ADR 0023](adr/0023-workflow-to-agent-bridge.md).
+
+## Code and dependency boundaries
+
+- Applications own configuration, composition, workflow definitions and application-level tests.
+- Libraries own contracts and feature implementations; they do not depend on application artifacts.
+- Contracts have no main-classpath dependency. Execution cannot depend on control code.
+- Test support is consumed only in test scope.
+- Feature packages group related behavior inside the runtime library; they do not imply additional services.
+
+The complete module map and build conventions are in [repository structure](repository-structure.md).
+
+## Implementation evidence
+
+Use [acceptance tests](test-cases.md) and [traceability](traceability.md) for completion status.
+Use [policy](policy.md), [audit](audit.md), [contracts](contracts.md) and [lifecycle](lifecycle.md) for implemented
+surfaces, configuration and limits. Spike reports preserve findings and decisions; prototype implementations
+are not retained in this repository.

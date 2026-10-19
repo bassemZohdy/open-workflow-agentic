@@ -24,9 +24,9 @@ jobs:
         run: mvn -B verify
       - name: Acceptance status matches the build (no automated test regressed)
         run: >-
-          java -cp "oa-testkit/target/classes:$(cat oa-testkit/target/classpath.txt)"
+          java -cp "modules/oa-testkit/target/classes:$(cat modules/oa-testkit/target/classpath.txt)"
           io.github.bassemzohdy.openworkflow.agentic.testkit.acceptance.AcceptanceStatus --check
-      - name: Dependency policy (contracts purity, licence allow-list)
+      - name: Dependency policy (module boundaries, licence allow-list)
         run: python3 tools/check_dependency_policy.py
       - name: Dependency policy tests
         run: python3 -m unittest discover -s tools -p 'test_*.py' -v

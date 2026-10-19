@@ -25,17 +25,19 @@ Two consequences shape everything:
 
 ## 2. Target architecture
 
-```
-oa-contracts      pure Java: records, JSON schemas, ports (no framework dependencies)
-oa-runtime        Quarkus: Flow glue, agent runtime, gateways, human tasks, effect ledger, memory
-oa-control        Quarkus: registry, publication, approvals, incidents, operations API, console backend
-oa-eval           evaluation suites, scorers, gate (used in CI and by oa-control)
-oa-testkit        acceptance annotations, scripted model, fault injection, fake IdP and policy service
-app-runtime       deployable that serves execution
-app-control       deployable that serves administration
-console           web UI (technology decided in WP-603)
-authoring-cli     validate, test, simulate and package artifacts
-```
+| Location | Responsibility | Current state |
+|---|---|---|
+| `modules/oa-contracts` | Pure Java records, JSON schemas and ports | Implemented |
+| `modules/oa-runtime` | Execution: Flow glue, agents, lifecycle, gateways, audit and persistence | Implemented capabilities |
+| `modules/oa-control` | Registry, publication, approvals and incidents | Skeleton |
+| `modules/oa-eval` | Evaluation suites, scorers and release gate | Skeleton |
+| `modules/oa-testkit` | Acceptance reporting, model doubles and fault injection | Implemented |
+| `apps/app-runtime` | Execution application | Runnable |
+| `apps/app-control` | Administration application | Skeleton |
+| Future console and authoring tooling | UI and artifact lifecycle tooling | Planned; no module yet |
+
+Module paths are defined in the root POM. See [repository structure](../repository-structure.md).
+
 
 Rules:
 

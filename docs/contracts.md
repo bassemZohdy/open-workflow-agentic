@@ -120,7 +120,7 @@ Ports are interfaces in `...contracts.port`. Their Javadoc states the failure se
 
 ## 9. Wire form and JSON Schemas
 
-The schemas are in `oa-contracts/src/main/resources/schemas/`, Draft 2020-12, one self-contained file per type with `additionalProperties: false`:
+The schemas are in `modules/oa-contracts/src/main/resources/schemas/`, Draft 2020-12, one self-contained file per type with `additionalProperties: false`:
 
 | Schema file | Record |
 |---|---|

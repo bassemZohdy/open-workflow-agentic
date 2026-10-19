@@ -46,14 +46,14 @@ Run the full build first, then the generator from the repository root:
 
 ```bash
 mvn -B verify
-java -cp "oa-testkit/target/classes:$(cat oa-testkit/target/classpath.txt)" \
+java -cp "modules/oa-testkit/target/classes:$(cat modules/oa-testkit/target/classpath.txt)" \
   io.github.bassemzohdy.openworkflow.agentic.testkit.acceptance.AcceptanceStatus
 ```
 
 Add `--check` to change nothing and only verify (CI runs this):
 
 ```bash
-java -cp "oa-testkit/target/classes:$(cat oa-testkit/target/classpath.txt)" \
+java -cp "modules/oa-testkit/target/classes:$(cat modules/oa-testkit/target/classpath.txt)" \
   io.github.bassemzohdy.openworkflow.agentic.testkit.acceptance.AcceptanceStatus --check
 ```
 

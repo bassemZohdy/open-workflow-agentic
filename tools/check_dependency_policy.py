@@ -2,10 +2,12 @@
 """Dependency policy check. Run after `mvn -B verify`.
 
 The parent POM makes maven-dependency-plugin write each module's resolved dependencies to
-<module>/target/dependency-list.txt during `verify`. This script reads those files and enforces two rules:
+<module>/target/dependency-list.txt during `verify`. This script reads those files and enforces these rules:
 
-1. Contracts purity (ADR 0017, docs/plan/README.md section 2): oa-contracts has no dependency on its main
+1. Module boundaries (ADR 0017 and ADR 0024): oa-contracts has no dependency on its main
    classpath (scope compile, provided, runtime or system). Test-scoped dependencies are allowed.
+   Runtime modules cannot depend on control modules. Production code cannot depend on oa-testkit or
+   application modules; oa-testkit may be used only in test scope.
 
 2. Licence allow-list, decided per scope. Licence names are read from each artifact's POM in the local Maven
    repository (inherited from the parent POM when the artifact declares none) and normalised to identifiers:
@@ -205,16 +207,23 @@ def check(root, local_repo, exceptions_path=DEFAULT_EXCEPTIONS):
     used = set()
     checked = set()
     for module in modules_of(root):
+        module_name = Path(module).name
         listing = root / module / "target" / "dependency-list.txt"
         if not listing.is_file():
             missing.append(f"{listing} (run `mvn -B verify` first)")
             continue
         for group, artifact, version, scope in parse_dependency_list(listing):
-            if group == PROJECT_GROUP:
-                continue
-            if module == CONTRACTS_MODULE and scope in MAIN_CLASSPATH_SCOPES:
+            if module_name == CONTRACTS_MODULE and scope in MAIN_CLASSPATH_SCOPES:
                 violations.append(f"{module} must have no main-classpath dependency, but has "
                                   f"{group}:{artifact}:{version} ({scope})")
+            if group == PROJECT_GROUP:
+                if module_name in {"oa-runtime", "app-runtime", "oa-testkit"} and artifact in {"oa-control", "app-control"}:
+                    violations.append(f"{module} must not depend on {artifact} ({scope})")
+                if artifact == "oa-testkit" and scope != "test":
+                    violations.append(f"{module} may depend on oa-testkit only in test scope, not {scope}")
+                if artifact.startswith("app-"):
+                    violations.append(f"{module} must not depend on deployable {artifact} ({scope})")
+                continue
             key = (group, artifact, version, scope)
             if key in checked:
                 continue
@@ -278,7 +287,7 @@ def main(argv=None):
         for item in violations:
             print("  " + item)
         return 1
-    print("dependency policy: holds (oa-contracts is dependency-free on the main classpath; "
+    print("dependency policy: holds (module boundaries enforced; oa-contracts is dependency-free on the main classpath; "
           "all licences allowed for their scope)")
     return 0
 

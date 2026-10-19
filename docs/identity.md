@@ -1,7 +1,7 @@
 # Identity and delegated authority
 
 Work package WP-102, requirement M11, acceptance test T07. Decision record: [ADR 0021](adr/0021-identity-delegation-policy-engine-and-secrets.md).
-Code: `oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/identity`.
+Code: `modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/identity`.
 
 Tags used below follow ADR 0021: **[verified]** was run and passed here, **[fake]** was run only against an in-process
 stand-in, **[unverified]** was not run.
