@@ -1,5 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.policy;
 
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuthorizationRequest;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.PolicyDecisionPoint;
@@ -16,14 +18,14 @@ final class PolicyDoubles {
     /** Audit sink that keeps every record in memory. */
     static class InMemoryAuditSink implements AuditSink {
 
-        private final List<PolicyDecisionRecord> records = new ArrayList<>();
+        private final List<AuditEvent> records = new ArrayList<>();
 
         @Override
-        public synchronized void record(PolicyDecisionRecord record) {
+        public synchronized void record(AuditEvent record) {
             records.add(record);
         }
 
-        synchronized List<PolicyDecisionRecord> records() {
+        synchronized List<AuditEvent> records() {
             return List.copyOf(records);
         }
     }
