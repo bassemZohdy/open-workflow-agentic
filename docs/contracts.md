@@ -114,6 +114,8 @@ Ports are interfaces in `...contracts.port`. Their Javadoc states the failure se
 | `TaskStore` | `insert`, `find(taskId)`, `findByThread(threadId)`, `replace(next, expectedVersion)` | A missing row is an empty optional. The runtime then refuses the thread and never creates a row to fill the gap. A duplicate task id or thread id is `IllegalStateException`. `replace` is optimistic: a version mismatch or a skipped version is `IllegalStateException`. An unavailable store throws, and callers must not read an exception as "no task". |
 | `ArtifactRegistry` | `activeVersion(kind, name)`, `version(kind, name, version)` | An artifact that is not approved, or unknown, is empty, and work that needs it is refused. An unavailable registry throws; the runtime keeps running pinned versions and starts no new work that needs an unverified one. A stale answer past the freshness limit is empty, never guessed. |
 
+**Bulkhead on the policy decision point.** `FailClosedPolicyDecisionPoint` admits at most `maxInFlight` delegate calls at once. The bound is a constructor argument, validated to be between 1 and `MAX_IN_FLIGHT` (1,024). The default is `DEFAULT_MAX_IN_FLIGHT` (64), used by the two constructors that do not take it. Admission is a non-blocking `Semaphore.tryAcquire()`, so a full bulkhead never waits: the call returns `ERROR` at once, with a reason that names the bulkhead, and the delegate is not called. A permit is released only when the delegate call itself returns or throws, never when the caller times out. A delegate that never returns therefore strands at most `maxInFlight` virtual threads, and capacity comes back when they finish. For WP-103, the PEP should keep the default 64 for an in-process PDP and raise it only after measuring peak concurrent decisions under load, staying below 1,024 and within the connection pool when the PDP calls out. Tests: `FailClosedBulkheadTest`.
+
 ## 9. Wire form and JSON Schemas
 
 The schemas are in `oa-contracts/src/main/resources/schemas/`, Draft 2020-12, one self-contained file per type with `additionalProperties: false`:
@@ -131,6 +133,13 @@ Wire notes: ids are ULID strings in upper case; `ThreadId` is a string; instants
 
 The schema cannot express two rules: a due time after creation (`HumanTask`) and the hash chain (`AuditEvent`). The record and `AuditHash` enforce those.
 
+**Formats.** Draft 2020-12 treats `format` as an annotation unless assertion is switched on, so `SchemaContractTest` builds its registry with `SchemaRegistryConfig.builder().formatAssertionsEnabled(true)`. The schemas use one format, `date-time`, in `decision` (`decidedAt`), `effect` (`recordedAt`), `human-task` (`createdAt`, and `dueAt` inside `anyOf` with `null`), `evidence` (`capturedAt`) and `audit-event` (`occurredAt`). The validator checks it with the ethlo `itu` library that networknt 2.0.8 loads. The test `theOnlyFormatInTheSchemasIsDateTimeAndEveryUseIsTested` fails when a schema adds a format, so each new format needs VALID and INVALID cases first. Other keywords (`pattern`, `maxLength`) are always asserted.
+
+**Known gaps** (the validator is more lenient or stricter than RFC 3339 on these points; the schemas are not changed):
+
+- A space in place of the `T` separator is accepted. RFC 3339 section 5.6 allows it only as a readability note, not in its grammar. The writers here emit only `T` and `Z`. `leniencyOfTheDateTimeValidatorIsPinned` records the behaviour; a strict check would need a `pattern` on each `date-time` field.
+- A leap second (`:60`) is rejected, although RFC 3339 section 5.7 allows it. `java.time.Instant` never produces one.
+
 ## 10. Verification
 
 | Test | Covers |
@@ -142,8 +151,9 @@ The schema cannot express two rules: a due time after creation (`HumanTask`) and
 | `AuditHashTest` | Intact chain, changed field, recomputed event, removed, inserted and reordered events, truncation against a head, full rewrite |
 | `GovernanceRecordsTest` | Decision attribution, effect state machine, human task and evidence invariants |
 | `FailClosedPolicyDecisionPointTest` | Pass-through of ALLOW and DENY; throw, null, slow, interrupt and `Error` become `ERROR` |
+| `FailClosedBulkheadTest` | Stuck delegates exhaust the bound and refusals are prompt; live delegates never exceed the bound; permits return only when delegates return; capacity recovers; a 300-caller burst; bound validation |
 | `PortContractTest` | Port semantics with in-memory doubles and a guarded gateway |
-| `SchemaContractTest` | Samples validate; invalid documents are rejected; schema properties match the records |
+| `SchemaContractTest` | Samples validate; invalid documents are rejected; schema properties match the records; `date-time` fields reject malformed timestamps (format assertion on) and accept offsets; the set of formats in the schemas is the one tested |
 
 ## 11. Not in this package
 

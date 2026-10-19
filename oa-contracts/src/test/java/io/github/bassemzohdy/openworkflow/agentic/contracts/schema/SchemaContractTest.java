@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.networknt.schema.Error;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SchemaRegistryConfig;
 import com.networknt.schema.SpecificationVersion;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent;
@@ -28,7 +29,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +42,13 @@ import org.junit.jupiter.api.Test;
 class SchemaContractTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final SchemaRegistry REGISTRY = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
+    /**
+     * Draft 2020-12 makes {@code format} an annotation by default, so a malformed date-time would pass. Format
+     * assertion is switched on here so that every {@code format} keyword in the schemas is enforced.
+     */
+    private static final SchemaRegistry REGISTRY = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12,
+            builder -> builder.schemaRegistryConfig(
+                    SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build()));
     private static final Map<String, Class<?>> RECORDS = new LinkedHashMap<>();
 
     static {
@@ -234,6 +243,135 @@ class SchemaContractTest {
         ObjectNode doc = WireFormat.auditEvent(Samples.auditEvent());
         ((ObjectNode) doc.get("actor")).remove("id");
         assertInvalid("audit-event.schema.json", doc, "nested subject without id");
+    }
+
+    // Formats: Draft 2020-12 treats "format" as an annotation unless assertion is enabled, so these tests are
+    // what make a malformed timestamp fail.
+
+    /** Every {@code date-time} field in the schemas, with a valid sample record to change. */
+    private static List<TimestampField> timestampFields() {
+        return List.of(
+                new TimestampField("decision.schema.json", "decidedAt",
+                        () -> WireFormat.decision(Samples.decision())),
+                new TimestampField("effect.schema.json", "recordedAt", () -> WireFormat.effect(Samples.effect())),
+                new TimestampField("human-task.schema.json", "createdAt",
+                        () -> WireFormat.humanTask(Samples.humanTask())),
+                new TimestampField("human-task.schema.json", "dueAt",
+                        () -> WireFormat.humanTask(Samples.humanTask())),
+                new TimestampField("evidence.schema.json", "capturedAt", () -> WireFormat.evidence(Samples.evidence())),
+                new TimestampField("audit-event.schema.json", "occurredAt",
+                        () -> WireFormat.auditEvent(Samples.auditEvent())));
+    }
+
+    private record TimestampField(String schema, String field, Supplier<ObjectNode> sample) {
+        ObjectNode with(String value) {
+            ObjectNode doc = sample.get();
+            doc.put(field, value);
+            return doc;
+        }
+
+        @Override
+        public String toString() {
+            return schema + "#" + field;
+        }
+    }
+
+    /** RFC 3339 date-times, including the offsets used in the UAE and in UTC. */
+    private static final List<String> VALID_DATE_TIMES = List.of(
+            "2026-10-18T10:00:00Z",
+            "2026-10-18T14:00:00+04:00",
+            "2026-10-18T10:00:00.123Z",
+            "2026-10-18T10:00:00.123456789-05:30");
+
+    /**
+     * Strings that a format-aware validator must reject in a date-time field. The space separator and lower-case
+     * t and z are not listed: the validator accepts them (see {@link #leniencyOfTheDateTimeValidatorIsPinned}).
+     */
+    private static final List<String> INVALID_DATE_TIMES = List.of(
+            "",
+            "yesterday",
+            "2026-10-18",
+            "2026-10-18T10:00:00",
+            "2026-10-18T10:00:00+0400",
+            "2026-13-18T10:00:00Z",
+            "2026-02-30T10:00:00Z",
+            "2026-10-18T25:00:00Z",
+            "2026-10-18T10:61:00Z");
+
+    @Test
+    void dateTimeFieldsAcceptRfc3339TimestampsWithAnOffset() {
+        for (TimestampField field : timestampFields()) {
+            for (String good : VALID_DATE_TIMES) {
+                assertValid(field.schema(), field.with(good));
+            }
+        }
+    }
+
+    @Test
+    void dateTimeFieldsRejectMalformedTimestamps() {
+        for (TimestampField field : timestampFields()) {
+            for (String bad : INVALID_DATE_TIMES) {
+                assertInvalid(field.schema(), field.with(bad), field + " accepted \"" + bad + "\"");
+            }
+        }
+    }
+
+    /**
+     * Known gap (docs/contracts.md): RFC 3339 section 5.6 permits a space for the T and lower-case t and z, and the
+     * validator accepts them. The writers in this project emit only the upper-case form, so the contract cannot
+     * tell them apart. This test pins the behaviour, so a change in the validator is noticed.
+     */
+    @Test
+    void leniencyOfTheDateTimeValidatorIsPinned() {
+        TimestampField decidedAt = new TimestampField("decision.schema.json", "decidedAt",
+                () -> WireFormat.decision(Samples.decision()));
+        assertValid(decidedAt.schema(), decidedAt.with("2026-10-18 10:00:00Z"));
+        assertValid(decidedAt.schema(), decidedAt.with("2026-10-18t10:00:00z"));
+    }
+
+    @Test
+    void theOnlyFormatInTheSchemasIsDateTimeAndEveryUseIsTested() throws IOException {
+        Set<String> formats = new TreeSet<>();
+        for (String file : RECORDS.keySet()) {
+            collectFormats(JSON.readTree(text(file)), formats);
+        }
+        // A new format needs its own VALID and INVALID cases before this list grows.
+        assertEquals(Set.of("date-time"), formats, "schema formats changed: add tests for each new format");
+        assertEquals(Set.of("decision.schema.json", "effect.schema.json", "human-task.schema.json",
+                "evidence.schema.json", "audit-event.schema.json"), schemasUsingDateTime());
+    }
+
+    private static Set<String> schemasUsingDateTime() {
+        Set<String> out = new TreeSet<>();
+        for (String file : RECORDS.keySet()) {
+            Set<String> formats = new TreeSet<>();
+            collectFormats(parse(file), formats);
+            if (formats.contains("date-time")) {
+                out.add(file);
+            }
+        }
+        return out;
+    }
+
+    private static JsonNode parse(String file) {
+        try {
+            return JSON.readTree(text(file));
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void collectFormats(JsonNode node, Set<String> out) {
+        if (node.isObject()) {
+            node.fields().forEachRemaining(entry -> {
+                if ("format".equals(entry.getKey()) && entry.getValue().isTextual()) {
+                    out.add(entry.getValue().asText());
+                }
+                collectFormats(entry.getValue(), out);
+            });
+        } else if (node.isArray()) {
+            node.forEach(child -> collectFormats(child, out));
+        }
     }
 
     // Helpers
