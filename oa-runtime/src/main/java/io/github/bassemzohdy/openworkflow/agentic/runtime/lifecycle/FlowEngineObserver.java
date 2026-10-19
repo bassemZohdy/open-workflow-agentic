@@ -46,6 +46,13 @@ public class FlowEngineObserver implements WorkflowExecutionListener {
 
     @Override
     public void onWorkflowFailed(WorkflowFailedEvent event) {
+        // The registry keeps no reason for a fault; the engine's cause goes to the log, truncated.
+        Throwable cause = event.cause();
+        if (cause != null) {
+            String text = String.valueOf(cause.getMessage());
+            LOG.warnf("engine instance faulted: %s: %s", cause.getClass().getName(),
+                    text.length() > 300 ? text.substring(0, 300) : text);
+        }
         report(event, EngineStatus.FAULTED);
     }
 

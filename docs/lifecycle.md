@@ -1,8 +1,8 @@
 # Run lifecycle and the instance registry (WP-105, slice 105a)
 
-**Status:** WP-105a and WP-105c implemented (105b and 105d not built; the reconciler is section 9) · **Decisions:** [ADR 0019](adr/0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md), [ADR 0020](adr/0020-checkpoint-scoping-and-state-evolution.md), [ADR 0023](adr/0023-workflow-to-agent-bridge.md) · **Plan:** [section 2, canonical progress](plan/README.md)
+**Status:** WP-105a, WP-105b and WP-105c implemented (105d not built; the reconciler is section 9, the outbox and projection are section 10) · **Decisions:** [ADR 0019](adr/0019-how-workflow-instances-are-started-queried-cancelled-and-resumed.md), [ADR 0020](adr/0020-checkpoint-scoping-and-state-evolution.md), [ADR 0023](adr/0023-workflow-to-agent-bridge.md) · **Plan:** [section 2, canonical progress](plan/README.md)
 
-This slice makes the platform's own record of a run authoritative for lifecycle status, definition version and request idempotency. Quarkus Flow executes the pinned definition; it is not the record of what was asked for or what state the run is in. Slices 105b (outbox and projection), 105c (reconciler) and 105d (operations API) are not built here. Section 6 lists the seams they use.
+This slice makes the platform's own record of a run authoritative for lifecycle status, definition version and request idempotency. Quarkus Flow executes the pinned definition; it is not the record of what was asked for or what state the run is in. Slice 105d (operations API) is not built here. The reconciler (105c) is section 9; the outbox and projection (105b) are section 10. Section 6 lists the seams they use.
 
 ## 1. Tables (schema `task`, migrations V10 to V13)
 
@@ -333,5 +333,78 @@ These are for the owner. The ADRs were not edited.
 - The probe definition ships under `app-runtime/src/main/resources/flow`, not under `src/test`. Flow reads definitions at build time, so a test-only copy cannot reach the packaged child process the process test runs.
 - The 105a boot tests start the probe definition instead of `research-and-approve`. The latter calls an agent endpoint that does not exist here and fails within milliseconds, which made its status race the tests once the registry follows the engine.
 - `%test.quarkus.http.test-port=0` replaces the fixed test port (8081), so parallel Maven runs do not collide.
-- The observer covers the engine transitions the brief put in 105c (WAITING, RUNNING, COMPLETED, FAILED, CANCELLED). This overlaps the engine observer that 105b was given; the two branches will conflict in `FlowWorkflowEngine` and `InstanceService`, and 105b should build on this one.
+- The observer covers the engine transitions the brief put in 105c (WAITING, RUNNING, COMPLETED, FAILED, CANCELLED). The 105b branch was merged into this one (`wp-105b-outbox-projection`). Its changes did not touch `FlowWorkflowEngine` or `InstanceService`, so those merged without conflict. The outbox row is written in `JdbcInstanceStore.replace`, which the observer and the reconciler use, so every transition they make writes its outbox row in the same transaction. The one write that bypasses `replace`, the resume epoch, writes its own outbox row in the same transaction (`ReconcilerRepairTest.everyRepairThatChangesARowWritesItsOutboxRowInTheSameTransaction`). Audit rows (`task.repair_event`) are not changes of state and have no outbox row.
 - `retry` and `recover` are Java entry points only, as the brief asked.
+
+## 10. Outbox and projection (WP-105b)
+
+Every change of an instance or an agent task writes an outbox row in the same transaction as its history row. A relay delivers the rows to consumers in order. The consumer `TaskViewProjector` keeps `task.task_view`, a read model with one row per instance. The projection is never a source of truth.
+
+### 10.1 Tables (migrations V14 and V15)
+
+| Table | Row | Notes |
+|---|---|---|
+| `task.outbox` | One event per history row | `id` is a bigint identity, so it gives the delivery order. `aggregate_type` (`INSTANCE` or `AGENT_TASK`), `aggregate_id`, `aggregate_version` (unique with the type), `partition_key` (the instance id, for both types), `event_type` (`instance.created`, `instance.updated` for a change that keeps the status, `instance.status_changed`, and the same three for `agent_task`), `payload` (jsonb: tenant, owner, definition id and version, previous and new status, reason, actor, occurred time), `occurred_at` (equal to the history row's time), `published_at`, `attempts`, `next_attempt_at`, `failed_at`, `last_error` (exception class name, never its message). |
+| `task.task_view` | One row per instance | Instance id, tenant, owner, definition id and version, instance status and version, current agent task id, status and outbox id, `waiting_for_human` (generated: instance `WAITING` or agent task `WAITING_FOR_HUMAN`), last reason, last transition time, `last_outbox_id` applied, `updated_at`. |
+
+Writes: `JdbcInstanceStore` (insert and replace) and `JdbcTaskStore` (insert and replace) call `OutboxEntry.writeTo` in their transaction. No other path writes outbox rows. `JdbcTaskStore` first locks the instance row, which serializes the writes of one instance, so the outbox id order of an instance is its commit order.
+
+### 10.2 Sequence
+
+```mermaid
+sequenceDiagram
+    participant S as Store (instance or agent task)
+    participant DB as PostgreSQL
+    participant R as OutboxRelay
+    participant P as TaskViewProjector
+    S->>DB: lock the instance row (agent writes), change the row
+    S->>DB: history row and outbox row, commit
+    R->>DB: claim a batch: FOR UPDATE SKIP LOCKED, id order, partition not blocked
+    R->>P: apply(connection, event), inside a savepoint
+    P->>DB: update task_view where last_outbox_id < event id
+    R->>DB: published_at = now(), commit (same transaction)
+```
+
+The relay runs in each process on a single-thread executor (`OutboxRelayService`, every `agentic.outbox.relay.interval`, default 500 ms). db-scheduler is not used: the relay polls a table, it does not fire at a time, and several processes may poll at once because the claim skips locked rows. Configuration keys: `agentic.outbox.relay.enabled`, `.batch-size` (20), `.max-attempts` (5), `.backoff-base` (1 s), `.backoff-max` (1 min), `.interval`.
+
+### 10.3 Ordering and delivery guarantees
+
+- **Order within an instance.** The relay claims a row only when no earlier row of its partition is unpublished. "Unpublished" includes rows in backoff, failed rows, and rows another relay holds. So a later event of an instance is never delivered before an earlier one. Other instances are not blocked by it.
+- **No two relays on one instance.** Two relays cannot claim two rows of one partition at once, for the reason above. `OutboxRelayTest.fourRelaysDeliverEveryRowOnceAndInOrderWithinAnInstance` runs four relays over 300 events of 60 instances and checks that each event is delivered once and each instance's events in version order.
+- **At least once.** A row is marked published in the same transaction as the consumer's writes. A crash before the commit redelivers the row. A row can also be redelivered when an operator re-queues it. Consumers must be idempotent (`OutboxConsumer` javadoc).
+- **Idempotent projection.** Each view row stores `last_outbox_id`. An event is applied only when its id is greater, in the same statement as the change. A duplicate or an older event changes nothing (`TaskViewProjectionTest`, `OutboxRelayTest.aRowDeliveredTwiceChangesNothingTheSecondTime`).
+- **Agent event before its instance.** Not possible in order. If it happens anyway (for example a manual edit), the projector refuses it, the relay retries with backoff, and the row stays unpublished.
+
+### 10.4 Failure and poison rows
+
+- A consumer that throws has its writes for that event rolled back to a savepoint. The row gets `attempts + 1`, and `next_attempt_at` moves by `backoff-base × 2^(attempts−1)`, capped at `backoff-max`.
+- After `max-attempts` the row gets `failed_at` and `last_error`. The row stays in the table and is never dropped. It blocks the later rows of its own instance, so the view never shows a later state over an unapplied earlier one. Other instances continue.
+- **Operator procedure.** `OutboxAdmin.failures(limit)` lists failed rows (class name of the last error, the time, the event). Fix the cause, then `OutboxAdmin.requeue(id)`. The row's attempts are reset and it is delivered again, in order. `requeue` returns false for a row that is not failed. The HTTP operations API comes in WP-105d.
+- **Lag.** Micrometer gauges, read at most once a second: `agentic.outbox.unpublished` (count, failed rows included), `agentic.outbox.unpublished.oldest.age.seconds`, `agentic.outbox.failed`.
+
+### 10.5 The projection
+
+- `TaskViewProjector` is the only consumer in this slice. Instance events set the instance fields. Agent task events set the current agent task fields, so the current agent task of an instance is the one with the latest agent event.
+- `updated_at` and `last_transition_at` are the time of the event, not the projector's clock. That is what makes a rebuild comparable with the live view.
+- `TaskViewQuery` reads one tenant at a time, filters by status and definition, and pages by instance id (a ULID, so creation order). The cursor is the encoded last instance id. `snapshot()` is for verification.
+
+### 10.6 Rebuild
+
+`TaskViewRebuilder.rebuild()` deletes the view and recreates it in one transaction. It takes `share row exclusive` locks on the outbox and the view, so relays and the projector wait while it runs. It folds the **published** events from the history tables, the same set the projector has applied. An event that is not published yet (in backoff, failed, or still in flight) is in neither the live view nor the rebuild, and it appears in both once it is published.
+
+`TaskViewRebuildTest` deletes every row and rebuilds, then compares the live rows with the rebuilt rows, field by field. `OutboxKillIT` checks the same against the registry after a process restart.
+
+### 10.7 What 105c and 105d may rely on
+
+- `task.outbox` holds every change of an instance and an agent task, in order, from the first insert. Rows are not deleted in this slice (no retention yet).
+- `task.task_view` is for reading and for dashboards. Repairs and decisions read the registry and history (ADR 0002). The view may lag by the relay interval plus the backlog, shown by the lag gauges.
+- 105c may use `OutboxAdmin.lag()` and `failures()` to detect stuck work. A failed row is not a reason to repair the instance; it is a projection problem.
+- 105d may call `OutboxAdmin.requeue` and `TaskViewRebuilder.rebuild`. Rebuild takes locks, so it is a maintenance action, not a request-path action.
+- Any new writer of a registry or agent task row must go through the stores and hold the instance row lock, or the partition order breaks.
+
+### 10.8 Not in this slice
+
+- Retention of published outbox rows.
+- Consumers outside the database. A consumer must be local to the relay's transaction.
+- The engine observer that writes `WAITING`, `COMPLETED` and `FAILED` from engine events is built in 105c (section 9). Its changes go through the same store, so they also write outbox rows.
+- A multi-node deployment test. The kill test runs one process at a time against one Postgres. The four-relay test shares one JVM.

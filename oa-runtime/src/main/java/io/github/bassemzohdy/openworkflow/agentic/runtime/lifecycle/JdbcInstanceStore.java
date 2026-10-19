@@ -3,6 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.outbox.OutboxEntry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.sql.Connection;
@@ -12,7 +13,9 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -56,6 +59,8 @@ public class JdbcInstanceStore implements InstanceStore {
             if (inserted == 1) {
                 writeHistory(connection, candidate.id(), 0L, null, InstanceStatus.STARTING, reason,
                         candidate.owner(), candidate.createdAt());
+                outbox(candidate, 0L, null, InstanceStatus.STARTING, reason, candidate.owner(),
+                        candidate.createdAt()).writeTo(connection);
                 return new Insertion(candidate, true);
             }
             InstanceRecord existing = selectByKey(connection, candidate.tenant(), candidate.idempotencyKey())
@@ -132,6 +137,8 @@ public class JdbcInstanceStore implements InstanceStore {
             }
             writeHistory(connection, next.id(), next.version(), current.status(), next.status(), reason, actor,
                     next.updatedAt());
+            outbox(next, next.version(), current.status(), next.status(), reason, actor, next.updatedAt())
+                    .writeTo(connection);
             return next;
         });
     }
@@ -163,6 +170,18 @@ public class JdbcInstanceStore implements InstanceStore {
             }
             return entries;
         });
+    }
+
+    /** The outbox row that mirrors one history row of an instance (WP-105b). Same transaction, same time. */
+    private static OutboxEntry outbox(InstanceRecord row, long version, InstanceStatus from, InstanceStatus to,
+                                      String reason, Subject actor, Instant at) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("tenant", row.tenant());
+        details.put("owner", Map.of("kind", row.owner().kind().name(), "id", row.owner().id()));
+        details.put("definitionId", row.definition().definitionId());
+        details.put("definitionVersion", row.definition().version());
+        return OutboxEntry.transition(OutboxEntry.AggregateType.INSTANCE, row.id().value(), row.id().value(), version,
+                from == null ? null : from.name(), to.name(), reason, actor, at, details);
     }
 
     private static void requireInitial(InstanceRecord candidate) {

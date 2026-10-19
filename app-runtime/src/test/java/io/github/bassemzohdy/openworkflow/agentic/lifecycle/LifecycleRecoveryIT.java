@@ -25,12 +25,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
  * Process-level acceptance of the run lifecycle (WP-105c, scope item 6). The application runs as child JVMs on the
- * database named by {@code DB_URL}; each run is killed with SIGKILL ({@link ManagedProcess#kill()}), and the next run
+ * fresh database created on the server named by {@code DB_URL} (dropped at the end); each run is killed with SIGKILL ({@link ManagedProcess#kill()}), and the next run
  * starts on the same database.
  *
  * <p>Scenario A: a kill during the effect call. Without the reconciler the restored instance stays idle; with it the
@@ -44,8 +46,14 @@ class LifecycleRecoveryIT {
 
     private static final Path JAR = Path.of("target/quarkus-app/quarkus-run.jar");
     private static final Path LOGS = Path.of("target/process-logs");
-    private static final String DB_URL = System.getenv().getOrDefault("DB_URL",
+    /** The server to administer; each class run creates its own database on it. */
+    private static final String SERVER_URL = System.getenv().getOrDefault("DB_URL",
             "jdbc:postgresql://localhost:5432/agentic");
+    private static final String DB_USER = System.getenv().getOrDefault("DB_USER", "postgres");
+    private static final String DB_PASSWORD = System.getenv().getOrDefault("DB_PASSWORD", "postgres");
+    private static String databaseName;
+    /** The fresh database of this run. The child reconciler must see only this test's rows (see createDatabase). */
+    private static String dbUrl;
     private static final String DEFINITION = "agentic/lifecycle-probe";
     private static final String EVENT = "org.openworkflow.agentic.lifecycle.probe";
 
@@ -53,6 +61,33 @@ class LifecycleRecoveryIT {
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
 
     private final java.util.List<ManagedProcess> started = new java.util.ArrayList<>();
+
+    /**
+     * Creates a fresh database for this run. A shared database holds rows of other tests, and the child reconciler
+     * repairs every row it finds: stale rows of a definition that calls a port nobody listens on open Flow's HTTP
+     * circuit breaker for localhost, and the probe's own call is then refused (found in a full verify run).
+     */
+    @BeforeAll
+    static void createDatabase() throws Exception {
+        databaseName = "lifecycle_it_" + UUID.randomUUID().toString().replace("-", "");
+        String prefix = SERVER_URL.substring(0, SERVER_URL.lastIndexOf('/') + 1);
+        try (Connection admin = DriverManager.getConnection(SERVER_URL, DB_USER, DB_PASSWORD);
+                java.sql.Statement statement = admin.createStatement()) {
+            statement.execute("create database " + databaseName);
+        }
+        dbUrl = prefix + databaseName;
+    }
+
+    @AfterAll
+    static void dropDatabase() throws Exception {
+        if (databaseName == null) {
+            return;
+        }
+        try (Connection admin = DriverManager.getConnection(SERVER_URL, DB_USER, DB_PASSWORD);
+                java.sql.Statement statement = admin.createStatement()) {
+            statement.execute("drop database if exists " + databaseName + " with (force)");
+        }
+    }
 
     @AfterEach
     void stopEverything() throws InterruptedException {
@@ -69,6 +104,7 @@ class LifecycleRecoveryIT {
         ManagedProcess.Builder builder = ManagedProcess.jar(JAR)
                 .httpPort(port)
                 .logFile(LOGS.resolve(label + ".log"))
+                .property("quarkus.datasource.jdbc.url", dbUrl)
                 .property("agentic.dev.trust-caller-headers", "true")
                 .property("agentic.dev.lifecycle-probes", "true")
                 .property("agentic.reconciler.enabled", String.valueOf(reconciler))
@@ -164,7 +200,7 @@ class LifecycleRecoveryIT {
     }
 
     private static long count(String sql, Object... params) throws Exception {
-        try (Connection connection = DriverManager.getConnection(DB_URL, "postgres", "postgres");
+        try (Connection connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
                 PreparedStatement statement = connection.prepareStatement(sql)) {
             for (int i = 0; i < params.length; i++) {
                 statement.setObject(i + 1, params[i]);
@@ -177,7 +213,7 @@ class LifecycleRecoveryIT {
     }
 
     private static String registryId(String tenant, String key) throws Exception {
-        try (Connection connection = DriverManager.getConnection(DB_URL, "postgres", "postgres");
+        try (Connection connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
                 PreparedStatement statement = connection.prepareStatement(
                         "select id from task.instance where tenant = ? and idempotency_key = ?")) {
             statement.setString(1, tenant);

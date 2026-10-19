@@ -350,4 +350,37 @@ class ReconcilerRepairTest {
         assertEquals(1, engine.cancels.get(), "recover cancels a wait past its deadline");
         assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, waiting).status());
     }
+
+    @Test
+    void everyRepairThatChangesARowWritesItsOutboxRowInTheSameTransaction() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+
+        // (a) The resume epoch change: a row version with a history row and an outbox row, both with the reason.
+        String resumedEngine = "outbox-resume-" + RUN;
+        engine.report(resumedEngine, EngineStatus.PENDING);
+        InstanceRecord resumed = move(newRow(tenant), InstanceStatus.RUNNING, resumedEngine, null);
+        reconciler(engine, tenant, 3).reconcileOnce();
+        InstanceRecord afterResume = reload(tenant, resumed);
+        assertEquals(resumed.version() + 1, afterResume.version(), "the resume is one change of the row");
+        long version = afterResume.version();
+        assertEquals(1L, count(dataSource, "select count(*) from task.instance_event where instance_id = ? and version = ?"
+                + " and reason = 'reconciler.resume'", resumed.id().value(), version), "history row of the resume");
+        assertEquals(1L, count(dataSource, "select count(*) from task.outbox where aggregate_type = 'INSTANCE'"
+                + " and aggregate_id = ? and aggregate_version = ? and event_type = 'instance.updated'"
+                + " and payload->>'reason' = 'reconciler.resume' and payload->>'resumeEpoch' = '1'",
+                resumed.id().value(), version), "outbox row of the resume, same version");
+
+        // (b) A repair made through the store: a WAITING row past its deadline that the engine does not hold is FAILED.
+        String lostEngine = "outbox-deadline-" + RUN;
+        InstanceRecord failed = move(move(newRow(tenant), InstanceStatus.RUNNING, lostEngine, null),
+                InstanceStatus.WAITING, lostEngine, Instant.now().minus(Duration.ofMinutes(1)));
+        reconciler(engine, tenant, 3).reconcileOnce();
+        InstanceRecord failedAfter = reload(tenant, failed);
+        assertEquals(InstanceStatus.FAILED, failedAfter.status());
+        assertEquals(1L, count(dataSource, "select count(*) from task.outbox where aggregate_id = ?"
+                + " and aggregate_version = ? and event_type = 'instance.status_changed'"
+                + " and payload->>'status' = 'FAILED' and payload->>'reason' = 'reconciler.deadline.no-engine-instance'",
+                failed.id().value(), failedAfter.version()), "outbox row of the failure, same version");
+    }
 }
