@@ -16,7 +16,7 @@ import jakarta.enterprise.inject.Alternative;
 public class StubLlm implements LlmClient {
 
     private final ScriptedLlmClient model = ScriptedLlmClient.create()
-            .fallback((system, user) -> "[stub] " + system.split("\\.")[0]);
+            .fallback((system, user) -> "{\"text\":\"[stub] " + system.split("\\.")[0] + "\",\"actions\":[],\"escalation\":null}");
 
     @Override
     public String complete(String system, String user) {
