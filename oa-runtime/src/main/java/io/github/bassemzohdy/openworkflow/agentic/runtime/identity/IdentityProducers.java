@@ -61,6 +61,23 @@ public class IdentityProducers {
                 settings.grantMaxLifetime());
     }
 
+    @Produces
+    @Singleton
+    public InstanceAuthorityStore instanceAuthorityStore(DataSource dataSource) {
+        return new InstanceAuthorityStore(dataSource);
+    }
+
+    /**
+     * The identity of instances. Its bean types include {@code ResumeGate}, so the reconciler asks it before a restored
+     * instance continues.
+     */
+    @Produces
+    @Singleton
+    public InstanceAuthorities instanceAuthorities(InstanceAuthorityStore store, DelegationGrants grants,
+                                                   IdentityAudit audit) {
+        return new InstanceAuthorities(store, grants, audit, Clock.systemUTC());
+    }
+
     /**
      * The secret provider: files in {@code agentic.secrets.dir}. Without the setting every secret is unavailable, so
      * work that needs one pauses or fails instead of running without it.

@@ -56,6 +56,9 @@ public class Reconciler {
     private static final Duration AUDIT_WINDOW = Duration.ofHours(1);
     private static final Duration MAX_BACKOFF = Duration.ofMinutes(10);
 
+    /** The history reason of an instance that waits for a person to renew its delegated authority. */
+    public static final String REASON_REAUTHORIZATION = "reauthorization.required";
+
     /** Where the reconciler is in its life. */
     public enum State {
         /** Disabled by configuration. Only {@link #reconcileOnce()} runs passes. */
@@ -101,14 +104,15 @@ public class Reconciler {
     private final DataSource dataSource;
     private final Clock clock;
     private final Predicate<String> tenantScope;
+    private final ResumeGate gate;
     private final ScheduledExecutorService executor;
     private final AtomicBoolean warmedUp = new AtomicBoolean();
     private volatile State state;
 
     @Inject
     public Reconciler(InstanceStore store, WorkflowEngine engine, EngineStatusSync sync, RegistryScan scan,
-                      RepairStore repairs, LifecycleSettings settings, DataSource dataSource) {
-        this(store, engine, sync, scan, repairs, settings, dataSource, Clock.systemUTC(), tenant -> true);
+                      RepairStore repairs, LifecycleSettings settings, DataSource dataSource, ResumeGate gate) {
+        this(store, engine, sync, scan, repairs, settings, dataSource, Clock.systemUTC(), tenant -> true, gate);
     }
 
     /**
@@ -118,6 +122,14 @@ public class Reconciler {
     public Reconciler(InstanceStore store, WorkflowEngine engine, EngineStatusSync sync, RegistryScan scan,
                       RepairStore repairs, LifecycleSettings settings, DataSource dataSource, Clock clock,
                       Predicate<String> tenantScope) {
+        this(store, engine, sync, scan, repairs, settings, dataSource, clock, tenantScope, ResumeGate.ALLOW);
+    }
+
+    /** As above, with the gate that decides whether a restored instance may run again (WP-102). */
+    public Reconciler(InstanceStore store, WorkflowEngine engine, EngineStatusSync sync, RegistryScan scan,
+                      RepairStore repairs, LifecycleSettings settings, DataSource dataSource, Clock clock,
+                      Predicate<String> tenantScope, ResumeGate gate) {
+        this.gate = Objects.requireNonNull(gate, "gate");
         this.store = Objects.requireNonNull(store, "store");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.sync = Objects.requireNonNull(sync, "sync");
@@ -429,13 +441,67 @@ public class Reconciler {
         }
         if (view.get().status() == EngineStatus.PENDING) {
             // Restored from Flow's tables and registered as active, but not started (WP-003, fact 1).
+            // First ask whether the authority of the instance still holds (WP-102): a restored instance that runs under
+            // a delegation grant continues only while the grant is usable. Anything but PROCEED keeps it from running.
+            ResumeGate.Decision decision = gateDecision(row);
+            if (!decision.proceeds()) {
+                holdForAuthority(row, decision, now);
+                return;
+            }
+            boolean wasHeld = isHeldForAuthority(row);
             // The epoch is written first, so the task that runs again sees the new value.
             long epoch = repairs.incrementResumeEpoch(row.id().value());
             boolean started = engine.startRestored(row.definition(), engineId);
             repairs.record("resume", row.id().value(), started ? "resumed" : "refused", "resume epoch " + epoch);
+            if (started && wasHeld) {
+                sync.observe(engineId, EngineStatus.RUNNING, "reauthorized");
+            }
             return;
         }
         sync.observe(engineId, view.get().status(), "polled");
+    }
+
+    /** The gate's answer; a gate that throws is UNAVAILABLE, so the instance does not run. */
+    private ResumeGate.Decision gateDecision(InstanceRecord row) {
+        try {
+            return gate.check(row);
+        } catch (RuntimeException failed) {
+            LOG.warnf("resume gate failed for instance %s (%s); the instance is not resumed now", row.id(),
+                    simpleName(failed));
+            return new ResumeGate.Decision(ResumeGate.Outcome.UNAVAILABLE, "gate.failed");
+        }
+    }
+
+    /**
+     * The instance must not run. For REAUTHORIZATION_REQUIRED the registry says so: a RUNNING row moves to WAITING, and
+     * a history row with the reason {@value #REASON_REAUTHORIZATION} is written once (it reaches the task view and the
+     * inspect output). The wait gets the usual deadline, so an instance that nobody re-authorizes is cancelled by the
+     * deadline repair like any other wait. An UNAVAILABLE gate changes nothing and is reported once per audit window.
+     */
+    private void holdForAuthority(InstanceRecord row, ResumeGate.Decision decision, Instant now) {
+        if (decision.outcome() == ResumeGate.Outcome.UNAVAILABLE) {
+            auditOnce("resume", row.id().value(), "held", "authority unavailable: " + decision.reason(), now);
+            return;
+        }
+        if (!isHeldForAuthority(row)) {
+            Instant deadline = row.waitDeadline() != null ? row.waitDeadline() : now.plus(settings.waitDeadline);
+            try {
+                store.replace(row.successor(now, InstanceStatus.WAITING, row.engineInstanceId(), row.startAttempts(),
+                        row.lastError(), deadline), row.version(), REASON_REAUTHORIZATION, InstanceService.RUNTIME_ACTOR);
+            } catch (StaleVersionException moved) {
+                LOG.debugf("instance %s changed while it was held for re-authorization; the next pass decides", row.id());
+                return;
+            }
+        }
+        auditOnce("resume", row.id().value(), "held", "re-authorization required: " + decision.reason(), now);
+    }
+
+    private boolean isHeldForAuthority(InstanceRecord row) {
+        if (row.status() != InstanceStatus.WAITING) {
+            return false;
+        }
+        java.util.List<HistoryEntry> history = store.history(row.id());
+        return !history.isEmpty() && REASON_REAUTHORIZATION.equals(history.get(history.size() - 1).reason());
     }
 
     // ---- (iii) engine instances the registry does not know --------------------------------------------------------

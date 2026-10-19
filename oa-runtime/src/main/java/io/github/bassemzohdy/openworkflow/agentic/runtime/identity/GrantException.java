@@ -17,6 +17,8 @@ public final class GrantException extends RuntimeException {
         NOT_FOUND,
         /** The parent grant is revoked, expired or unknown, so nothing can be delegated from it. */
         PARENT_INACTIVE,
+        /** The grant named for an instance is revoked, expired or unknown (use {@code NOT_FOUND} for unknown ids). */
+        INACTIVE,
         /** The agent already appears in the delegation chain, or the chain is too deep. */
         CYCLE,
         /** The grant store or the audit trail is unavailable; nothing was granted. */

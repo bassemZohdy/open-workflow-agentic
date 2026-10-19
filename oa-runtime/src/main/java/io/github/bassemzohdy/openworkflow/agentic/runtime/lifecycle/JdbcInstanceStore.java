@@ -43,6 +43,11 @@ public class JdbcInstanceStore implements InstanceStore {
 
     @Override
     public Insertion insertIfAbsent(InstanceRecord candidate, String reason) {
+        return insertIfAbsent(candidate, reason, null);
+    }
+
+    @Override
+    public Insertion insertIfAbsent(InstanceRecord candidate, String reason, InsertHook hook) {
         requireInitial(candidate);
         return Transactions.inTransaction(dataSource, connection -> {
             int inserted;
@@ -61,6 +66,9 @@ public class JdbcInstanceStore implements InstanceStore {
                         candidate.owner(), candidate.createdAt());
                 outbox(candidate, 0L, null, InstanceStatus.STARTING, reason, candidate.owner(),
                         candidate.createdAt()).writeTo(connection);
+                if (hook != null) {
+                    hook.afterInsert(connection, candidate.id());
+                }
                 return new Insertion(candidate, true);
             }
             InstanceRecord existing = selectByKey(connection, candidate.tenant(), candidate.idempotencyKey())

@@ -46,6 +46,45 @@ resource, so a runtime that passes it through fails there.
 Status: client and guard **[fake]**, against `DelegationAuthorizationServer` in oa-testkit test scope. Against Keycloak
 **[unverified]**.
 
+## 5. Re-authorization after long waits
+
+An instance can run under a delegation grant: `POST /instances` takes an optional `delegationGrantId`. The grant must be
+active now, in the caller's tenant, and given by the caller (another user's grant is answered like an unknown one, 404).
+The instance then has a row in `identity.instance_authority`, written in the same transaction as the instance row
+(`InstanceStore.insertIfAbsent` with an `InsertHook`): subject, grant id, correlation id, and a state. Identifiers only.
+
+Before a restored instance runs again, the reconciler asks the `ResumeGate` (`InstanceAuthorities` implements it):
+
+| Situation | Typed outcome | What happens |
+|---|---|---|
+| no authority row, or no grant | `PROCEED` | resumes as before |
+| grant and all grants above it active | `PROCEED` | resumes (resume epoch + 1, `startRestored`) |
+| grant revoked, expired, or an ancestor ended | `REAUTHORIZATION_REQUIRED` | not resumed; see below |
+| state already `REAUTHORIZATION_REQUIRED` | `REAUTHORIZATION_REQUIRED` | stays held until the user renews |
+| the check fails (database down, audit down) | `UNAVAILABLE` | not resumed, nothing marked, next pass asks again |
+
+On `REAUTHORIZATION_REQUIRED`: the audit event `identity.reauthorization.required` is written first (grant id and reason, no
+token), then the authority state is set. The registry row moves to `WAITING` with the history reason
+`reauthorization.required` and the usual wait deadline (`agentic.reconciler.wait-deadline`), so an instance that nobody renews
+is cancelled by the deadline repair like any other wait. This uses the existing states: RUNNING to WAITING is already a legal
+transition, and a row that already waits gets a same-status history row. No state-machine change. The reason reaches the
+outbox, the task view (`lastReason`) and the inspect output, which also has an `authority` section (subject, grant, correlation
+id, state, reason, since).
+
+Renewal: `POST /instances/{id}/reauthorize` with `{"delegationGrantId": "..."}`. Only the user who started the instance
+(403 for another user in the tenant, 404 for another tenant), only while the instance waits (409 otherwise), only with an
+active grant of the same user to the same agent (409 if it is not usable). The audit event `identity.reauthorization.granted`
+is written, the grant is rebound by compare-and-set, and the reconciler resumes the instance at once. A gate that is
+`UNAVAILABLE` never blocks forever and never lets an instance through.
+
+The same check is available to a step that is about to use the grant (`InstanceAuthorities.recheck`), and a refused token
+exchange (`ExchangeException.Code.GRANT_INACTIVE`) is the same condition. Wiring a live step to it belongs to the agent bridge
+(WP-2xx); in WP-102 the wired point is the resume of a restored instance.
+
+Status: **[verified]** against PostgreSQL and the real reconciler with a fake engine (`ReauthorizationResumeTest`,
+`InstanceAuthoritiesTest`, `InstanceAuthorityApiTest`). With the real engine and a killed process: `IdentityRecoveryIT`
+(section 7).
+
 ## 6. Secrets
 
 `SecretProvider` is the port; `FileSecretProvider` reads files from `agentic.secrets.dir` (a mounted Kubernetes Secret, for

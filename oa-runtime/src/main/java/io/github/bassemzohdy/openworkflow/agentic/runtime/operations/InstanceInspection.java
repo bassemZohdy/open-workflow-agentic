@@ -123,6 +123,36 @@ public class InstanceInspection {
         });
     }
 
+    /**
+     * The identity the instance runs under, as identifiers: subject, grant, correlation id, and whether it waits for
+     * re-authorization (and why, and since when). Null when the instance carries no authority row. No token or secret is
+     * ever stored, so none can appear here (docs/identity.md section 7).
+     */
+    public Map<String, Object> authority(String instanceId) {
+        return Transactions.inTransaction(dataSource, connection -> {
+            try (PreparedStatement select = connection.prepareStatement("""
+                    select subject_kind, subject_id, grant_id, correlation_id, state, state_reason, state_since
+                      from identity.instance_authority where instance_id = ?
+                    """)) {
+                select.setString(1, instanceId);
+                try (ResultSet rs = select.executeQuery()) {
+                    if (!rs.next()) {
+                        return null;
+                    }
+                    Map<String, Object> out = new LinkedHashMap<>();
+                    out.put("subjectKind", rs.getString("subject_kind"));
+                    out.put("subject", rs.getString("subject_id"));
+                    out.put("grantId", rs.getString("grant_id"));
+                    out.put("correlationId", rs.getString("correlation_id"));
+                    out.put("state", rs.getString("state"));
+                    out.put("reason", rs.getString("state_reason"));
+                    out.put("since", text(instant(rs.getTimestamp("state_since"))));
+                    return out;
+                }
+            }
+        });
+    }
+
     private static Instant instant(Timestamp timestamp) throws SQLException {
         return timestamp == null ? null : timestamp.toInstant();
     }

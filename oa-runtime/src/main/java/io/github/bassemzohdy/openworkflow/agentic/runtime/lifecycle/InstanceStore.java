@@ -1,6 +1,8 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 
@@ -23,6 +25,21 @@ public interface InstanceStore {
      */
     Insertion insertIfAbsent(InstanceRecord candidate, String reason);
 
+    /**
+     * As {@link #insertIfAbsent(InstanceRecord, String)}, and when this call creates the row, also runs {@code hook} on
+     * the same connection, in the same transaction, after the row and its history are written. If the hook throws, the
+     * whole insert is rolled back. The hook is not run when the key already had a row. Used to write the identity of the
+     * instance atomically with the instance (docs/identity.md section 7).
+     *
+     * @throws UnsupportedOperationException if this store cannot run a hook and one is given
+     */
+    default Insertion insertIfAbsent(InstanceRecord candidate, String reason, InsertHook hook) {
+        if (hook != null) {
+            throw new UnsupportedOperationException("this store cannot run work in the insert transaction");
+        }
+        return insertIfAbsent(candidate, reason);
+    }
+
     /** The instance with this id in this tenant. Another tenant's id is empty, not forbidden, so ids do not leak. */
     Optional<InstanceRecord> find(String tenant, Ulid id);
 
@@ -38,6 +55,12 @@ public interface InstanceStore {
 
     /** The history of one instance, oldest first. Append-only in the database. */
     List<HistoryEntry> history(Ulid id);
+
+    /** Work done in the transaction that creates an instance row. */
+    @FunctionalInterface
+    interface InsertHook {
+        void afterInsert(Connection connection, Ulid instanceId) throws SQLException;
+    }
 
     /** The result of {@link #insertIfAbsent}. */
     record Insertion(InstanceRecord record, boolean created) {

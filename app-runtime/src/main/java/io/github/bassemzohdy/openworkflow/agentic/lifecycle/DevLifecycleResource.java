@@ -2,6 +2,8 @@ package io.github.bassemzohdy.openworkflow.agentic.lifecycle;
 
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityScope;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InstanceAuthorities;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.RegistryScan;
 import io.serverlessworkflow.impl.WorkflowApplication;
 import jakarta.inject.Inject;
@@ -60,6 +62,9 @@ public class DevLifecycleResource {
     @Inject
     RegistryScan scan;
 
+    @Inject
+    InstanceAuthorities authorities;
+
     @POST
     @Path("/effects")
     @Consumes(MediaType.APPLICATION_JSON)
@@ -71,6 +76,14 @@ public class DevLifecycleResource {
         String mode = String.valueOf(body == null ? "ok" : body.getOrDefault("mode", "ok"));
         long epoch = instanceId == null ? -1 : scan.resumeEpochOfEngineInstance(instanceId).orElse(-1);
         LOG.infof("probe-effect received instance=%s epoch=%d mode=%s", instanceId, epoch, mode);
+        // The identity of the instance comes back from the registry by the engine instance id; nothing about it travelled
+        // in the workflow state. The log line is what the kill/restart test reads.
+        try (AuthorityScope ignored = authorities.restore(instanceId).orElse(null)) {
+            AuthorityScope.current().ifPresentOrElse(
+                    a -> LOG.infof("probe-effect authority instance=%s subject=%s grant=%s correlation=%s state=%s epoch=%d",
+                            instanceId, a.subject().id(), a.grantId(), a.correlationId(), a.state(), epoch),
+                    () -> LOG.infof("probe-effect authority instance=%s none", instanceId));
+        }
         if ("hold".equals(mode) && epoch == 0) {
             sleep(HOLD_MILLIS);
         }
