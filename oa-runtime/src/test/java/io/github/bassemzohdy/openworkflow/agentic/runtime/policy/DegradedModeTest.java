@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.ActionKind;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuthorizationRequest;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
@@ -68,12 +69,12 @@ class DegradedModeTest {
         InMemoryAuditSink audit = new InMemoryAuditSink();
         pep(unavailable(), audit).operation(RecoveryOperation.CANCEL, OPERATOR, OPERATOR_SCOPES, TASK_ID);
 
-        List<PolicyDecisionRecord> records = audit.records();
+        List<AuditEvent> records = audit.records();
         assertEquals(2, records.size());
-        assertFalse(records.get(0).recoveryPath());
-        assertEquals(DecisionOutcome.ERROR, records.get(0).decision().outcome());
-        assertTrue(records.get(1).recoveryPath());
-        assertEquals(DecisionOutcome.ALLOW, records.get(1).decision().outcome());
+        assertFalse(Boolean.parseBoolean(records.get(0).attributes().get("policy.recoveryPath")));
+        assertEquals(DecisionOutcome.ERROR, DecisionOutcome.valueOf(records.get(0).attributes().get("policy.outcome")));
+        assertTrue(Boolean.parseBoolean(records.get(1).attributes().get("policy.recoveryPath")));
+        assertEquals(DecisionOutcome.ALLOW, DecisionOutcome.valueOf(records.get(1).attributes().get("policy.outcome")));
     }
 
     @Test
@@ -95,7 +96,7 @@ class DegradedModeTest {
         for (Decision d : refused) {
             assertFalse(d.allows(), d.toString());
         }
-        assertTrue(audit.records().stream().noneMatch(PolicyDecisionRecord::recoveryPath),
+        assertTrue(audit.records().stream().noneMatch(event -> Boolean.parseBoolean(event.attributes().get("policy.recoveryPath"))),
                 "the recovery rule must not be consulted for other actions");
     }
 
@@ -136,8 +137,8 @@ class DegradedModeTest {
         assertEquals(DecisionOutcome.ERROR, d.outcome());
         assertEquals("engine broke", d.reason());
         assertEquals(2, audit.records().size());
-        assertTrue(audit.records().get(1).recoveryPath());
-        assertEquals("unknown recovery operation", audit.records().get(1).decision().reason());
+        assertTrue(Boolean.parseBoolean(audit.records().get(1).attributes().get("policy.recoveryPath")));
+        assertEquals("unknown recovery operation", audit.records().get(1).attributes().get("policy.reason"));
     }
 
     @Test
@@ -147,7 +148,7 @@ class DegradedModeTest {
         Decision d = pep(denying, audit).operation(RecoveryOperation.CANCEL, OPERATOR, OPERATOR_SCOPES, TASK_ID);
         assertEquals(DecisionOutcome.DENY, d.outcome());
         assertEquals(1, audit.records().size());
-        assertFalse(audit.records().get(0).recoveryPath());
+        assertFalse(Boolean.parseBoolean(audit.records().get(0).attributes().get("policy.recoveryPath")));
     }
 
     @Test
@@ -164,8 +165,8 @@ class DegradedModeTest {
     void theRecoveryDecisionMustBeRecordedOrItIsRefused() {
         InMemoryAuditSink auditThatFailsOnRecovery = new InMemoryAuditSink() {
             @Override
-            public void record(PolicyDecisionRecord record) {
-                if (record.recoveryPath()) {
+            public void record(AuditEvent record) {
+                if (Boolean.parseBoolean(record.attributes().get("policy.recoveryPath"))) {
                     throw new IllegalStateException("audit down");
                 }
                 super.record(record);
