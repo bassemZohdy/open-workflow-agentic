@@ -116,6 +116,33 @@ final class Harness {
         }
     }
 
+    /** A raw answer: status, media type and body. */
+    record Raw(int status, String contentType, String body) {
+    }
+
+    /** POST that returns the status and media type instead of failing on 3xx and above. */
+    static Raw postRaw(String path, Object body) throws IOException, InterruptedException {
+        HttpResponse<String> r = HTTP.send(HttpRequest.newBuilder(URI.create(BASE + path))
+                .timeout(Duration.ofSeconds(30))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
+                .build(), HttpResponse.BodyHandlers.ofString());
+        return new Raw(r.statusCode(), r.headers().firstValue("Content-Type").orElse(""), r.body());
+    }
+
+    /** HTTP status of a GET, or -1 when nothing answers. */
+    static int status(String path) {
+        try {
+            return HTTP.send(HttpRequest.newBuilder(URI.create(BASE + path))
+                    .timeout(Duration.ofSeconds(5)).GET().build(), HttpResponse.BodyHandlers.ofString()).statusCode();
+        } catch (IOException e) {
+            return -1;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return -1;
+        }
+    }
+
     static void await(String what, Duration timeout, BooleanSupplier condition) throws InterruptedException {
         long deadline = System.nanoTime() + timeout.toNanos();
         while (System.nanoTime() < deadline) {
@@ -188,6 +215,17 @@ final class Harness {
 
         String logText() throws IOException {
             return Files.exists(log) ? Files.readString(log) : "";
+        }
+
+        /** Waits until the process log contains the text. */
+        void awaitLog(String text, Duration timeout) throws InterruptedException {
+            await(name + " log contains: " + text, timeout, () -> {
+                try {
+                    return logText().contains(text);
+                } catch (IOException e) {
+                    return false;
+                }
+            });
         }
     }
 }

@@ -38,6 +38,10 @@ public class Lifecycle {
     @ConfigProperty(name = "spikec.reconcile.enabled", defaultValue = "true")
     boolean reconcileEnabled;
 
+    /** Test-only: the reconciliation throws this many times before it does any work. Zero in production. */
+    @ConfigProperty(name = "spikec.reconcile.fail-attempts", defaultValue = "0")
+    int forcedFailAttempts;
+
     private volatile boolean ready;
 
     public boolean isReady() {
@@ -58,6 +62,9 @@ public class Lifecycle {
 
     private void reconcile() {
         try {
+            if (forcedFailAttempts > 0) {
+                throw new IllegalStateException("forced recovery failure (test)");
+            }
             awaitDefinitions();
             // Restored instances are registered in memory; give the engine a moment to finish restoring.
             Thread.sleep(1_000);
