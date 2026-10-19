@@ -7,7 +7,9 @@ import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -51,6 +53,31 @@ public class CountingWorkflowEngine implements WorkflowEngine {
                 inner.start();
             }
         };
+    }
+
+    @Override
+    public Optional<ActiveInstance> activeInstance(DefinitionRef definition, String engineInstanceId) {
+        return real.activeInstance(definition, engineInstanceId);
+    }
+
+    @Override
+    public List<String> activeInstanceIds(DefinitionRef definition) {
+        return real.activeInstanceIds(definition);
+    }
+
+    @Override
+    public List<DefinitionRef> definitions() {
+        return real.definitions();
+    }
+
+    @Override
+    public boolean startRestored(DefinitionRef definition, String engineInstanceId) {
+        return real.startRestored(definition, engineInstanceId);
+    }
+
+    @Override
+    public boolean cancel(DefinitionRef definition, String engineInstanceId) {
+        return real.cancel(definition, engineInstanceId);
     }
 
     /** Resets the counters and the pending failures. */

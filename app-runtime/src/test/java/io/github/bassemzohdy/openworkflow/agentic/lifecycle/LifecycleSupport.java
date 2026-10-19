@@ -15,7 +15,13 @@ import javax.sql.DataSource;
 /** Shared helpers for the lifecycle boot tests. Each test uses its own tenant, so tests do not see each other's rows. */
 final class LifecycleSupport {
 
-    static final String DEFINITION_ID = "agentic/research-and-approve";
+    /**
+     * The boot tests start the lifecycle-probe definition, not research-and-approve: the latter calls an agent endpoint
+     * that does not exist here, so it fails within milliseconds and the registry (now synced from the engine, WP-105c)
+     * would move before the test reads it. The probe holds its first effect call for 20 seconds, so the instance stays
+     * RUNNING for the length of a test.
+     */
+    static final String DEFINITION_ID = "agentic/lifecycle-probe";
     static final String DEFINITION_VERSION = "0.1.0";
 
     private LifecycleSupport() {
@@ -39,7 +45,9 @@ final class LifecycleSupport {
     }
 
     static Map<String, Object> standardBody(String key) {
-        return body(DEFINITION_ID, DEFINITION_VERSION, key, Map.of("topic", "agentic workflows"));
+        // The test port is random; RestAssured is pointed at the running application, so its port is the right one.
+        String effectUrl = "http://localhost:" + io.restassured.RestAssured.port + "/dev/lifecycle/effects";
+        return body(DEFINITION_ID, DEFINITION_VERSION, key, Map.of("effectUrl", effectUrl, "mode", "hold"));
     }
 
     static ValidatableResponse post(String tenant, Map<String, Object> body) {
