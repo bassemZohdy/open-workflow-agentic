@@ -46,6 +46,33 @@ resource, so a runtime that passes it through fails there.
 Status: client and guard **[fake]**, against `DelegationAuthorizationServer` in oa-testkit test scope. Against Keycloak
 **[unverified]**.
 
+## 6. Secrets
+
+`SecretProvider` is the port; `FileSecretProvider` reads files from `agentic.secrets.dir` (a mounted Kubernetes Secret, for
+example). Vault is out of scope.
+
+- Rotating values are files, never environment variables (an environment variable cannot change in a running process).
+- A secret name is a plain file name. The file must resolve inside the directory; a symlink out of it is refused. The
+  symlink swap Kubernetes performs inside a mount is a normal rotation.
+- A changed file (real path, modification time or size) is read on the next call. An unchanged file is read again every
+  `agentic.secrets.ttl` (default 30 s).
+- A deleted file revokes the secret at once, even inside the ttl.
+- A read error that is not "missing" lets the cached value be used for `agentic.secrets.max-stale` (default 2 min) after the
+  ttl, and then the secret is unavailable. An empty, oversized or non-text file is unavailable at once and never falls back
+  to an older value.
+- Unavailable means `SecretUnavailableException`. The token exchanger turns it into `ExchangeException(UNAVAILABLE)` and
+  sends nothing, so dependent work pauses or fails; it does not run without the secret.
+- A value is never logged, never in an exception message, never in an audit attribute. Audit events
+  `identity.secret.rotated` and `identity.secret.unavailable` carry the secret's name and a generation number (or a reason)
+  only; there is no hash of the value.
+- The JVM cannot wipe a `String`. `Credential` limits where a value travels (redacted `toString` and JSON, identity
+  equality); it does not erase memory.
+
+Status: **[verified]** with a real directory (symlinks, rotation, deletion, unreadable path) in
+`FileSecretProviderTest`, and with the exchanger in `SecretRotationExchangeTest` against the in-process authorization
+server. Behaviour on a real Kubernetes mount is **[unverified]**: the atomic-swap layout is reproduced with symlinks, not
+with a kubelet.
+
 ## 9. Keycloak 26.2+ integration test (unverified)
 
 This test has not been run. No container runtime is available where WP-102 was built, so no Keycloak was started. It is
