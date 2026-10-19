@@ -1,7 +1,15 @@
 {
+  "T07": {
+    "status": "automated",
+    "where": "oa-testkit:DelegatedAuthorityAcceptanceTest#revokingTheParentStopsTheChildAndTheTokensItAlreadyHolds; oa-testkit:DelegatedAuthorityAcceptanceTest#theAgentTaskContractCannotBeWidenedByAChildTask; oa-testkit:DelegatedAuthorityAcceptanceTest#anExpiredTokenIsRefusedAndNoNewOneIsIssuedUnderAnExpiredOrRevokedGrant; oa-testkit:DelegatedAuthorityAcceptanceTest#thePolicyBoundaryDeniesADelegatedCallOutsideItsScopeRecordsWhyAndFailsClosedWhenItCannotDecide; oa-testkit:DelegatedAuthorityAcceptanceTest#aTokenIsAcceptedOnceAndEveryLaterUseIsAReplayEvenAfterARestart; oa-testkit:DelegatedAuthorityAcceptanceTest#aTokenIsBoundToItsResourceAndTheUsersOwnTokenIsNotADelegatedOne; oa-testkit:DelegatedAuthorityAcceptanceTest#theDatabaseRefusesAWiderOrLongerChildEvenWhenTheServiceIsBypassed; oa-testkit:DelegatedAuthorityAcceptanceTest#anAgentCannotPassOnMoreThanItHoldsInScopeLifeOrIdentity; oa-testkit:DelegatedAuthorityAcceptanceTest#theExchangeNeverIssuesMoreThanTheGrantAndTheResourceRefusesAForgedWiderToken"
+  },
   "T12": {
     "status": "planned",
     "where": "poc item 4"
+  },
+  "T13": {
+    "status": "planned",
+    "where": "poc item 5"
   },
   "T16": {
     "status": "planned",
@@ -14,9 +22,5 @@
   "T37": {
     "status": "planned",
     "where": "poc item 4"
-  },
-  "T13": {
-    "status": "planned",
-    "where": "poc item 5"
   }
 }
