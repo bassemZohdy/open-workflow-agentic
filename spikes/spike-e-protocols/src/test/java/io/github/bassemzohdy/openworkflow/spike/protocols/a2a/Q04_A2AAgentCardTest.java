@@ -33,9 +33,10 @@ class Q04_A2AAgentCardTest {
     }
 
     @Test
-    @Disabled("Blocked: the A2A reference server does not serve /.well-known/agent-card.json in this "
-            + "Quarkus app. Observed 404; its routes are an @Observes Router method on a class that is not "
-            + "a bean, and its JSON-RPC handler and security helper beans are not produced.")
+    @Disabled("Blocked (issue #25): Observed 404 on /.well-known/agent-card.json. A2AServerRoutes is a @Singleton "
+            + "with an @Observes Router method, but JSONRPCHandler and VertxSecurityHelper have no bean-defining "
+            + "annotation and were not produced. CaseA2AWiring produces them but was not run: Quarkus augmentation "
+            + "stalls in ArC AutoAddScope bean discovery under -Pa2a on this host. See WP-007, In-process wiring.")
     void Q04_agentCardServedAtWellKnownPathWithProtocolVersion() throws Exception {
         // Intended check: GET <base>/.well-known/agent-card.json returns 200 with supportedInterfaces[0].protocolVersion "1.0".
         // Not run: see the @Disabled reason.

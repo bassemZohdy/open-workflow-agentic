@@ -38,7 +38,7 @@ class Q05_A2ATaskLifecycleTest {
     }
 
     @Test
-    @Disabled("Blocked: A2A reference server routes and JSON-RPC beans are not wired in this Quarkus app (observed 404 on the Agent Card). Not run; see WP-007 spike report.")
+    @Disabled("Blocked (issue #25): Agent Card 404. Missing beans were JSONRPCHandler and VertxSecurityHelper; CaseA2AWiring produces them but this was not run, because Quarkus augmentation stalls in ArC AutoAddScope bean discovery under -Pa2a on this host. See WP-007, In-process wiring.")
     void Q05_completedTaskStreamsWorkingThenCompleted() throws Exception {
         Client client = A2ATestSupport.client(A2A.getAgentCard(base.toString()), true);
         try {
@@ -55,7 +55,7 @@ class Q05_A2ATaskLifecycleTest {
     }
 
     @Test
-    @Disabled("Blocked: A2A reference server routes and JSON-RPC beans are not wired in this Quarkus app (observed 404 on the Agent Card). Not run; see WP-007 spike report.")
+    @Disabled("Blocked (issue #25): Agent Card 404. Missing beans were JSONRPCHandler and VertxSecurityHelper; CaseA2AWiring produces them but this was not run, because Quarkus augmentation stalls in ArC AutoAddScope bean discovery under -Pa2a on this host. See WP-007, In-process wiring.")
     void Q05_inputRequiredPausesTaskAndFollowUpResumesIt() throws Exception {
         Client client = A2ATestSupport.client(A2A.getAgentCard(base.toString()), true);
         try {
@@ -83,7 +83,7 @@ class Q05_A2ATaskLifecycleTest {
     }
 
     @Test
-    @Disabled("Blocked: A2A reference server routes and JSON-RPC beans are not wired in this Quarkus app (observed 404 on the Agent Card). Not run; see WP-007 spike report.")
+    @Disabled("Blocked (issue #25): Agent Card 404. Missing beans were JSONRPCHandler and VertxSecurityHelper; CaseA2AWiring produces them but this was not run, because Quarkus augmentation stalls in ArC AutoAddScope bean discovery under -Pa2a on this host. See WP-007, In-process wiring.")
     void Q05_runningTaskCanBeCanceled() throws Exception {
         Client client = A2ATestSupport.client(A2A.getAgentCard(base.toString()), true);
         try {

@@ -41,7 +41,7 @@ Confidence labels:
 | `io.github.a2asdk:*` | up to 1.0.0.Alpha3 | 2026-02-19 | Superseded group name. Do not use. |
 | `langgraph4j-ag-ui-sdk` | 1.9.5 | 2026-10-13 | Exists. Not evaluated. |
 
-**Risks:** (1) the A2A reference server is not a Quarkus extension and does not come up in a Quarkus test app; wiring it needs `JSONRPCHandler`, `AgentCardCacheMetadata`, `VertxSecurityHelper` (which needs `quarkus-security`) to be produced by us, and we did not finish that. (2) The 1.14.2 BOM and beta lines are easy to mix up. (3) MCP spec `2026-07-28` is recent; client and server both list it, but interop was not tested.
+**Risks:** (1) the A2A reference server is not a Quarkus extension and does not come up in a Quarkus test app; wiring it needs `JSONRPCHandler` and `VertxSecurityHelper` to be produced by us (neither has a bean-defining annotation; `AgentCardCacheMetadata` is already a bean), and we did not finish that. Under `-Pa2a`, augmentation also stalls in ArC bean discovery (see "In-process wiring (issue #25)"). (2) The 1.14.2 BOM and beta lines are easy to mix up. (3) MCP spec `2026-07-28` is recent; client and server both list it, but interop was not tested.
 
 ## Test status
 
@@ -72,9 +72,19 @@ Environment notes: Maven Central returned HTTP 429 once and recovered. GitHub wa
 | WP-402 Safe upgrades; plan section 3 and decision D-8 | "Quarkus LangChain4j 1.14.2 ... stay on 1.14" | Correct the assumption: the 1.14.2 BOM manages langchain4j 1.20.2 and the MCP module uses 1.20.2-beta30. Record this in the plan's reuse table when the plan is next revised (not edited here). |
 | WP-113 and WP-406 | Not MCP/A2A specific | No change. |
 
+## In-process wiring (issue #25)
+
+**Status:** not closed. Routes are still not served, and no A2A test ran.
+
+- **Root cause of the 404 (read-in-jar).** `a2a-java-sdk-reference-jsonrpc` 1.4.0.Final has `A2AServerRoutes`, a `@Singleton` with an `@Observes Router` method that registers `POST /`, `GET /.well-known/agent-card.json` and a tenant-regex variant. It injects `JSONRPCHandler`, `AgentCardCacheMetadata`, `VertxSecurityHelper` and `Executor`. `JSONRPCHandler` (`transport-jsonrpc`) and `VertxSecurityHelper` (`reference-common`) have no bean-defining annotation, so nothing produces them. `AgentCardCacheMetadata` is `@ApplicationScoped` in `server-common` (read-in-jar), so the earlier note that it was missing was wrong. `DefaultRequestHandler`, `InMemoryTaskStore`, `InMemoryQueueManager`, `MainEventBusProcessor` and `InMemoryPushNotificationConfigStore` are annotated.
+- **Added (untested at runtime).** `src/test/.../a2a/CaseA2AWiring.java` produces `JSONRPCHandler` (public 3-argument constructor, `@PublicAgentCard` card, `RequestHandler`, `Executor`), `VertxSecurityHelper` (public no-arg constructor) and a virtual-thread `Executor`. `CaseAgentExecutor` and `CaseAgentCard` were already in place. It compiles under `-Pa2a` (`mvn -Pa2a test-compile`, BUILD SUCCESS). It was not run, so it may still be wrong.
+- **Blocker found while testing.** Under `-Pa2a`, Quarkus augmentation does not finish on this host. Thread dumps (`jstack`, twice, same stack) show the build thread CPU-bound in ArC `AutoAddScopeProcessor` (`implementsInterface`) → Jandex `CompositeIndex.getClassByName` during `BeanDeployment.findBeans`. Runs reached 10 to 15 minutes with no output. Excluding `a2a-java-sdk-spec-grpc` from the client did not change it. The default build (no A2A) is not affected. The stall was seen before this change (the first baseline run) and after it, so the wiring was never exercised.
+- **Tests.** No test changed from disabled to enabled. Each `@Disabled` reason in Q04, Q05, Q06 (the first test only) and Q07 now says what is missing and where the stall is. `Q06_childDelegationCanOnlyNarrowScope` is unchanged: the protocol does not provide scope narrowing.
+- **Next step.** Find which index or extension makes `AutoAddScope` slow (for example by bisecting the test-scope dependencies, or running on a host with more CPU), then run `Q04` to `Q07` under `-Pa2a` with `CaseA2AWiring`.
+
 ## Open questions
 
-1. How to wire the A2A reference server in a Quarkus test app. A binding subclass made the route observer active, and the build then reported missing `JSONRPCHandler`, `AgentCardCacheMetadata` and `VertxSecurityHelper` beans (the last needs `quarkus-security`). Whether to produce these ourselves or use another A2A server (for example a plain Vert.x route on the SDK's JSON-RPC handler) is open. Q04's served card and Q05 to Q07 depend on it.
+1. How to wire the A2A reference server in a Quarkus test app. See "In-process wiring (issue #25)" above: the missing beans are `JSONRPCHandler` and `VertxSecurityHelper`, and augmentation stalls under `-Pa2a`. Whether to keep the produced beans or use another A2A server (for example a plain Vert.x route on the SDK's JSON-RPC handler) is open. Q04's served card and Q05 to Q07 depend on it.
 2. Why `@McpParamHeader` does not populate a tool parameter in this setup (Q03). The raw header is present, so the header path itself works.
 3. Whether `quarkus-langchain4j-a2a-apicurio-registry` works with SDK 1.4.0.Final or only with 1.0.0.Final.
 4. Whether `io.modelcontextprotocol.sdk` (MCP Java SDK, 2.x line) should be the client instead of langchain4j's MCP module. Not evaluated.

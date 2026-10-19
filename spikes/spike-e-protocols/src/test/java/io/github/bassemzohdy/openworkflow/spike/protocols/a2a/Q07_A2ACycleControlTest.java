@@ -25,7 +25,7 @@ class Q07_A2ACycleControlTest {
     URL base;
 
     @Test
-    @Disabled("Blocked: A2A reference server routes and JSON-RPC beans are not wired in this Quarkus app (observed 404 on the Agent Card). Not run; see WP-007 spike report.")
+    @Disabled("Blocked (issue #25): Agent Card 404. Missing beans were JSONRPCHandler and VertxSecurityHelper; CaseA2AWiring produces them but this was not run, because Quarkus augmentation stalls in ArC AutoAddScope bean discovery under -Pa2a on this host. See WP-007, In-process wiring.")
     void Q07_contextIdIsReusedAcrossTasksAndTaskIdsAreDistinct() throws Exception {
         Client client = A2ATestSupport.client(A2A.getAgentCard(base.toString()), false);
         try {
@@ -43,7 +43,7 @@ class Q07_A2ACycleControlTest {
     }
 
     @Test
-    @Disabled("Blocked: A2A reference server routes and JSON-RPC beans are not wired in this Quarkus app (observed 404 on the Agent Card). Not run; see WP-007 spike report.")
+    @Disabled("Blocked (issue #25): Agent Card 404. Missing beans were JSONRPCHandler and VertxSecurityHelper; CaseA2AWiring produces them but this was not run, because Quarkus augmentation stalls in ArC AutoAddScope bean discovery under -Pa2a on this host. See WP-007, In-process wiring.")
     void Q07_customMessageMetadataRoundTripsToTheServer() throws Exception {
         Client client = A2ATestSupport.client(A2A.getAgentCard(base.toString()), false);
         try {
