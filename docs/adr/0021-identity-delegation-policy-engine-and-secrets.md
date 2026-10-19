@@ -1,9 +1,9 @@
 # ADR-0021: Identity delegation, policy engine and secret store
 
-**Status:** Proposed  
+**Status:** Accepted  
 **Date:** 2026-10-18
 
-Evidence: [WP-006 spike report](../spikes/WP-006-identity-policy-secrets.md) and the code in `spikes/spike-d-identity-policy` (43 tests pass). Owner decisions D-1 and D-2 of the [plan](../plan/README.md) are the inputs; the secret store decision is proposed here as D-9 and is not yet in the plan.
+Evidence: [WP-006 spike report](../spikes/WP-006-identity-policy-secrets.md) and the code in `spikes/spike-d-identity-policy` (43 tests pass). Owner decisions D-1 and D-2 of the [plan](../plan/README.md) are the inputs; the secret store decision is D-9 in the plan, decided on 2026-10-19 (section 3 below).
 
 Each part of the decision is marked **[verified]** (a test in the spike ran) or **[read-in-docs]** (taken from official documentation or from an artifact's own documentation, not executed). Parts marked **[unverified]** must not be relied on until the named check is done.
 
@@ -41,9 +41,9 @@ Constraints in this environment: no container runtime, so no Keycloak, Vault or 
 - Attribution: a Cedar decision names the deciding policy by an engine-assigned id (`policy0`, `policy1`), not by the `@id` annotation **[verified]**. The plan needs its own stable policy-id map. Policy-set version recording is not built **[unverified]**.
 - Default deny for uncovered paths and non-bypass of in-process calls are not verified **[unverified]**: see Consequences.
 
-### 3. Secrets (proposed D-9): Vault where it exists, Kubernetes Secrets for static values
+### 3. Secrets (D-9, decided 2026-10-19): Vault where the organization runs it, Kubernetes Secrets for static values
 
-- If the organization runs Vault: credentials are dynamic or leased and renewed by the application through `quarkus-vault`. **[read-in-docs, version mismatch]** The BOM pins 4.9.0; the docs read describe 5.0.0.Beta1. **[unverified]** lease semantics (the Vault lease page could not be read) and renewal failure handling. Check: a Vault integration test on 4.9.0 before the secret store is chosen.
+- If the organization runs Vault: credentials are dynamic or leased and renewed by the application through `quarkus-vault`. **[read-in-docs, version mismatch]** The BOM pins 4.9.0; the docs read describe 5.0.0.Beta1. **[unverified]** lease semantics (the Vault lease page could not be read) and renewal failure handling. Decided 2026-10-19: `quarkus-vault` stays on the BOM's 4.9.0, and a Vault integration test on 4.9.0 is required before the secret store is chosen. Check: the Vault integration test named here.
 - Kubernetes Secrets for static values only, read from mounted files and reloaded or restarted on change. **[read-in-docs, CSI driver docs]**: rotation for mounted secrets is driven by kubelet's republish cycle with a default 2-minute window; environment variables from synced Secrets are not updated without a pod restart. **[unverified]** core Kubernetes mount timing and encryption at rest.
 - Application rules, regardless of store: renew or re-read before the TTL; handle renewal failure by pausing work that needs the credential; never read rotating values from environment variables; reacquire user-delegated tokens from the grant, not from a stored refresh token **[verified for the last rule, in our model]**.
 
@@ -56,7 +56,7 @@ Constraints in this environment: no container runtime, so no Keycloak, Vault or 
 - Decisions must carry the policy id and the policy-set version (M12). The id map and version recording are our work.
 - Each enforcement point must be on the only path to its tool or model. This is an architectural property that the spike did not test: it needs an ArchUnit rule and a runtime check, and it applies to every new route.
 - Path rules: the HTTP policy is attached to the configured path (`/tools/*`). Routes outside that path are expected to be uncovered; this is inferred from the configuration and was not tested **[unverified]**. Deny-by-default for all other paths must be configured and tested (open).
-- The secret store decision is new (D-9). Until it is taken, WP-102 can only implement the application rules in section 3, not the store.
+- The secret store decision is D-9, decided on 2026-10-19 as section 3 states. The Vault path is not chosen until the Vault integration test passes on 4.9.0. Until then the application rules in section 3 apply to either store, and the Kubernetes Secrets path is the only one for static values.
 
 ## Alternatives considered
 
@@ -67,3 +67,12 @@ Constraints in this environment: no container runtime, so no Keycloak, Vault or 
 - **Quarkus `@PermissionsAllowed` with custom checkers as the policy engine:** not tested. The rules are expressed in Java code, which is harder to review and to version than declarative policies. Kept as a second enforcement point only if tested **[unverified]**.
 - **Kubernetes Secrets only:** simpler, but no lease, revocation or dynamic credentials, and rotation needs restarts for environment variables **[read-in-docs]**. Kept for static values.
 - **Vault only:** stronger rotation, but it is a service to run and the Quarkus binding in the BOM is at a version whose docs were not read **[unverified]**.
+
+## Amendments (2026-10-19)
+
+The owner decided D-9 on 2026-10-19. Section 3 above now states the decision. The earlier wording was "proposed here as D-9", with no decision and no entry in the plan. The plan's section 9 now has a D-9 row, marked decided.
+
+1. **Secret store (D-9).** Was: proposed, with the choice open. Now: Vault where the organization runs it; Kubernetes Secrets for static values; `quarkus-vault` stays on the BOM's 4.9.0; a Vault integration test on 4.9.0 is required before the secret store is chosen. Status: decided. The Vault integration test is not written or run yet, so the Vault path is not implemented.
+2. **Version of the Vault binding.** The docs read in section 3 describes `quarkus-vault` 5.0.0.Beta1, but the BOM pins 4.9.0. The decision keeps 4.9.0. The lease and renewal behaviour of 4.9.0 is therefore still unverified, and the integration test is the check.
+
+Nothing else in this ADR is changed by the owner's decisions.
