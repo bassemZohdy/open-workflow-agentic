@@ -112,6 +112,41 @@ Status: **[verified]** with a real directory (symlinks, rotation, deletion, unre
 server. Behaviour on a real Kubernetes mount is **[unverified]**: the atomic-swap layout is reproduced with symlinks, not
 with a kubelet.
 
+## 7. Propagation and no persistence
+
+**What is carried.** Three identifiers: the subject, the grant id and the correlation id. `AuthorityScope` holds them for the
+current thread and in the log context (`oa.subject`, `oa.grant`, `oa.instance`). `wrap`, `wrapCall`, `wrapGet` and
+`wrapExecutor` capture the scope when a task is created and install it, then remove it, around the task on whatever thread
+runs it. The scope is context, not authentication: nothing trusts it for an access decision. Decisions use the registry row
+and the grant store.
+
+**What is stored.** Only identifiers, in `identity.instance_authority` (section 5), written in the transaction that creates the
+instance. Nothing about identity travels in workflow state, the engine's checkpoints, outbox payloads or audit events beyond
+those identifiers. A token is never stored. The table refuses values that look like one (length, character set, a value
+starting `eyJ`).
+
+**Resume.** After a restart the engine instance has no thread context. `InstanceAuthorities.restore(engineInstanceId)` reads the
+registry row and installs the scope again, so a step on a restored instance sees the original subject, grant and correlation id.
+A token for a downstream call is obtained again by exchange (section 4) under that grant; the old one was never kept.
+
+**Evidence.** `IdentityRecoveryIT` (failsafe, real child JVMs, SIGKILL, real engine, tokens of the fake issuer):
+
+1. Two instances start under two grants of one user with distinct correlation ids; a secret is read and rotated in the process.
+2. The process is killed with SIGKILL; one grant is revoked while it is down.
+3. After restart the instance with the valid grant resumes (epoch 1) and its step sees the same subject, grant and correlation id.
+   The other one is held: no effect call, status WAITING, history reason `reauthorization.required` once, one audit event,
+   inspect shows the state, the task view shows the reason.
+4. The user renews with a new grant; the held instance resumes under the new grant with the original subject and correlation id.
+5. Both complete. Every table of every non-system schema (workflow rows, registry, history, outbox, task view, audit events
+   and payloads, scheduler rows, grants, authority) and both process logs are searched for the tokens used (whole, payload part,
+   signature part, hex, base64) and for both secret values with their hex and base64 forms. The search first has to find a token
+   planted in a table, so it cannot pass by looking at nothing. No hit is allowed.
+
+Limits: the scan proves the absence of these exact strings and encodings, not of every transformation. Checkpoints are the
+engine's persistence tables in the same database; the scan covers them as part of "every table". The database password is not
+scanned (it appears in connection settings by design). The live in-process path is not gated by a grant check; the check is
+available to steps (`InstanceAuthorities.recheck`) and is wired at resume. Verified against the testkit's fake issuer only.
+
 ## 9. Keycloak 26.2+ integration test (unverified)
 
 This test has not been run. No container runtime is available where WP-102 was built, so no Keycloak was started. It is
