@@ -47,6 +47,13 @@ public class FlowWorkflowEngine implements WorkflowEngine {
                 // start() returns a future that completes when the instance completes or waits. We do not wait for it.
                 instance.start();
             }
+
+            @Override
+            public boolean discard() {
+                // prepare() registers a PENDING Flow instance. If the registry write loses a cancellation race,
+                // cancel that still-pending instance so it is not left unregistered in Flow.
+                return instance.cancel();
+            }
         };
     }
 
