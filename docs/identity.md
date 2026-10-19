@@ -217,9 +217,9 @@ available to steps (`InstanceAuthorities.recheck`) and is wired at resume. Verif
 
 Run on 2026-10-19 against real Keycloak distributions (no container runtime was available, so the tarballs were started
 with `kc.sh start-dev`): **26.2.5** and **26.8.1**, the latter also with
-`--features=token-exchange-delegation,parameterized-scopes`. The realm and every request are in
-`docs/handoffs/claude/WP-102-keycloak-probe.py`; rerun it to reproduce. This was a probe with a script, not yet a CI test:
-nothing here is asserted by the build, and `Rfc8693TokenExchanger` and `JwtTokenVerifier` were not yet run against these
+`--features=token-exchange-delegation,parameterized-scopes`. The realm and every request are described in 9.5, so
+the run can be repeated by hand. The probing script was removed from the repository on review (research code stays out);
+nothing here is asserted by the build yet, and `Rfc8693TokenExchanger` and `JwtTokenVerifier` were not yet run against these
 tokens (the next step, see the handoff).
 
 ### 9.1 Realm set-up that the old text left out (all needed, all found by failing)
@@ -273,6 +273,34 @@ tokens (the next step, see the handoff).
 
 Rotation of the JWKS signing key against a running verifier; the user's token expiring mid-flight beyond the single case
 tested; Keycloak 26.8 in a stable (non-preview) configuration; any other identity provider.
+
+### 9.5 Reproduction recipe
+
+Start Keycloak 26.2.5 (or 26.8.1) with `bin/kc.sh start-dev` and a bootstrap admin (`KC_BOOTSTRAP_ADMIN_USERNAME` /
+`KC_BOOTSTRAP_ADMIN_PASSWORD`); for delegation add `--features=token-exchange-delegation,parameterized-scopes`. Use the admin
+REST API (`/admin/realms`) with an admin-cli password-grant token. Create, in this order:
+
+1. Realm `agentic`, access token lifespan 3600 s. Add user-profile attributes `tenant` and `sub_kind`.
+2. Client scopes `cases:read`, `cases:write`, `cases:delete` (include in token scope; hide from consent).
+3. Client `oa-api`: public, direct access grants, standard flow off. Mappers: audience `oa-api`, audience `oa-agent-runtime`,
+   user-attribute `tenant` and `sub_kind`. Optional scopes `cases:read`, `cases:write`. For the expiry case also a copy with
+   client attribute `access.token.lifespan=20`.
+4. Client `oa-agent-runtime`: confidential, secret of your choice, service accounts on, standard flow off, attribute
+   `standard.token.exchange.enabled=true`, `access.token.lifespan=300`. Remove default scopes `profile` and `email`. Mappers:
+   user-attribute `tenant` and `sub_kind`. Optional scopes `cases:read`, `cases:write`. Set the attributes `tenant=tenant-agent`
+   and `sub_kind=AGENT` on its service-account user.
+5. Confidential clients `tool-cases` and `tool-search` with a client role `invoke` each.
+6. User `alice` (password, email verified, attribute `tenant=tenant-1`) with the `invoke` role of both tool clients.
+7. For 26.8 delegation: a hard-coded claim mapper on `oa-api` writing the JSON claim `may_act` = `{"sub": "<user id of the
+   oa-agent-runtime service account>"}`.
+
+Requests (all to the realm token endpoint): alice's token by password grant against `oa-api` with `scope=cases:read cases:write`;
+the workload token by client credentials of `oa-agent-runtime`; then a `urn:ietf:params:oauth:grant-type:token-exchange` request
+authenticated as `oa-agent-runtime` (HTTP Basic) with `subject_token` = alice's token, `audience`, `scope`, and optionally
+`actor_token` = the workload token with `actor_token_type` of access_token. Variants run: garbage, wrong-type and
+user's-own actor token; scope alice lacks; unregistered audience; garbage subject token; a 20 s user token before and after its
+expiry; alice's token after logout. The results are in 9.2. The assertion-bearing form of this recipe is the Keycloak
+integration test in `apps/app-runtime/src/test/java/.../identity/` (env-gated on `KEYCLOAK_URL`).
 
 ## 10. Configuration
 
