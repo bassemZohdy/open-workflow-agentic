@@ -1,0 +1,8 @@
+[
+  {
+    "workflow": "research-and-approve",
+    "agents": ["research"],
+    "tools": [],
+    "policies": []
+  }
+]
