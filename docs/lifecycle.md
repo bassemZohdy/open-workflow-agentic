@@ -293,7 +293,7 @@ Each returns counts. The operator's identity is not recorded by these methods; 1
 
 ### 9.7 The resume epoch seam (WP-108)
 
-`task.instance.resume_epoch` counts the restarts the reconciler performed. It is incremented before `startRestored`, so the task that runs again sees the new value. A task reads it from its engine instance id through `RegistryScan.resumeEpochOfEngineInstance`. In YAML, the probe sends the engine id in `X-Flow-Instance-Id` and the endpoint looks the epoch up. Whether a YAML expression can read the epoch directly was not tested; the call above is the verified path. WP-108 keys its effect ledger on (engine instance id, epoch, node id).
+`task.instance.resume_epoch` counts the restarts the reconciler performed. It is incremented before `startRestored`, so the task that runs again sees the new value. A task reads it from its engine instance id through `RegistryScan.resumeEpochOfEngineInstance`. In YAML, the probe sends the engine id in `X-Flow-Instance-Id` and the endpoint looks the epoch up. Whether a YAML expression can read the epoch directly was not tested; the call above is the verified path. The epoch is diagnostic only: WP-108 derives an effect key from the scoped thread, node and persisted logical operation occurrence. Retrying or restarting that occurrence MUST reuse its key; including the changing epoch would permit a duplicate business effect. See [WP-108](handoffs/gpt/WP-108.md).
 
 ### 9.8 HTTP retry rule
 
