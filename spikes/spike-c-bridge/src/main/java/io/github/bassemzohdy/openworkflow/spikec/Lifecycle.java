@@ -108,7 +108,7 @@ public class Lifecycle {
         for (Map<String, Object> row : rows) {
             String bridge = (String) row.get("bridge");
             String engineId = (String) row.get("engine_id");
-            if (!restoredEngineIds.add(engineId)) {
+            if (restoredEngineIds.contains(engineId)) {
                 continue;
             }
             WorkflowDefinition d = definition("bridge-" + bridge);
@@ -122,17 +122,23 @@ public class Lifecycle {
             } else {
                 LOG.info("no persisted engine instance for {} (completed or never persisted)", engineId);
             }
+            // Mark work complete only after start (or the confirmed absent-instance check) succeeds. If it throws,
+            // the next recovery attempt retries this row instead of opening readiness with work skipped.
+            restoredEngineIds.add(engineId);
         }
         // Bridge C: agent runs that were in flight in this JVM.
         Thread.sleep(1_000);
         for (Map<String, Object> run : store.runsToRecover("C-async")) {
             Ctx ctx = Ctx.fromJson((String) run.get("received_ctx"));
-            if (!restartedThreads.add(ctx.threadId().value())) {
+            String threadId = ctx.threadId().value();
+            if (restartedThreads.contains(threadId)) {
                 continue;
             }
             LOG.info("restarting agent run {} from status {}", ctx.threadId(), run.get("status"));
-            store.recordStep(ctx.threadId().value(), "reconciler-restart:" + run.get("status"), ctx, null);
+            store.recordStep(threadId, "reconciler-restart:" + run.get("status"), ctx, null);
             async.recover(ctx, (String) run.get("status"));
+            // If recordStep or recover throws, leave the run eligible for the next attempt.
+            restartedThreads.add(threadId);
         }
     }
 
