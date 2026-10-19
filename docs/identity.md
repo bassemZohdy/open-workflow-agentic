@@ -219,7 +219,7 @@ Run on 2026-10-19 against real Keycloak distributions (no container runtime was 
 with `kc.sh start-dev`): **26.2.5** and **26.8.1**, the latter also with
 `--features=token-exchange-delegation,parameterized-scopes`. The realm and every request are described in 9.5, so
 the run can be repeated by hand. The probing script was removed from the repository on review (research code stays out);
-nothing here is asserted by the build yet, and `Rfc8693TokenExchanger` and `JwtTokenVerifier` were not yet run against these
+the results are now asserted by `KeycloakInteropIT` (9.6) when a Keycloak is supplied, and `Rfc8693TokenExchanger` and `JwtTokenVerifier` were not yet run against these
 tokens (the next step, see the handoff).
 
 ### 9.1 Realm set-up that the old text left out (all needed, all found by failing)
@@ -269,6 +269,25 @@ tokens (the next step, see the handoff).
   runtime holds and our own grant check (already in force), not by the issued token. That is a policy decision for the
   integration owner: the handoff lists the options.
 
+### 9.6 The Keycloak integration test
+
+`KeycloakInteropIT` (with `KeycloakRealm`, which builds the realm of 9.5 through the admin API) runs the product's own
+`Rfc8693TokenExchanger` and `JwtTokenVerifier` against a real server. It is skipped unless `KEYCLOAK_URL` is set, so the normal
+build does not need Keycloak. It deletes and rebuilds the realm `agentic-it`: use a throw-away server.
+
+* Keycloak 26.2.5: `KEYCLOAK_URL=http://localhost:18080 mvn -pl apps/app-runtime -am verify -Dit.test=KeycloakInteropIT`
+* Keycloak 26.8.1 with `--features=token-exchange-delegation,parameterized-scopes`: also `KEYCLOAK_DELEGATION=true`.
+* Server start: `bin/kc.sh start-dev` with `KC_BOOTSTRAP_ADMIN_USERNAME=admin KC_BOOTSTRAP_ADMIN_PASSWORD=admin`
+  (`KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` override); the database is the usual `DB_URL`.
+
+Run on 2026-10-19: **10 of 10 passed on 26.2.5 and 10 of 10 on 26.8.1 (delegation)**, no container runtime, two local
+distributions. It asserts: the verifier reads tenant, scopes, and agent kind from Keycloak tokens; on 26.2.5 the client
+discards the exchanged token because there is no `act` (the gap, asserted as such); on 26.8.1 the client issues a delegated
+token whose actor is the agent's service-account user id; `invalid_scope`, `invalid_client` for an unknown audience,
+`invalid_request` for an expired subject token, refusal after logout; `actor_token` ignored on 26.2.5 and validated on 26.8.1;
+no `profile`/`email` scope; 300 s lifetime that outlives a 20 s subject token (asserted as a KNOWN GAP). Not covered: JWKS key
+rotation, and CI wiring (requested from GPT, handoff H2).
+
 ### 9.4 Still unverified
 
 Rotation of the JWKS signing key against a running verifier; the user's token expiring mid-flight beyond the single case
@@ -300,7 +319,7 @@ authenticated as `oa-agent-runtime` (HTTP Basic) with `subject_token` = alice's 
 `actor_token` = the workload token with `actor_token_type` of access_token. Variants run: garbage, wrong-type and
 user's-own actor token; scope alice lacks; unregistered audience; garbage subject token; a 20 s user token before and after its
 expiry; alice's token after logout. The results are in 9.2. The assertion-bearing form of this recipe is the Keycloak
-integration test in `apps/app-runtime/src/test/java/.../identity/` (env-gated on `KEYCLOAK_URL`).
+integration test in `apps/app-runtime/src/test/java/.../identity/` (`KeycloakInteropIT`, section 9.6; its realm is `agentic-it`).
 
 ## 10. Configuration
 
@@ -352,7 +371,7 @@ the wait deadline (`agentic.reconciler.wait-deadline`) cancels it.
 | Token exchange and resource guard | **[fake]**: the testkit's in-process authorization server and issuer (`DelegationAuthorizationServer`, `FakeIdentityProvider`). It follows the behaviour documented for Keycloak 26.2+, but is not Keycloak |
 | Kill/restart: identity restored, a held instance, no credential stored | **[verified]** with real child JVMs and the real engine (`IdentityRecoveryIT`), tokens from the fake issuer |
 | T07 | `DelegatedAuthorityAcceptanceTest`: widening, expiry and replay with two scripted agents against the fake issuer; policy boundary with the embedded Cedar engine. Real multi-agent flows are WP-207 |
-| A real Keycloak 26.2.5 and 26.8.1: exchange, `actor_token`, `act`/`may_act`, lifetime, expiry, logout | **[probed]** by script on 2026-10-19 (section 9); our client and verifier **not yet run** against it; JWKS rotation **[unverified]** |
+| A real Keycloak 26.2.5 and 26.8.1: exchange, `actor_token`, `act`/`may_act`, lifetime, expiry, logout | **[probed]** by script on 2026-10-19 (section 9); our client and verifier run against both by `KeycloakInteropIT` (section 9.6); not run in CI; JWKS rotation **[unverified]** |
 | A live step gated by the grant check | **not built**: only resume is wired; `InstanceAuthorities.recheck` exists for the agent bridge (WP-2xx) |
 | `TokenExchanger` used by a running flow | **not built**: the bean exists, nothing in the runtime injects it yet |
 | Identity carried through asynchronous tasks | the `AuthorityScope` wrappers exist and are unit tested; no runtime component uses them yet except resume |
