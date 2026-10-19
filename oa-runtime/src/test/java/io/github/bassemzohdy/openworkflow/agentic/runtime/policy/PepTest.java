@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.RiskTier;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.ActionKind;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuthorizationRequest;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
@@ -24,6 +25,8 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.SafeRecovery.Re
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
@@ -193,13 +196,43 @@ class PepTest {
         Decision refused = pep.toolCall(AGENT, PolicyFixtures.task(), "delete", 1L);
 
         assertEquals(2, audit.records().size());
-        PolicyDecisionRecord first = audit.records().get(0);
-        PolicyDecisionRecord second = audit.records().get(1);
-        assertEquals(allowed, first.decision());
-        assertEquals(refused, second.decision());
-        assertFalse(first.recoveryPath());
-        assertFalse(second.recoveryPath());
-        assertEquals("tool:delete", second.request().resource());
+        AuditEvent first = audit.records().get(0);
+        AuditEvent second = audit.records().get(1);
+        assertEquals("ALLOW", first.attributes().get("policy.outcome"));
+        assertEquals("DENY", second.attributes().get("policy.outcome"));
+        assertEquals(Boolean.toString(allowed.allows()), first.attributes().get("policy.recoveryPath"));
+        assertEquals(Boolean.toString(refused.allows()), second.attributes().get("policy.recoveryPath"));
+        assertEquals("tool:delete", second.resourceId());
+    }
+
+    @Test
+    void thePepUsesItsExplicitBulkheadBound() throws Exception {
+        CountDownLatch delegateEntered = new CountDownLatch(1);
+        CountDownLatch releaseDelegate = new CountDownLatch(1);
+        ScriptedEngine engine = new ScriptedEngine(request -> {
+            delegateEntered.countDown();
+            try {
+                releaseDelegate.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("test delegate interrupted", e);
+            }
+            return allow(request);
+        });
+        Pep pep = new Pep(engine, new InMemoryAuditSink(), Duration.ofSeconds(5), CLOCK, 1);
+        Thread first = Thread.ofPlatform().start(
+                () -> pep.toolCall(AGENT, PolicyFixtures.task(), "search", 500L));
+        try {
+            assertTrue(delegateEntered.await(2, TimeUnit.SECONDS));
+            Decision overflow = pep.toolCall(AGENT, PolicyFixtures.task(), "search", 500L);
+            assertEquals(DecisionOutcome.ERROR, overflow.outcome());
+            assertTrue(overflow.reason().contains("bulkhead"), overflow.reason());
+            assertEquals(1, engine.received().size(), "a full PEP bulkhead does not call its delegate");
+        } finally {
+            releaseDelegate.countDown();
+        }
+        first.join(2_000);
+        assertFalse(first.isAlive(), "the admitted decision should finish after its delegate is released");
     }
 
     @Test
@@ -214,7 +247,7 @@ class PepTest {
     void aDecisionThatCannotBeRecordedIsRefusedEvenWhenItWasAnAllow() {
         InMemoryAuditSink broken = new InMemoryAuditSink() {
             @Override
-            public void record(PolicyDecisionRecord record) {
+            public void record(AuditEvent record) {
                 throw new IllegalStateException("audit store unavailable");
             }
         };
