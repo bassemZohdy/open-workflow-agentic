@@ -314,10 +314,18 @@ public class Reconciler {
             recordStartFailure(row, now, failed);
             return;
         }
-        InstanceRecord prepared = store.replace(
-                row.successor(now, InstanceStatus.STARTING, launch.engineInstanceId(), row.startAttempts(),
-                        row.lastError(), null),
-                row.version(), "reconciler.prepared", InstanceService.RUNTIME_ACTOR);
+        InstanceRecord prepared;
+        try {
+            prepared = store.replace(
+                    row.successor(now, InstanceStatus.STARTING, launch.engineInstanceId(), row.startAttempts(),
+                            row.lastError(), null),
+                    row.version(), "reconciler.prepared", InstanceService.RUNTIME_ACTOR);
+        } catch (StaleVersionException moved) {
+            // An operator changed the row while the engine was prepared (for example a cancel, ADR 0019, amendment 4).
+            // The prepared engine instance is never started; the row says what the operator decided.
+            repairs.record("start", row.id().value(), "superseded", "row changed while prepared; not started");
+            return;
+        }
         try {
             launch.start();
         } catch (RuntimeException failed) {
@@ -476,6 +484,8 @@ public class Reconciler {
         }
         String engineId = row.engineInstanceId();
         if (engineId == null) {
+            // Not reachable for rows written since ADR 0019 amendment 4 (issue #24): a cancel of a row with no engine
+            // id goes straight to CANCELLED. Kept for rows that were already CANCEL_REQUESTED without an engine id.
             auditOnce("cancel.unconfirmed", row.id().value(), "no-engine-instance",
                     "cancel requested before the engine id was recorded", now);
             return;

@@ -24,6 +24,7 @@ class StateMachineTest {
             new String[] {"STARTING", "RUNNING"},
             new String[] {"STARTING", "FAILED"},
             new String[] {"STARTING", "CANCEL_REQUESTED"},
+            new String[] {"STARTING", "CANCELLED"},
             new String[] {"RUNNING", "WAITING"},
             new String[] {"RUNNING", "COMPLETED"},
             new String[] {"RUNNING", "FAILED"},
@@ -67,7 +68,44 @@ class StateMachineTest {
                 }
             }
         }
-        assertEquals(INSTANCE_EDGES.size(), 14, "the table has 14 edges");
+        assertEquals(INSTANCE_EDGES.size(), 15, "the table has 15 edges");
+    }
+
+    /**
+     * STARTING to CANCELLED is an edge only while no engine instance id is recorded (ADR 0019, amendment 4). Every other
+     * pair of states is unaffected by the engine id.
+     */
+    @Test
+    void startingToCancelledIsLegalOnlyWithNoEngineInstanceId() {
+        assertTrue(InstanceStateMachine.canMove(InstanceStatus.STARTING, InstanceStatus.CANCELLED, false));
+        assertFalse(InstanceStateMachine.canMove(InstanceStatus.STARTING, InstanceStatus.CANCELLED, true));
+        InstanceStateMachine.requireMove(InstanceStatus.STARTING, InstanceStatus.CANCELLED, false);
+        IllegalTransitionException refused = assertThrows(IllegalTransitionException.class,
+                () -> InstanceStateMachine.requireMove(InstanceStatus.STARTING, InstanceStatus.CANCELLED, true));
+        assertTrue(refused.getMessage().contains("STARTING") && refused.getMessage().contains("CANCELLED"),
+                refused.getMessage());
+    }
+
+    @Test
+    void theEngineIdRuleDoesNotChangeAnyOtherEdge() {
+        for (InstanceStatus from : InstanceStatus.values()) {
+            for (InstanceStatus to : InstanceStatus.values()) {
+                if (from == InstanceStatus.STARTING && to == InstanceStatus.CANCELLED) {
+                    continue;
+                }
+                assertEquals(InstanceStateMachine.canMove(from, to), InstanceStateMachine.canMove(from, to, true),
+                        from + " -> " + to + " with an engine id");
+                assertEquals(InstanceStateMachine.canMove(from, to), InstanceStateMachine.canMove(from, to, false),
+                        from + " -> " + to + " without an engine id");
+            }
+        }
+    }
+
+    @Test
+    void startingMovesOnlyToTheStatesTheTableNames() {
+        assertEquals(java.util.Set.of(InstanceStatus.RUNNING, InstanceStatus.FAILED,
+                InstanceStatus.CANCEL_REQUESTED, InstanceStatus.CANCELLED),
+                InstanceStateMachine.allowedFrom(InstanceStatus.STARTING));
     }
 
     @Test
