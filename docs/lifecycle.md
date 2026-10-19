@@ -308,7 +308,13 @@ Commands, run from the worktree root with `DB_URL=jdbc:postgresql://localhost:54
 - `mvn -B verify`, the full build, including the `*IT` process tests (`LifecycleRecoveryIT`).
 - `python3 tools/check_dependency_policy.py`, `python3 tools/render_requirements.py --check`, and the generator check from `docs/testing.md`.
 
-The results are recorded in the report that accompanies this slice, with the output lines of each command.
+Results on the committed tree (`mvn -B verify` exit 0, `BUILD SUCCESS`):
+
+- oa-contracts 141 tests, oa-runtime 38, oa-testkit 96, app-runtime surefire 54, all passing. ArchUnit: `ArchitectureTest` passing in oa-contracts and oa-runtime.
+- app-runtime failsafe: `LifecycleRecoveryIT`, 2 tests, 0 failures, 60.5 s. It starts child JVMs on the same database and kills them with SIGKILL. Scenario A (kill during the effect): without the reconciler the instance stays RUNNING and no epoch-1 call is logged; with it the effect runs again with epoch 1, the instance waits, the event completes it, and the key has one registry row and one resume repair. Scenario B (kill after the registry insert, dev fault point `after-insert`): the process halts with the row in STARTING and no engine id; a later process with the reconciler starts it and the key has one row.
+- `python3 tools/check_dependency_policy.py`: `dependency policy: holds`, exit 0.
+- `python3 tools/render_requirements.py --check`: `requirements docs up to date`, exit 0.
+- `AcceptanceStatus --check`: `annotated test methods observed: 0 (passing: 0)`, `test-status.json is consistent with the build`, exit 0. No test is annotated `@Acceptance` in this slice; T16 belongs to 105d.
 
 ### 9.11 ADR statements that are wrong or incomplete
 
