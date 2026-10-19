@@ -133,6 +133,13 @@ Wire notes: ids are ULID strings in upper case; `ThreadId` is a string; instants
 
 The schema cannot express two rules: a due time after creation (`HumanTask`) and the hash chain (`AuditEvent`). The record and `AuditHash` enforce those.
 
+**Formats.** Draft 2020-12 treats `format` as an annotation unless assertion is switched on, so `SchemaContractTest` builds its registry with `SchemaRegistryConfig.builder().formatAssertionsEnabled(true)`. The schemas use one format, `date-time`, in `decision` (`decidedAt`), `effect` (`recordedAt`), `human-task` (`createdAt`, and `dueAt` inside `anyOf` with `null`), `evidence` (`capturedAt`) and `audit-event` (`occurredAt`). The validator checks it with the ethlo `itu` library that networknt 2.0.8 loads. The test `theOnlyFormatInTheSchemasIsDateTimeAndEveryUseIsTested` fails when a schema adds a format, so each new format needs VALID and INVALID cases first. Other keywords (`pattern`, `maxLength`) are always asserted.
+
+**Known gaps** (the validator is more lenient or stricter than RFC 3339 on these points; the schemas are not changed):
+
+- A space in place of the `T` separator is accepted. RFC 3339 section 5.6 allows it only as a readability note, not in its grammar. The writers here emit only `T` and `Z`. `leniencyOfTheDateTimeValidatorIsPinned` records the behaviour; a strict check would need a `pattern` on each `date-time` field.
+- A leap second (`:60`) is rejected, although RFC 3339 section 5.7 allows it. `java.time.Instant` never produces one.
+
 ## 10. Verification
 
 | Test | Covers |
@@ -146,7 +153,7 @@ The schema cannot express two rules: a due time after creation (`HumanTask`) and
 | `FailClosedPolicyDecisionPointTest` | Pass-through of ALLOW and DENY; throw, null, slow, interrupt and `Error` become `ERROR` |
 | `FailClosedBulkheadTest` | Stuck delegates exhaust the bound and refusals are prompt; live delegates never exceed the bound; permits return only when delegates return; capacity recovers; a 300-caller burst; bound validation |
 | `PortContractTest` | Port semantics with in-memory doubles and a guarded gateway |
-| `SchemaContractTest` | Samples validate; invalid documents are rejected; schema properties match the records |
+| `SchemaContractTest` | Samples validate; invalid documents are rejected; schema properties match the records; `date-time` fields reject malformed timestamps (format assertion on) and accept offsets; the set of formats in the schemas is the one tested |
 
 ## 11. Not in this package
 
