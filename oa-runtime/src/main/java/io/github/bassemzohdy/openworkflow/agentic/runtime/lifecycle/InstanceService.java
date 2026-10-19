@@ -107,10 +107,18 @@ public class InstanceService {
         } catch (RuntimeException e) {
             return new StartResult(recordStartFailure(row, e), true);
         }
-        InstanceRecord prepared = store.replace(
-                row.successor(now(), InstanceStatus.STARTING, launch.engineInstanceId(), row.startAttempts(),
-                        row.lastError(), row.waitDeadline()),
-                row.version(), REASON_PREPARED, RUNTIME_ACTOR);
+        InstanceRecord prepared;
+        try {
+            prepared = store.replace(
+                    row.successor(now(), InstanceStatus.STARTING, launch.engineInstanceId(), row.startAttempts(),
+                            row.lastError(), row.waitDeadline()),
+                    row.version(), REASON_PREPARED, RUNTIME_ACTOR);
+        } catch (StaleVersionException moved) {
+            // An operator changed the row while the engine was being prepared (WP-105d, a cancel). The prepared
+            // instance is never started: the row says what the operator decided. The response reports that state.
+            LOG.infof("instance %s changed while its engine instance was prepared; not started", row.id());
+            return new StartResult(store.find(row.tenant(), row.id()).orElse(row), true);
+        }
         faults.hit(LifecycleFaults.AFTER_PREPARE);
         try {
             launch.start();

@@ -15,6 +15,9 @@ Every boundary where the runtime lets something happen asks the PEP first. The P
 | Human-task action | `Pep.humanTaskAction(actor, scopes, task, verb)` | `human-task:<taskId>:<verb>` | `HUMAN_TASK_ACTION` |
 | Publication or activation | `Pep.publication(publisher, scopes, artifactRef)` | `artifact:<kind>/<name>@<version>#<sha256>` | `PUBLICATION` |
 | Operator recovery | `Pep.operation(op, operator, scopes, taskId)` | `operation:cancel`, `operation:pause`, `operation:drain` | `OPERATION` |
+| Operator operation on a registry instance (WP-105d) | `Pep.instanceOperation(op, operator, scopes, instanceId)` | `operation:inspect`, `operation:retry`, `operation:recover` | `OPERATION` |
+
+For the operations API (`docs/lifecycle.md`, section 11), the request's task id carries the registry instance id, since the request shape has no instance field. Cancel and pause use `Pep.operation` with that id; inspect, retry and recover use `Pep.instanceOperation`. Only the first two are named by the safe-recovery rule, so the other three are refused when the main policy is unavailable.
 
 **Non-bypass is a convention for now.** Nothing yet prevents a caller from invoking a tool without the PEP. The architectural rule (every route goes through the PEP) is open work (section 8).
 
