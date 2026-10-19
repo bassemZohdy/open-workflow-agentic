@@ -84,11 +84,13 @@ A user's request creates a delegation grant: scope, expiry, subject. It is not a
 |---|---|---|---|
 | Process engine | Quarkus Flow 1.2.0 | Stable core; extensions for JPA, Kubernetes durable mode, messaging, scheduler, OIDC, OpenTelemetry, gRPC | Governance around it |
 | Agent graphs | LangGraph4j 1.9.5 | Postgres saver, OpenTelemetry, AG-UI SDK, handoff modules | Graph catalog, interceptors |
-| Models, MCP, RAG, memory | Quarkus LangChain4j 1.14.2 | MCP, OIDC MCP and model auth providers, pgvector, memory stores, evaluation testing modules. Version 2.0.0.Beta1 exists | Gateways, ACL-aware retrieval |
+| Models, MCP, RAG, memory | Quarkus LangChain4j 1.14.2 (its BOM brings langchain4j 1.20.2, see the note below) | MCP, OIDC MCP and model auth providers, pgvector, memory stores, evaluation testing modules. Version 2.0.0.Beta1 exists (beta only) | Gateways, ACL-aware retrieval |
 | Agent interop | A2A Java SDK, Apicurio registry integration | To be confirmed in WP-007 | Delegation scope and cycle control |
 | Timers | db-scheduler 0.0.2 | Young (0.0.x) | Deadlines tied to instances |
 | Identity | Keycloak, quarkus-oidc | Mature | Delegation grants |
 | Policy | OPA or Cedar | Decision in WP-006 | PEP library, fail-closed rules |
+
+Version note (checked 19 Oct 2026). The `quarkus-langchain4j-bom` 1.14.2 imports `dev.langchain4j:langchain4j-bom` 1.20.2, so the langchain4j libraries that the BOM manages are 1.20.2 (the dependency tree of the WP-007 spike resolved the same version). The number 1.14 names the Quarkus LangChain4j line, not the langchain4j library. On Maven Central that day the Quarkus 4 platform line had only 4.0.0.Beta1 and the quarkus-langchain4j 2 line only 2.0.0.Beta1, so neither had a final release; 1.15.0.CR1 is a release candidate. The 3.x platform has the final 3.40.1, which D-8 does not adopt. Revisit when finals ship (issue #26).
 
 Known weak spots: `quarkus-flow-langchain4j` is Preview and `langchain4j-agentic` is experimental, so they are not used. There is no official Quarkus Flow to LangGraph4j bridge. Quarkus 4.0 and LangChain4j 2.0 are in beta; we stay on 3.39 and 1.14 and plan an upgrade (WP-402).
 
@@ -180,7 +182,7 @@ Principles:
 
 ## 9. Decisions needed from the owner
 
-Each has a recommended default so work is not blocked.
+Each has a recommended default so work is not blocked. Rows marked decided were settled by the owner, and their text is the decision.
 
 | # | Decision | Recommended default | Needed by |
 |---|---|---|---|
@@ -191,7 +193,8 @@ Each has a recommended default so work is not blocked.
 | D-5 | Model access | Quarkus LangChain4j bindings in the app, optional external gateway | WP-503 |
 | D-6 | Tenancy | Single tenant first; row-level security when needed | WP-404 |
 | D-7 | Reporting duties for AI incidents | Hook only; content depends on the applicable profile | WP-305 |
-| D-8 | Quarkus 4 and LangChain4j 2 | Stay on 3.39 and 1.14 until stable | WP-402 |
+| D-8 | Quarkus 4 and LangChain4j 2 | **Decided 2026-10-19:** stay on Quarkus 3.39.5 and Quarkus LangChain4j 1.14.2 until finals ship. The 1.14.2 BOM brings langchain4j 1.20.2 (see the note in section 3) | WP-402 |
+| D-9 | Secret store | **Decided 2026-10-19 (ADR 0021):** Vault where the organization runs it; Kubernetes Secrets for static values. `quarkus-vault` stays on the BOM's 4.9.0, and a Vault integration test on 4.9.0 is required before the Vault path is chosen | WP-102 |
 
 ## 10. First two weeks
 
