@@ -24,13 +24,13 @@ import java.util.function.BooleanSupplier;
 
 /**
  * Process-level harness. Each application run is a separate JVM started from the packaged jar, killed with
- * SIGKILL ({@code kill -9}) and started again on the same database, as spike-a and spike-b do. Only the spike_c
- * database is used. The HTTP port is 18195 (8081 is used by other sessions).
+ * SIGKILL ({@code kill -9}) and started again on the same database, as spike-a and spike-b do. Only the database
+  * named by SPIKEC_JDBC_URL is used (default spike_c). The HTTP port is 18196; 8081 and 18195 belong to other sessions.
  */
 final class Harness {
 
-    static final String BASE = "http://127.0.0.1:18195";
-    static final String JDBC = "jdbc:postgresql://localhost:5432/spike_c";
+    static final String BASE = "http://127.0.0.1:18196";
+    static final String JDBC = System.getenv().getOrDefault("SPIKEC_JDBC_URL", "jdbc:postgresql://localhost:5432/spike_c");
     static final Path JAR = Path.of("target/quarkus-app/quarkus-run.jar");
     static final Path LOGS = Path.of("target/process-logs");
     static final ObjectMapper JSON = new ObjectMapper();
@@ -148,7 +148,7 @@ final class Harness {
             Files.createDirectories(LOGS);
             List<String> cmd = new ArrayList<>();
             cmd.add(System.getProperty("java.home") + "/bin/java");
-            cmd.add("-Dquarkus.http.port=18195");
+            cmd.add("-Dquarkus.http.port=18196");
             props.forEach((k, v) -> cmd.add("-D" + k + "=" + v));
             cmd.add("-jar");
             cmd.add(JAR.toString());

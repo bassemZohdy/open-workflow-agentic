@@ -13,7 +13,7 @@ do:
       with:
         method: post
         endpoint:
-          uri: http://localhost:18195/agents/research/run
+          uri: http://localhost:18196/agents/research/run
         headers:
           X-Correlation-Id: ${ $workflow.input.correlationId }
         body: ${ $workflow.input }
@@ -33,5 +33,5 @@ do:
       with:
         method: post
         endpoint:
-          uri: http://localhost:18195/agents/research/resume
+          uri: http://localhost:18196/agents/research/resume
         body: '${ { instanceId: ((if type == "array" then .[0] else . end) | (.instanceId // .data.instanceId)) } }'
