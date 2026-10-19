@@ -8,20 +8,28 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.TaskStore;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.outbox.OutboxEntry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javax.sql.DataSource;
 
 /**
  * The {@code task.agent_task} table as a {@link TaskStore} (ADR 0020, decision 1). Every write is one transaction that
- * also writes its history row. Ownership is not decided here: the runtime asks {@link #findByThread} before it reads,
- * writes or resumes a thread.
+ * also writes its history row and its outbox row (WP-105b). Ownership is not decided here: the runtime asks
+ * {@link #findByThread} before it reads, writes or resumes a thread.
+ *
+ * <p>Each write first locks the workflow instance row. That serializes the outbox writes of one instance, so the
+ * outbox id order of an instance is its commit order (see {@code V14__task_outbox.sql}).
  */
 @ApplicationScoped
 public class JdbcTaskStore implements TaskStore {
@@ -53,12 +61,15 @@ public class JdbcTaskStore implements TaskStore {
             throw new IllegalStateException("a new task must be " + AgentTaskStateMachine.initial());
         }
         return Transactions.inTransaction(dataSource, connection -> {
-            int inserted;
+            Map<String, Object> instance = lockInstance(connection, record.workflowInstance(), record.tenant())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "the task's instance does not exist in this tenant"));
+            Instant at;
             try (PreparedStatement insert = connection.prepareStatement("""
                     insert into task.agent_task (id, instance_id, tenant, owner_kind, owner_id, thread_name, status,
                         contract, version)
-                    select ?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), ?
-                     where exists (select 1 from task.instance where id = ? and tenant = ?)
+                    values (?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), ?)
+                    returning updated_at
                     """)) {
                 insert.setString(1, record.taskId().value());
                 insert.setString(2, record.workflowInstance());
@@ -69,19 +80,18 @@ public class JdbcTaskStore implements TaskStore {
                 insert.setString(7, record.status().name());
                 insert.setString(8, AgentTaskCodec.encode(record.contract()));
                 insert.setLong(9, record.version());
-                insert.setString(10, record.workflowInstance());
-                insert.setString(11, record.tenant());
-                inserted = insert.executeUpdate();
+                try (ResultSet rs = insert.executeQuery()) {
+                    rs.next();
+                    at = rs.getTimestamp("updated_at").toInstant();
+                }
             } catch (SQLException e) {
                 if ("23505".equals(e.getSQLState())) {
                     throw new IllegalStateException("the task id or the thread id already exists", e);
                 }
                 throw e;
             }
-            if (inserted != 1) {
-                throw new IllegalStateException("the task's instance does not exist in this tenant");
-            }
-            writeHistory(connection, record.taskId(), 0L, null, record.status(), REASON_CREATED, RUNTIME);
+            writeHistory(connection, record.taskId(), 0L, null, record.status(), REASON_CREATED, RUNTIME, at);
+            outbox(record, 0L, null, record.status(), REASON_CREATED, at, instance).writeTo(connection);
             return record;
         });
     }
@@ -106,6 +116,9 @@ public class JdbcTaskStore implements TaskStore {
                     + " but was " + next.version());
         }
         return Transactions.inTransaction(dataSource, connection -> {
+            Map<String, Object> instance = lockInstance(connection, next.workflowInstance(), next.tenant())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "the task's instance does not exist in this tenant"));
             AgentTaskRecord current = lockedRow(connection, next.taskId());
             if (current.version() != expectedVersion) {
                 throw new StaleVersionException("agent task " + next.taskId(), expectedVersion, current.version());
@@ -114,21 +127,29 @@ public class JdbcTaskStore implements TaskStore {
             if (current.status() != next.status()) {
                 AgentTaskStateMachine.requireMove(current.status(), next.status());
             }
+            Instant at;
             try (PreparedStatement update = connection.prepareStatement("""
                     update task.agent_task
                        set status = ?, version = ?, updated_at = now()
                      where id = ? and version = ?
+                    returning updated_at
                     """)) {
                 update.setString(1, next.status().name());
                 update.setLong(2, next.version());
                 update.setString(3, next.taskId().value());
                 update.setLong(4, expectedVersion);
-                if (update.executeUpdate() != 1) {
-                    throw new IllegalStateException("agent task " + next.taskId() + " was not updated under its lock");
+                try (ResultSet rs = update.executeQuery()) {
+                    if (!rs.next()) {
+                        // Cannot happen while the row lock is held; kept as a guard against a future change to the lock.
+                        throw new IllegalStateException("agent task " + next.taskId() + " was not updated under its lock");
+                    }
+                    at = rs.getTimestamp("updated_at").toInstant();
                 }
             }
             writeHistory(connection, next.taskId(), next.version(), current.status(), next.status(),
-                    REASON_STATUS_CHANGED, RUNTIME);
+                    REASON_STATUS_CHANGED, RUNTIME, at);
+            outbox(next, next.version(), current.status(), next.status(), REASON_STATUS_CHANGED, at, instance)
+                    .writeTo(connection);
             return next;
         });
     }
@@ -142,6 +163,28 @@ public class JdbcTaskStore implements TaskStore {
                 }
             }
         });
+    }
+
+    /**
+     * Locks the instance row of a task, the partition of its outbox rows. Returns the definition of the instance, which
+     * the outbox payload carries, or empty when the instance is not in this tenant.
+     */
+    private static Optional<Map<String, Object>> lockInstance(Connection connection, String instanceId, String tenant)
+            throws SQLException {
+        try (PreparedStatement lock = connection.prepareStatement(
+                "select definition_id, definition_version from task.instance where id = ? and tenant = ? for update")) {
+            lock.setString(1, instanceId);
+            lock.setString(2, tenant);
+            try (ResultSet rs = lock.executeQuery()) {
+                if (!rs.next()) {
+                    return Optional.empty();
+                }
+                Map<String, Object> definition = new LinkedHashMap<>();
+                definition.put("definitionId", rs.getString("definition_id"));
+                definition.put("definitionVersion", rs.getString("definition_version"));
+                return Optional.of(definition);
+            }
+        }
     }
 
     private static AgentTaskRecord lockedRow(Connection connection, Ulid taskId) throws SQLException {
@@ -168,11 +211,12 @@ public class JdbcTaskStore implements TaskStore {
     }
 
     private static void writeHistory(Connection connection, Ulid taskId, long version, AgentTaskStatus from,
-                                     AgentTaskStatus to, String reason, Subject actor) throws SQLException {
+                                     AgentTaskStatus to, String reason, Subject actor, Instant at)
+            throws SQLException {
         try (PreparedStatement history = connection.prepareStatement("""
                 insert into task.agent_task_event (agent_task_id, version, from_status, to_status, reason,
-                    actor_kind, actor_id)
-                values (?, ?, ?, ?, ?, ?, ?)
+                    actor_kind, actor_id, occurred_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?)
                 """)) {
             history.setString(1, taskId.value());
             history.setLong(2, version);
@@ -181,8 +225,23 @@ public class JdbcTaskStore implements TaskStore {
             history.setString(5, reason);
             history.setString(6, actor.kind().name());
             history.setString(7, actor.id());
+            history.setTimestamp(8, Timestamp.from(at));
             history.executeUpdate();
         }
+    }
+
+    /** The outbox row that mirrors one history row of an agent task (WP-105b). Same transaction, same time. */
+    private static OutboxEntry outbox(AgentTaskRecord task, long version, AgentTaskStatus from, AgentTaskStatus to,
+                                      String reason, Instant at, Map<String, Object> instance) {
+        Map<String, Object> details = new LinkedHashMap<>(instance);
+        details.put("tenant", task.tenant());
+        details.put("owner", Map.of("kind", task.owner().kind().name(), "id", task.owner().id()));
+        details.put("instanceId", task.workflowInstance());
+        details.put("taskId", task.taskId().value());
+        details.put("threadId", task.threadId().value());
+        return OutboxEntry.transition(OutboxEntry.AggregateType.AGENT_TASK, task.taskId().value(),
+                task.workflowInstance(), version, from == null ? null : from.name(), to.name(), reason, RUNTIME, at,
+                details);
     }
 
     private static AgentTaskRecord read(ResultSet rs) throws SQLException {

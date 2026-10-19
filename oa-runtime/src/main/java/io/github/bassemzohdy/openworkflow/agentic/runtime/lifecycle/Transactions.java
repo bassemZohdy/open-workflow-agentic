@@ -9,17 +9,18 @@ import javax.sql.DataSource;
  * {@link StoreUnavailableException}; a domain exception from the work (for example an illegal transition) is
  * rethrown unchanged after the rollback, so callers can tell the two apart.
  */
-final class Transactions {
+public final class Transactions {
 
+    /** A unit of JDBC work that runs on one connection inside one transaction. */
     @FunctionalInterface
-    interface Work<T> {
+    public interface Work<T> {
         T run(Connection connection) throws SQLException;
     }
 
     private Transactions() {
     }
 
-    static <T> T inTransaction(DataSource dataSource, Work<T> work) {
+    public static <T> T inTransaction(DataSource dataSource, Work<T> work) {
         try (Connection connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
