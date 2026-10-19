@@ -21,6 +21,8 @@ final class PolicyDecisionAuditEvent {
         attributes.put("policy.id", decision.policy().policyId());
         attributes.put("policy.version", decision.policy().policySetVersion());
         attributes.put("policy.action", request.action().name());
+        attributes.put("policy.reason", decision.reason().substring(0,
+                Math.min(decision.reason().length(), AuditEvent.MAX_TEXT_LENGTH)));
         attributes.put("policy.recoveryPath", Boolean.toString(record.recoveryPath()));
         if (request.taskId() != null) {
             attributes.put("policy.taskId", request.taskId().value());
