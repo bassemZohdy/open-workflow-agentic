@@ -58,7 +58,11 @@ public class SpikeApi {
     @Path("/instances/{bridge}")
     public Response start(@PathParam("bridge") String bridge, StartBody body) {
         if (!lifecycle.isReady()) {
-            return Response.status(503).build();
+            // Refused before any row is written. Problem document as in oa-runtime's ProblemDetailMapper (RFC 9457).
+            return Response.status(503).type("application/problem+json")
+                    .entity(Map.of("type", "about:blank", "title", "Service Unavailable", "status", 503,
+                            "detail", "workflow recovery has not completed; new instances are refused"))
+                    .build();
         }
         String definitionName = switch (bridge) {
             case "a", "b", "c" -> "bridge-" + bridge;
