@@ -209,7 +209,9 @@ class PepTest {
     void thePepUsesItsExplicitBulkheadBound() throws Exception {
         CountDownLatch delegateEntered = new CountDownLatch(1);
         CountDownLatch releaseDelegate = new CountDownLatch(1);
+        AtomicInteger delegateCalls = new AtomicInteger();
         ScriptedEngine engine = new ScriptedEngine(request -> {
+            delegateCalls.incrementAndGet();
             delegateEntered.countDown();
             try {
                 releaseDelegate.await();
@@ -227,7 +229,7 @@ class PepTest {
             Decision overflow = pep.toolCall(AGENT, PolicyFixtures.task(), "search", 500L);
             assertEquals(DecisionOutcome.ERROR, overflow.outcome());
             assertTrue(overflow.reason().contains("bulkhead"), overflow.reason());
-            assertEquals(1, engine.received().size(), "a full PEP bulkhead does not call its delegate");
+            assertEquals(1, delegateCalls.get(), "a full PEP bulkhead does not call its delegate");
         } finally {
             releaseDelegate.countDown();
         }
