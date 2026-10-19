@@ -206,7 +206,7 @@ These are not ADR edits. The ADRs were left unchanged, as the brief asks.
 
 ## 9. Reconciler (WP-105c)
 
-Code: `Reconciler`, `EngineStatusSync`, `FlowEngineObserver`, `RegistryScan`, `RepairStore`, `AgentRunPolicy`, `LifecycleSettings`, `LifecycleFaults` in `oa-runtime`; the probe and its switches in `app-runtime`. Schema: V16 (`task.instance.resume_epoch`), V17 (`agent_task` bridge and lease), V18 (`task.repair_event`, append-only), V19 (wait-deadline index).
+Code: `Reconciler`, `EngineStatusSync`, `FlowEngineObserver`, `RegistryScan`, `RepairStore`, `AgentRunPolicy`, `LifecycleSettings`, `LifecycleFaults` in `oa-runtime`; the probe and its switches in `app-runtime`. Schema: V35 (`task.instance.resume_epoch`), V36 (`agent_task` bridge and lease), V37 (`task.repair_event`, append-only), V38 (wait-deadline index).
 
 ### 9.1 What Flow can and cannot report
 
