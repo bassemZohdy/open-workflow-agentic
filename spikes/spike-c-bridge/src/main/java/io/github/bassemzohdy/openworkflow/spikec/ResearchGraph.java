@@ -11,6 +11,8 @@ import jakarta.inject.Inject;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import javax.sql.DataSource;
 import org.bsc.async.AsyncGenerator;
 import org.bsc.langgraph4j.CompileConfig;
@@ -21,6 +23,7 @@ import org.bsc.langgraph4j.NodeOutput;
 import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.action.InterruptionMetadata;
+import org.bsc.langgraph4j.checkpoint.BaseCheckpointSaver;
 import org.bsc.langgraph4j.checkpoint.PostgresSaverV2;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.MDC;
@@ -61,6 +64,15 @@ public class ResearchGraph {
     @ConfigProperty(name = "spikec.effect.keyed", defaultValue = "true")
     boolean effectKeyed;
 
+    /**
+     * Test seams, package-private and never set in production: wrap the checkpoint saver, replace the serializer,
+     * and throw from a node by name before it does its work. The defaults change nothing.
+     */
+    UnaryOperator<BaseCheckpointSaver> saverDecorator = saver -> saver;
+    JsonSpikeSerializer serializer = new JsonSpikeSerializer();
+    Consumer<String> nodeFault = node -> {
+    };
+
     private CompiledGraph<SpikeState> graph;
 
     /** Result of driving the graph: the status it stopped in, and the thread. */
@@ -69,10 +81,12 @@ public class ResearchGraph {
 
     @PostConstruct
     void build() throws Exception {
-        var ser = new JsonSpikeSerializer();
-        var saver = PostgresSaverV2.builder().stateSerializer(ser).datasource(dataSource).createTables(true).build();
+        var ser = serializer;
+        BaseCheckpointSaver saver = saverDecorator.apply(
+                PostgresSaverV2.builder().stateSerializer(ser).datasource(dataSource).createTables(true).build());
         var g = new StateGraph<>(ser)
                 .addNode("draft", node_async(s -> {
+                    nodeFault.accept("draft");
                     Ctx ctx = Ctx.fromJson(s.text(SpikeState.CTX));
                     store.recordStep(ctx.threadId().value(), "draft", ctx, MDC.get("correlationId"));
                     sleep(draftDelayMs);
@@ -80,6 +94,7 @@ public class ResearchGraph {
                             "Topic: " + ctx.topic()));
                 }))
                 .addNode("publish", node_async(s -> {
+                    nodeFault.accept("publish");
                     Ctx ctx = Ctx.fromJson(s.text(SpikeState.CTX));
                     String thread = ctx.threadId().value();
                     store.recordStep(thread, "publish", ctx, MDC.get("correlationId"));
