@@ -1,4 +1,8 @@
 {
+  "T01": {
+    "status": "automated",
+    "where": "app-runtime:AgenticAppTest#structuredAgentOutputRejectsMalformedActionsAndUnauthorizedEscalation"
+  },
   "T07": {
     "status": "automated",
     "where": "oa-testkit:DelegatedAuthorityAcceptanceTest#revokingTheParentStopsTheChildAndTheTokensItAlreadyHolds; oa-testkit:DelegatedAuthorityAcceptanceTest#theAgentTaskContractCannotBeWidenedByAChildTask; oa-testkit:DelegatedAuthorityAcceptanceTest#anExpiredTokenIsRefusedAndNoNewOneIsIssuedUnderAnExpiredOrRevokedGrant; oa-testkit:DelegatedAuthorityAcceptanceTest#thePolicyBoundaryDeniesADelegatedCallOutsideItsScopeRecordsWhyAndFailsClosedWhenItCannotDecide; oa-testkit:DelegatedAuthorityAcceptanceTest#aTokenIsAcceptedOnceAndEveryLaterUseIsAReplayEvenAfterARestart; oa-testkit:DelegatedAuthorityAcceptanceTest#aTokenIsBoundToItsResourceAndTheUsersOwnTokenIsNotADelegatedOne; oa-testkit:DelegatedAuthorityAcceptanceTest#theDatabaseRefusesAWiderOrLongerChildEvenWhenTheServiceIsBypassed; oa-testkit:DelegatedAuthorityAcceptanceTest#anAgentCannotPassOnMoreThanItHoldsInScopeLifeOrIdentity; oa-testkit:DelegatedAuthorityAcceptanceTest#theExchangeNeverIssuesMoreThanTheGrantAndTheResourceRefusesAForgedWiderToken"

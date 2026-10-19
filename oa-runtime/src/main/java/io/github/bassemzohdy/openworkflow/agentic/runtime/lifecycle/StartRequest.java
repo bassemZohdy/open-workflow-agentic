@@ -1,6 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.Checks;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -18,9 +19,10 @@ import java.util.regex.Pattern;
  * @param definition     the pinned definition and version
  * @param input          the workflow input; copied, and bounded to {@link #MAX_INPUT_BYTES} as canonical JSON
  * @param idempotencyKey the caller's key for this request
+ * @param retriedFrom    the FAILED instance this request retries, or null for a plain start (ADR 0019, amendment 3)
  */
 public record StartRequest(String tenant, Subject owner, DefinitionRef definition, Map<String, Object> input,
-                           String idempotencyKey) {
+                           String idempotencyKey, Ulid retriedFrom) {
 
     /** Largest accepted input, measured as canonical JSON in UTF-8 bytes. */
     public static final int MAX_INPUT_BYTES = 64 * 1024;
@@ -39,13 +41,23 @@ public record StartRequest(String tenant, Subject owner, DefinitionRef definitio
         }
     }
 
+    /** A plain start: not a retry of any instance. */
+    public StartRequest(String tenant, Subject owner, DefinitionRef definition, Map<String, Object> input,
+                        String idempotencyKey) {
+        this(tenant, owner, definition, input, idempotencyKey, null);
+    }
+
     /** The canonical JSON text of the input, as stored. */
     public String canonicalInput() {
         return Json.canonical(input);
     }
 
-    /** The fingerprint that tells a repeated request from a reuse of the key for a different request. */
+    /**
+     * The fingerprint that tells a repeated request from a reuse of the key for a different request. A retry includes
+     * the instance it retries, so a plain start and a retry with the same input never share a fingerprint.
+     */
     public String fingerprint() {
-        return Json.fingerprint(definition, canonicalInput());
+        String basis = retriedFrom == null ? canonicalInput() : canonicalInput() + "\nretried-from " + retriedFrom.value();
+        return Json.fingerprint(definition, basis);
     }
 }

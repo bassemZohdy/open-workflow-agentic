@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
  * @param startAttempts      failed engine start attempts so far
  * @param lastError          the class name of the last start error, or null; never the message
  * @param waitDeadline       the absolute deadline of the current wait, or null (ADR 0019, Deadlines)
+ * @param retriedFrom        the FAILED instance this one was created to retry, or null (ADR 0019, amendment 3)
  * @param version            optimistic-lock version; 0 when inserted
  * @param createdAt          when the row was created
  * @param updatedAt          when the row last changed
@@ -46,6 +47,7 @@ public record InstanceRecord(
         int startAttempts,
         String lastError,
         Instant waitDeadline,
+        Ulid retriedFrom,
         long version,
         Instant createdAt,
         Instant updatedAt) {
@@ -79,7 +81,7 @@ public record InstanceRecord(
     public static InstanceRecord starting(Ulid id, StartRequest request, Instant now) {
         return new InstanceRecord(id, request.tenant(), request.owner(), request.idempotencyKey(),
                 request.fingerprint(), request.definition(), request.input(), InstanceStatus.STARTING, null, 0, null,
-                null, 0L, now, now);
+                null, request.retriedFrom(), 0L, now, now);
     }
 
     /**
@@ -89,8 +91,8 @@ public record InstanceRecord(
     public InstanceRecord successor(Instant at, InstanceStatus nextStatus, String nextEngineInstanceId,
                                     int nextStartAttempts, String nextLastError, Instant nextWaitDeadline) {
         return new InstanceRecord(id, tenant, owner, idempotencyKey, requestFingerprint, definition, input,
-                nextStatus, nextEngineInstanceId, nextStartAttempts, nextLastError, nextWaitDeadline, version + 1,
-                createdAt, at);
+                nextStatus, nextEngineInstanceId, nextStartAttempts, nextLastError, nextWaitDeadline, retriedFrom,
+                version + 1, createdAt, at);
     }
 
     /** The canonical text of the input, as stored. */

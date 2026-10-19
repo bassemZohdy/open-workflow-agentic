@@ -30,9 +30,13 @@ public class JdbcInstanceStore implements InstanceStore {
     private static final String SELECT_COLUMNS = """
             select id, tenant, owner_kind, owner_id, idempotency_key, request_fingerprint, definition_id,
                    definition_version, input::text as input_text, status, engine_instance_id, start_attempts,
-                   last_error, wait_deadline, version, created_at, updated_at
+                   last_error, wait_deadline, retried_from, version, created_at, updated_at
               from task.instance
             """;
+
+    /** The unique index that allows one live retry per failed instance (V50). */
+    static final String LIVE_RETRY_INDEX = "instance_one_live_retry_uk";
+    private static final String SQL_STATE_UNIQUE_VIOLATION = "23505";
 
     private final DataSource dataSource;
 
@@ -42,29 +46,30 @@ public class JdbcInstanceStore implements InstanceStore {
     }
 
     @Override
-    public Insertion insertIfAbsent(InstanceRecord candidate, String reason) {
-        return insertIfAbsent(candidate, reason, null);
-    }
-
-    @Override
-    public Insertion insertIfAbsent(InstanceRecord candidate, String reason, InsertHook hook) {
+    public Insertion insertIfAbsent(InstanceRecord candidate, String reason, Subject actor, InsertHook hook) {
         requireInitial(candidate);
+        Objects.requireNonNull(actor, "actor");
         return Transactions.inTransaction(dataSource, connection -> {
             int inserted;
             try (PreparedStatement insert = connection.prepareStatement("""
                     insert into task.instance (id, tenant, owner_kind, owner_id, idempotency_key,
                         request_fingerprint, definition_id, definition_version, input, status, engine_instance_id,
-                        start_attempts, last_error, wait_deadline, version, created_at, updated_at)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?, ?, ?)
+                        start_attempts, last_error, wait_deadline, retried_from, version, created_at, updated_at)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, cast(? as jsonb), ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     on conflict (tenant, idempotency_key) do nothing
                     """)) {
                 bindRow(insert, candidate);
                 inserted = insert.executeUpdate();
+            } catch (SQLException e) {
+                if (isLiveRetryViolation(e)) {
+                    throw new LiveRetryExistsException(candidate.retriedFrom());
+                }
+                throw e;
             }
             if (inserted == 1) {
                 writeHistory(connection, candidate.id(), 0L, null, InstanceStatus.STARTING, reason,
-                        candidate.owner(), candidate.createdAt());
-                outbox(candidate, 0L, null, InstanceStatus.STARTING, reason, candidate.owner(),
+                        actor, candidate.createdAt());
+                outbox(candidate, 0L, null, InstanceStatus.STARTING, reason, actor,
                         candidate.createdAt()).writeTo(connection);
                 if (hook != null) {
                     hook.afterInsert(connection, candidate.id());
@@ -75,6 +80,58 @@ public class JdbcInstanceStore implements InstanceStore {
                     .orElseThrow(() -> new IllegalStateException("conflicting idempotency row vanished"));
             return new Insertion(existing, false);
         });
+    }
+
+    @Override
+    public Optional<InstanceRecord> findByKey(String tenant, String idempotencyKey) {
+        return Transactions.inTransaction(dataSource, connection -> selectByKey(connection, tenant, idempotencyKey));
+    }
+
+    @Override
+    public Optional<InstanceRecord> liveRetryOf(String tenant, Ulid failedId) {
+        Objects.requireNonNull(failedId, "failedId");
+        return Transactions.inTransaction(dataSource, connection -> {
+            try (PreparedStatement select = connection.prepareStatement(
+                    SELECT_COLUMNS + """
+                     where tenant = ? and retried_from = ?
+                       and status not in ('CANCELLED', 'COMPLETED', 'FAILED')
+                     limit 1
+                    """)) {
+                select.setString(1, tenant);
+                select.setString(2, failedId.value());
+                try (ResultSet rs = select.executeQuery()) {
+                    return rs.next() ? Optional.of(read(rs)) : Optional.empty();
+                }
+            }
+        });
+    }
+
+    @Override
+    public List<Ulid> retriesOf(String tenant, Ulid id) {
+        Objects.requireNonNull(id, "id");
+        return Transactions.inTransaction(dataSource, connection -> {
+            List<Ulid> ids = new ArrayList<>();
+            try (PreparedStatement select = connection.prepareStatement("""
+                    select id from task.instance
+                     where tenant = ? and retried_from = ?
+                     order by created_at, id
+                    """)) {
+                select.setString(1, tenant);
+                select.setString(2, id.value());
+                try (ResultSet rs = select.executeQuery()) {
+                    while (rs.next()) {
+                        ids.add(Ulid.parse(rs.getString("id")));
+                    }
+                }
+            }
+            return ids;
+        });
+    }
+
+    /** True when the insert failed on the one-live-retry index (SQLSTATE 23505 naming the index). */
+    private static boolean isLiveRetryViolation(SQLException e) {
+        return SQL_STATE_UNIQUE_VIOLATION.equals(e.getSQLState())
+                && e.getMessage() != null && e.getMessage().contains(LIVE_RETRY_INDEX);
     }
 
     @Override
@@ -121,7 +178,9 @@ public class JdbcInstanceStore implements InstanceStore {
                 throw new IllegalStateException("the engine instance id of " + next.id() + " is already set");
             }
             if (current.status() != next.status()) {
-                InstanceStateMachine.requireMove(current.status(), next.status());
+                // The engine id rule of STARTING to CANCELLED (ADR 0019, amendment 4), checked on every write.
+                boolean engineRecorded = current.engineInstanceId() != null || next.engineInstanceId() != null;
+                InstanceStateMachine.requireMove(current.status(), next.status(), engineRecorded);
             }
             try (PreparedStatement update = connection.prepareStatement("""
                     update task.instance
@@ -207,6 +266,7 @@ public class JdbcInstanceStore implements InstanceStore {
                 || !current.requestFingerprint().equals(next.requestFingerprint())
                 || !current.definition().equals(next.definition())
                 || !current.input().equals(next.input())
+                || !Objects.equals(current.retriedFrom(), next.retriedFrom())
                 || !current.createdAt().equals(next.createdAt())) {
             throw new IllegalStateException("identity and input of instance " + next.id() + " may not change");
         }
@@ -227,9 +287,10 @@ public class JdbcInstanceStore implements InstanceStore {
         insert.setInt(12, row.startAttempts());
         insert.setString(13, row.lastError());
         insert.setTimestamp(14, toTimestamp(row.waitDeadline()));
-        insert.setLong(15, row.version());
-        insert.setTimestamp(16, Timestamp.from(row.createdAt()));
-        insert.setTimestamp(17, Timestamp.from(row.updatedAt()));
+        insert.setString(15, row.retriedFrom() == null ? null : row.retriedFrom().value());
+        insert.setLong(16, row.version());
+        insert.setTimestamp(17, Timestamp.from(row.createdAt()));
+        insert.setTimestamp(18, Timestamp.from(row.updatedAt()));
     }
 
     private static Optional<InstanceRecord> selectByKey(Connection connection, String tenant, String key)
@@ -278,6 +339,7 @@ public class JdbcInstanceStore implements InstanceStore {
                 rs.getInt("start_attempts"),
                 rs.getString("last_error"),
                 fromTimestamp(rs.getTimestamp("wait_deadline")),
+                rs.getString("retried_from") == null ? null : Ulid.parse(rs.getString("retried_from")),
                 rs.getLong("version"),
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant());

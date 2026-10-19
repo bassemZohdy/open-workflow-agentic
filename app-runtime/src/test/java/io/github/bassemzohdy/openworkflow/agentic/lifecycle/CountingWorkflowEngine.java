@@ -30,6 +30,7 @@ public class CountingWorkflowEngine implements WorkflowEngine {
 
     private final AtomicInteger prepares = new AtomicInteger();
     private final AtomicInteger starts = new AtomicInteger();
+    private final AtomicInteger discards = new AtomicInteger();
     private final AtomicInteger failStarts = new AtomicInteger();
     private final AtomicReference<CountDownLatch[]> holdNextPrepare = new AtomicReference<>();
 
@@ -60,6 +61,12 @@ public class CountingWorkflowEngine implements WorkflowEngine {
                     throw new IllegalStateException("simulated engine failure before the instance was accepted");
                 }
                 inner.start();
+            }
+
+            @Override
+            public boolean discard() {
+                discards.incrementAndGet();
+                return inner.discard();
             }
         };
     }
@@ -93,6 +100,7 @@ public class CountingWorkflowEngine implements WorkflowEngine {
     public void reset() {
         prepares.set(0);
         starts.set(0);
+        discards.set(0);
         failStarts.set(0);
         holdNextPrepare.set(null);
     }
@@ -119,6 +127,10 @@ public class CountingWorkflowEngine implements WorkflowEngine {
 
     public int starts() {
         return starts.get();
+    }
+
+    public int discards() {
+        return discards.get();
     }
 
     /** The next {@code n} calls to {@link EngineLaunch#start()} fail. */

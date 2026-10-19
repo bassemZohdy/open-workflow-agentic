@@ -30,6 +30,9 @@ public class ResearchAgent {
     @Inject
     DataSource dataSource;
 
+    @Inject
+    AgentOutputValidator outputValidator;
+
     private CompiledGraph<ResearchState> graph;
 
     @PostConstruct
@@ -41,15 +44,15 @@ public class ResearchAgent {
 
         var g = new StateGraph<>(serializer)
                 .addNode("plan", node_async(s -> Map.of(ResearchState.PLAN,
-                        llm.complete("You plan research. Return 3 short numbered steps.",
-                                s.text(ResearchState.TOPIC).orElse("")))))
+                        outputValidator.validateText(llm.complete("Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, give 3 short numbered research steps.",
+                                s.text(ResearchState.TOPIC).orElse(""))))))
                 .addNode("draft", node_async(s -> Map.of(ResearchState.DRAFT,
-                        llm.complete("You write a concise research brief following the plan.",
+                        outputValidator.validateText(llm.complete("Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, write a concise research brief following the plan.",
                                 "Topic: " + s.text(ResearchState.TOPIC).orElse("")
-                                        + "\nPlan:\n" + s.text(ResearchState.PLAN).orElse("")))))
+                                        + "\nPlan:\n" + s.text(ResearchState.PLAN).orElse(""))))))
                 .addNode("review", node_async(s -> Map.of(ResearchState.REVIEW,
-                        llm.complete("You critically review a brief. Reply with APPROVE or REVISE and one reason.",
-                                s.text(ResearchState.DRAFT).orElse("")))))
+                        outputValidator.validateText(llm.complete("Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, reply with APPROVE or REVISE and one reason.",
+                                s.text(ResearchState.DRAFT).orElse(""))))))
                 .addEdge(START, "plan")
                 .addEdge("plan", "draft")
                 .addEdge("draft", "review")

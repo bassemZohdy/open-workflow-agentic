@@ -5,7 +5,9 @@ import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSup
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.auditCount;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.historyWithReason;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.inspect;
+import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.moveTo;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.post;
+import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.retriesOf;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.startRunning;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.status;
 import static org.hamcrest.Matchers.containsString;
@@ -13,6 +15,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceStatus;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcInstanceStore;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
@@ -29,6 +33,23 @@ class OperationsDegradedTest {
 
     @Inject
     DataSource dataSource;
+
+    @Inject
+    JdbcInstanceStore store;
+
+    @Test
+    void retryOfAFailedInstanceIsRefusedWithTheEngineDownAndCreatesNothing() {
+        String tenant = LifecycleSupport.newTenant();
+        String id = startRunning(tenant);
+        moveTo(store, tenant, id, InstanceStatus.FAILED);
+
+        post(tenant, OPERATE, "degraded-retry-failed", id, "retry").statusCode(503)
+                .body("detail", containsString("nothing was changed"));
+
+        assertEquals(0, retriesOf(dataSource, id), "no linked instance is created with the engine down");
+        assertEquals("FAILED", status(dataSource, id));
+        assertEquals(1, auditCount(dataSource, "operation.attempt", id, "error"));
+    }
 
     @Test
     void cancelWithTheRecoveryScopeIsAllowedAndAuditedAsARecoveryDecision() {
