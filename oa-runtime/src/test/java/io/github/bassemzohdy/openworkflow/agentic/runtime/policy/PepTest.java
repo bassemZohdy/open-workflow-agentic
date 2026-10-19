@@ -272,7 +272,7 @@ class PepTest {
         Decision d = pep.toolCall(AGENT, PolicyFixtures.task(), "search", 1L);
         assertEquals(DecisionOutcome.ERROR, d.outcome());
         assertEquals(1, audit.records().size());
-        assertFalse(audit.records().get(0).recoveryPath());
+        assertEquals("false", audit.records().get(0).attributes().get("policy.recoveryPath"));
     }
 
     @Test
