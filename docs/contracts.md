@@ -137,10 +137,7 @@ The schema cannot express two rules: a due time after creation (`HumanTask`) and
 
 **Formats.** Draft 2020-12 treats `format` as an annotation unless assertion is switched on, so `SchemaContractTest` builds its registry with `SchemaRegistryConfig.builder().formatAssertionsEnabled(true)`. The schemas use one format, `date-time`, in `decision` (`decidedAt`), `effect` (`recordedAt`), `human-task` (`createdAt`, and `dueAt` inside `anyOf` with `null`), `evidence` (`capturedAt`) and `audit-event` (`occurredAt`). The validator checks it with the ethlo `itu` library that networknt 2.0.8 loads. The test `theOnlyFormatInTheSchemasIsDateTimeAndEveryUseIsTested` fails when a schema adds a format, so each new format needs VALID and INVALID cases first. Other keywords (`pattern`, `maxLength`) are always asserted.
 
-**Known gaps** (the validator is more lenient or stricter than RFC 3339 on these points; the schemas are not changed):
-
-- A space in place of the `T` separator is accepted. RFC 3339 section 5.6 allows it only as a readability note, not in its grammar. The writers here emit only `T` and `Z`. `leniencyOfTheDateTimeValidatorIsPinned` records the behaviour; a strict check would need a `pattern` on each `date-time` field.
-- A leap second (`:60`) is rejected, although RFC 3339 section 5.7 allows it. `java.time.Instant` never produces one.
+**Supported date-time profile.** Each `date-time` field combines format assertion with a schema pattern. The pattern requires the canonical upper-case `T` and `Z`, a seconds value from `00` through `59`, and an optional fractional second or numeric offset. Format assertion validates calendar dates and time/offset ranges. This intentionally excludes leap seconds because `java.time.Instant` cannot represent them. `SchemaContractTest` checks valid offsets and fractions, malformed calendar/time values, non-canonical separators, leap seconds, and invalid offsets for every timestamp field.
 
 ## 10. Verification
 
