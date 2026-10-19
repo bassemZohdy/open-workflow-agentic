@@ -61,7 +61,9 @@ Goal, requesting subject and delegation grant are carried over unchanged. A chai
 - `policy` is a `PolicyRef(policyId, policySetVersion)`. The policy id is the platform's stable id. Engine-assigned names such as `policy0` are not stable and must be mapped first.
 - `decidedBy` names the component that decided. The built-in rule for failures is `PolicyRef.FAIL_CLOSED` (`oa.fail-closed`, version `1`).
 
-`AuthorizationRequest(subject, action, resource, taskId)` is the input to a decision. `ActionKind` is `TOOL_CALL`, `MODEL_CALL`, `DATA_ACCESS`, `EFFECT_COMMIT`, `RESUME` or `DELEGATE`. `taskId` is null only for requests made outside an agent task.
+`AuthorizationRequest(subject, action, resource, taskId, context)` is the input to a decision. `ActionKind` is `TOOL_CALL`, `MODEL_CALL`, `DATA_ACCESS`, `EFFECT_COMMIT`, `RESUME`, `DELEGATE`, `HUMAN_TASK_ACTION`, `PUBLICATION` or `OPERATION` (WP-103 added the last three). `taskId` is null only for requests made outside an agent task.
+
+`PolicyContext(scopes, riskTier, budgetRemainingMicros, onBehalfOf, delegationGrantId, permittedByContract)` holds the facts a policy may read besides the request (WP-103). Every field is optional except `scopes`, which defaults to none; a null field means the fact does not apply to the call. The enforcement point fills it from the approved task, so the policy engine never reads the task store itself. The four-argument `AuthorizationRequest` constructor uses `PolicyContext.EMPTY`.
 
 ## 4. Effects (M03, M06, ADR 0020 decision 6)
 
@@ -95,7 +97,7 @@ Goal, requesting subject and delegation grant are carried over unchanged. A chai
 - a rewritten event that is recomputed alone (the next event's `previousHash` no longer links);
 - a removed, inserted or reordered event (sequence and links break).
 
-What it cannot detect alone: a full rewrite of the chain from some point, including the head. `verifyChain(events, expectedHead)` detects that, and also a truncation, when the head is kept outside the log. The head anchor is part of the audit work (WP-111).
+What it cannot detect alone: a full rewrite of the chain from some point, including the head. `verifyChain(events, expectedHead)` detects that, and also a truncation, when the head is kept outside the log. WP-111 keeps the head in the insert-only `audit.head_log` and checks it in `ChainVerifier`; an external anchor of the head is still open ([audit.md](audit.md) section 10). The attributes of an event also carry the chain, instance, correlation, version stamp and payload-reference keys that the trail uses ([audit.md](audit.md) section 1).
 
 ## 7. Artifacts (M09, M10, ADR 0020 decision 4)
 
@@ -114,6 +116,8 @@ Ports are interfaces in `...contracts.port`. Their Javadoc states the failure se
 | `TaskStore` | `insert`, `find(taskId)`, `findByThread(threadId)`, `replace(next, expectedVersion)` | A missing row is an empty optional. The runtime then refuses the thread and never creates a row to fill the gap. A duplicate task id or thread id is `IllegalStateException`. `replace` is optimistic: a version mismatch or a skipped version is `IllegalStateException`. An unavailable store throws, and callers must not read an exception as "no task". |
 | `ArtifactRegistry` | `activeVersion(kind, name)`, `version(kind, name, version)` | An artifact that is not approved, or unknown, is empty, and work that needs it is refused. An unavailable registry throws; the runtime keeps running pinned versions and starts no new work that needs an unverified one. A stale answer past the freshness limit is empty, never guessed. |
 
+**Bulkhead on the policy decision point.** `FailClosedPolicyDecisionPoint` admits at most `maxInFlight` delegate calls at once. The bound is a constructor argument, validated to be between 1 and `MAX_IN_FLIGHT` (1,024). The default is `DEFAULT_MAX_IN_FLIGHT` (64), used by the two constructors that do not take it. Admission is a non-blocking `Semaphore.tryAcquire()`, so a full bulkhead never waits: the call returns `ERROR` at once, with a reason that names the bulkhead, and the delegate is not called. A permit is released only when the delegate call itself returns or throws, never when the caller times out. A delegate that never returns therefore strands at most `maxInFlight` virtual threads, and capacity comes back when they finish. For WP-103, the PEP should keep the default 64 for an in-process PDP and raise it only after measuring peak concurrent decisions under load, staying below 1,024 and within the connection pool when the PDP calls out. Tests: `FailClosedBulkheadTest`.
+
 ## 9. Wire form and JSON Schemas
 
 The schemas are in `oa-contracts/src/main/resources/schemas/`, Draft 2020-12, one self-contained file per type with `additionalProperties: false`:
@@ -131,6 +135,10 @@ Wire notes: ids are ULID strings in upper case; `ThreadId` is a string; instants
 
 The schema cannot express two rules: a due time after creation (`HumanTask`) and the hash chain (`AuditEvent`). The record and `AuditHash` enforce those.
 
+**Formats.** Draft 2020-12 treats `format` as an annotation unless assertion is switched on, so `SchemaContractTest` builds its registry with `SchemaRegistryConfig.builder().formatAssertionsEnabled(true)`. The schemas use one format, `date-time`, in `decision` (`decidedAt`), `effect` (`recordedAt`), `human-task` (`createdAt`, and `dueAt` inside `anyOf` with `null`), `evidence` (`capturedAt`) and `audit-event` (`occurredAt`). The validator checks it with the ethlo `itu` library that networknt 2.0.8 loads. The test `theOnlyFormatInTheSchemasIsDateTimeAndEveryUseIsTested` fails when a schema adds a format, so each new format needs VALID and INVALID cases first. Other keywords (`pattern`, `maxLength`) are always asserted.
+
+**Supported date-time profile.** Each `date-time` field combines format assertion with a schema pattern. The pattern requires the canonical upper-case `T` and `Z`, a seconds value from `00` through `59`, and an optional fractional second or numeric offset. Format assertion validates calendar dates and time/offset ranges. This intentionally excludes leap seconds because `java.time.Instant` cannot represent them. `SchemaContractTest` checks valid offsets and fractions, malformed calendar/time values, non-canonical separators, leap seconds, and invalid offsets for every timestamp field.
+
 ## 10. Verification
 
 | Test | Covers |
@@ -142,8 +150,9 @@ The schema cannot express two rules: a due time after creation (`HumanTask`) and
 | `AuditHashTest` | Intact chain, changed field, recomputed event, removed, inserted and reordered events, truncation against a head, full rewrite |
 | `GovernanceRecordsTest` | Decision attribution, effect state machine, human task and evidence invariants |
 | `FailClosedPolicyDecisionPointTest` | Pass-through of ALLOW and DENY; throw, null, slow, interrupt and `Error` become `ERROR` |
+| `FailClosedBulkheadTest` | Stuck delegates exhaust the bound and refusals are prompt; live delegates never exceed the bound; permits return only when delegates return; capacity recovers; a 300-caller burst; bound validation |
 | `PortContractTest` | Port semantics with in-memory doubles and a guarded gateway |
-| `SchemaContractTest` | Samples validate; invalid documents are rejected; schema properties match the records |
+| `SchemaContractTest` | Samples validate; invalid documents are rejected; schema properties match the records; `date-time` fields reject malformed timestamps (format assertion on) and accept offsets; the set of formats in the schemas is the one tested |
 
 ## 11. Not in this package
 

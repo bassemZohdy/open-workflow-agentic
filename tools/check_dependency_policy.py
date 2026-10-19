@@ -46,6 +46,7 @@ DEFAULT_EXCEPTIONS = Path(__file__).resolve().parent / "dependency-policy-except
 LICENCE_PATTERNS = [
     (r"public domain|\bcc0\b", "Public-Domain"),
     (r"apache.*(2\.0|version 2)|apache-2\.0", "Apache-2.0"),
+    (r"^apache 2$", "Apache-2.0"),  # the short name used by fizzed/maven-parent (jne), which links the Apache 2.0 text
     (r"\bmit-0\b", "MIT-0"),
     (r"\bmit\b", "MIT"),
     (r"^edl\b|eclipse distribution", "BSD"),  # EDL 1.0 is the BSD-3-Clause text (Eclipse, edl-v10)

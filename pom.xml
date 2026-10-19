@@ -45,6 +45,7 @@
     <jandex-plugin.version>3.2.5</jandex-plugin.version>
     <archunit.version>1.4.1</archunit.version>
     <json-schema-validator.version>2.0.8</json-schema-validator.version>
+    <cedar-java.version>4.10.0</cedar-java.version>
   </properties>
 
   <dependencyManagement>

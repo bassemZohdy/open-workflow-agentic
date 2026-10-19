@@ -216,10 +216,24 @@ class DependencyPolicyTest(unittest.TestCase):
             "GNU General Public License, version 3": "GPL",
             "GNU Lesser General Public License": "LGPL",
             "Mozilla Public License 2.0": "MPL-2.0",
+            "Apache 2": "Apache-2.0",
         }
         for name, expected in cases.items():
             with self.subTest(name=name):
                 self.assertEqual(expected, policy.classify_licence(name))
+
+    def test_short_apache_name_is_only_the_exact_name(self):
+        # "Apache 2" is the whole name (fizzed/maven-parent). A longer name that merely contains it is not matched.
+        self.assertEqual("Apache-2.0", policy.classify_licence("Apache 2"))
+        self.assertIsNone(policy.classify_licence("Apache 2 with a bespoke clause"))
+
+    def test_jne_style_short_apache_name_inherited_from_the_parent_passes(self):
+        # Mirrors com.fizzed:jne: the artifact declares no licence and its parent says "Apache 2".
+        self.fx.artifact("com.example", "shortname-parent", "4.5.3", ["Apache 2"])
+        self.fx.artifact("com.example", "shortname-child", "4.5.3", None,
+                         parent=("com.example", "shortname-parent", "4.5.3"))
+        self.fx.deps("oa-runtime", ["com.example:shortname-child:jar:4.5.3:compile"])
+        self.assertEqual([], self.fx.run()[0])
 
     def test_unknown_names_are_not_classified(self):
         self.assertIsNone(policy.classify_licence("Some Bespoke Licence"))
