@@ -3,6 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.api.problem;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.api.ProblemDetail;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.correlation.CorrelationIdFilter;
 import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
@@ -36,10 +37,18 @@ public class ProblemDetailMapper implements ExceptionMapper<Throwable> {
             LOG.debugf("Request rejected with status %d (correlationId=%s): %s",
                     problem.status(), correlationId, problem.detail());
         }
-        return Response.status(problem.status())
+        Response.ResponseBuilder response = Response.status(problem.status())
                 .type(MEDIA_TYPE)
-                .entity(toBody(problem, correlationId))
-                .build();
+                .entity(toBody(problem, correlationId));
+        // A 401 must tell the client how to authenticate (RFC 9110 section 11.6.1); keep the header the resolver set.
+        if (error instanceof WebApplicationException web && web.getResponse() != null
+                && web.getResponse().getStatus() == 401) {
+            String challenge = web.getResponse().getHeaderString(HttpHeaders.WWW_AUTHENTICATE);
+            if (challenge != null) {
+                response.header(HttpHeaders.WWW_AUTHENTICATE, challenge);
+            }
+        }
+        return response.build();
     }
 
     static ProblemDetail toProblem(Throwable error) {

@@ -56,6 +56,11 @@
     </dependency>
     <dependency><groupId>com.google.guava</groupId><artifactId>guava</artifactId></dependency>
 
+    <!-- Identity (WP-102, ADR 0021): JWT signature verification against the issuer's JWKS. Apache-2.0, managed by the
+         Quarkus BOM. quarkus-oidc was considered and not used: it installs an HTTP authentication mechanism for every
+         route, and the caller seam (CallerContextResolver) must stay the one place that decides who is calling. -->
+    <dependency><groupId>com.nimbusds</groupId><artifactId>nimbus-jose-jwt</artifactId></dependency>
+
     <!-- Metrics: outbox lag gauges (WP-105b); the registry is chosen in app-runtime -->
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-micrometer</artifactId></dependency>
 
