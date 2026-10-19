@@ -218,6 +218,8 @@ Implemented scope:
 - JWT verification, scoped grants, replay protection, RFC 8693 client, mounted-secret rotation and wait reauthorization are implemented.
 - T07 is automated using in-process stand-ins; issuer interoperability is not proven.
 
+102a audit-caller increment in PR #39 was reviewed by GPT at 79f94ce56b794515cf3f66c3a832bfc84693dc00 with green CI run 39260386461; it is not merged by this change. 102b real product Java/Keycloak evidence remains open. WP-102 stays partial.
+
 Additional closure/integration tasks:
 
 - [ ] Run the real Keycloak test in docs/identity.md section 9; prove actor_token/act mapping, tenant/scope claims, audience narrowing and expiry bounds.

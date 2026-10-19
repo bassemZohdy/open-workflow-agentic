@@ -519,7 +519,8 @@
           "docs/identity.md",
           "docs/audit.md",
           "docs/handoffs/gpt/WP-102.md"
-        ]
+        ],
+        "scope_note": "102a audit-caller increment in PR #39 was reviewed by GPT at 79f94ce56b794515cf3f66c3a832bfc84693dc00 with green CI run 39260386461; it is not merged by this change. 102b real product Java/Keycloak evidence remains open. WP-102 stays partial."
       }
     },
     {
