@@ -1,6 +1,6 @@
 # WP-007 Spike E: MCP, A2A and agent protocols
 
-**Status:** Findings · **Date:** 2026-10-18 · **Owner:** WP-007 · **Code:** `spikes/spike-e-protocols/` (standalone Maven project, not in the root build)
+**Status:** Findings · **Date:** 2026-10-18 · **Owner:** WP-007 · **Code:** removed (issue #30); in git history at `b76181d` under `spikes/spike-e-protocols/`. WP-207 builds and tests the A2A implementation in its own work package; it does not revive the spike harness
 
 Confidence labels:
 

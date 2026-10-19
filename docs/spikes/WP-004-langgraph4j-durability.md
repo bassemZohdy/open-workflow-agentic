@@ -2,7 +2,7 @@
 
 **Status:** Closed for the questions below · **Date:** 2026-10-18 · **Version under test:** LangGraph4j 1.9.5 (same line as the root pom)
 
-Code: [spikes/spike-b-langgraph4j](../../spikes/spike-b-langgraph4j) (standalone Maven project, not in the root modules). Decision: [ADR-0020](../adr/0020-checkpoint-scoping-and-state-evolution.md).
+Code: removed (issue #30). The spike was temporary, was never part of the root build or the product, and only its outcomes are kept here; the code is in git history at `b76181d` under `spikes/`. The product work package builds and tests the real implementation. Decision: [ADR-0020](../adr/0020-checkpoint-scoping-and-state-evolution.md).
 
 ## How to read the evidence
 
@@ -95,6 +95,8 @@ Work packages are from [work-packages.md](../plan/work-packages.md). Nothing was
 9. The documentation pages are unread (blocked, see above).
 
 ## Commands run
+
+*Historical: these ran against the spike code, since removed (issue #30).*
 
 ```
 cd spikes/spike-b-langgraph4j

@@ -2,7 +2,7 @@
 
 **Status:** Findings, not a decision · **Date:** 2026-10-18 · **Work package:** [WP-006](../plan/work-packages.md) · **Requirements:** M11, M12 (with M02, M13, M19, M20, M26, M27)
 
-Code: [`spikes/spike-d-identity-policy`](../../spikes/spike-d-identity-policy) (standalone Maven project, 43 tests, not in the root `<modules>`). Decision record: [ADR 0021](../adr/0021-identity-delegation-policy-engine-and-secrets.md).
+Code: removed (issue #30). The spike was temporary, was never part of the root build or the product, and only its outcomes are kept here; the code is in git history at `b76181d` under `spikes/`. The product work package builds and tests the real implementation. Decision record: [ADR 0021](../adr/0021-identity-delegation-policy-engine-and-secrets.md).
 
 Confidence labels used below:
 

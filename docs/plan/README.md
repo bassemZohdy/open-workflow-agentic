@@ -128,6 +128,8 @@ flowchart LR
 
 WP-105 (canonical progress) is the single most important package: almost everything after phase 1 builds on it. Start it as soon as the spikes close and give it the best-understood design.
 
+**Spike code (issue #30).** The spike implementations were temporary, are not part of the product or the root build, and have been removed. Only their outcomes are kept: findings, measurements, confidence labels and decisions in [`docs/spikes`](../spikes) and the ADRs. WP-207 builds and tests the A2A implementation in its own work package; it does not revive the spike harness.
+
 ## 5. Order of work and parallelism
 
 - **Start together:** WP-001, then WP-002 to WP-007 in parallel; WP-008 follows WP-002 (two or three people can close all spikes in two weeks of elapsed time).
