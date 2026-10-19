@@ -206,7 +206,7 @@ These are not ADR edits. The ADRs were left unchanged, as the brief asks.
 
 ## 9. Reconciler (WP-105c)
 
-Code: `Reconciler`, `EngineStatusSync`, `FlowEngineObserver`, `RegistryScan`, `RepairStore`, `AgentRunPolicy`, `LifecycleSettings`, `LifecycleFaults` in `oa-runtime`; the probe and its switches in `app-runtime`. Schema: V16 (`task.instance.resume_epoch`), V17 (`agent_task` bridge and lease), V18 (`task.repair_event`, append-only), V19 (wait-deadline index).
+Code: `Reconciler`, `EngineStatusSync`, `FlowEngineObserver`, `RegistryScan`, `RepairStore`, `AgentRunPolicy`, `LifecycleSettings`, `LifecycleFaults` in `oa-runtime`; the probe and its switches in `app-runtime`. Schema: V35 (`task.instance.resume_epoch`), V36 (`agent_task` bridge and lease), V37 (`task.repair_event`, append-only), V38 (wait-deadline index).
 
 ### 9.1 What Flow can and cannot report
 
@@ -325,7 +325,7 @@ These are for the owner. The ADRs were not edited.
 - ADR 0019, Start: records RUNNING after `start()` returns. The engine's report can arrive first, so the registry follows the engine's report when both happen. The ADR should say so.
 - ADR 0019, Resume: the epoch must be incremented before the restart for WP-108 to key on it. The ADR does not say this.
 - ADR 0019, Retries: states the rule for the OWS retry. It does not say that the Flow default also repeats a 500 response (9.8).
-- ADR 0023, decision 7: requires the reconciler to restart agent runs "recorded as RUNNING or RESUMING", but does not define when such a run is no longer alive. 105c adds the lease columns for that (V17); the agent path that writes them does not exist yet.
+- ADR 0023, decision 7: requires the reconciler to restart agent runs "recorded as RUNNING or RESUMING", but does not define when such a run is no longer alive. 105c adds the lease columns for that (V36); the agent path that writes them does not exist yet.
 - ADR 0019, Query: "scoped by definition id and version" is still open (section 7, item 3).
 
 ### 9.12 Deviations from the brief
