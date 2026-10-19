@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.AgentOutputValidator;
+import io.github.bassemzohdy.openworkflow.agentic.testkit.acceptance.Acceptance;
 import io.serverlessworkflow.impl.WorkflowDefinition;
 import io.serverlessworkflow.impl.WorkflowException;
 import jakarta.enterprise.inject.Any;
