@@ -11,9 +11,10 @@ import javax.sql.DataSource;
 /** Receipt proof committed atomically with the actual SDK task checkpoint, never from a lifecycle notification. */
 @ApplicationScoped
 public class JdbcInboxCheckpointProof implements InboxCheckpointProof {
-    @Inject DataSource dataSource;
+    private final DataSource dataSource;
     @Inject TransactionManager transactions;
     @Inject JdbcInboxTaskLease taskLeases;
+    @Inject public JdbcInboxCheckpointProof(DataSource dataSource) { this.dataSource=java.util.Objects.requireNonNull(dataSource); }
 
     @Transactional(Transactional.TxType.MANDATORY)
     public void record(InboxCheckpointMarker marker) {
@@ -34,14 +35,16 @@ public class JdbcInboxCheckpointProof implements InboxCheckpointProof {
                     }
                 }
                 taskLeases.requireCurrent(marker.claim()); // Registry -> task lease -> delivery, all held until JTA completion.
-                try (var s = c.prepareStatement("select d.state,d.attempts,d.identity_digest,m.fingerprint "
+                try (var s = c.prepareStatement("select d.state,d.attempts,d.identity_digest,m.fingerprint,d.task_digest,d.claim_owner,d.claim_epoch "
                         + "from inbox.delivery d join inbox.signal s using(tenant,instance_id,wait_key) "
                         + "join inbox.message m on m.tenant=s.tenant and m.source=s.source and m.event_id=s.event_id "
                         + "where d.tenant=? and d.instance_id=? and d.wait_key=? for update of d")) {
                     route(s,w);
                     try (var r = s.executeQuery()) {
                         if (!r.next() || !r.getString(1).equals("DISPATCHED") || r.getInt(2) != marker.attempt()
-                                || !r.getString(3).equals(w.digest()) || !r.getString(4).equals(marker.receiptFingerprint())) {
+                                || !r.getString(3).equals(w.digest()) || !r.getString(4).equals(marker.receiptFingerprint())
+                                || !w.task().digest().equals(r.getString(5)) || !marker.claim().owner().equals(r.getString(6))
+                                || marker.claim().epoch()!=r.getLong(7)) {
                             throw new IllegalStateException("checkpoint lost its exact dispatch/receipt fence");
                         }
                     }
@@ -67,9 +70,15 @@ public class JdbcInboxCheckpointProof implements InboxCheckpointProof {
 
     @Override @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public boolean consumed(InboxWait w, InboxMessage receipt) {
-        if (!receipt.tenant().equals(w.tenant()) || !receipt.instanceId().equals(w.instanceId())
-                || !receipt.correlationKey().equals(w.route()) || !receipt.type().equals(w.eventType())) return false;
-        try (var c = dataSource.getConnection(); var s = c.prepareStatement("""
+        if(!receiptMatches(w,receipt)) return false;
+        try(var c=dataSource.getConnection()) { return consumed(c,w,receipt); }
+        catch(SQLException unavailable) { throw new StoreUnavailableException("inbox checkpoint proof unavailable",unavailable); }
+    }
+
+    /** Fresh authoritative read using the caller's already locked transaction; no second pooled connection. */
+    boolean consumed(Connection c,InboxWait w,InboxMessage receipt) throws SQLException {
+        if(!receiptMatches(w,receipt)) return false;
+        try (var s = c.prepareStatement("""
                 select 1 from inbox.checkpoint_receipt where tenant=? and instance_id=? and wait_key=?
                 and identity_digest=? and receipt_fingerprint=? and application_id=? and engine_instance_id=?
                 and task_position=? and iteration=?
@@ -77,7 +86,11 @@ public class JdbcInboxCheckpointProof implements InboxCheckpointProof {
             route(s,w); s.setString(4,w.digest()); s.setString(5,receipt.fingerprint()); s.setString(6,w.applicationId());
             s.setString(7,w.engineInstanceId()); s.setString(8,w.taskPosition()); s.setInt(9,w.iteration());
             try (var r = s.executeQuery()) { return r.next(); }
-        } catch (SQLException unavailable) { throw new StoreUnavailableException("inbox checkpoint proof unavailable",unavailable); }
+        }
+    }
+    private static boolean receiptMatches(InboxWait w,InboxMessage receipt) {
+        return receipt.tenant().equals(w.tenant()) && receipt.instanceId().equals(w.instanceId())
+                && receipt.correlationKey().equals(w.route()) && receipt.type().equals(w.eventType());
     }
     private static void route(PreparedStatement s, InboxWait w) throws SQLException {
         s.setString(1,w.tenant()); s.setString(2,w.instanceId().value()); s.setString(3,w.key());

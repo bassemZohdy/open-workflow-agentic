@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-2026-10-20: GPT merged #35 exact747ce7e as c01cef4 after Claude6282864843 APPROVE and CI39360512505; main postmerge39366191268 SUCCESS. #43 exact2cb33c1 merged into this parent as2c03869 after Claude6282954159 APPROVE/full39364985191; shared6a0081d approved6282963014 and full/matrix passed. Main-plan merge resolves source conflicts while keeping current product code identical to approved2cb33c1; renew current parent review/CI. #39 a1b1c0b SOURCE-PASS and real matrix standard3/native8/binding7 pass; full Maven passed but acceptance index failed. GPT tracking/main carrier07957f0 supplies exact CI-generated T07.where correction and resolved main plan, product code unchanged from a1b1c0b. Corrected candidate CI/review required before integration. WP-102/WP-107/WP-108 stay partial; ADR0025 Proposed. Task ownership d9b11c2 passed both lanes of39365931197 (lease7/checkpoint6, zero skips); successor preserves reservation-wins-deadline with a seventh actual SDK case, app test-compile passed, current execution pending. Product consumer/owned matching/ACK/restore/partition/full T13 remain open; ADR0026 Proposed..
+2026-10-20: #35/#37 plan is merged; #38 merged with WP-108 partial. #43 merged into #40; parent10a6926 full39367201113/matrix39367201013 SUCCESS, current exact peer review pending. GPT merged acceptance-only #45 exactbe71f0a into #39 as712c059 after Claude6283416018 APPROVE and full39368834100 SUCCESS. Detached GPT review of712c059 finds no product/test/workflow diff versus source-passed4d4d70b; tools68/projections pass, new full39369999072 and real Keycloak39369999157 pending. #44 exacta6bcccf full39367327487 SUCCESS (lease7/SDK7), exact Claude review pending. Owned-dispatch successor is a separate pushed branch until #44 completes: V69 and ten component cases compile, DB execution/peer review pending. WP-102/WP-107/WP-108 remain partial, ADR0025/0026 Proposed; actual consumer/coordinator/ACK-before-advance/restore/partition/loop/full T13 gates stay open..
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-19).
 
@@ -459,6 +459,7 @@ Implemented scope:
 - PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open.
 - Exact d9b11c2 workflow39365931197 SUCCESS both lanes: lease7/7, actual SDK/JPA6/6 (including task handover, expired lease, expiry after a proven delivery-row lock wait), selection6, protocol9, cancellation2, zero skips. Source code unchanged through merged main/docs b12a713; tools68/generated checks pass. Scoped checkpoint/lease proof only: consumer, owned matching/reservation, ACK/restore/process/partition/loop/full T13 and reciprocal current-head gates remain open.
 - Preserve reviewed reservation-wins-deadline semantics in the new task lease guard: acquire/renew check the current wait deadline; an already-reserved checkpoint checks active registry and exact live owner/epoch without retroactive wait expiry. Cancellation/lease expiry remain fenced. Seventh actual SDK/JPA case added; app test-compile passes, new execution pending. Original d9b11c2 six checkpoint/seven lease cases remain recorded as the prior scoped pass; no SQL rewritten or full T13 claim.
+- Owned-dispatch successor from exact #44 a6bcccf (full39367327487 SUCCESS) adds V69 task-fenced short-transaction matching/reservation/ACK, same-connection authoritative proof reads, one audited permission per registration/epoch and post-audit live authority checks. All seven actual SDK cases ported to owned reservations; ten new PostgreSQL failure/budget cases compile. Local app reactor test-compile passes; successor DB execution and reciprocal review pending. No production coordinator/consumer or T13 promotion; V64..V68 untouched.
 
 Additional closure/integration tasks:
 
@@ -475,7 +476,7 @@ Acceptance gates:
 
 - [ ] T13: implement, run in CI and record passing evidence
 
-Evidence: [docs/handoffs/gpt/WP-107.md](docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](docs/lifecycle.md), [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](docs/handoffs/gpt/INTEGRATION-2026-10-20.md)
+Evidence: [docs/handoffs/gpt/WP-107.md](docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](docs/lifecycle.md), [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](docs/handoffs/gpt/INTEGRATION-2026-10-20.md), [docs/handoffs/gpt/WP-107-owned-dispatch.md](docs/handoffs/gpt/WP-107-owned-dispatch.md)
 
 ### WP-108 Effect ledger and compensation — partial
 

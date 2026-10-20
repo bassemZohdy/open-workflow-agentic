@@ -184,8 +184,8 @@ public class JdbcInboxDispatch {
                     r.getTimestamp(3).toInstant())) : Optional.empty(); }
         }
     }
-    private record Registry(String status, Instant deadline) { }
-    private static Registry instance(Connection c, InboxWait wait) throws SQLException {
+    record Registry(String status, Instant deadline) { }
+    static Registry instance(Connection c, InboxWait wait) throws SQLException {
         try (var s = c.prepareStatement("select status,wait_deadline,definition_id,definition_version,engine_instance_id "
                 + "from task.instance where tenant=? and id=? for update")) {
             s.setString(1, wait.tenant()); s.setString(2, wait.instanceId().value());
@@ -200,12 +200,12 @@ public class JdbcInboxDispatch {
             }
         }
     }
-    private static Instant databaseNow(Connection c) throws SQLException {
+    static Instant databaseNow(Connection c) throws SQLException {
         try (var s = c.createStatement(); var r = s.executeQuery("select clock_timestamp()")) {
             r.next(); return r.getTimestamp(1).toInstant();
         }
     }
-    private static Optional<InboxMessage> signal(Connection c, InboxWait wait) throws SQLException {
+    static Optional<InboxMessage> signal(Connection c, InboxWait wait) throws SQLException {
         try (var s = c.prepareStatement("""
                 select m.* from inbox.signal s join inbox.message m
                 on m.tenant=s.tenant and m.source=s.source and m.event_id=s.event_id
@@ -223,13 +223,13 @@ public class JdbcInboxDispatch {
             }
         }
     }
-    private static boolean terminal(String state) { return Set.of("ACKNOWLEDGED","CANCELLED","EXPIRED").contains(state); }
-    private static void dispose(Connection c, InboxWait wait, String state) throws SQLException {
+    static boolean terminal(String state) { return Set.of("ACKNOWLEDGED","CANCELLED","EXPIRED").contains(state); }
+    static void dispose(Connection c, InboxWait wait, String state) throws SQLException {
         try (var s = c.prepareStatement("update inbox.delivery set state=? where tenant=? and instance_id=? and wait_key=?")) {
             s.setString(1,state); s.setString(2,wait.tenant()); s.setString(3,wait.instanceId().value()); s.setString(4,wait.key()); s.executeUpdate();
         }
     }
-    private static void route(PreparedStatement s, InboxWait wait) throws SQLException {
+    static void route(PreparedStatement s, InboxWait wait) throws SQLException {
         s.setString(1,wait.tenant()); s.setString(2,wait.instanceId().value()); s.setString(3,wait.key());
     }
     private void record(Reserved r, String action) {

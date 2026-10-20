@@ -439,6 +439,7 @@ Implementation status: **partial**.
 - Implemented: PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open.
 - Implemented: Exact d9b11c2 workflow39365931197 SUCCESS both lanes: lease7/7, actual SDK/JPA6/6 (including task handover, expired lease, expiry after a proven delivery-row lock wait), selection6, protocol9, cancellation2, zero skips. Source code unchanged through merged main/docs b12a713; tools68/generated checks pass. Scoped checkpoint/lease proof only: consumer, owned matching/reservation, ACK/restore/process/partition/loop/full T13 and reciprocal current-head gates remain open.
 - Implemented: Preserve reviewed reservation-wins-deadline semantics in the new task lease guard: acquire/renew check the current wait deadline; an already-reserved checkpoint checks active registry and exact live owner/epoch without retroactive wait expiry. Cancellation/lease expiry remain fenced. Seventh actual SDK/JPA case added; app test-compile passes, new execution pending. Original d9b11c2 six checkpoint/seven lease cases remain recorded as the prior scoped pass; no SQL rewritten or full T13 claim.
+- Implemented: Owned-dispatch successor from exact #44 a6bcccf (full39367327487 SUCCESS) adds V69 task-fenced short-transaction matching/reservation/ACK, same-connection authoritative proof reads, one audited permission per registration/epoch and post-audit live authority checks. All seven actual SDK cases ported to owned reservations; ten new PostgreSQL failure/budget cases compile. Local app reactor test-compile passes; successor DB execution and reciprocal review pending. No production coordinator/consumer or T13 promotion; V64..V68 untouched.
 
 Remaining gates:
 
@@ -451,7 +452,7 @@ Remaining gates:
 - Recheck cancellation under the dispatch reservation lock; use named system:event-recovery SERVICE principal and audit every attempt before releasing callbacks; manual changes require authorized oa.recover operation.
 - Complete event-triggered starts, retention/tombstones and delivery tracing; automate full T13 including failed compensation.
 
-Evidence: [docs/handoffs/gpt/WP-107.md](../../docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](../../docs/handoffs/gpt/INTEGRATION-2026-10-20.md)
+Evidence: [docs/handoffs/gpt/WP-107.md](../../docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](../../docs/handoffs/gpt/INTEGRATION-2026-10-20.md), [docs/handoffs/gpt/WP-107-owned-dispatch.md](../../docs/handoffs/gpt/WP-107-owned-dispatch.md)
 
 Reuse: quarkus-flow-messaging
 

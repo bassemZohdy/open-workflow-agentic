@@ -43,6 +43,7 @@ class AtomicInboxCheckpointTest {
     @Inject EntityManager em;
     @Inject DataSource dataSource;
     @Inject JdbcInboxTaskLease taskLeases;
+    @Inject JdbcOwnedInbox owned;
 
     record Listening(WorkflowContext workflow, TaskContext task) { }
     static class Broker extends InMemoryEvents {
@@ -130,27 +131,30 @@ class AtomicInboxCheckpointTest {
                 var message = new InboxMessage(row.tenant(),"urn:test:atomic",UUID.randomUUID().toString(),wait.eventType(),
                         row.id(),wait.route(),"{\"ok\":true}");
                 dispatch.register(wait); inbox.receive(message,now().plusSeconds(600));
-                assertEquals(Optional.of(message),inbox.matchCandidate(wait,message));
-                var claim = dispatch.claim(wait).orElseThrow();
-                JdbcInboxDispatch.Claim newer = null;
+                var lease=taskLeases.acquire(wait.task(),"owner-"+UUID.randomUUID(),
+                        mode==Mode.TASK_EXPIRED ? Duration.ofSeconds(1) : mode==Mode.TASK_DELAYED_EXPIRED
+                                ? Duration.ofSeconds(5) : Duration.ofSeconds(30)).orElseThrow();
+                List<InboxTaskClaim> cleanup=new ArrayList<>(); cleanup.add(lease.claim());
+                assertEquals(Optional.of(message),owned.match(lease.claim(),wait,message));
                 java.sql.Connection blocker=null;
                 int blockerPid=0;
                 try {
-                    var reserved = dispatch.reserve(claim,proof).orElseThrow();
+                    var reserved = owned.reserve(lease.claim(),wait).orElseThrow();
                     assertFalse(proof.consumed(wait,message));
-                    var lease=taskLeases.acquire(wait.task(),"owner-"+UUID.randomUUID(),
-                            mode==Mode.TASK_EXPIRED ? Duration.ofMillis(100) : mode==Mode.TASK_DELAYED_EXPIRED
-                                    ? Duration.ofSeconds(5) : Duration.ofSeconds(30)).orElseThrow();
                     InboxCheckpointMarker.install(listening.workflow(),task,reserved,lease.claim());
                     if (mode == Mode.HANDOVER) {
-                        claim.close(); newer = dispatch.claim(wait).orElseThrow();
-                        assertEquals(2,dispatch.reserve(newer,proof).orElseThrow().attempt());
+                        assertTrue(taskLeases.release(lease.claim()));
+                        var replacement=taskLeases.acquire(wait.task(),"replacement-"+UUID.randomUUID(),Duration.ofSeconds(30)).orElseThrow();
+                        cleanup.add(replacement.claim());
+                        assertEquals(2,owned.reserve(replacement.claim(),wait).orElseThrow().attempt());
+                        // Isolate the attempt fence: current owner, but the OLD reservation/attempt metadata.
+                        InboxCheckpointMarker.install(listening.workflow(),task,reserved,replacement.claim());
                     } else if (mode == Mode.CANCEL) {
                         move(row,InstanceStatus.CANCEL_REQUESTED,instance.id());
                     } else if (mode == Mode.TASK_HANDOVER) {
                         assertTrue(taskLeases.release(lease.claim()));
-                        assertEquals(lease.claim().epoch()+1,taskLeases.acquire(wait.task(),"replacement-"+UUID.randomUUID(),
-                                Duration.ofSeconds(30)).orElseThrow().claim().epoch());
+                        var replacement=taskLeases.acquire(wait.task(),"replacement-"+UUID.randomUUID(),Duration.ofSeconds(30)).orElseThrow();
+                        cleanup.add(replacement.claim()); assertEquals(lease.claim().epoch()+1,replacement.claim().epoch());
                     } else if (mode == Mode.TASK_EXPIRED) {
                         assertTimeoutPreemptively(Duration.ofSeconds(5),()-> {
                             while(!databaseExpired(lease)) Thread.sleep(10);
@@ -190,10 +194,9 @@ class AtomicInboxCheckpointTest {
                                 message.instanceId(),message.correlationKey(),message.dataJson());
                         assertFalse(proof.consumed(wait,another));
                         move(row,InstanceStatus.COMPLETED,instance.id());
-                        claim.close(); var restarted = new JdbcInboxDispatch(dataSource,e->{});
-                        try(var recovered = restarted.claim(wait).orElseThrow()) {
-                            assertTrue(restarted.reserve(recovered,proof).isEmpty(),"checkpoint-before-ACK must not authorize replay");
-                        }
+                        var restarted = new JdbcOwnedInbox(dataSource,taskLeases,inbox,proof,e->{},Clock.systemUTC());
+                        assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,restarted.acknowledge(wait));
+                        assertTrue(restarted.reserve(lease.claim(),wait).isEmpty(),"checkpoint-before-ACK must not authorize replay");
                         try(var c=dataSource.getConnection(); var s=c.prepareStatement("select state from inbox.delivery "
                                 + "where tenant=? and instance_id=? and wait_key=?")) {
                             s.setString(1,wait.tenant()); s.setString(2,wait.instanceId().value()); s.setString(3,wait.key());
@@ -214,7 +217,7 @@ class AtomicInboxCheckpointTest {
                 } finally {
                     if(blocker!=null) { blocker.rollback(); blocker.close(); }
                     releaseNext.complete(null);
-                    if (newer != null) newer.close(); claim.close();
+                    for(var claim:cleanup) taskLeases.release(claim);
                 }
             }
         }

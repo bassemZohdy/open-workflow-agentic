@@ -99,13 +99,16 @@ public class JdbcInboxTaskLease {
         try {
             if(transactions.getStatus()!=Status.STATUS_ACTIVE) throw new IllegalStateException("SDK checkpoint transaction required");
             try(var c=dataSource.getConnection()) {
-                // An in-time dispatch reservation wins its wait deadline. Checkpointing still requires a live
-                // lease and non-cancelled instance, but must not retroactively reject that accepted reservation.
-                boolean active=registry(c,claim.task(),false,false); Row row=read(c,claim.task()); Instant now=now(c);
-                if(!active || !matches(row,claim) || !row.expiresAt.isAfter(now))
-                    throw new IllegalStateException("checkpoint lost task ownership");
+                requireCurrent(c,claim,false);
             }
         } catch(SQLException | SystemException unavailable) { throw new StoreUnavailableException("task checkpoint fence unavailable",unavailable); }
+    }
+
+    /** Caller owns this short JDBC/JTA transaction. A committed reservation retains its deadline decision. */
+    void requireCurrent(Connection c,InboxTaskClaim claim,boolean newDispatch) throws SQLException {
+        boolean active=registry(c,claim.task(),false,newDispatch); Row row=read(c,claim.task()); Instant now=now(c);
+        if(!active || !matches(row,claim) || !row.expiresAt.isAfter(now))
+            throw new IllegalStateException("event task lost current ownership or wait authority");
     }
 
     private static boolean matches(Row row,InboxTaskClaim claim) {
