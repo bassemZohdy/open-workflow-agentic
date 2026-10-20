@@ -1,5 +1,7 @@
 # Changelog
 
+- GPT preparation normally combines frozen #51 current interruption code with group V71/V72 and binding V73, preserving source histories.62 local plain tests/app compilation/tools76 pass; fresh combined-head SQL/provider/full/peer evidence is required. This does not merge #51 to main or activate dispatch/acceptance.
+
 - Binding-store productc63130e passed BOTH39387463567:12 new actual PostgreSQL cases, existing issuing migration5/group11, core process recovery1 and standard3/native8, zero skips and strict evidence checks. Both completed-job logs inspected. Current-head peer/full CI, ordered foundations and actual governed dispatch remain open.
 
 - WP-108 coordination: specify stable journal/outbox identity, immutable audit drafts and idempotent central projection/readback after a lost actual commit reply. This is an explicit cross-owner proposal; no outbox/projector/mandatory audit gate is implemented or acceptance promoted.
@@ -20,9 +22,13 @@
 
 - WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. Eight new verifier cases and all76 tooling tests pass; new product process execution still needs fresh Linux CI. No acceptance promotion.
 
-- WP-108/WP-112 preparation: bounded, content-free OTel effect/dispatch/lookup/compensation spans, disabled SDK by default with runtime collector opt-in. Five local SDK/fault cases pass; three real ledger/CDI cases compile and await Linux execution. Governed Flow/adapter tracing and complete acceptance stay open.
+- WP-108 preparation: refuse interrupted callers before effect/refund dispatch and after blocking ledger/cleanup work, preserving committed facts and original recovery keys. Six local interruption cases pass; four new PostgreSQL cases compile and need fresh Linux execution. This is cooperative thread handling, not complete Flow/owner/authority cancellation.
 
-- WP-108 preparation: additive V70 protects effect intent identity, replay contract, irreversible state/attempt evidence and retained journal/compensation links. Five direct-SQL cases compile; Linux execution/review and original governed adapter/manual/audit/recovery gates remain open.
+- WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. All76 tooling tests pass. Exact4325993 passed BOTH39381656269 with process recovery1/SQL guards5/effects12/CDI tracing3/standard3/native8, zero skips and strict checks. Full governed Flow/owner/partition/peer gates remain; no acceptance promotion.
+
+- WP-108/WP-112 preparation: bounded, content-free OTel effect/dispatch/lookup/compensation spans, disabled SDK by default with runtime collector opt-in. Five SDK/fault and three real ledger/CDI cases pass in current Linux evidence above. Governed Flow/adapter/collector/complete distributed tracing remain open.
+
+- WP-108 preparation: additive V70 protects effect intent identity, replay contract, irreversible state/attempt evidence and retained journal/compensation links. Five direct-SQL cases and original core process recovery execute in current Linux evidence above. Final peer/full CI, governed adapter/manual/audit/owner/Flow recovery gates remain open.
 
 This log records implemented capabilities and their requirement coverage. Entries describe unreleased development work.
 A merged component or passing acceptance case does not close an entire platform requirement. The full
@@ -36,6 +42,12 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 - WP-107 integration: #48 merged after exact Claude approval, independent full verification and green full/strict provider CI. Group/coordinator/FIFO/foreach/until/loop, process/partition, effect and full T13 gates remain partial.
 
 - WP-108 partial: publish an explicit effect scope/registry-owner contract that preserves existing recovery keys, plus the current authority/manual-policy/central-audit handoff. Four scope and two existing key cases pass; no effect/operator consumer or package gate is activated by the value type.
+
+- WP-108 partial: publish an explicit effect scope/registry-owner contract that preserves existing recovery keys, plus the current authority/manual-policy/central-audit handoff. Four scope and two existing key cases pass; no effect/operator consumer or package gate is activated by the value type.
+
+- WP-103 shared contract preparation: immutable registry/task resource-call attribution, stable invocation keys distinct from target/request fingerprints, governed thread derivation and verified issuer/jti binding port. All170 contracts pass; backend/admission/dispatch and actual workflow success remain open.
+
+- WP-107 integration: #48 merged after exact Claude approval, independent full verification and green full/strict provider CI. Group/coordinator/FIFO/foreach/until/loop, process/partition, effect and full T13 gates remain partial.
 
 - WP-107 partial: repair actual committed receipt ACKs in bounded batches before the reconciler starts restored work, preserving identity/cancellation gates and failed-repair readiness. Ten new database/reader/lifecycle cases compile; execution/review and complete distributed consumer/T13 gates remain open.
 

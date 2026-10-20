@@ -1,7 +1,8 @@
 # WP-108 additive effect integrity guards
 
-Owner: GPT. Reviewer: Claude. Preparation after EffectScope3d16c17; no second
-active implementation PR while #46 remains in review. WP-108 remains partial.
+Owner: GPT. Reviewer: Claude. Current implementation PR #51 is based on
+reviewed main49/30e81c3. Earlier preparation evidence below is scoped history;
+the current head requires its own CI and peer review. WP-108 remains partial.
 
 V70 is allocated centrally by GPT for effect invariants. V63 and every applied
 migration stay unchanged. The new ledger trigger requires new rows to start as
@@ -38,3 +39,10 @@ tracing changes have their own new execution/review requirement.
 The authority/PEP/manual/central-audit request remains WP-108-authority.md.
 Governed adapters, actual Flow re-execution, old-owner/partition windows, full
 compensation/manual resolution and distributed tracing remain acceptance gates.
+
+Current preparation product4325993 now passed BOTH39381656269 with V70 guards5,
+original effect service12, actual CDI tracing3 AND the original separate-worker
+EffectCrashRecoveryIT1, zero failures/errors/skips; both full logs and strict
+provider/process evidence checks inspected. This re-executes the original core
+charge/refund abrupt-process recovery under V70 on merged main48. It does not
+prove actual governed Flow/owner/partition recovery or remove the gates above.

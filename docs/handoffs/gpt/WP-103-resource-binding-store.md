@@ -98,3 +98,18 @@ No full build workflow/current peer approval or actual workflow dispatch/T13 is
 claimed by these component/provider runs. Final integration still requires
 effect/group foundations, current full/strict CI and exact Claude review. The
 proposed audit consumer/outbox in WP-108-audit-projection-proposal.md is not code.
+
+## Current effect foundation combined in preparation
+
+Normal merge of frozen #51 exact7cbb4c978e1a1482e21aad29843c73485a237e90 into this
+preparation brings the current interruption boundaries and four real SQL recovery
+cases together with group V71/V72 and binding V73. It does NOT merge #51 to main,
+change its head or assert peer approval. Both source progress histories and
+CHANGELOG entries are retained; only execution_plan.status conflicted as a scalar
+and generated projections were regenerated from merged JSON.
+
+Combined local application-reactor selected build:62 plain tests (contracts21,
+runtime41), zero failures/errors/skips, all application tests compile. Tools76,
+generated and diff checks pass. This does NOT transfer old c63130e CI evidence
+to the changed combined head. Fresh current-head Linux/peer/full verification
+and ordered integration remain required. No dispatch/acceptance activation.
