@@ -103,3 +103,39 @@ Cross-owner correction requested in #39 comment6281835398: discover effective
 Main e738218 postmerge39357918414 passed. #42 partial dispatch successor754507a
 is pushed and awaiting CI39358587955/exact-head review; V66 remains stacked on
 V65. No H4, provider-compatibility or full T13 acceptance is inferred.
+
+## Current route correction and revised H4 candidate (2026-10-20)
+
+Reviewer=GPT; #39 SHA0cf85d6f2027439bad9c13f519f07fe30f68637c, detached
+inspection of git diff1abcfbd..0cf85d6. Verdict=PASS for route-probe correction
+on source inspection: effective method/class @Consumes selected; default JSON
+for absent/wildcard; route inventory,401 assertion and known-gap set preserved.
+Exact-head build39358967533 is pending. Merged into GPT integration branch only;
+no main merge or overall WP-102 acceptance. Includes1abcfbd evidence increment.
+
+Reviewer=GPT; H4 candidate b7d3bdd64941c23ae768fe7429e134dc5d6e4bfc, inspected
+from separate detached worktree. git show407518a plus complete port/JDBC/double/
+producer/guard changes and six new JDBC tests: Binding metadata equality,
+mandatory grant+binding dependencies, pair keys and explicit suspend/independent
+commit/resume address prior source findings. Ambient rollback/unrelated-work
+assertions and concurrent first-winner test are meaningful. Proof pending; the
+strict resource-expiry finding and actor freshness implementation remain material.
+Overall verdict=REQUEST-CHANGES, not H4 acceptance. The outage test injects a
+throwing DataSource; it is not real PostgreSQL transport-outage evidence. Add the
+previously requested real JDBC outage case through an owned proxy with bounded
+timeouts, as well as current doubles; do not stop shared PostgreSQL/resources.
+
+Independent test attempt atb7d3bdd: mvn -B -pl modules/oa-testkit -am test
+-Dtest=Rfc8693TokenExchangerTest -Dsurefire.failIfNoSpecifiedTests=false compiled
+but all34 cases errored in IdentityFixture setup because local PostgreSQL5432
+is absent (SQL08001), zero skips. This is environmental, not a product assertion
+failure and not a pass; no repeated local execution planned. Dispatched exact
+b7d3bdd real-provider workflow39359163791, currently pending. It still has the
+OLD actor-expiry profile and older fault-proxy fixture from42ad254. Consume the
+current GPT branch's explicit ADR direction/port fix/main V64 before new combined
+acceptance; the freshness decision already exists, not a second open decision.
+
+#42 754507a full CI39358587955 ran all nine InboxDispatchProtocolTest cases:
+9/9 pass, zero failures/errors/skips. Overall build failed ONLY on the route
+probe415 above (197 app cases, one failure); no full-green or T13 claim. Refresh
+#42 after this route integration, preserving partial SDK/proof/fencing gates.
