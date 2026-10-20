@@ -227,6 +227,28 @@ class KeycloakDelegationIT {
         assertEquals(Code.GRANT_INACTIVE, refused(h.exchanger, h.request(subject, TOOL, READ, brief)).code());
     }
 
+    /**
+     * KNOWN INCOMPATIBILITY (open ADR decision, docs/handoffs/claude/WP-102.md section 8). Keycloak accepts the actor token
+     * only from the exchanging client itself (it refuses "Requesting client does not match the client_id in the may_act
+     * claim"), and it gives a token the lifespan of its client at the moment of issue. The actor token and the token issued
+     * by the exchange therefore have the same lifespan, and the exchanged one is issued later: with the strict H3 bound
+     * (nothing may outlive the verified actor token) a stock Keycloak exchange succeeds only when it happens within the
+     * second the actor token was issued. This test asserts the product's refusal deterministically; it does not make the
+     * positive case pass.
+     */
+    @Test
+    void anActorTokenOfTheExchangingClientExpiresBeforeWhatIsIssuedLaterSoTheStrictBoundRefuses() throws Exception {
+        String subject = h.delegatedSubject(KeycloakRealm.CONSOLE);
+        DelegationGrant grant = h.grant(READ, Duration.ofHours(1));
+        ExchangeRequest request = h.request(subject, TOOL, READ, grant); // the actor token is issued here
+        Thread.sleep(Duration.ofSeconds(2));
+
+        ExchangeException e = refused(h.exchanger, request);
+
+        assertEquals(Code.BAD_RESPONSE, e.code());
+        assertTrue(e.getMessage().contains("actor"), e.getMessage());
+    }
+
     @Test
     void subjectExpiryBoundsIssuedCredential() {
         // a subject token that lives an hour: the issued credential ends within five minutes, so within it
