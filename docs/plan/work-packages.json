@@ -521,7 +521,9 @@
           "docs/handoffs/gpt/WP-102.md"
         ],
         "scope_note": "PR #40 integrates reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858. KeycloakInteropIT is characterization only; all ten cases were skipped in build run 39262137012. Separate non-skipped characterization CI is wired; strict H1/H2 consumer cases and WP-102 closure remain open. No merge to main or real-provider pass is claimed."
-      }
+      },
+      "status": "partial",
+      "status_note": "Strict Keycloak consumer a20b1b2 integrated into GPT #40; both strict Java preflights and 55 tool tests pass. Combined-head full/matrix CI pending. GPT review requests H3 verified actor expiry and H4 durable exact issuer+jti-to-grant/chain binding; another equivalent active grant must not revive a revoked credential. WP-102 remains partial; skipped or historical characterization tests do not close it."
     },
     {
       "id": "WP-103",

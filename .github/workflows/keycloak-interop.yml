@@ -47,18 +47,6 @@ jobs:
             evidence: contract
             evidence_args: ''
             delegation: 'true'
-          - profile: standard
-            image: quay.io/keycloak/keycloak:26.2.5
-            test: KeycloakInteropIT
-            evidence: characterization
-            evidence_args: '--characterization'
-            delegation: 'false'
-          - profile: delegation
-            image: quay.io/keycloak/keycloak:26.8.1
-            test: KeycloakInteropIT
-            evidence: characterization
-            evidence_args: '--characterization'
-            delegation: 'true'
     services:
       postgres:
         image: postgres:16
