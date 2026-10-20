@@ -9,8 +9,10 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCal
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchAgent;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AgentResourceAdmission;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenRejectedException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchState;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerContext;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerContextResolver;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.problem.ProblemException;
@@ -87,12 +89,12 @@ public class AgentResource {
     }
 
     /** A caller and, for a delegated token, the admission handle whose authority is re-checked before the run. */
-    private record Admitted(CallerContext caller, AgentResourceAdmission.Principal delegated) { }
+    private record Admitted(CallerAuthority who, AgentResourceAdmission.Principal delegated) { }
 
     @POST
     public Map<String, Object> run(@Context HttpHeaders headers, String body) {
         Admitted admitted = admitted(headers);
-        CallerContext caller = admitted.caller();
+        CallerContext caller = admitted.who().caller();
         authorize(caller);
         Request request = parse(body);
         ThreadId thread;
@@ -108,8 +110,7 @@ public class AgentResource {
                         "a delegated call does not choose a thread id");
             }
             var call = admitted.delegated().call();
-            if (!call.scope().requestFingerprint().equals(ResourceCallScope.requestFingerprint(
-                    canonicalRequest(request.topic())))) {
+            if (!call.scope().requestFingerprint().equals(approvedFingerprint(request.topic()))) {
                 throw new ProblemException(Response.Status.FORBIDDEN,
                         "the request does not match the approved invocation");
             }
@@ -117,9 +118,7 @@ public class AgentResource {
             thread = call.scope().threadId();
         }
         // policy and audit above can block: the authority is judged again immediately before anything runs
-        if (admitted.delegated() != null) {
-            revalidate(admitted.delegated());
-        }
+        current(admitted.who());
         var state = agent.run(thread.value(), request.topic());
         return Map.of(
                 "threadId", threadId,
@@ -140,27 +139,68 @@ public class AgentResource {
     }
 
     /**
-     * The canonical request text whose digest the dispatcher approved: the JSON object {@code {"topic":"<topic>"}} as
-     * Jackson writes it (one key, standard escaping). The dispatcher must derive the approved request fingerprint from
-     * the same text (docs/handoffs/claude/WP-103.md).
+     * The canonical text of the interim research v1 request (agreed with the dispatcher): one JSON object with exactly one
+     * key, {@code {"topic":"<topic>"}}, compact (no whitespace, no BOM), strict UTF-8, and no thread id. The renderer is
+     * hand-written so it cannot change with any JSON library or pretty-printing configuration. Escaping: {@code "} and
+     * backslash with a backslash; backspace, form feed, newline, carriage return and tab as {@code \b \f \n \r \t};
+     * every other control character below U+0020 as lowercase four-digit hex unicode escapes (backslash, u, 00, two hex digits); everything else, including U+007F,
+     * non-ASCII and supplementary characters, is written as itself. A topic that is not well-formed UTF-16 is refused.
      */
-    private String canonicalRequest(String topic) {
+    public static String canonicalRequest(String topic) {
+        StringBuilder out = new StringBuilder(topic.length() + 12).append("{\"topic\":\"");
+        for (int i = 0; i < topic.length(); i++) {
+            char c = topic.charAt(i);
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\b' -> out.append("\\b");
+                case '\f' -> out.append("\\f");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else if (Character.isHighSurrogate(c) && i + 1 < topic.length()
+                            && Character.isLowSurrogate(topic.charAt(i + 1))) {
+                        out.append(c).append(topic.charAt(++i));
+                    } else if (Character.isSurrogate(c)) {
+                        throw new IllegalArgumentException("the topic is not well-formed text");
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.append("\"}").toString();
+    }
+
+    private static String approvedFingerprint(String topic) {
         try {
-            return json.writeValueAsString(Map.of("topic", topic));
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            return ResourceCallScope.requestFingerprint(canonicalRequest(topic));
+        } catch (IllegalArgumentException malformed) {
             throw new ProblemException(Response.Status.BAD_REQUEST, "the request body is not valid");
         }
     }
 
-    private void revalidate(AgentResourceAdmission.Principal principal) {
+    /**
+     * Shows that the caller's authority is current now, for a user's own token and for a delegated one alike: the signed
+     * expiry and, for a delegated token, the exact issuing grant chain (the single use is not consumed twice). A
+     * development-header caller has no signed expiry and keeps its explicit dev and test seam; it is never production
+     * permission because the resolver refuses that seam outside dev and test profiles.
+     */
+    private static void current(CallerAuthority who) {
+        if (!who.caller().verified()) {
+            return;
+        }
         try {
-            admission.revalidate(principal);
-        } catch (TokenRejectedException gone) {
-            if (gone.reason() == TokenRejectedException.Reason.VERIFIER_UNAVAILABLE) {
+            who.requireCurrent(java.util.Set.of(AgentResourceAdmission.SCOPE));
+        } catch (AuthorityLostException gone) {
+            if (gone.reason() == AuthorityLostException.Reason.UNAVAILABLE) {
                 throw new ProblemException(Response.Status.SERVICE_UNAVAILABLE,
                         "the authority could not be checked; the agent was not run");
             }
-            throw new WebApplicationException("the delegated authority is no longer valid", Response
+            throw new WebApplicationException("the caller's authority is no longer valid", Response
                     .status(Response.Status.UNAUTHORIZED)
                     .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer error=\"invalid_token\"").build());
         }
@@ -176,8 +216,7 @@ public class AgentResource {
         if (bearer != null && admission.configured()) {
             try {
                 var principal = admission.admit(bearer);
-                return new Admitted(new CallerContext(principal.tenant(), principal.user(), principal.scopes(),
-                        CallerContext.Provenance.VERIFIED_TOKEN), principal);
+                return new Admitted(admission.authority(principal), principal);
             } catch (TokenRejectedException refused) {
                 switch (refused.reason()) {
                     // not a delegated token for this resource: the resolver decides (user token, or 401)
@@ -192,7 +231,7 @@ public class AgentResource {
                 }
             }
         }
-        return new Admitted(callers.resolve(headers), null);
+        return new Admitted(callers.resolveAuthority(headers), null);
     }
 
     private static String bearer(HttpHeaders headers) {

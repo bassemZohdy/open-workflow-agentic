@@ -42,6 +42,7 @@ public class AgentResourceAdmission {
     private final ResourceCallBindings calls;
     private final IssuedTokenBindings issued;
     private final String audience;
+    private final Clock clock;
 
     @Inject
     public AgentResourceAdmission(IdentitySettings settings, TokenVerifier verifier, DelegationGrants grants,
@@ -50,7 +51,7 @@ public class AgentResourceAdmission {
         this(settings.agentResourceAudience().map(audience -> new ResourceTokenGuard(verifier, audience,
                 new JdbcReplayCache(data), grants, bindings, Clock.systemUTC(), 1)).orElse(null),
                 resourceCalls.isResolvable() ? resourceCalls.get() : null, bindings,
-                settings.agentResourceAudience().orElse(null));
+                settings.agentResourceAudience().orElse(null), Clock.systemUTC());
     }
 
     /**
@@ -59,7 +60,8 @@ public class AgentResourceAdmission {
      * {@link TokenRejectedException.Reason#BINDING_MISSING} (an unbound credential is never accepted).
      */
     public AgentResourceAdmission(ResourceTokenGuard guard, ResourceCallBindings calls, IssuedTokenBindings issued,
-                                  String audience) {
+                                  String audience, Clock clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
         this.guard = guard;
         this.calls = calls;
         this.issued = issued;
@@ -139,8 +141,7 @@ public class AgentResourceAdmission {
      * The admitted principal as a transient authority handle: its {@code requireCurrent} re-checks the signed expiry and
      * the exact grant chain with this resource's settings and the guard's clock, without a second replay admission.
      */
-    public io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority authority(Principal principal,
-            Clock clock) {
+    public io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority authority(Principal principal) {
         Objects.requireNonNull(principal, "principal");
         return io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority.ofDelegatedToken(
                 principal.token(), clock, (token, scopes) -> {

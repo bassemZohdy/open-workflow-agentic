@@ -129,9 +129,9 @@ class CallerAuthorityTest {
         calls.bind(ResourceCallFixtures.binding(token, grant.id(), ResourceCallFixtures.scope(tenant, ALICE, AUDIENCE,
                 io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep.AGENT_RESEARCH_RUN,
                 ResourceCallFixtures.TOPIC_REQUEST)));
-        AgentResourceAdmission admission = new AgentResourceAdmission(guard, calls, bindings, AUDIENCE);
+        AgentResourceAdmission admission = new AgentResourceAdmission(guard, calls, bindings, AUDIENCE, clock);
         var principal = admission.admit("a.b.c");
-        return new Delegated(grants, grant, admission.authority(principal, clock), admissions);
+        return new Delegated(grants, grant, admission.authority(principal), admissions);
     }
 
     @Test

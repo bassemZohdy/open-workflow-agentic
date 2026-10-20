@@ -57,7 +57,7 @@ class AgentResourceBindingAdmissionTest {
 
     private Reason refusal(ResourceCallBindings calls) {
         return assertThrows(TokenRejectedException.class,
-                () -> new AgentResourceAdmission(guard, calls, issued, AUDIENCE).admit("a.b.c")).reason();
+                () -> new AgentResourceAdmission(guard, calls, issued, AUDIENCE, clock).admit("a.b.c")).reason();
     }
 
     private ResourceCallBindings bound(String callTenant, Subject owner, String audience, String operation) {
@@ -70,7 +70,7 @@ class AgentResourceBindingAdmissionTest {
     @Test
     void anAgreeingBindingAdmitsAndCarriesTheInvocation() {
         var calls = bound(tenant, ALICE, AUDIENCE, Pep.AGENT_RESEARCH_RUN);
-        var principal = new AgentResourceAdmission(guard, calls, issued, AUDIENCE).admit("a.b.c");
+        var principal = new AgentResourceAdmission(guard, calls, issued, AUDIENCE, clock).admit("a.b.c");
         assertEquals(calls.find(ISSUER, token.tokenId()).orElseThrow(), principal.call());
     }
 

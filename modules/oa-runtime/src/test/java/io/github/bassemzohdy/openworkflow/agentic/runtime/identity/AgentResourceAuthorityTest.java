@@ -93,7 +93,7 @@ class AgentResourceAuthorityTest {
         Pep pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "ok",
                 new PolicyRef("test.permit", "1"), clock.instant()), slowAudit);
         resource = new AgentResource(agent, null, pep, new ObjectMapper(),
-                new AgentResourceAdmission(guard, calls, bindings, AUDIENCE));
+                new AgentResourceAdmission(guard, calls, bindings, AUDIENCE, clock));
     }
 
     private static HttpHeaders bearer() {
