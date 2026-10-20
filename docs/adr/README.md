@@ -29,5 +29,6 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 | [0023](0023-workflow-to-agent-bridge.md) | Workflow-to-agent bridge: HTTP call confirmed, async callback for long steps (spike WP-005) | Accepted |
 
 | [0024](0024-group-applications-and-library-modules.md) | Group applications and library modules | Accepted |
+| [0025](0025-acknowledge-inbox-delivery-only-after-durable-checkpoint.md) | Acknowledge inbox delivery only after a durable checkpoint | Proposed; implementation and review open |
 
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.

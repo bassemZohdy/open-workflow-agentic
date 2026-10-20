@@ -76,6 +76,24 @@ These apply to every REST endpoint. The types live in `oa-contracts`, the HTTP m
 - An artifact whose POM declares no licence can be added to `tools/dependency-policy-exceptions.json` after its licence is verified from its own metadata. Entries are reviewed, scoped, and fail the build when stale or marked `unverified`.
 - The Maven enforcer enforces Java 21, Maven 3.9 and no duplicate dependency declarations.
 
+## Working as GPT and Claude
+
+[TODO.md](TODO.md#two-agent-delivery-plan) contains two exclusive backlogs, prerequisite handoffs and
+reserved write areas. GPT owns integration and shared tracking; Claude owns identity/policy, agent and
+control features. The other agent reviews every implementation PR at its current head SHA. Record the
+agent name, commit, findings, checks and verdict explicitly when both agents use the same GitHub account.
+
+Keep separate branches/worktrees and one implementation PR per agent. Pick the first unblocked owned
+package. Request cross-area changes in `docs/handoffs/gpt/<WP-id>.md` or
+`docs/handoffs/claude/<WP-id>.md`; the registered writer implements them. GPT serializes contracts,
+configuration, migrations and source/generated tracking. Never edit applied migrations or allocate
+independent migration ranges to each agent. The full agreement and initial review tasks are in TODO.md.
+
+Assignments live in `execution_plan` in `docs/plan/work-packages.json`. CI rejects missing/duplicate
+owners, self-review, missing prerequisite gates, cycles and overlapping reserved paths. When a package
+closes, GPT removes its backlog row, removes satisfied `after` gates from consumers, records evidence,
+updates acceptance status and regenerates tracking. Re-register paths before transferring write ownership.
+
 ## Definition of done for a work package
 
 From [docs/plan/README.md](docs/plan/README.md), section 7:

@@ -285,13 +285,15 @@ Deliverables:
 Implementation status: **partial**.
 - Implemented: JWT verification, scoped grants, replay protection, RFC 8693 client, mounted-secret rotation and wait reauthorization are implemented.
 - Implemented: T07 is automated using in-process stand-ins; issuer interoperability is not proven.
+- Implemented: Claude c6a9228 strict Java tests and product hardening integrated into GPT #40; prior399fda1 full CI and six real delegation cases pass, standard never reached its IT. Current665547e reruns after a GPT fault-proxy fixture correction; H3/H4 remain open.
 
 Remaining gates:
 
 - Run the real Keycloak test in docs/identity.md section 9; prove actor_token/act mapping, tenant/scope claims, audience narrowing and expiry bounds.
 - Resolve any issuer mismatch, record the real-IdP evidence, and add the repeatable integration test to an appropriate CI profile.
-- Bind verified caller identity to audit API access instead of its anonymous subject.
 - If the Vault path is selected, implement and run the quarkus-vault 4.9.0 integration/renewal/rotation test required by ADR 0021; mounted static secrets remain the implemented path.
+- H3: bound actual signed credential by verified actor expiry as well as subject/grant/300s; H4: durable exact issuer+jti-to-grant/chain binding, with equivalent-grant revocation tests.
+- Strict combined-head matrix/reciprocal review still required; ordinary builds running zero Keycloak cases are not provider evidence.
 
 Evidence: [docs/identity.md](../../docs/identity.md), [docs/audit.md](../../docs/audit.md)
 
@@ -403,14 +405,20 @@ Implementation status: **partial**.
 - Implemented: Bounded canonical envelope, audit/metrics and scoped ingress passed full CI 39352802891 at 04b421f (6 unit, 4 HTTP, 1 native policy, 9 JDBC inbox cases).
 - Implemented: Actual JPA writer success observer and bounded fail-closed checkpoint gate implemented; unhealthy readiness/new-start refusal and 14 local unit cases pass. Current-head application binding/full CI and durable inbox acknowledgement remain open.
 - Implemented: Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open.
+- Implemented: Draft #41 implements durable inbox signals and authorized/audited scoped CloudEvents receipt; ingress/privacy04b421f full CI39352802891 green.
+- Implemented: Actual JPA checkpoint guard, unhealthy readiness and new-start refusal implemented at499550a; full CI39354335254 passes, including selected guarded writer/original reader and existing restart tests. This is not end-to-end inbox consumption.
+- Implemented: PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open.
 
 Remaining gates:
 
 - Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.
 - Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.
 - Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.
+- Complete durable Flow wait delivery and persisted signal ACK; prove receipt-before-registration, restart/crash windows and stable loop/parallel occurrence identity.
+- Recheck cancellation under the dispatch reservation lock; use named system:event-recovery SERVICE principal and audit every attempt before releasing callbacks; manual changes require authorized oa.recover operation.
+- Complete event-triggered starts, retention/tombstones and delivery tracing; automate full T13 including failed compensation.
 
-Evidence: [docs/handoffs/gpt/WP-107.md](../../docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](../../docs/lifecycle.md)
+Evidence: [docs/handoffs/gpt/WP-107.md](../../docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](../../docs/handoffs/gpt/INTEGRATION-2026-10-20.md)
 
 Reuse: quarkus-flow-messaging
 
@@ -430,7 +438,7 @@ Deliverables:
 Implementation status: **partial**.
 - Implemented: JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.
 - Implemented: Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.
-- Implemented: Reviewed99f475d merged to main at2f722cf after Claude current-head PASS and full CI39349314182; remaining package gates stay partial.
+- Implemented: Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial.
 
 Remaining gates:
 

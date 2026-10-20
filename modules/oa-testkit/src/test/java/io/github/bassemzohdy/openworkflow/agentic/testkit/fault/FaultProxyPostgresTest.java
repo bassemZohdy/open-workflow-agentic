@@ -47,8 +47,12 @@ class FaultProxyPostgresTest {
 
     @Test
     void connectionsAreRefusedWhileTheProxyIsStopped() throws Exception {
-        proxy.stop();
-        assertThrows(SQLException.class, () -> connect(proxy.port(), 2));
+        try (var stopped = StoppedProxyPort.acquire(proxy,() -> new FaultProxy("127.0.0.1",5432).start())) {
+            proxy = stopped.proxy();
+            assertThrows(SQLException.class, () -> {
+                try (Connection unexpected = connect(proxy.port(),2)) { scalar(unexpected,"select 1"); }
+            });
+        }
         proxy.start();
         try (Connection c = connect(proxy.port(), 5)) {
             assertEquals(4, scalar(c, "select 4"));
