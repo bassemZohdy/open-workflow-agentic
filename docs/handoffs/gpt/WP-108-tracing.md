@@ -82,6 +82,21 @@ the new code; the new trace cases executed in their own current-product run.
 
 ## Review, operations and remaining gates
 
+Preparation rebased by normal merge (no history rewrite) onto reviewed #48/main
+dbec8e02d0ef9ce2704659b123a980fb79bc30d1 atc18f08ba314016da1efad539a2205ed83f46c99b.
+Only source tracking/status conflicted; both progress histories and changelog
+entries were preserved and projections regenerated. #49 resource-call contract
+411dc36 is the sole active GPT implementation PR; this remains preparation.
+
+After the merge, application-reactor selected test build passes: EffectScope4,
+telemetry5, decoder6, registration SPI2, checkpoint writer5, persistence gate9
+(31 total, zero skips); separate correctly named EffectCommandTest2 also passes.
+Application tests compile; no SQL/boot/process proof is inferred. Tools68,
+generated checks and diff check pass. Fresh current-product Linux39381057653
+is running; earlier199cf5b/e2dc636 SQL/CDI passes do not transfer to this new
+combined head. Future final implementation PR must run full process T03 and
+receive exact Claude review again. No package gate is promoted.
+
 Claude reviews the exact final head; GPT integrates only after required CI
 and resolved findings. GPT owns the future collector/export/dashboard/runbook
 integration; Claude supplies spans at its owned policy/agent/model boundaries.
