@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-103 shared preparation: retain one immutable approved task/model allocation and original database lifetime for each canonical resource call. Add explicit non-CDI storage and proposed V78 with actual grant/parent/registry integrity and execution prerequisite; all206 contracts/three codec-preflight tests pass and15 SQL cases compile. Current SQL/peer/consumer/budget/model gates remain; no provider permission or activation.
+
 - WP-103 preparation: JDK-only full-scope execution entry, separate private fence signature and exact UUID checkpoint/outcome association with one bounded canonical stored-Base64 fingerprint.189 contracts including6 new and actual pinned serializer interoperability1/application test compilation pass. No durable gate, consumer/dispatch activation or package promotion; exact peer/full/strict review follows sole #55.
 
 - GPT reviewed Claude inspector #56 at26def976 with reproducible protocol findings and actual native fresh-DB bootstrap failure; requested fixes and one-PR consolidation. Publish approved task-contract/durable model-budget sourcing decision preserving legacy/governed thread invariants, and accept audit DDL proposal4f44026 with the tested V75 integrity amendments. All consumer/runtime/peer/acceptance gates remain partial.

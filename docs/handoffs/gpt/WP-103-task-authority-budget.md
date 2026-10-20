@@ -78,3 +78,10 @@ but activates the new consumer only after its specific shared handoffs merge.
 Full callback/producer/mandatory audit/UNKNOWN/process/owner/restore and actual
 research HTTP success remain open. Route-level authorization alone is not model
 boundary governance.
+
+
+Preparation update: see WP-103-task-allocation-store.md and ADR0029. The explicit
+shared allocation API/backend and proposed V78 are now implemented in separate
+GPT execution preparation, with local contract/preflight/compile evidence; current
+SQL/peer/adoption results belong to that handoff. This original decision is not
+retroactive permission or proof of model-budget/gateway enforcement. No activation.
