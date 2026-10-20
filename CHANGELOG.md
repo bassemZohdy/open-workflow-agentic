@@ -1,6 +1,6 @@
 # Changelog
 
-- WP-108 audited boundary preparation reuses the core effect/compensation protocol with complete retained-source receipts before target lookup/dispatch and cached/private results, full current-fence hooks and compensation proof. Recheck both replay windows after blocking telemetry/audit/fence, retaining another dispatch fact for actual replay. Local17 selected cases pass;23 new SQL/protocol cases compile, fresh combined CI/peer/actual consumer gates pending. No activation or acceptance promotion.
+- WP-108 audited boundary preparation reuses the core effect/compensation protocol with complete retained-source receipts before target lookup/dispatch and cached/private results, full current-fence hooks and compensation proof. Recheck both replay windows after blocking telemetry/audit/fence, retaining another dispatch fact for actual replay. Exact cd8ef8b/BOTH39438989932 passes23 new boundary cases/source17/model24/allocation15 and real standard3/delegation8/core1/audit-process4 EACH, zero skips; both finished logs/all158 XML and14 owned worker logs per lane inspected. Initial fixture timestamp errors are fixed; one pre-test native dependency-resolution failure had an isolated unchanged retry. Peer/actual consumer/authority/bounded I/O/metrics/Flow gates remain pending. No activation or acceptance promotion.
 
 - WP-108 process recovery preparation: require four actual source/local-ACK commit-death windows in both real-provider lanes, with new-JVM readback and strict non-skipped XML checks. Exactfaef72e/BOTH39414376142 passes new process4/source-delivery17/core1 EACH, standard3/native8 and all three strict checkers, zero failures/errors/skips; actual XML and14 owned child logs per lane inspected. Tools82 pass. Central receipt fixtures do not prove the real audit consumer; no activation or package promotion.
 
@@ -172,7 +172,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
   [PR #33](https://github.com/bassemZohdy/open-workflow-agentic/pull/33), [structure](docs/repository-structure.md).
 - Remove the five exploratory spike projects while keeping reports, measurements, confidence labels and ADRs.
   [PR #32](https://github.com/bassemZohdy/open-workflow-agentic/pull/32).
-- Record owner decisions in ADRs 0019â€“0023, including recovery liveness, secret-store conditions and version policy.
+- Record owner decisions in ADRs 0019–0023, including recovery liveness, secret-store conditions and version policy.
   [PR #27](https://github.com/bassemZohdy/open-workflow-agentic/pull/27).
 - Retain the bridge findings/ADR and the partial A2A wiring diagnosis as research outcomes; a working product A2A
   server/client is still required in WP-207. [PR #8](https://github.com/bassemZohdy/open-workflow-agentic/pull/8),
@@ -209,7 +209,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 - Retain LangGraph4j durability, identity/policy/secrets and MCP/A2A/AG-UI research findings in
   [spike reports](docs/spikes/) and [ADRs](docs/adr/README.md). Reported unknowns remain product validation tasks.
 
-## Implemented portions of requirements â€” 2026-10-19 snapshot
+## Implemented portions of requirements — 2026-10-19 snapshot
 
 Every row below has concrete implementation evidence. Coverage is **partial** for the full requirement; the
 remaining scope is tracked by its owning work packages in TODO.md. Research-only findings are excluded from
