@@ -67,3 +67,25 @@ Current approved target/actual SDK complete business occurrence, stable governed
 UNKNOWN decisions, exact graph inspection/output, concurrent credentials,
 commit-loss/process/partition/old-owner/cancellation/restore and full workflow401
 and package/acceptance gates remain partial. #55 remains the sole frozen GPT PR.
+
+## Actual proposed-schema execution
+
+reviewer=GPT; verified SHA=d489000706ae904527bc74aa043cab8d8524e234.
+Verdict: PASS six proposed V76 schema cases; runtime/activation/package gates
+remain OPEN. BOTH39404240486 SUCCESS. GPT downloaded and inspected completed
+standard118566165129/native118566165396 logs: ResourceExecutionSchemaTest6,
+AuditSourceBindingSchemaTest6, binding17/group11/core process recovery1 in each
+lane, standard3/native8 and strict checker output pass, zero failures/errors/
+skips. Reactor totals193 contracts/333 runtime/196 testkit/304 application cases.
+This supersedes new-SQL-pending statements for that EXACT proposal product. It
+is still outside Flyway and not a callback, graph, private-output or commit-loss
+proof. A data duplicate INSERT failure is not proof of one actual graph entry.
+
+The next WP-108 producer investigation confirms JdbcEffectLedger.journal writes
+inside the fact transaction but discards the generated effect.event id/time.
+The atomic producer must retain stable source/draft id/time/content in THAT
+transaction and bind newly trusted full-owner scope; it must not guess legacy
+ws1 provenance or manufacture another draft after an uncertain commit. Required
+interfaces AuditSource/AuditReceipt/canonical helper are already merged in #54;
+no whole WP-102 completion gate is introduced. Consumer appendOnce/mandatory
+audit acknowledgment and current authority remain separate adoption gates.

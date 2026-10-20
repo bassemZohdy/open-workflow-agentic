@@ -1,5 +1,7 @@
 # Changelog
 
+- Exact V76 proposald489000 passed BOTH39404240486:6 actual cloned execution-schema cases plus audit-source6/binding17/group11/process1 per provider/standard3/native8/strict, zero skips and both finished logs inspected. SQL remains outside Flyway; actual one-callback/graph/audit/authority/commit-loss/recovery and exact peer gates remain open.
+
 - WP-103 backend preparation: propose V76 immutable one-entry-per-call and one-outcome association with canonical full-source checks, registry/binding-time guard and target-scoped physical UUID references. Six rollback-only cloned-schema cases compile; Linux evidence and runtime one-callback/current authority/audit/recovery gates remain open. SQL stays outside Flyway, with no dispatch or package promotion.
 
 - Exact4a45515 proposed audit-source schema passed both provider/process lanes with6 real cloned-schema SQL cases; frozen #55 passed full and both strict lanes with group SQL11/snapshot6/SDK4. All finished logs inspected, zero skips. Exact peer/activation/consumer gates remain. Pinned saver source refines UUID/serialized-text/released-error/mutable-checkpoint recovery requirements.
