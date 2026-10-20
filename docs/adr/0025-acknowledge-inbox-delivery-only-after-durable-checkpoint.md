@@ -123,3 +123,22 @@ review are pending. Previous ingress head 04b421f passed full CI 39352802891.
 This is infrastructure evidence only. All consumption/restart/cancellation/
 compensation proofs in the table above still gate this proposed decision and
 T13. The proposed status is unchanged.
+
+
+### Recovery authority and current commit-gate evidence
+
+Claude's WP-107 handoff at c6a9228 confirms the current ingress DATA_ACCESS
+contract and adds R1-R3. Proposed consumption/replay runs as SERVICE principal
+`system:event-recovery`, never with the producer's identity or stored bearer.
+Every delivery attempt records action, tenant, instance, signal and occurrence
+before releasing its callback. Reservation/consumption checks cancellation under
+the instance lock; a matched signal alone does not authorize dispatch. Manual
+poison/expiry resolution is an instance OPERATION through verified caller,
+`oa.recover` and `operation:resolve-signal`, with per-change audit. Claude owns
+the policy hook after GPT confirms the concrete adapter interface. These are
+requirements, not an already implemented recovery authorization path.
+
+The qualifier-corrected #41 head499550a passed full CI39354335254, including
+CheckpointBindingTest proving the guarded writer/original reader in the real
+application. No test was removed. Loop/parallel consumption, persisted signal
+ACK, replay and complete T13 remain open; this ADR stays Proposed.

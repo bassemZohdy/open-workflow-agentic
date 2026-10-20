@@ -13,7 +13,7 @@ Existing business process uses an AI evidence-review step, deterministic policy,
 |---|---|---|---|---|---|
 | T01 | Reject malformed agent output, forbidden action and unauthorized escalation | M01, M02, M12, M14 | WP-104 | automated | apps/app-runtime:AgenticAppTest#structuredAgentOutputRejectsMalformedActionsAndUnauthorizedEscalation |
 | T02 | Prove authorized human task cannot be approved by a forbidden initiator/agent | M05, M11 | WP-106 | not-started | - |
-| T03 | Prove compensation and no duplicate side effect after acknowledgment loss | M06, M07 | WP-108 | not-started | - |
+| T03 | Prove compensation and no duplicate side effect after acknowledgment loss | M06, M07 | WP-108 | automated | apps/app-runtime:EffectCrashRecoveryIT#processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation |
 | T04 | Trace every decision to actor, model/prompt/tool versions, and workflow step | M15, M16 | WP-301 | not-started | - |
 | T05 | Demonstrate existing enterprise-service adapters and timeout contracts, and consume an MCP tool and an A2A agent natively or through a gateway | M23 | WP-207 | not-started | - |
 

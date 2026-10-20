@@ -72,8 +72,10 @@ def validate_assignments(plan):
                 errors.append(f'invalid write area path: {path}')
                 continue
             for previous, owner in paths:
-                if (path.rstrip('/') == previous.rstrip('/') or (previous.endswith('/') and path.startswith(previous))
-                        or (path.endswith('/') and previous.startswith(path))):
+                current_folded, previous_folded = path.casefold(), previous.casefold()
+                if (current_folded.rstrip('/') == previous_folded.rstrip('/')
+                        or (previous.endswith('/') and current_folded.startswith(previous_folded))
+                        or (path.endswith('/') and previous_folded.startswith(current_folded))):
                     errors.append(f'overlapping write areas: {owner}:{previous} and {area["owner"]}:{path}')
             paths.append((path, area['owner']))
     if not paths:

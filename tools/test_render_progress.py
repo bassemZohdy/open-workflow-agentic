@@ -117,6 +117,16 @@ class ProgressValidationTest(unittest.TestCase):
             'area': 'Alias', 'owner': 'Claude', 'rule': 'Must not overlap', 'paths': ['TODO.md/']})
         self.assertTrue(any('overlapping write areas' in e for e in self.errors()))
 
+    def test_case_aliases_cannot_bypass_directory_or_file_ownership(self):
+        import render_agent_backlogs
+        for path in ('Tools/', 'TOOLS', 'Tools/hidden.py', 'todo.MD'):
+            with self.subTest(path=path):
+                plan = copy.deepcopy(self.plan)
+                plan['execution_plan']['write_areas'].append({
+                    'area': 'Case alias', 'owner': 'Claude', 'rule': 'Must not overlap', 'paths': [path]})
+                self.assertTrue(any('overlapping write areas' in e
+                                    for e in render_agent_backlogs.validate_assignments(plan)))
+
     def test_remaining_real_identity_gate_cannot_be_declared_complete(self):
         w = next(w for w in self.plan['work_packages'] if w['id'] == 'WP-102')
         w['progress']['status'] = 'completed'

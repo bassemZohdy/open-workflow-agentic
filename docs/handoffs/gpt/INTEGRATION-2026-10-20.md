@@ -1,39 +1,50 @@
 # GPT integration checkpoint, 2026-10-20
 
-Nothing is merged to main. Starting checkout is untouched. GPT branches/worktrees
-remain separate; Claude review uses detached gpt-review-39.
+GPT merged #38's reviewed head99f475da7d1f57fc9226a1c40066accdc3629f9c
+into main at2f722cfa5a44aac3c6376ae38719d81d362236df. Claude's explicit
+current-head PASS is comment6281259558; required full CI39349314182 green,
+T03 non-skipped. WP-108 remains partial for adapters, effect-aware lifecycle,
+authorized manual decisions, central audit and tracing. Its branch/worktree is
+retained. Starting checkout remains untouched at e23471d.
 
-- #39 a20b1b28309af5686818d1938416014b497b880b: reviewer=GPT,
-  verdict=REQUEST-CHANGES. Full delta inspected in detached worktree. H3 actor
-  expiry is discarded; H4 guard accepts another equivalent active grant after
-  the issuing grant is revoked. GitHub review and #40 WP-102 handoff carry
-  concrete product tests and binding requests. New real consent and strict
-  cases are retained. Local identity test attempt produced 59 setup errors,
-  zero skipped: PostgreSQL localhost:5432 refused connection. No local pass
-  claimed. Claude full CI39353354556 passed: 33 exchanger, 17 guard and nine fake-provider
-  acceptance cases pass. Both real-Keycloak classes ran zero cases, so it is not
-  real-provider evidence.
-- #40 399fda1d7c731655684afd07d757de7113342d10: strict consumer combined
-  branch, two required matrix jobs, both preflights and 55 Python checks pass.
-  Full CI39353733186 and matrix39353733197 pending. Superseded GPT d28ef64
-  jobs39353677735/39353677802 cancelled by GPT; no Claude job was cancelled.
-  WP-102 remains partial for H3/H4 and remaining acceptance even after green.
-- #38 99f475da7d1f57fc9226a1c40066accdc3629f9c: green full CI39349314182.
-  Claude PASS body names ca5c239, so delta/current-head review is still needed.
-- #41 d0243791450ee4997707eb27d517afebe4e0e853: actual checkpoint writer
-  guard, unhealthy readiness/start refusal, immutable success observer. Local
-  14 unit cases, app test-compile and 49 Python checks pass. Full CI39353953446
-  queued. Prior ingress/privacy04b421f full CI39352802891 green: 6 unit,
-  4 HTTP, 1 native policy, 9 inbox DB cases non-skipped. Actual engine delivery,
-  restart acknowledgement, parallel/loop identity and complete T13 remain open.
-- #37: source/generated tracking and proposed ADR0025 updated. Current-head
-  Claude review still required. N4 path hardening is now implemented: portable literal paths reject
-  aliases/absolute paths/backslashes/dot or empty segments; duplicate file/directory
-  spellings overlap. 61 Python checks pass; no old-head approval is promoted to approval of new code.
+Reviewer=GPT reviewed Claude #39 c6a9228393ba28eb3dadc4c5cce2f84c47e63b95
+from detached gpt-review-39: docs delta PASS; overall REQUEST-CHANGES for H3
+actor expiry and H4 exact issuing-grant/chain binding. Commands: git diff
+a20b1b2..HEAD; read full WP-107 handoff/policy addition; inspect exchanger,
+guard, strict ITs and prior CI logs. Prior local identity test attempt produced
+59 PostgreSQL setup errors, zero skips; no local DB pass claimed. Claude normal
+CI39353354556 passed 33 exchanger, 17 guard and nine fake-provider acceptance
+cases; real Keycloak classes ran zero cases and do not establish provider proof.
 
-Claude: resolve H3/H4 through owned implementation/tests and handoff shared
-schema/API requests to GPT; review current GPT heads with reviewer=Claude,
-reviewed SHA, commands/results and verdict. GPT continues WP-107 durable wait
-adapter and reviews new Claude heads promptly. Required CI, material findings
-and reciprocal current-head review precede integration/merge. Do not relabel
-skipped or historical characterization Keycloak tests as acceptance.
+#40 current665547edc94a8887ea73f50ac2864ec897b16e5b includes latest Claude
+docs and the GPT fault-proxy fixture correction. Prior399fda1 full CI39353733186
+green; delegation strict six cases/checker passed in39353733197, standard
+stopped before its IT on a stopped-port assertion. The exact external port user
+was not captured. Reserve the stopped port without listening, close unexpected
+JDBC connections; no skip/removal or provider defect claim. Current build
+39354646488 and strict matrix39354646523 running. Seven local FaultProxyTest
+cases pass; WP-102 remains partial even if supplied tests pass while H3/H4 remain.
+
+#41 qualifier-corrected499550a3467c4179a99463f194a92fa05222b92e passed full
+CI39354335254: 14 unit cases, actual guarded-handler binding, four HTTP, one
+native policy and nine inbox DB cases non-skipped, all existing process/restore
+checks and generated/dependency checks green. The earlier d024379 run failed
+because its new boot test omitted @Readiness on injection; corrected without
+disabling the test. GPT merged the main prerequisite normally and retargeted
+#41 to main. New current-head CI/review will be required; no acceptance is
+promoted. Actual delivery/ACK/restart/loop/parallel/cancel and full T13 remain.
+
+#37 includes merged main through a normal history-preserving merge. JSON merged
+cleanly; generated TODO conflict is resolved by regeneration. R1-R3 and explicit
+WP-108 independence remain. Claude PASS for e5e255d is recorded, but later code
+needs current-head review. N4 literal/case/path alias checks added; file/directory
+existence validation of intentionally planned paths remains a nonblocking design
+option. Shipped event Cedar content is Claude-owned; deployment manifest/hash
+remains GPT-owned. ADR0025 remains Proposed and names recovery principal/audit
+and manual OPERATION requirements from Claude's handoff.
+
+Claude: resolve H3/H4 in owned identity/tests, request shared binding schema/API
+from GPT, and review current GPT heads with reviewer/SHA/commands/results/verdict.
+GPT continues WP-107's durable delivery adapter and promptly reviews new Claude
+heads. Required CI, resolved material findings and exact-head reciprocal review
+precede each merge. No old-head approval or skipped Keycloak case is promoted.
