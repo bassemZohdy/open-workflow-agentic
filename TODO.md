@@ -419,11 +419,21 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-02. Shared pat
 
 Implemented scope:
 
+- JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.
+- Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied.
+- Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.
+- Bounded canonical envelope, audit/metrics and scoped ingress passed full CI 39352802891 at 04b421f (6 unit, 4 HTTP, 1 native policy, 9 JDBC inbox cases).
+- Actual JPA writer success observer and bounded fail-closed checkpoint gate implemented; unhealthy readiness/new-start refusal and 14 local unit cases pass. Current-head application binding/full CI and durable inbox acknowledgement remain open.
+- Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open.
 - Draft #41 implements durable inbox signals and authorized/audited scoped CloudEvents receipt; ingress/privacy04b421f full CI39352802891 green.
 - Actual JPA checkpoint guard, unhealthy readiness and new-start refusal implemented at499550a; full CI39354335254 passes, including selected guarded writer/original reader and existing restart tests. This is not end-to-end inbox consumption.
+- PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open.
 
 Additional closure/integration tasks:
 
+- [ ] Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.
+- [ ] Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.
+- [ ] Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.
 - [ ] Complete durable Flow wait delivery and persisted signal ACK; prove receipt-before-registration, restart/crash windows and stable loop/parallel occurrence identity.
 - [ ] Recheck cancellation under the dispatch reservation lock; use named system:event-recovery SERVICE principal and audit every attempt before releasing callbacks; manual changes require authorized oa.recover operation.
 - [ ] Complete event-triggered starts, retention/tombstones and delivery tracing; automate full T13 including failed compensation.
@@ -432,7 +442,7 @@ Acceptance gates:
 
 - [ ] T13: implement, run in CI and record passing evidence
 
-Evidence: [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](docs/handoffs/gpt/INTEGRATION-2026-10-20.md)
+Evidence: [docs/handoffs/gpt/WP-107.md](docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](docs/lifecycle.md), [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](docs/handoffs/gpt/INTEGRATION-2026-10-20.md)
 
 ### WP-108 Effect ledger and compensation — partial
 
