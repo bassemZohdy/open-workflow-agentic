@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
 
 /**
  * The SDK logs/swallow exceptional lifecycle futures. A failed required checkpoint must instead keep its stage
@@ -26,6 +27,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
  */
 @ApplicationScoped
 public class PersistenceCommitGate implements AutoCloseable {
+    private static final Logger LOG = Logger.getLogger(PersistenceCommitGate.class);
     public enum Operation { STARTED, COMPLETED, FAILED, ABORTED, SUSPENDED, RESUMED, TASK_RETRIED, TASK_STARTED, TASK_COMPLETED }
     public record Failure(Operation operation, String errorClass, Instant observedAt) { }
     public record Status(boolean healthy, int inFlight, long heldCalls, Optional<Failure> failure) { }
@@ -86,21 +88,39 @@ public class PersistenceCommitGate implements AutoCloseable {
             actual.whenComplete((ignored, error) -> {
                 inFlight.decrementAndGet(); watchdog.cancel(false);
                 if (!phase.compareAndSet(0, error == null ? 1 : 2)) return;
-                if (error != null) { fail(operation, error.getClass().getSimpleName()); return; }
+                if (error != null) { fail(operation, error); return; }
                 if (closed.get()) return;
                 try { committed.run(); result.succeed(); }
-                catch (RuntimeException observerFailure) { phase.set(2); fail(operation, observerFailure.getClass().getSimpleName()); }
+                catch (RuntimeException observerFailure) { phase.set(2); fail(operation, observerFailure); }
             });
         } catch (RuntimeException writeFailure) {
             inFlight.decrementAndGet(); watchdog.cancel(false);
-            if (phase.compareAndSet(0, 2)) fail(operation, writeFailure.getClass().getSimpleName());
+            if (phase.compareAndSet(0, 2)) fail(operation, writeFailure);
         }
         return result;
     }
 
     private void fail(Operation operation, String errorClass) {
+        fail(operation,errorClass,"-","-");
+    }
+    private void fail(Operation operation, Throwable error) {
+        Throwable root = error; String sqlState = "-";
+        for (int depth=0; depth<16; depth++) {
+            if (root instanceof java.sql.SQLException sql && sql.getSQLState()!=null
+                    && sql.getSQLState().matches("[A-Za-z0-9]{5}")) sqlState=sql.getSQLState();
+            if (root.getCause()==null || root.getCause()==root) break;
+            root=root.getCause();
+        }
+        fail(operation,error.getClass().getSimpleName(),root.getClass().getSimpleName(),sqlState);
+    }
+    private void fail(Operation operation, String errorClass, String rootClass, String sqlState) {
         Failure observed = new Failure(operation, errorClass, clock.instant());
-        if (failure.compareAndSet(null, observed)) firstFailure.complete(observed);
+        if (failure.compareAndSet(null, observed)) {
+            firstFailure.complete(observed);
+            // Exception messages/SQL text may contain payloads or credentials. Log only bounded structural diagnostics.
+            LOG.errorf("Checkpoint recovery required: operation=%s error=%s root=%s sqlState=%s",
+                    operation,errorClass,rootClass,sqlState);
+        }
     }
 
     @Override @PreDestroy

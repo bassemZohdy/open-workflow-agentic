@@ -189,4 +189,14 @@ recovery. cutConnections runs after failed calls returned, so it is not separate
 active-SQL-cut evidence. A lost commit ACK can legitimately leave an orphan
 binding while discarding the token; do not require rollback on an unknown commit.
 Published findings: #39 comment6282376227 / #40 comment6282376516. Current #35
-747ce7e and #42 2f21aaf are unchanged/green and still need Claude's exact review.
+747ce7e remains unchanged/green and still needs Claude's exact review. Claude
+reviewed #42 2f21aaf in comment6282145103: APPROVE-WITH-COMMENTS for the partial
+protocol store, N1 required before consumer wiring (fixed on the SDK successor).
+
+Exact fc0376c matrix39362290043 SUCCESS; full build39362289998 FAILED with
+downstream lifecycle failures after the checkpoint barrier became unhealthy.
+Reviewer=GPT; `gh run view 39362289998 --log-failed` inspected, no first underlying
+writer error recorded. Verdict remains REQUEST-CHANGES; provider success cannot
+waive full-build failures. GPT is adding bounded structural first-failure logging
+and a deterministic late-cancellation/checkpoint regression on its SDK branch.
+The cancellation race is unproven pending execution; no behavior weakened.
