@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class CheckpointBindingTest {
     @Inject PersistenceInstanceHandlers handlers;
     @Inject PersistenceCommitGate gate;
-    @Inject CheckpointReadiness readiness;
+    @Inject @org.eclipse.microprofile.health.Readiness CheckpointReadiness readiness;
 
     @Test
     void realApplicationUsesGuardedWriterAndOriginalJpaRestoreReader() {
