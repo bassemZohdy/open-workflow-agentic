@@ -7,6 +7,10 @@
   "fullSemanticConformance" : "NOT_ESTABLISHED",
   "serializationStack" : "SDK public APIs with Quarkus Flow classpath modules",
   "metadataSerializerClass" : "io.quarkiverse.flow.dsl.serialization.jackson.TaskMetadataSerializer",
+  "knownForkDivergence" : {
+    "scope" : "parallel and released-parallel only; actual fingerprints retained; both named-branch orders remain DIVERGED",
+    "allowedObservedFingerprints" : [ "e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170", "69fa2e55fe1e428fa345c250358bb39aeec2e4073ebc59a98feaf2c19b15cad4" ]
+  },
   "developmentSchemaVersion" : "1.0.3",
   "releasedBaseline" : {
     "version" : "1.0.1",

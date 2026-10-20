@@ -60,6 +60,11 @@ final class OwsConformance {
         report.put("serializationStack","SDK public APIs with Quarkus Flow classpath modules");
         report.put("metadataSerializerClass",WorkflowFormat.JSON.mapper().getSerializerProviderInstance()
                 .findValueSerializer(io.serverlessworkflow.api.types.TaskMetadata.class).getClass().getName());
+        report.putObject("knownForkDivergence")
+                .put("scope","parallel and released-parallel only; actual fingerprints retained; both named-branch orders remain DIVERGED")
+                .putArray("allowedObservedFingerprints")
+                .add("e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170")
+                .add("69fa2e55fe1e428fa345c250358bb39aeec2e4073ebc59a98feaf2c19b15cad4");
         report.put("developmentSchemaVersion","1.0.3");
         report.putObject("releasedBaseline").put("version","1.0.1").put("specCommit","f43a6e3cfb97a724d4b434b0ecc769379af379e9")
                 .put("schemaSha256",RELEASED_SCHEMA_SHA).put("latestReleaseObservedAt","2026-10-20");

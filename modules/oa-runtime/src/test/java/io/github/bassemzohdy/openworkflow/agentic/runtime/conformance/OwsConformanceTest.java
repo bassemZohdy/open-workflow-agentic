@@ -14,7 +14,8 @@ class OwsConformanceTest {
         Path baseline=root.resolve("docs/conformance/ows-portability-report.json");
         if(Boolean.getBoolean("ows.updateReport")){Files.createDirectories(baseline.getParent());Files.writeString(baseline,text);}
         assertTrue(Files.exists(baseline),"Generate and inspect assessment with -Dows.updateReport=true");
-        assertEquals(OwsConformance.JSON.readTree(Files.readString(baseline)),report,"Actual SDK/schema/roundtrip behavior changed: inspect generated assessment");
+        assertEquals(comparableAssessment(OwsConformance.JSON.readTree(Files.readString(baseline))),comparableAssessment(report),
+                "Actual SDK/schema/roundtrip behavior changed: inspect generated assessment");
         assertEquals(42,report.path("cases").size());assertEquals("NOT_ESTABLISHED",report.path("fullSemanticConformance").asText());
         assertEquals(76,report.path("summary").path("exportAttempts").asInt());
         assertEquals(74,report.path("summary").path("serializationSucceeded").asInt());
@@ -34,6 +35,38 @@ class OwsConformanceTest {
             }
         }
         assertEquals(48,measured);
+    }
+    /** Only the two observed wrong fork outputs are equivalent for regression comparison.
+     * The generated report and output files always retain the actual order/fingerprint. */
+    private static JsonNode comparableAssessment(JsonNode report) {
+        JsonNode copy=report.deepCopy();
+        for(var sample:copy.path("cases"))if(java.util.Set.of("parallel","released-parallel").contains(sample.path("id").asText())) {
+            for(String format:java.util.List.of("source","JSON","YAML")) {
+                var observation=(com.fasterxml.jackson.databind.node.ObjectNode)sample.path("execution").path(format);
+                assertEquals("DIVERGED",observation.path("status").asText(),"Known fork failure must not become conformant silently");
+                assertTrue(java.util.Set.of("e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170",
+                        "69fa2e55fe1e428fa345c250358bb39aeec2e4073ebc59a98feaf2c19b15cad4")
+                        .contains(observation.path("actualFingerprint").asText()),"Unexpected fork output; inspect actual artifacts");
+                observation.put("actualFingerprint","KNOWN_DIVERGENT_NAMED_BRANCH_ORDER");
+            }
+        }
+        return copy;
+    }
+    @Test void comparisonAcceptsOnlyTheTwoKnownWrongForkOrdersAndPreservesActualReport() throws Exception {
+        JsonNode original=OwsConformance.JSON.readTree(Files.readString(OwsConformance.repository().resolve("docs/conformance/ows-portability-report.json")));
+        JsonNode changed=original.deepCopy();JsonNode fork=null;
+        for(var sample:changed.path("cases"))if(sample.path("id").asText().equals("parallel"))fork=sample;
+        assertNotNull(fork);var observation=(com.fasterxml.jackson.databind.node.ObjectNode)fork.path("execution").path("JSON");
+        observation.put("actualFingerprint","69fa2e55fe1e428fa345c250358bb39aeec2e4073ebc59a98feaf2c19b15cad4");
+        assertEquals(comparableAssessment(original),comparableAssessment(changed));
+        assertEquals("69fa2e55fe1e428fa345c250358bb39aeec2e4073ebc59a98feaf2c19b15cad4",observation.path("actualFingerprint").asText());
+        observation.put("actualFingerprint","unexpected-third-output");
+        assertThrows(AssertionError.class,()->comparableAssessment(changed));
+        observation.put("actualFingerprint","e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170").put("status","MATCH");
+        assertThrows(AssertionError.class,()->comparableAssessment(changed));
+        JsonNode unrelated=original.deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode)unrelated.path("cases").get(0).path("execution").path("source")).put("actualFingerprint","changed-context-output");
+        assertNotEquals(comparableAssessment(original),comparableAssessment(unrelated));
     }
     @Test void assessmentDetectsRemovedMetadataAndChangedOrderedTasksWithoutReportingValues() throws Exception {
         var before=OwsConformance.JSON.readTree("{\"metadata\":{\"vendor/key\":\"private-value\"},\"do\":[\"first\",\"second\"]}");

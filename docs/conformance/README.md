@@ -62,7 +62,12 @@ retained in generated execution artifacts.
    [{left:{side:left}},{right:{side:right}}], while the fixture expects the branch
    outputs [{side:left},{side:right}]. The normative [fork description](https://github.com/open-workflow-specification/specification/blob/2dd2c84170d5f3e05d58e913e9ca298dcf8d543a/dsl-reference.md#fork)
    describes an ordered array of branch outputs. Keep this interpretation visible
-   and resolve it before promising that output contract across runtimes.
+   and resolve it before promising that output contract across runtimes. Actual
+   provider CI also observed the two named branch results in reversed order.
+   The assessment comparison permits only the two explicitly fingerprinted
+   wrong outputs for these two fork fixtures; both must remain DIVERGED.
+   Unexpected outputs still fail, ordered-array comparisons elsewhere stay exact,
+   and generated reports/output artifacts retain the actual observed order.
 3. **Nested metadata serialization:** JSON and YAML writes of nested task
    metadata both fail with JsonMappingException/JsonGenerationException. The
    actual serializer is Quarkus Flow TaskMetadataSerializer, not an alternative
