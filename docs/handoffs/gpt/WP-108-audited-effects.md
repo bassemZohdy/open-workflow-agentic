@@ -147,7 +147,8 @@ the store's immutable identity comparison remains intact. Those 22 setup errors
 are not boundary assertion proof. Failed logs are retained; fresh corrected
 execution is recorded above.
 
-Additional activation limits from source inspection: the new repeatable-history
+Historical activation limits at cd8ef8b (see WP-108-storage-bounds.md for the
+current limits on short SQL transactions and explicit metrics and fresh evidence): repeatable-history
 and current-registry guards set local 2s/5s SQL limits, but older ledger preparation
 and delivery/ACK transactions still use their existing wait behavior. Those helper
 limits are NOT a whole-operation database/central/transport deadline. Bound those
