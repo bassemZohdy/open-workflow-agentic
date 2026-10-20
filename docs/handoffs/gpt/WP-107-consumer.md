@@ -72,3 +72,33 @@ from local mixed-order cancellation. Full T13 includes failed compensation.
 
 No production consumer/coordinator is wired by this decoder. WP-107 remains
 partial, ADR0025/0026 Proposed; no acceptance marker/count/status is promoted.
+
+## Pinned registration behavior and group-storage boundary
+
+Two additional plain unit cases execute the actual pinned EventRegistrationInfo,
+TypeEventRegistrationBuilder and InMemoryEvents SPI (literal predicates need no
+workflow/correlation context). A single event completes BOTH identical all
+registrations, invoking each callback. For any, the first future unregisters all
+registrations, yet the captured CopyOnWrite broadcast snapshot still invokes
+the second callback; a later publication invokes neither. Unregistration alone
+cannot make an already captured loser inert. Both tests pass, along with
+decoder6/parser2:10/10 non-skipped. They characterize registration delivery, not
+full workflow completion, persistence or T13. An initial generic unregister
+method-reference compile mismatch was corrected to the actual Type registration
+cast; no behavioral assertion was weakened.
+
+V64 intentionally gives inbox.signal a global unique receipt binding. Applying
+that per-registration representation unchanged to overlapping all filters would
+not reproduce the observed fan-out. Design an additive durable group/membership
+representation and prove conformance before activation; do not reinterpret a
+receipt ID as filter ordinal, require two distinct receipts merely to sidestep
+overlap, or equate unregistration with a durable any-winner fence. Historical
+single-wait signal/proof rows remain retained, with their evidenced scope.
+
+The [OWS1.0.3 Listen reference](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen)
+requires ordered consumed output and serial FIFO foreach processing. Group
+reconstruction must retain arrival/consumption order rather than silently
+reordering outputs by filter ordinal. The specification does not itself settle
+every overlap/delivery detail above; the two SPI tests are the concrete pinned
+observations used for this integration design. Foreach, until and parallel/loop
+restore still need their full actual-engine failure/ordering cases.
