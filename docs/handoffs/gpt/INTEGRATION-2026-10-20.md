@@ -115,3 +115,24 @@ reviews still gate integration. New #39 a1b1c0b SOURCE-PASS addresses both
 material prior findings; full39365958905/matrix39365958968 still live. Detailed
 review in PR-39-review.md and comment6282871542. No current identity/provider
 acceptance or merge is inferred from old-profile passes.
+
+### Identity and task ownership integrated after current review
+
+GPT merged #45 exactbe71f0a into #39 as712c059 after Claude6283416018 APPROVE
+and full39368834100 SUCCESS. GPT formal review5580828818 APPROVE at exact712c059
+records detached source checks and full39369999072/matrix39369999157 SUCCESS:
+native8/standard3/binding7 each lane non-skipped, acceptance12 passing/0 missing,
+index consistent. Claude6283500105 confirms current head/local equivalent code.
+GPT merged #39 to main as0aec745; starting checkout remains untouched.
+
+GPT merged #44 exacta6bcccf into #40 as2d8761f after Claude6283480485 scoped
+APPROVE and full39367327487 SUCCESS. No blocking finding; effect/consumer/T13
+gates retained. P2 audit-loss liveness is bounded by the original30s expiry;
+P3 receipt epoch is validated at write time, not an epoch-history FK. The
+successor ADR/handoff documents those clarifications; approved #44 was frozen.
+
+Parent #40 normally merges main0aec745 at0f9ba10. No product conflicts; four
+source conflicts preserve all incoming array items and existing gates before
+regenerating TODO/plan.68 tools/generated/diff checks pass. Renew exact combined
+head full/native CI and Claude review before parent integration. No blanket
+WP-102/WP-107/WP-108 completion or ADR0025/0026 acceptance follows.
