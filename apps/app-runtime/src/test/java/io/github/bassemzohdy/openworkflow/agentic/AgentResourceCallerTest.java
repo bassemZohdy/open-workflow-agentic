@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.specification.RequestSpecification;
@@ -12,7 +13,6 @@ import jakarta.inject.Inject;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
@@ -43,13 +43,14 @@ class AgentResourceCallerTest {
     @Test
     void anAnonymousCallerIs401WhateverTheBodyAndTheAgentDoesNotRun() throws Exception {
         String thread = newThread();
+        long allThreads = threads();
         for (String body : List.of("{\"topic\":\"x\",\"threadId\":\"" + thread + "\"}", "{", "", "[]")) {
             given().contentType("application/json").body(body).when().post("/agents/research")
                     .then().statusCode(401);
         }
         // a claimed identity without a token is not a caller either (the header seam is trusted in %test, so the claim
         // is only refused for want of X-Tenant/X-Subject: the anonymous case above sends neither)
-        assertEquals(0, checkpointRows(thread));
+        assertEquals(allThreads, threads(), "a refused call opens no checkpoint thread");
     }
 
     @Test
@@ -57,33 +58,40 @@ class AgentResourceCallerTest {
         String tenant = "t-" + UlidGenerator.shared().next().value();
         String thread = newThread();
         long before = deniedDecisions();
+        long allThreads = threads();
         for (String scopes : new String[] {null, "", "oa.inspect", "oa.operate,oa.recover", "oa.agent.runner"}) {
             caller(tenant, scopes).contentType("application/json")
                     .body("{\"topic\":\"x\",\"threadId\":\"" + thread + "\"}")
                     .when().post("/agents/research")
                     .then().statusCode(403).contentType("application/problem+json").body("status", equalTo(403));
         }
-        assertEquals(0, checkpointRows(thread));
+        assertEquals(allThreads, threads(), "a refused call opens no checkpoint thread");
         assertEquals(5, deniedDecisions() - before, "each refusal is an audited policy decision");
     }
 
     @Test
-    void aCallerWithTheScopeRunsTheAgentOnAThreadPrivateToItsTenant() throws Exception {
+    void aThreadBelongsToOneUserOfOneTenant() throws Exception {
         String tenantA = "t-" + UlidGenerator.shared().next().value();
         String tenantB = "t-" + UlidGenerator.shared().next().value();
         String thread = newThread();
-        for (String tenant : List.of(tenantA, tenantB)) {
-            caller(tenant, RUN).contentType("application/json")
+        // (tenant, user): alice and bob of A, alice of B all send the same visible thread id; alice of A twice
+        for (String[] who : new String[][] {{tenantA, "alice"}, {tenantA, "bob"}, {tenantB, "alice"}, {tenantA, "alice"}}) {
+            given().header("X-Tenant", who[0]).header("X-Subject", who[1]).header("X-Scopes", RUN)
+                    .contentType("application/json")
                     .body("{\"topic\":\"agentic workflows\",\"threadId\":\"" + thread + "\"}")
                     .when().post("/agents/research")
-                    .then().statusCode(200).body("threadId", equalTo(thread))
-                    .body("plan", containsString("[stub]"));
+                    .then().statusCode(200).body("threadId", equalTo(thread)).body("plan", containsString("[stub]"));
         }
-        // the same caller-visible thread id is a different checkpoint thread per tenant
-        List<String> threads = checkpointThreads(thread);
-        assertEquals(true, threads.contains(tenantA + "/" + thread), threads.toString());
-        assertEquals(true, threads.contains(tenantB + "/" + thread), threads.toString());
-        assertEquals(false, threads.contains(thread), "the bare id is never a checkpoint thread: " + threads);
+        // one thread name per owner (the SDK writes one row per run): alice of A ran twice, the others once
+        java.util.Map<String, Integer> runs = new java.util.TreeMap<>();
+        for (String[] who : new String[][] {{tenantA, "alice"}, {tenantA, "bob"}, {tenantB, "alice"}, {tenantA, "alice"}}) {
+            runs.merge(ThreadId.derive(who[0], "USER:" + who[1], "direct:" + thread).value(), 1, Integer::sum);
+        }
+        assertEquals(3, runs.size(), "three distinct owners derive three distinct threads; the owner's repeat reuses its own");
+        for (var e : runs.entrySet()) {
+            assertEquals(e.getValue().longValue(), threadRows(e.getKey()), e.getKey());
+        }
+        assertEquals(0, threadRows(thread), "the bare visible id is never a checkpoint thread");
     }
 
     @Test
@@ -106,23 +114,23 @@ class AgentResourceCallerTest {
                 + " and resource_id = 'agent:research:run' and attributes ->> 'policy.outcome' = 'DENY'");
     }
 
-    private long checkpointRows(String thread) throws SQLException {
-        return checkpointThreads(thread).size();
-    }
-
-    /** Names of checkpoint threads that end with the given caller-visible thread id (any tenant prefix). */
-    private List<String> checkpointThreads(String thread) throws SQLException {
-        List<String> out = new ArrayList<>();
+    private long threadRows(String name) throws SQLException {
         try (Connection c = dataSource.getConnection();
-                var s = c.prepareStatement("select distinct thread_name from lg4jthread where thread_name like ?")) {
-            s.setString(1, "%" + thread);
+                var s = c.prepareStatement("select count(*) from lg4jthread where thread_name = ?")) {
+            s.setString(1, name);
             try (ResultSet r = s.executeQuery()) {
-                while (r.next()) {
-                    out.add(r.getString(1));
-                }
+                r.next();
+                return r.getLong(1);
             }
         }
-        return out;
+    }
+
+    /** All checkpoint threads; the table exists only after the agent first runs. */
+    private long threads() throws SQLException {
+        if (scalar("select count(*) from information_schema.tables where table_name = 'lg4jthread'") == 0) {
+            return 0;
+        }
+        return scalar("select count(*) from lg4jthread");
     }
 
     private long scalar(String sql) throws SQLException {

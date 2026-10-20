@@ -32,6 +32,13 @@ public interface IdentitySettings {
     /** The audience of this API: a user's token must name it. Required with the issuer. */
     Optional<String> audience();
 
+    /**
+     * The audience of the governed agent-run resource ({@code POST /agents/research}) for delegated tokens (WP-103).
+     * A delegated token is admitted there only through {@link AgentResourceAdmission}, and only when this audience is
+     * set; without it the resource accepts user tokens alone. It should differ from {@link #audience()}.
+     */
+    Optional<String> agentResourceAudience();
+
     /** The claim that holds the tenant of the caller. A user's token without it is refused. */
     @WithDefault("tenant")
     String tenantClaim();
