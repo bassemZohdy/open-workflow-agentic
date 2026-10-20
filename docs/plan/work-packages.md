@@ -473,13 +473,14 @@ Implementation status: **partial**.
 - Implemented: Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial.
 - Implemented: Governed-boundary preparation publishes framework-free EffectScope (tenant, registry instance, full owner Subject) and exact authority/manual-policy/central-audit handoff. Reuses existing ws1/ef1 derivation without key/schema changes; requires verified registry/full-owner checks because historical thread hashing omits subject kind. Four new scope and two existing key unit cases pass zero skips. This is attribution data, not an authority grant or consumer activation. Specific current-authority-after-blocking-I/O, resolve-effect OPERATION policy, audit producer/consumer and real Flow/effect/manual execution gates remain open; no whole-WP-102 start dependency.
 - Implemented: Additive V70 storage guards preserve effect key/target/request/purpose/creation/replay binding, irreversible attempts and existing state transitions, immutable repeated outcome evidence and retained journal/compensation links. Five new direct-SQL cases compile with app reactor; execution/review pending. No public authority/manual/adapter activation or acceptance closure.
+- Implemented: Effect tracing preparation adds schema1 fixed logical/dispatch/lookup/compensation spans with current parent context, finite outcome attributes and no payload/key/subject/target/credential/exception events. SDK defaults disabled with runtime collector opt-in, bounded batch queue/export and content capture disabled. Five local real-SDK/fault cases pass; app reactor test-compile and dependency/license checks pass; three actual ledger/CDI trace cases compile pending Linux. V70 standard lane39374918657 passed guard5/existing service12/ledger4/standard3; delegation lane pending. No governed Flow/adapter/manual/audit or whole tracing/acceptance closure.
 
 Remaining gates:
 
 - Integrate governed adapters and effect-aware Flow re-execution through the new execution boundary with WP-105/WP-113.
 - Integrate policy-verified manual decisions and central audit projection through Claude-owned handoffs; add distributed trace spans. Low-cardinality metrics and CDI ambient-rollback tests are included.
 
-Evidence: [docs/handoffs/gpt/WP-108.md](../../docs/handoffs/gpt/WP-108.md), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java](../../modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java), [apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java](../../apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java), [docs/handoffs/gpt/WP-108-authority.md](../../docs/handoffs/gpt/WP-108-authority.md), [docs/handoffs/gpt/WP-108-storage-guards.md](../../docs/handoffs/gpt/WP-108-storage-guards.md)
+Evidence: [docs/handoffs/gpt/WP-108.md](../../docs/handoffs/gpt/WP-108.md), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java](../../modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java), [apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java](../../apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java), [docs/handoffs/gpt/WP-108-authority.md](../../docs/handoffs/gpt/WP-108-authority.md), [docs/handoffs/gpt/WP-108-storage-guards.md](../../docs/handoffs/gpt/WP-108-storage-guards.md), [docs/handoffs/gpt/WP-108-tracing.md](../../docs/handoffs/gpt/WP-108-tracing.md)
 
 Notes: The workflow HTTP client retries below OWS retry policy by default, and restart can re-run the first unfinished task. Disable unintended client retries and require the effect ledger/idempotency contract for every external effect; do not promise exactly-once delivery to arbitrary targets.
 
@@ -559,13 +560,14 @@ Deliverables:
 
 Implementation status: **partial**.
 - Implemented: Correlation IDs, health endpoints, Prometheus metrics and outbox-lag metrics exist.
+- Implemented: WP-108 preparation supplies bounded OTel effect/dispatch/lookup/compensation spans using pinned existing Quarkus3.39.5 BOM/API1.62.0, custom schema1 and disabled SDK by default. Five in-process SDK/fault cases pass; actual ledger/CDI trace execution and end-to-end Flow/agent/tool/model, async/restart propagation, collector/runbook/dashboard/alert/SLO evidence remain open. No full observability deliverable or acceptance promotion.
 
 Remaining gates:
 
 - Add OpenTelemetry across workflow, graph, tool and model spans under one correlation ID.
 - Finish structured operational logs and dashboards as code; document collection and alerting.
 
-Evidence: [README.md](../../README.md), [docs/lifecycle.md](../../docs/lifecycle.md)
+Evidence: [README.md](../../README.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](../../docs/handoffs/gpt/WP-108-tracing.md)
 
 Reuse: quarkus-flow-opentelemetry, langgraph4j-opentelemetry, quarkus-opentelemetry
 

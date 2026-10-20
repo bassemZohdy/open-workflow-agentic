@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-2026-10-20: #35/#37 plan, #38 and #39 merged; reviewed #43/#44 integrated into #40. Current #40 dbe3bd8 full39370961537/matrix39370996254 SUCCESS; current #46 89b0f0d full39371032850/matrix39370993287 SUCCESS (SDK8/owned10/lease7 per lane, standard3/native8, zero skips). Exact Claude reviews still gate both integrations. Main#39 postmerge0aec745 full39370817682/matrix39370817686 SUCCESS. Consumer preparation5a0c77b pushes decoder/overlap/any-snapshot evidence (10 local unit cases) with no additional active PR/activation. WP-108 governed-boundary preparation adds EffectScope and a concrete current authority/manual-policy/audit cross-owner handoff, preserving original keys and partial gates; scope4/existing-key2 pass. Full consumer/all-any/FIFO/foreach/ACK/restore/effect/process/partition/loop/manual/starts/retention/tracing/T13 remain open. WP-102/WP-107/WP-108 partial; ADR0025/0026 Proposed..
+2026-10-20: GPT merged #40 and #46 after exact Claude approvals and required full/real-provider CI. Main is34b6a52; postmerge39375207519 running. Current single GPT PR #48 is frozen at e2e9b89, with full39375306470/matrix39375306597 and exact Claude review pending. Its productaf5df6e already passed both lanes39374605698: actualSDK11, original-reader recovery5 and lifecycle5, standard3/native8, zero skips. GPT reviewed Claude #47 bb58420 REQUEST_CHANGES6284057207 for cross-user checkpoint ownership and incompatible exchanged-credential admission; green39374220592 does not resolve findings. Independent WP-108 preparation reserves V70 effect integrity guards at199cf5b: standard lane39374918657 passed guard5/existing service12/ledger4/standard3, delegation lane pending. Further preparation adds bounded content-free OTel effect/dispatch/lookup/compensation spans and disabled-by-default SDK with runtime collector opt-in. Five real-SDK/fault unit cases, app test-compile and dependency policy pass; three real ledger/CDI trace cases await new Linux execution. No second GPT implementation PR. WP-102/WP-103/WP-107/WP-108/WP-112 retain original partial acceptance gates, including live async identity/exchange, full group/FIFO/foreach/until/coordinator, every later ownership/effect boundary, process/partition/loop, governed manual/adapter/audit, starts, retention, distributed traces and full T13. Reviewed interfaces remain immediately usable; no whole WP-102 start dependency is added..
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-19).
 
@@ -494,6 +494,7 @@ Implemented scope:
 - Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial.
 - Governed-boundary preparation publishes framework-free EffectScope (tenant, registry instance, full owner Subject) and exact authority/manual-policy/central-audit handoff. Reuses existing ws1/ef1 derivation without key/schema changes; requires verified registry/full-owner checks because historical thread hashing omits subject kind. Four new scope and two existing key unit cases pass zero skips. This is attribution data, not an authority grant or consumer activation. Specific current-authority-after-blocking-I/O, resolve-effect OPERATION policy, audit producer/consumer and real Flow/effect/manual execution gates remain open; no whole-WP-102 start dependency.
 - Additive V70 storage guards preserve effect key/target/request/purpose/creation/replay binding, irreversible attempts and existing state transitions, immutable repeated outcome evidence and retained journal/compensation links. Five new direct-SQL cases compile with app reactor; execution/review pending. No public authority/manual/adapter activation or acceptance closure.
+- Effect tracing preparation adds schema1 fixed logical/dispatch/lookup/compensation spans with current parent context, finite outcome attributes and no payload/key/subject/target/credential/exception events. SDK defaults disabled with runtime collector opt-in, bounded batch queue/export and content capture disabled. Five local real-SDK/fault cases pass; app reactor test-compile and dependency/license checks pass; three actual ledger/CDI trace cases compile pending Linux. V70 standard lane39374918657 passed guard5/existing service12/ledger4/standard3; delegation lane pending. No governed Flow/adapter/manual/audit or whole tracing/acceptance closure.
 
 Additional closure/integration tasks:
 
@@ -504,7 +505,7 @@ Acceptance gates:
 
 - [x] T03: automated
 
-Evidence: [docs/handoffs/gpt/WP-108.md](docs/handoffs/gpt/WP-108.md), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java](modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java), [apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java](apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java), [docs/handoffs/gpt/WP-108-authority.md](docs/handoffs/gpt/WP-108-authority.md), [docs/handoffs/gpt/WP-108-storage-guards.md](docs/handoffs/gpt/WP-108-storage-guards.md)
+Evidence: [docs/handoffs/gpt/WP-108.md](docs/handoffs/gpt/WP-108.md), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java](modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java), [apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java](apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java), [docs/handoffs/gpt/WP-108-authority.md](docs/handoffs/gpt/WP-108-authority.md), [docs/handoffs/gpt/WP-108-storage-guards.md](docs/handoffs/gpt/WP-108-storage-guards.md), [docs/handoffs/gpt/WP-108-tracing.md](docs/handoffs/gpt/WP-108-tracing.md)
 
 ### WP-109 Timers, deadlines and durable failover — partial
 
@@ -582,13 +583,14 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-07. Shared pat
 Implemented scope:
 
 - Correlation IDs, health endpoints, Prometheus metrics and outbox-lag metrics exist.
+- WP-108 preparation supplies bounded OTel effect/dispatch/lookup/compensation spans using pinned existing Quarkus3.39.5 BOM/API1.62.0, custom schema1 and disabled SDK by default. Five in-process SDK/fault cases pass; actual ledger/CDI trace execution and end-to-end Flow/agent/tool/model, async/restart propagation, collector/runbook/dashboard/alert/SLO evidence remain open. No full observability deliverable or acceptance promotion.
 
 Additional closure/integration tasks:
 
 - [ ] Add OpenTelemetry across workflow, graph, tool and model spans under one correlation ID.
 - [ ] Finish structured operational logs and dashboards as code; document collection and alerting.
 
-Evidence: [README.md](README.md), [docs/lifecycle.md](docs/lifecycle.md)
+Evidence: [README.md](README.md), [docs/lifecycle.md](docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](docs/handoffs/gpt/WP-108-tracing.md)
 
 ### WP-113 Enterprise service adapters — not-started
 

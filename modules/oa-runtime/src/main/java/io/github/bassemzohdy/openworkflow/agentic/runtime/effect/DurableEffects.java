@@ -28,17 +28,26 @@ public class DurableEffects {
     private static final Logger LOG = Logger.getLogger(DurableEffects.class);
     private final JdbcEffectLedger ledger;
     private final Clock clock;
+    private final EffectTelemetry telemetry;
     @Inject MeterRegistry metrics;
     // Each active call uses a claim connection and short transaction connections. Avoid unbounded pool claims.
     private final Semaphore slots = new Semaphore(4);
 
     @Inject
-    public DurableEffects(JdbcEffectLedger ledger) { this(ledger, Clock.systemUTC()); }
+    public DurableEffects(JdbcEffectLedger ledger,EffectTelemetry telemetry) { this(ledger,Clock.systemUTC(),telemetry); }
+    public DurableEffects(JdbcEffectLedger ledger) {this(ledger,Clock.systemUTC());}
     public DurableEffects(JdbcEffectLedger ledger, Clock clock) {
-        this.ledger = Objects.requireNonNull(ledger); this.clock = Objects.requireNonNull(clock);
+        this(ledger,clock,EffectTelemetry.noop());
+    }
+    public DurableEffects(JdbcEffectLedger ledger,Clock clock,EffectTelemetry telemetry) {
+        this.ledger = Objects.requireNonNull(ledger); this.clock = Objects.requireNonNull(clock);this.telemetry=Objects.requireNonNull(telemetry);
     }
 
     public Effect execute(EffectCommand command, EffectTarget target) {
+        return telemetry.effect(EffectTelemetry.Operation.EXECUTE,()->executeCommand(command,target));
+    }
+
+    private Effect executeCommand(EffectCommand command,EffectTarget target) {
         requireTarget(command, target);
         if (!slots.tryAcquire()) throw new JdbcEffectLedger.EffectBusyException();
         try { return ledger.exclusively(command.key(), () -> executeLocked(command, target)); }
@@ -82,6 +91,10 @@ public class DurableEffects {
 
     /** Compensation has its own durable intent/key; loss of its acknowledgment is recovered like any other effect. */
     public Effect compensate(EffectKey original, EffectCommand compensation, EffectTarget target) {
+        return telemetry.effect(EffectTelemetry.Operation.COMPENSATE,()->compensateCommand(original,compensation,target));
+    }
+
+    private Effect compensateCommand(EffectKey original,EffectCommand compensation,EffectTarget target) {
         requireTarget(compensation, target);
         if (!original.threadId().equals(compensation.key().threadId()) || original.equals(compensation.key())) {
             throw new IllegalArgumentException("compensation requires another key in the original scope");
@@ -118,17 +131,21 @@ public class DurableEffects {
         if (!command.target().equals(target.target())) throw new IllegalArgumentException("adapter target mismatch");
     }
 
-    private static Reply dispatch(EffectTarget target, EffectKey key) {
-        try { return Objects.requireNonNull(target.execute(key.idempotencyKey()), "target reply"); }
-        catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
-        } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }
+    private Reply dispatch(EffectTarget target, EffectKey key) {
+        return telemetry.target(EffectTelemetry.Operation.DISPATCH,()->{
+            try { return Objects.requireNonNull(target.execute(key.idempotencyKey()), "target reply"); }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
+            } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }
+        });
     }
 
-    private static Reply lookup(EffectTarget target, EffectKey key) {
-        try { return Objects.requireNonNull(target.lookup(key.idempotencyKey()), "lookup reply"); }
-        catch (InterruptedException e) {
-            Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
-        } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }
+    private Reply lookup(EffectTarget target, EffectKey key) {
+        return telemetry.target(EffectTelemetry.Operation.LOOKUP,()->{
+            try { return Objects.requireNonNull(target.lookup(key.idempotencyKey()), "lookup reply"); }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
+            } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }
+        });
     }
 }
