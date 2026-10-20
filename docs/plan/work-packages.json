@@ -823,7 +823,8 @@
         "implemented": [
           "JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.",
           "Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.",
-          "Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial."
+          "Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial.",
+          "Governed-boundary preparation publishes framework-free EffectScope (tenant, registry instance, full owner Subject) and exact authority/manual-policy/central-audit handoff. Reuses existing ws1/ef1 derivation without key/schema changes; requires verified registry/full-owner checks because historical thread hashing omits subject kind. Four new scope and two existing key unit cases pass zero skips. This is attribution data, not an authority grant or consumer activation. Specific current-authority-after-blocking-I/O, resolve-effect OPERATION policy, audit producer/consumer and real Flow/effect/manual execution gates remain open; no whole-WP-102 start dependency."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -835,7 +836,8 @@
         "evidence": [
           "docs/handoffs/gpt/WP-108.md",
           "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java",
-          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java"
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java",
+          "docs/handoffs/gpt/WP-108-authority.md"
         ]
       }
     },
@@ -2627,7 +2629,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-19",
-    "status": "2026-10-20: #35/#37 ownership plan, #38 and #39 merged; #39 exact712c059 approved GPT5580828818/Claude6283500105, full/native strict CI passed (main0aec745). #43/#44 scoped SDK/ownership merged into #40; #44 exacta6bcccf approved Claude6283480485/full39367327487. Current #40 dbe3bd8 full39370961537/matrix39370996254 SUCCESS, exact Claude review still required before main integration/coverage reconciliation. #46 exact89b0f0d corrected SUPPORTS helper passes BOTH lanes39370993287: SDK8/owned10/lease7/protocol9/selection6/cancellation2/binding7 each, standard3/native8 zero skips; full39371032850 and exact peer review pending. Separate consumer preparation b0aa86f pushed with10 local decoder/parser/SPI cases, no duplicate PR or activation. Complete all-any/fan-out/FIFO/foreach/ACK/restore/effect/process/partition/loop/manual/starts/retention/tracing/T13 gates retained; WP-102/WP-107/WP-108 partial, ADR0025/0026 Proposed.",
+    "status": "2026-10-20: #35/#37 plan, #38 and #39 merged; reviewed #43/#44 integrated into #40. Current #40 dbe3bd8 full39370961537/matrix39370996254 SUCCESS; current #46 89b0f0d full39371032850/matrix39370993287 SUCCESS (SDK8/owned10/lease7 per lane, standard3/native8, zero skips). Exact Claude reviews still gate both integrations. Main#39 postmerge0aec745 full39370817682/matrix39370817686 SUCCESS. Consumer preparation5a0c77b pushes decoder/overlap/any-snapshot evidence (10 local unit cases) with no additional active PR/activation. WP-108 governed-boundary preparation adds EffectScope and a concrete current authority/manual-policy/audit cross-owner handoff, preserving original keys and partial gates; scope4/existing-key2 pass. Full consumer/all-any/FIFO/foreach/ACK/restore/effect/process/partition/loop/manual/starts/retention/tracing/T13 remain open. WP-102/WP-107/WP-108 partial; ADR0025/0026 Proposed.",
     "agents": [
       {
         "id": "GPT",
