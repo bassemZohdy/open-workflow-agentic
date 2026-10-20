@@ -163,5 +163,8 @@ The worker now closes the complete pending port and publishes with ATOMIC_MOVE
 in its SAME unique owned directory, after flushing ready output. Parent existence
 cannot observe a partially written published file. No sleeps/retry/guard removal
 substitute for the publication fix. Local native filesystem/concurrent-reader
-probe100 succeeds; fresh exact Linux HTTP7 execution remains required. See the
-current manual-decision handoff for final source/evidence, not older proof transfer.
+probe100 succeeds. Final exacte1c2d8417599c96cbaf336a8f74d945227463aee/
+BOTH39457012587 now passes HTTP7/core1/source-ACK4 EACH plus manual26 and real
+standard3/native8; both full logs/all161 XML/13 HTTP+14 original process logs per
+lane/actual archive bytes-digests inspected. See the current manual-decision
+handoff for exact artifacts/remaining gates; no earlier proof or peer transfer.

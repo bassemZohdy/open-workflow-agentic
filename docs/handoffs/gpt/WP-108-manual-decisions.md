@@ -1,6 +1,6 @@
 # WP-108 immutable manual decision storage preparation
 
-Owner: GPT. Consumer/reviewer: Claude. Preparation, not operator activation.
+Owner: GPT. Consumer/reviewer: Claude. Storage preparation verified; operator activation remains gated.
 Sole GPT implementation PR #55 remains frozen ea56f3319d0e896d54703d9f4d857252906ed2a4
 with exact Claude review absent. No second PR or approval/CI transfer.
 
@@ -140,9 +140,69 @@ observes a completed port. Unsupported atomic publication refuses rather than
 falling back to the raced protocol. No assertion removed/weakened and no unchanged
 retry. A local actual native filesystem/concurrent-reader probe completes100
 publications with zero partial/invalid reads; that probe is not DB/provider proof.
-Current26/eight-contract/HTTP7/core1/audit-process4/provider gates need fresh exact
-Linux execution after BOTH the scoped read API and atomic fixture fix. The live
-5a8241a/BOTH39455577089 is an intermediate source, not this final fixture code.
+Those combined gates required fresh exact Linux execution after BOTH the scoped
+read API and atomic fixture fix; the verified final source is recorded below.
+Intermediate5a8241a/BOTH39455577089 is SUCCESS, not the final fixture code. Both
+finished logs/actual archives12280472909/12280837368 inspected, bytes/digests/CRC/
+paths verified; all161 XML per lane and exact26+8+7+31+24+15 names, prior27 process
+logs and bounded conformance outputs checked. That proof is not transferred.
+
+## Verified final exact source
+
+reviewer=GPT (AUTHOR verification only, not peer approval); reviewed/tested SHA
+**e1c2d8417599c96cbaf336a8f74d945227463aee**. Verdict: storage preparation PASS;
+integration HOLD for exact Claude/final PR/actual operator-authority/central gates.
+The subsequent handoff/tracking commit contains no product/test change and is not
+mislabeled as the tested source.
+
+[BOTH39457012587](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39457012587)
+is terminal SUCCESS at exactly that SHA, first attempt/no rerun. Both completed
+raw logs downloaded/inspected: standard118746423492/native118746424204. EACH:
+contracts220/runtime351/testkit196/application unit417, including manual SQL26/
+new contract8/boundary31/source17/model24/allocation15 and other selected cases.
+Failsafe totals15/20: HTTP7/source-ACK process4/core process1 EACH, real standard3/
+native8. All four strict markers pass, zero failures/errors/skips.
+
+Downloaded exact artifacts; verified raw archive bytes against GitHub SHA256,
+CRC and owned safe extraction paths:
+
+| Lane / artifact | Bytes | SHA256 |
+| --- | ---: | --- |
+| standard12279939616 | 2287944 | 054316922464cc93e7a181954bb6c795ae7ac29242ca4f7f6bd4f0a6ae749a29 |
+| native12280678416 | 2281693 | 0c593614047504f20ce8499cdf0169f7557ceb8a9244f682856fb6b571efdd15 |
+
+ALL161 actual XML per lane parsed: positive consistent suite/case counters,
+unique identities, no failure/error/skip. Exact current manual26/contract8/HTTP7/
+boundary31/model24/allocation15 method sets match source. Reran
+`python tools/require_keycloak_evidence.py --root <actual-lane> --profile
+<standard|delegation> --effect-recovery --effect-audit-recovery
+--effect-http-recovery` on each actual result archive, not source fixtures.
+
+Each lane has11 actual HTTP server/two client logs with the planned charge/refund
+post-COMMIT halts, client post-reply halt and fresh-client SAME_KEY confirmation;
+14 original worker logs retain all four source/ACK halts plus six intent/four ACK
+reopens. Both lanes have one owned WAIT_CHARGE cleanup InterruptedException with
+committed/release files retained; actual timeout/business recovery assertions pass.
+Fixture LogManager bootstrap warnings are retained, not application/test failures.
+No assertion was removed and no failed assertion/source rerun unchanged.
+
+Actual conformance reports/48 outputs/74 exports/two known writer diagnostics
+checked per lane, admitting ONLY the two already bounded wrong fork-order hashes.
+Results stay30 MATCH/18 DIVERGED, not full semantic conformance. Every earlier
+failed/partial/intermediate run above remains distinct from this final proof.
+
+Local author checks: all220 contracts/eight new independent vector cases; selected
+17 provenance6/cancellation-replay7/scope4; all91 app sources compile; tools88,
+unchanged dependency policy, generated/authored-diff checks pass. The actual native
+filesystem/concurrent-reader100 probe verifies port publication only, not provider/
+DB/manual process behavior. Applied migrations/V75/V77/acceptance-status bytes and
+all package/completed-deliverable status fields were compared with priorb856437
+and are unchanged. No full local PostgreSQL/provider/all-module suite is claimed.
+
+Publication/handoff comments are [6295221080](https://github.com/bassemZohdy/open-workflow-agentic/pull/54#issuecomment-6295221080)
+and [6295430907](https://github.com/bassemZohdy/open-workflow-agentic/pull/54#issuecomment-6295430907).
+Actual operator/evidence/current final mutation-output/atomic central/Flow/manual
+process/partition/restore/correction and full T03/WP-108 gates below remain open.
 
 ## Explicit Claude handoff and remaining gates
 
