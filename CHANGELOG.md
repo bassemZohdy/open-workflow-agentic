@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-108 coordination: specify stable journal/outbox identity, immutable audit drafts and idempotent central projection/readback after a lost actual commit reply. This is an explicit cross-owner proposal; no outbox/projector/mandatory audit gate is implemented or acceptance promoted.
+
 - WP-103 GPT preparation: V73 and JDBC resource-call attribution atomically retain immutable invocation contracts and issuer/jti mappings, enforce full registry and exact issuing metadata, preserve historical readback and refuse unknown commit replies.23 selected plain cases/application test compilation/tools76 pass;12 new actual PostgreSQL cases await Linux execution. No credential release, dispatch, workflow401 fix or acceptance promotion.
 
 - Combined preparation on reviewed #48 and effect/process-CI foundation passed BOTH39381927960 atc1fd835: snapshots6/group SQL11/actual SDK-JPA11/receipt recovery5/restore gate5/CDI tracing3/core effect process recovery1/standard3/native8, zero skips and strict checkers. Production group selector/coordinator/execution/recovery/T13 remains open.
