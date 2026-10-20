@@ -7,7 +7,25 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ## [Unreleased]
 
+- WP-102 partial: add V65 immutable issuer/jti-to-grant schema with tenant binding and expiry retention. Product admission integration and native-provider lifetime compatibility remain open.
+
+### Added
+
+- **Effect ledger (WP-108, partial):** JDBC write-ahead intent and stable operation keys, request conflict
+  rejection, cross-process execution claims, bounded unknown-outcome replay, compensation intents and an
+  internal durable manual-resolution queue. Added database and process-death T03 tests. Governed adapter,
+  manual-decision, central-audit and lifecycle integration remain open; CI and Claude review are required
+  before merge. [Scope and handoff](docs/handoffs/gpt/WP-108.md).
+
 ### Tracking
+
+- Integrate the reviewed PR #39 audit-caller increment into PR #40; run its real
+  Keycloak characterization on both pinned issuers separately from strict authority
+  contract gates. Skips and characterization never close WP-102.
+
+- **WP-102 H1/H2 (partial):** retain strict signed actor proof, reject actorless standard exchange,
+  and add an isolated real-Keycloak Java CI matrix with missing/skipped-evidence rejection. The Java
+  identity tests remain Claude-owned; harness availability does not complete provider interoperability.
 
 - Reconcile all 53 work packages and 64 requirements with merged code and evidence. Keep component completion,
   partial integration and unstarted work explicit. Generate TODO.md and progress pages from the plan JSON;
