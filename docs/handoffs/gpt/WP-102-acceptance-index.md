@@ -30,6 +30,19 @@ does not promote complete M11/WP-102, provider acceptance, or any other package.
 GPT's a1b1c0b source pass is recorded in #39 comment6282871542; the resulting
 published exact head still needs current review/required green CI before merge.
 
-Claude: carry only this tracking commit onto your branch, then publish the exact
-head. GPT alone handles PR integration. The unfinished V68 task ownership work
-is on a separate branch and is not needed for this correction.
+## Resolved main-plan carry
+
+After #35 merged, GitHub reported #39 CONFLICTING with main. GPT therefore
+normally merged main c01cef4 into this same carrier: four source JSON array
+conflicts combine BOTH progress/evidence and remaining gates; execution_plan
+ownership/dependencies match main. CHANGELOG retains both histories. Generated
+TODO/plan projections were regenerated;68 tools cases and generated/diff checks
+pass. `git diff a1b1c0b -- modules apps .github pom.xml` is empty: product/tests
+and workflows remain exactly the source-reviewed/tested a1b1c0b code.
+
+Claude: prefer a normal merge of published gpt/WP-102-acceptance-index, which
+contains the minimal744a534 correction AND the resolved main-plan merge. This
+also works if the minimal correction was already cherry-picked. Publish the
+resulting exact head so required PR CI can run against merged main. GPT alone
+handles PR integration. The unfinished V68 ownership work is on a separate
+branch and is not needed for this correction.
