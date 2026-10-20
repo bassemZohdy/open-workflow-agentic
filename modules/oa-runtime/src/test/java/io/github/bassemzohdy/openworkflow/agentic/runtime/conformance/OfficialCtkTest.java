@@ -14,7 +14,7 @@ import java.util.concurrent.*;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
-/** Executes unchanged official definitions. External scenarios remain explicitly unmeasured.
+/** Executes unchanged official definitions with controlled HTTP/OpenAPI/event providers.
  * This strict pinned-feature reader is deliberately not a general Gherkin implementation. */
 class OfficialCtkTest {
     record Step(String text,String block) { }
@@ -60,11 +60,15 @@ class OfficialCtkTest {
     static JsonNode yaml(String text) throws Exception {return OwsConformance.YAML.readTree(text);}
     static Observation execute(String source,JsonNode input) throws Exception {
         OwsConformance.requirePure(yaml(source)); // fail closed before constructing an executable definition
+        return execute(source,input,WorkflowApplication.builder(),null);
+    }
+    static Observation execute(String source,JsonNode input,WorkflowApplication.Builder builder,CtkProviders providers) throws Exception {
         var tasks=new CopyOnWriteArrayList<String>();
         var listener=new WorkflowExecutionListener() {
             public void onTaskStarted(TaskStartedEvent e){tasks.add(e.taskContext().taskName());}
         };
-        try(var app=WorkflowApplication.builder().withListener(listener).disableLifeCycleCEPublishing().disableStatusChangePublishing().build()) {
+        try(var app=builder.withListener(listener).disableLifeCycleCEPublishing().disableStatusChangePublishing().build()) {
+            if(providers!=null)providers.verifyBindings(app); // BEFORE definition construction or any execution
             var instance=app.workflowDefinition(WorkflowReader.readWorkflowFromString(source,WorkflowFormat.YAML))
                     .instance(OwsConformance.JSON.convertValue(input,Object.class));
             JsonNode output=NullNode.instance,error=NullNode.instance;
@@ -110,7 +114,7 @@ class OfficialCtkTest {
         }
         throw new IllegalArgumentException("Not an assertion: "+text);
     }
-    @Test void allPinnedOfficialScenariosHaveExplicitCoverageAndPureAssertionsAreMeasured() throws Exception {
+    @Test void allPinnedOfficialScenariosRunUnchangedWithPureOrControlledProvidersAndEveryAssertionIsMeasured() throws Exception {
         var manifest=OwsConformance.JSON.readTree(OwsConformance.resource(PREFIX+"manifest.json"));
         var scenarios=new ArrayList<Scenario>();int features=0;
         for(var file:manifest.path("files")) {
@@ -123,7 +127,8 @@ class OfficialCtkTest {
         assertEquals(11,features);assertEquals(21,scenarios.size());
         var report=OwsConformance.JSON.createObjectNode().put("specCommit",manifest.path("commit").asText())
                 .put("sdkVersion","7.35.3.Final").put("fullSemanticConformance","NOT_ESTABLISHED")
-                .put("scope","All pinned development CTK scenarios inventoried; unchanged pure definitions executed; external scenarios unmeasured");
+                .put("scope","All pinned development CTK scenarios attempted unchanged with pure or controlled HTTP/OpenAPI/event providers")
+                .put("publicProviderInteroperability","NOT_ESTABLISHED: loopback transport substitution, pinned document and in-memory event delivery");
         var results=report.putArray("scenarios");int executed=0,unmeasured=0,matched=0,diverged=0,assertions=0;
         Path artifacts=Path.of("target/conformance/official-ctk");Files.createDirectories(artifacts);
         for(int index=0;index<scenarios.size();index++) {
@@ -139,21 +144,27 @@ class OfficialCtkTest {
             var checked=item.putArray("assertions");
             boolean external=false;
             try {OwsConformance.requirePure(yaml(source));}catch(IllegalArgumentException unavailable){external=true;}
+            ObjectNode providerObservation=null;Observation actual;
             if(external) {
-                unmeasured++;item.put("status","UNMEASURED").put("reason","External HTTP/OpenAPI/event execution requires a separate controlled provider contract; official definitions unchanged");
-                for(var check:checks)checked.addObject().put("step",check.text()).put("status","UNMEASURED");continue;
-            }
-            executed++;var actual=execute(source,input);boolean match=true;
+                CtkProviders.requireControlledSource(yaml(source));
+                try(var providers=new CtkProviders()) {
+                    actual=execute(source,input,providers.configure(WorkflowApplication.builder()),providers);providerObservation=providers.observation();
+                    item.set("providerSummary",providers.summary());
+                }
+                item.put("provider","CONTROLLED_HTTP_OPENAPI_EVENT");
+            }else {actual=execute(source,input);item.put("provider","PURE");}
+            executed++;boolean match=true;
             for(var check:checks){boolean ok=assertion(check,actual);match&=ok;assertions++;checked.addObject().put("step",check.text()).put("status",ok?"MATCH":"DIVERGED");}
             item.put("status",match?"MATCH":"DIVERGED");if(match)matched++;else diverged++;
             String artifact=String.format(Locale.ROOT,"scenario-%02d.json",index+1);item.put("observation",artifact);
             var observation=OwsConformance.JSON.createObjectNode().put("workflowStatus",actual.status());
             observation.set("output",actual.output());observation.set("error",actual.error());observation.set("taskStarts",OwsConformance.JSON.valueToTree(actual.tasks()));
+            if(providerObservation!=null)observation.set("provider",providerObservation);
             Files.writeString(artifacts.resolve(artifact),OwsConformance.JSON.writerWithDefaultPrettyPrinter().writeValueAsString(observation)+"\n");
         }
         report.putObject("summary").put("features",features).put("scenarios",scenarios.size()).put("executed",executed)
                 .put("unmeasured",unmeasured).put("matched",matched).put("diverged",diverged).put("measuredAssertions",assertions);
-        assertEquals(11,executed);assertEquals(10,unmeasured);assertEquals(24,assertions);
+        assertEquals(21,executed);assertEquals(0,unmeasured);assertEquals(45,assertions);
         String text=OwsConformance.JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)+"\n";
         Files.writeString(artifacts.resolve("report.json"),text);
         Path baseline=OwsConformance.repository().resolve("docs/conformance/official-ctk-report.json");

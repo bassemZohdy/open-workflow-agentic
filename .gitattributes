@@ -5,3 +5,4 @@ modules/oa-runtime/src/test/resources/conformance/schema/* text eol=lf
 modules/oa-runtime/src/test/resources/conformance/upstream/* text eol=lf
 modules/oa-runtime/src/test/resources/conformance/upstream/ctk/** text eol=lf
 modules/oa-runtime/src/main/resources/conformance/schema/* text eol=lf
+modules/oa-runtime/src/test/resources/conformance/providers/petstore-swagger.json -text

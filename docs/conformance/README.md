@@ -78,8 +78,8 @@ retained in generated execution artifacts.
    both import stages; runtime support for that format is not established. JSON
    Schema acceptance alone is not full DSL or executable-provider conformance.
 5. **Authoring loss:** model exports are data artifacts. The shipped YAML comments
-   and the comment/alias fixture are not reproduced as source text. Preserve
-   original authored source separately in a future authoring/import/export service.
+   and the comment/alias fixture are not reproduced as source text. The source codec now preserves
+   original bytes; durable authoring storage and activation remain separate gates.
 
 The initial loop expectation was corrected using the pinned official
 [For CTK](https://github.com/open-workflow-specification/specification/blob/2dd2c84170d5f3e05d58e913e9ca298dcf8d543a/ctk/features/for.feature):
@@ -103,7 +103,7 @@ on its service contract even when its definition is standard OWS.
 | Surface | Portability boundary |
 |---|---|
 | Shipped research-and-approve and lifecycle-probe YAML | Standard HTTP/listen/set constructs; both still declare DSL 1.0.0, not 1.0.3. Their source is unchanged. |
-| Embedded localhost research URL and input effectUrl | Deployment/service dependencies; credentials, registered targets, identity and policy are separate runtime contracts. No HTTP call is made by this assessment. |
+| Embedded localhost research URL and input effectUrl | Deployment/service dependencies; credentials, registered targets, identity and policy are separate runtime contracts. These shipped definitions are not executed by the round-trip assessment. |
 | Approval and lifecycle CloudEvent types | Required external event contracts, correlation/ingress/producer configuration; syntax validation does not prove durable delivery. |
 | document/task metadata and use.extensions in corpus | Standard opaque metadata/extension hooks. Actual extension behavior is unmeasured. |
 | FlowWorkflowEngine and CheckpointingWriter adapters | Quarkus/Java SDK execution and opaque persistence-state coupling. Model roundtrips do not export in-flight execution state. |
@@ -117,35 +117,65 @@ feature and README bytes, lengths and SHA-256 digests are retained under
 schema corpus. This is a strict reader for those pinned Gherkin steps, not a
 general Cucumber implementation. Unknown steps and malformed docstrings fail.
 
-Eleven unchanged pure definitions execute with the actual SDK. All 24 official
-assertions are evaluated, including real task-start order and structured fault
-fields: nine scenarios MATCH and two DIVERGE. The raised error has
-`instance: do/0/raiseError`, while the official CTK expects `/do/0/raiseError`.
-The implicit-default switch completes with `colors: [red, green, blue]` and
-starts the three following tasks, rather than retaining `color: yellow` and
-ending at `switchColor`. These are observed CTK differences requiring resolution
-or adjudication; neither expectation is rewritten. Actual output/error/task-start
-observations are retained as CI artifacts, including competing-fork results whose
-winning color may vary. The baseline compares official assertion outcomes rather
-than sorting or discarding the actual observations.
+All21 unchanged definitions now execute with the actual SDK: eleven pure and
+ten with controlled providers. All45 official assertions are evaluated. The
+current report records14 MATCH/seven DIVERGED, with no unmeasured scenario in
+this pinned development kit. This is measurement, not a conformance certificate.
 
-Ten scenarios remain explicitly UNMEASURED: five calls, two HTTP-backed data-flow
-cases, two HTTP-backed try cases and one emit case. The pure-execution guard runs
-before constructing an executable definition; this suite never contacts the
-public Petstore/httpbin services or publishes an event. An inventory entry is
-not execution proof. The two new differences supplement the earlier round-trip,
-context and noncompeting-fork findings; the 48-execution assessment is unchanged.
+Controlled HTTP uses the actual SDK executors/auth/output, a contextual JAX-RS
+client and the existing Quarkus Jackson reader. A per-client filter records the
+original URI, then routes only exact fixture GETs to an owned loopback server.
+The actual OpenAPI reader loads an unmodified, byte-pinned Apache-2.0 Petstore
+schema through an exact-URI loader; HTTP operations still use the same guarded
+transport. Emit uses the actual SDK CloudEvent construction and in-memory broker
+with recorded subscriber delivery. Source/input/official expectations are
+unchanged. This does not prove public provider availability/TLS or production
+identity, target permission, audit or delivery durability.
 
-Remaining work includes executing the external official CTK scenarios with
-controlled provider/event contracts, confirmed finding resolution, actual authoring/import/export
-API/source retention and a second-runtime/provider/artifact substitution run.
-No package or acceptance status is promoted by this bounded measurement.
+The seven observed differences requiring resolution or adjudication are:
+
+- HTTP URI interpolation encodes the query separator into the path:
+  `findByStatus%3Fstatus=available`. The guard records/refuses that malformed
+  request before transport; it does not repair it or supply an invented result.
+- HTTP and OpenAPI `output: response` return content without the required response
+  envelope (two scenarios), despite actual loopback200 responses.
+- Emit actually delivers the expected CloudEvent/data, but workflow output stays
+  the original user input instead of the envelope expected by the CTK.
+- Raise uses `do/0/raiseError` instead of the expected leading-slash pointer.
+- Implicit-default switch runs following tasks instead of ending at switchColor.
+- The404 catcher requests the new open-workflow error URI, while the actual SDK
+  raises the older serverlessworkflow1.0.0 communication type. It remains faulted;
+  the503 catcher correctly leaves that404 uncaught in the positive control.
+
+Actual output/error/task starts, original/transport URIs, resource opens, event
+id/time/data and refusals remain in CI observation artifacts. The baseline
+compares official assertion outcomes and deterministic provider summaries;
+random event ids/times and ephemeral loopback ports remain in raw observations.
+Neither arrays nor wrong results are sorted or replaced to satisfy expectations.
+The earlier42-source/48-execution model assessment is unchanged and remains a
+separate bounded measurement.
+
+A first local exploratory run mistakenly registered the HTTP client through the
+SDK's global Supplier overload, which populates a different map from the
+contextual lookup used by HTTP execution. That run bypassed the intended client
+and issued fixture-only public GETs; its results are INVALID as controlled
+provider evidence and retained separately in the owned local target directory.
+The corrected contextual binding is checked before definition construction, and
+a regression refuses the wrong binding before any SDK workflow can execute.
+The actual standalone Quarkus Jackson reader is also explicitly client-scoped;
+no global runtime configuration, proxy, DNS or trust setting is changed.
+
+Remaining work includes finding adjudication/resolution, broader released and
+public-provider/TLS checks, actual durable authoring/approved materialization
+and a second-runtime/provider/artifact substitution run. No package or acceptance
+status is promoted by this controlled measurement. See the current handoff in
+docs/handoffs/gpt/WP-605-controlled-ctk.md for exact verification evidence.
 
 The released-declared execution variants change ONLY document.dsl and
 document.version to 1.0.1, retaining the same tasks/input/expected results. A test
 checks that derivation. They are comparisons on the pinned stack, not the complete
 released CTK or a claim that development-text interpretations are all settled.
 Three extra development-valid shapes fail the released schema: the emit URI,
-gRPC host and shell argument forms in this corpus. Protocol execution remains
-unmeasured. The report includes the actual host metadata serializer class so
+gRPC host and shell argument forms in this corpus. The controlled CTK protocol measurements above are separate from these
+model-shape samples; no general public-provider execution claim follows. The report includes the actual host metadata serializer class so
 stack-specific behavior is not misattributed to a bare upstream SDK.
