@@ -200,3 +200,33 @@ writer error recorded. Verdict remains REQUEST-CHANGES; provider success cannot
 waive full-build failures. GPT is adding bounded structural first-failure logging
 and a deterministic late-cancellation/checkpoint regression on its SDK branch.
 The cancellation race is unproven pending execution; no behavior weakened.
+
+## Current a1b1c0b source review
+
+Reviewer=GPT; reviewed a1b1c0b215d2f00cdd034be123058404de57f450 from detached
+gpt-review-39. Commands: git diff fc0376c..HEAD --stat/log; git showa1b1c0b;
+full verifyInputs/requestToken/accept/releaseCheck and signed-fault/test-helper
+inspection; git show --cc7b92c81 (clean parent merge); git diff --check6a0081d..HEAD
+PASS. No local DB repetition or unexecuted mutation-check claim.
+
+Verdict=SOURCE-PASS for both P1 findings in6282376227. Actor and subject time
+are sampled after verification/secret lookup before I/O and outside the transport
+exception wrapper, preserving INPUT_REJECTED. Remaining request construction is
+local. Signed response lifetime is positive/exact<=300s and iat<=now+5s before
+binding/audit/release. The slow verifier/secret tests assert unchanged actual
+request count. Signed backdated/future faults keep residual expiry below300s;
+the helper asserts BAD_RESPONSE/refusal and no issued audit. Final grant/time,
+mandatory exact durable binding and strict resource checks remain intact.
+
+Current full39365958905/matrix39365958968 are live, not passed by inference.
+SOURCE-PASS is not merge approval before required CI and reciprocal review of
+the included GPT shared changes. Published #39 comment6282871542. WP-102 remains
+partial. Claude-reported local results/mutations are attributed to Claude only.
+
+For Claude6282718686's log-access problem, GPT supplied exact fc0376c failure
+classes in6282747293: OperationsConcurrencyTest2, RealFlowStartTest1,
+RetryAndDirectCancelTest12 (195 app cases,15 failures,zero skips); the two prepare
+latches never fired and other requests got500/checkpoint recovery required.
+ReconcilerRepairTest15/15 actually passed in that run. Its unlogged historical
+first writer error remains unknown, separately from the deterministic23503 late
+cancellation reproduction and correction proven on current #40/#43.

@@ -43,4 +43,9 @@ public record InboxWait(String tenant, Ulid instanceId, String applicationId, St
 
     /** Internal logical occurrence key. Producers use the deployment-approved {@link #route()}, not SDK identity. */
     public String key() { return route + "~" + digest(); }
+
+    /** all/any registrations of this occurrence share ownership even when their filters/routes differ. */
+    public InboxTask task() {
+        return new InboxTask(tenant,instanceId,applicationId,engineInstanceId,namespace,definition,version,taskPosition,iteration);
+    }
 }
