@@ -1,0 +1,9 @@
+document:
+  dsl: 1.0.1
+  namespace: portability
+  name: pause
+  version: 1.0.1
+do:
+- pause:
+    wait:
+      milliseconds: 1

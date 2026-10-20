@@ -6,6 +6,56 @@
 
 - WP-108 preparation: explicitly opt in to atomic retained effect audit provenance and original drafts; exact retry preserves source identity after uncertain commit replies. Proposed V77 guards scoped journal/source consistency and keeps legacy rows unproven. Exact2941204 passes BOTH39410266875: nine real SQL/six producer cases, core process recovery in each lane and standard3/native8 with strict checkers, zero failures/errors/skips. No central receipt, governed target/Flow activation or package promotion.
 
+- WP-103 shared model-budget preparation: retain full-ceiling per-node MODEL allowances under original leaf/actual-parent caps and enter a callback only after a known fresh commit. Add explicit non-CDI gate/proposed V79, current post-I/O checks, original deadlines/JTA/connection bounds and corrected uncertain-retry/usage documentation. Exact4bbf029/BOTH39434232554 passes24 SQL/protocol cases plus15 allocation regressions in EACH lane, contracts212/runtime344/testkit196/app343, real standard3/delegation8/core1 EACH/strict zero skips; all154 actual suite XML per lane inspected. The initial corruption-fixture trigger error is fixed without weakening its assertion. Peer/final PR/model-consumer/usage/restore gates remain; no activation or acceptance promotion.
+
+- WP-103 shared preparation: retain one immutable approved task/model allocation and original database lifetime for each canonical resource call. Add explicit non-CDI storage and proposed V78 with actual grant/parent/registry integrity and execution prerequisite; all206 contracts/three codec-preflight tests pass, and15 actual SQL cases pass EACH lane at1ae6886/BOTH39426839423 (all152 actual XML per lane inspected, provider/process/strict checks zero skips). The initial SQL-precedence failure is corrected and retained. Peer/final PR/consumer/budget/model gates remain; no provider permission or activation.
+
+- WP-103 preparation: JDK-only full-scope execution entry, separate private fence signature and exact UUID checkpoint/outcome association with one bounded canonical stored-Base64 fingerprint.189 contracts including6 new and actual pinned serializer interoperability1/application test compilation pass. No durable gate, consumer/dispatch activation or package promotion; exact peer/full/strict review follows sole #55.
+
+- GPT reviewed Claude inspector #56 at26def976 with reproducible protocol findings and actual native fresh-DB bootstrap failure; requested fixes and one-PR consolidation. Publish approved task-contract/durable model-budget sourcing decision preserving legacy/governed thread invariants, and accept audit DDL proposal4f44026 with the tested V75 integrity amendments. All consumer/runtime/peer/acceptance gates remain partial.
+
+- Exact V76 proposald489000 passed BOTH39404240486:6 actual cloned execution-schema cases plus audit-source6/binding17/group11/process1 per provider/standard3/native8/strict, zero skips and both finished logs inspected. SQL remains outside Flyway; actual one-callback/graph/audit/authority/commit-loss/recovery and exact peer gates remain open.
+
+- WP-103 backend preparation: propose V76 immutable one-entry-per-call and one-outcome association with canonical full-source checks, registry/binding-time guard and target-scoped physical UUID references. Six rollback-only cloned-schema cases compile; Linux evidence and runtime one-callback/current authority/audit/recovery gates remain open. SQL stays outside Flyway, with no dispatch or package promotion.
+
+- Exact4a45515 proposed audit-source schema passed both provider/process lanes with6 real cloned-schema SQL cases; frozen #55 passed full and both strict lanes with group SQL11/snapshot6/SDK4. All finished logs inspected, zero skips. Exact peer/activation/consumer gates remain. Pinned saver source refines UUID/serialized-text/released-error/mutable-checkpoint recovery requirements.
+
+- WP-108: #54 merged after exact Claude approval and full/strict CI. Prepare executable retained-source V75 DDL outside Flyway with complete immutable attribution/event-head FKs and six rollback-only schema cases; Linux execution and cross-owner test/consumer review precede activation. Clarify canonical attribute ordering as UTF-16 code units. WP-103 graph-inspection proposal reviewed with explicit entry/fence/UNKNOWN gates. No package/acceptance promotion.
+
+- Exact c2decc1 passed BOTH39396747028: both actual PostgreSQL task-start/completion boundary controls, binding17/SDK3/process1 per provider/standard3/native8 and strict checkers, zero skips; both logs inspected. Publish the cross-owner graph execution versus immutable outcome-readback proposal. Complete occurrence/restore/execution and final peer/integration gates remain open.
+
+- WP-103 preparation: exercise actual SDK/JPA task-start versus task-completion metadata storage, with a negative control against treating task-start success as a durable occurrence reservation. New two PostgreSQL cases compile and both full workflow fixtures validate; Linux execution and production occurrence/restore gates remain open.
+
+- Exact canonical-occurrence productb051776 passed BOTH39393353409:17 actual PostgreSQL cases including Unicode backfill and conflicting-history refusal, scope7/SDK observations3/core process1/standard3/native8, zero skips/strict checkers. Both finished logs inspected. Full producer/restore/execution and final-head peer/integration gates remain open.
+
+- WP-103 preparation: additive V74 retains one canonical call per complete business occurrence while preserving existing rc1 keys. New producer lookup recovers original attribution across changing SDK retry counters and rejects changed contracts.12 local plain cases/app compile/tools76 pass;17 actual PostgreSQL cases including upgrade/backfill/conflict await new-head Linux evidence. No dispatch or acceptance promotion.
+
+- Combined6fbb9fb passed BOTH39388831952: actual effects16/group11/binding12/interruption6/core process1/standard3/native8, zero skips/strict checks. Three later full-SDK workflow observations prove retry counters can change for the same loop index; naive scope derivation is unsafe and the durable producer remains open. All three fixtures validate against OWS1.0.3.
+
+- GPT preparation normally combines frozen #51 current interruption code with group V71/V72 and binding V73, preserving source histories.62 local plain tests/app compilation/tools76 pass; fresh combined-head SQL/provider/full/peer evidence is required. This does not merge #51 to main or activate dispatch/acceptance.
+
+- Binding-store productc63130e passed BOTH39387463567:12 new actual PostgreSQL cases, existing issuing migration5/group11, core process recovery1 and standard3/native8, zero skips and strict evidence checks. Both completed-job logs inspected. Current-head peer/full CI, ordered foundations and actual governed dispatch remain open.
+
+- WP-108 coordination: specify stable journal/outbox identity, immutable audit drafts and idempotent central projection/readback after a lost actual commit reply. This is an explicit cross-owner proposal; no outbox/projector/mandatory audit gate is implemented or acceptance promoted.
+
+- WP-103 GPT preparation: V73 and JDBC resource-call attribution atomically retain immutable invocation contracts and issuer/jti mappings, enforce full registry and exact issuing metadata, preserve historical readback and refuse unknown commit replies.23 selected plain cases/application test compilation/tools76 pass;12 new actual PostgreSQL cases await Linux execution. No credential release, dispatch, workflow401 fix or acceptance promotion.
+
+- Combined preparation on reviewed #48 and effect/process-CI foundation passed BOTH39381927960 atc1fd835: snapshots6/group SQL11/actual SDK-JPA11/receipt recovery5/restore gate5/CDI tracing3/core effect process recovery1/standard3/native8, zero skips and strict checkers. Production group selector/coordinator/execution/recovery/T13 remains open.
+
+- WP-107 preparation: derive pinned group snapshots from actual SDK listen tasks, scoped approved producer routes and explicit correlation parameters. Preserve duplicate ordinals and empty ANY arrays. Forty selected plain cases pass; full consumer/coordinator/recovery remains open. Exact V72 product4d75161 independently passed both39379015967 lanes (11 SQL cases, zero skips).
+
+- WP-107 storage hardening: additive V72 closes late membership INSERTs after selection and binds members to the original match set; readback also fails closed on changed membership. Thirty local plain cases pass; eleven SQL cases compile and await fresh CI. V71 remains unchanged.
+
+- WP-107 preparation: centrally sequenced V71 and task-fenced group selection retain configuration/deadline, ordered receipt memberships and stream/stop roles. Twenty-eight plain cases/app compile pass; ten PostgreSQL cases await CI. Selection grants no callback, checkpoint or ACK; full consumer/recovery/T13 stays open.
+
+- WP-107 preparation: framework-free listen-group identities preserve duplicate filter ordinals, data/until roles, wildcard ANY and pinned configuration. Receipt-match classification excludes stopping events from data; it grants no execution permission. All172 contract tests pass, including8 new cases; durable storage/coordinator and full acceptance remain open.
+
+- WP-107 preparation: four actual SDK full-workflow listen-group cases establish ALL order/overlap and negative controls for ANY post-completion mutation and concurrent foreach/until completion. All four fixtures validate; these observations do not close durable delivery, FIFO or T13 gates.
+
+- WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. Eight new verifier cases and all76 tooling tests pass; new product process execution still needs fresh Linux CI. No acceptance promotion.
+
+- WP-605 partial preparation: measure42 sources against released1.0.1/development1.0.3 schemas,76 export attempts (74 successes/two metadata failures) and48 pure execution observations with one pinned official development CTK case. Record export/context, fork-output and metadata-writer differences plus authoring/source and runtime-dependency limits; green reproduction is not semantic certification. Seven local assessment/control tests and all affected Linux/provider tests pass at f1dc63f (Linux39420975592/BOTH39420975752, actual XML/report inspected, zero skips); actual fork-order instability remains explicit. Full CTK, finding resolution, real authoring APIs, substitution and exact peer/final PR CI gates remain open.
+
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 
 - WP-108 preparation: refuse interrupted callers before effect/refund dispatch and after blocking ledger/cleanup work, preserving committed facts and original recovery keys. Six local interruption cases pass; four new PostgreSQL cases compile and need fresh Linux execution. This is cooperative thread handling, not complete Flow/owner/authority cancellation.
@@ -22,6 +72,12 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 [work-packages.json](docs/plan/work-packages.json).
 
 ## [Unreleased]
+
+- WP-103 shared contract preparation: immutable registry/task resource-call attribution, stable invocation keys distinct from target/request fingerprints, governed thread derivation and verified issuer/jti binding port. All170 contracts pass; backend/admission/dispatch and actual workflow success remain open.
+
+- WP-107 integration: #48 merged after exact Claude approval, independent full verification and green full/strict provider CI. Group/coordinator/FIFO/foreach/until/loop, process/partition, effect and full T13 gates remain partial.
+
+- WP-108 partial: publish an explicit effect scope/registry-owner contract that preserves existing recovery keys, plus the current authority/manual-policy/central-audit handoff. Four scope and two existing key cases pass; no effect/operator consumer or package gate is activated by the value type.
 
 - WP-108 partial: publish an explicit effect scope/registry-owner contract that preserves existing recovery keys, plus the current authority/manual-policy/central-audit handoff. Four scope and two existing key cases pass; no effect/operator consumer or package gate is activated by the value type.
 

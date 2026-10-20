@@ -1,0 +1,14 @@
+document:
+  dsl: 1.0.3
+  namespace: portability
+  name: invalid-schema-format
+  version: 1.0.0
+input:
+  schema:
+    format: 123
+    document:
+      type: object
+do:
+- copy:
+    set:
+      value: 1

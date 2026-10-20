@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: run-shell
+  version: '1.0.0'
+do:
+- invoke:
+    run:
+      shell:
+        command: echo
+        arguments:
+        - fixture-only-not-executed
+    timeout:
+      after:
+        seconds: 1

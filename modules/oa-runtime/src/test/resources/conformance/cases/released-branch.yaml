@@ -1,0 +1,22 @@
+document:
+  dsl: 1.0.1
+  namespace: portability
+  name: branch
+  version: 1.0.1
+do:
+- choose:
+    switch:
+    - first:
+        when: ${ .kind == "first" }
+        then: selected
+    - default:
+        then: fallback
+- selected:
+    do:
+    - compose:
+        set:
+          result: selected
+    then: end
+- fallback:
+    set:
+      result: fallback

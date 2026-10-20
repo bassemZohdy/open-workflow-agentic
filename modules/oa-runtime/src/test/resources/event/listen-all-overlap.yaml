@@ -1,0 +1,22 @@
+document:
+  dsl: '1.0.3'
+  namespace: agentic-test
+  name: listen-all-overlap
+  version: '1.0.0'
+  summary: Test fixture with overlapping ALL filters; one broker event matches both registrations.
+input:
+  schema:
+    format: json
+    document: { type: object }
+output:
+  schema:
+    format: json
+    document: { type: array }
+do:
+  - awaitEvents:
+      listen:
+        to:
+          all:
+            - with: { type: org.openworkflow.agentic.group.a }
+            - with: { type: org.openworkflow.agentic.group.a }
+      timeout: { after: PT30S }

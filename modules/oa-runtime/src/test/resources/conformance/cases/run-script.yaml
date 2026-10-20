@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: run-script
+  version: '1.0.0'
+do:
+- invoke:
+    run:
+      script:
+        language: js
+        code: 'return {value: 1};'
+    timeout:
+      after:
+        seconds: 1

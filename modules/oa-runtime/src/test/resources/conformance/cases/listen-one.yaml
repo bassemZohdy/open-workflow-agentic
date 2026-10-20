@@ -1,0 +1,16 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: listen-one
+  version: '1.0.0'
+do:
+- awaitEvents:
+    listen:
+      to:
+        one:
+          with:
+            type: example.approved.v1
+      read: envelope
+    timeout:
+      after:
+        seconds: 1

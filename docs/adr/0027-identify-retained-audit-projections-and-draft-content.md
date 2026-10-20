@@ -14,7 +14,7 @@ finite transition/committed source sequence independently of content. Retain ONE
 draft ULID, original microsecond time and content. Changed content for the same
 source conflicts; central chain position/hash remain separately assigned.
 Canonical draft bytes bind id/time/full actor/action/resource/selected chain/all
-sorted attributes, excluding central sealing fields. Refuse malformed text/finer
+sorted attributes, excluding central sealing fields. Attribute keys use Java String natural order: UTF-16 code-unit order, which can differ from Unicode code-point or UTF-8 byte order for supplementary characters. Other-language implementations must reproduce that exact order. Refuse malformed text/finer
 precision rather than normalizing. Existing AuditHash encoding is unchanged.
 
 This data contract does no I/O and grants no authority. GPT later retains source/
