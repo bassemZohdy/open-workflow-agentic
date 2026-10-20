@@ -86,7 +86,10 @@ class AtomicInboxCheckpointTest {
     @Test void taskLeaseExpiryIsCheckedAgainAfterWaitingForTheDeliveryRowLock() throws Exception {
         execute(Mode.TASK_DELAYED_EXPIRED);
     }
-    enum Mode { COMMIT, HANDOVER, CANCEL, TASK_HANDOVER, TASK_EXPIRED, TASK_DELAYED_EXPIRED }
+    @Test void anInTimeReservationCanCheckpointAfterItsWaitDeadlineWithTheSameLiveOwner() throws Exception {
+        execute(Mode.RESERVATION_WON_DEADLINE);
+    }
+    enum Mode { COMMIT, HANDOVER, CANCEL, TASK_HANDOVER, TASK_EXPIRED, TASK_DELAYED_EXPIRED, RESERVATION_WON_DEADLINE }
 
     private void execute(Mode mode) throws Exception {
         assertInstanceOf(InboxCheckpointJpaOperations.class,operations);
@@ -113,6 +116,10 @@ class AtomicInboxCheckpointTest {
                         new DefinitionRef("agentic/atomic-receipt-test","1.0.0"),Map.of(),"start");
                 var row = registry.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(),request,now()),"test.start").record();
                 row = move(move(row,InstanceStatus.RUNNING,instance.id()),InstanceStatus.WAITING,instance.id());
+                if(mode==Mode.RESERVATION_WON_DEADLINE) {
+                    row=registry.replace(row.successor(now(),InstanceStatus.WAITING,instance.id(),row.startAttempts(),null,now().plusSeconds(5)),
+                            row.version(),"test.original-deadline",row.owner());
+                }
                 var completed = instance.start();
                 var listening = broker.listening.get(10,TimeUnit.SECONDS);
                 var task = listening.task();
@@ -155,6 +162,10 @@ class AtomicInboxCheckpointTest {
                             try(var r=s.executeQuery()) { assertTrue(r.next()); }
                         }
                         try(var s=blocker.prepareStatement("select pg_backend_pid()");var r=s.executeQuery()) { r.next(); blockerPid=r.getInt(1); }
+                    } else if(mode==Mode.RESERVATION_WON_DEADLINE) {
+                        assertTimeoutPreemptively(Duration.ofSeconds(10),()-> {
+                            while(!deliveryExpired(wait)) Thread.sleep(10);
+                        });
                     }
                     broker.publish(CloudEventBuilder.v1().withId(message.eventId()).withSource(URI.create(message.source()))
                             .withType(message.type()).withData("application/json",message.dataJson().getBytes(StandardCharsets.UTF_8))
@@ -165,7 +176,7 @@ class AtomicInboxCheckpointTest {
                         assertTimeoutPreemptively(Duration.ofSeconds(10),()-> { while(!databaseExpired(lease)) Thread.sleep(10); });
                         blocker.commit(); blocker.close(); blocker=null;
                     }
-                    if (mode == Mode.COMMIT) {
+                    if (mode == Mode.COMMIT || mode==Mode.RESERVATION_WON_DEADLINE) {
                         next.get(15,TimeUnit.SECONDS);
                         assertFalse(completed.isDone(),"observe the committed wait before SDK workflow-completion cleanup");
                         assertTrue(QuarkusTransaction.requiringNew().call(()->em.find(CompletedTaskEntity.class,key)!=null));
@@ -206,6 +217,13 @@ class AtomicInboxCheckpointTest {
                     if (newer != null) newer.close(); claim.close();
                 }
             }
+        }
+    }
+    private boolean deliveryExpired(InboxWait wait) throws SQLException {
+        try(var c=dataSource.getConnection();var s=c.prepareStatement("select deadline<=clock_timestamp() from inbox.delivery "
+                +"where tenant=? and instance_id=? and wait_key=?")) {
+            s.setString(1,wait.tenant()); s.setString(2,wait.instanceId().value()); s.setString(3,wait.key());
+            try(var r=s.executeQuery()) { assertTrue(r.next()); return r.getBoolean(1); }
         }
     }
     private void awaitDeliveryBlock(int blockerPid) {

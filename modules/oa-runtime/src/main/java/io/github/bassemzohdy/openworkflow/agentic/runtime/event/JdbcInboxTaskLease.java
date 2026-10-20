@@ -99,7 +99,9 @@ public class JdbcInboxTaskLease {
         try {
             if(transactions.getStatus()!=Status.STATUS_ACTIVE) throw new IllegalStateException("SDK checkpoint transaction required");
             try(var c=dataSource.getConnection()) {
-                boolean active=registry(c,claim.task(),false); Row row=read(c,claim.task()); Instant now=now(c);
+                // An in-time dispatch reservation wins its wait deadline. Checkpointing still requires a live
+                // lease and non-cancelled instance, but must not retroactively reject that accepted reservation.
+                boolean active=registry(c,claim.task(),false,false); Row row=read(c,claim.task()); Instant now=now(c);
                 if(!active || !matches(row,claim) || !row.expiresAt.isAfter(now))
                     throw new IllegalStateException("checkpoint lost task ownership");
             }
@@ -116,6 +118,9 @@ public class JdbcInboxTaskLease {
         return ttl.toMillis();
     }
     private static boolean registry(Connection c,InboxTask task,boolean cleanup) throws SQLException {
+        return registry(c,task,cleanup,true);
+    }
+    private static boolean registry(Connection c,InboxTask task,boolean cleanup,boolean requireUnexpiredWait) throws SQLException {
         try(var s=c.prepareStatement("select definition_id,definition_version,engine_instance_id,status,wait_deadline "
                 +"from task.instance where tenant=? and id=? for update")) {
             s.setString(1,task.tenant()); s.setString(2,task.instanceId().value());
@@ -125,7 +130,7 @@ public class JdbcInboxTaskLease {
                     throw new IllegalStateException("task lease does not identify the pinned instance");
                 String status=r.getString(4); Timestamp deadline=r.getTimestamp(5);
                 return cleanup || (Set.of("WAITING","RUNNING").contains(status)
-                        && (deadline==null || deadline.toInstant().isAfter(now(c))));
+                        && (!requireUnexpiredWait || deadline==null || deadline.toInstant().isAfter(now(c))));
             }
         }
     }

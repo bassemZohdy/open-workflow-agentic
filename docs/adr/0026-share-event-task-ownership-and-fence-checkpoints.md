@@ -32,6 +32,9 @@ its connection is lost. A callback return is not proof of a durable checkpoint.
    holding registry -> task lease -> delivery row locks until commit. Check
    expiry again after the last blocking delivery-row lock. Lost/expired authority
    rolls back both rows and the guarded lifecycle stage stays pending.
+   An in-time committed dispatch reservation wins its wait deadline: checkpointing
+   still requires the live task lease and non-cancelled registry, but does not
+   retroactively reject that accepted reservation after its wait deadline.
 5. Record the exact task digest/owner/epoch on new immutable receipt proofs.
    Preserve V64..V67; V68 adds the lease and nullable historical proof fields.
    New markers require format2 and an explicit claim. Missing/old marker authority

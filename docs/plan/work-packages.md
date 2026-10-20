@@ -438,6 +438,7 @@ Implementation status: **partial**.
 - Implemented: Actual JPA checkpoint guard, unhealthy readiness and new-start refusal implemented at499550a; full CI39354335254 passes, including selected guarded writer/original reader and existing restart tests. This is not end-to-end inbox consumption.
 - Implemented: PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open.
 - Implemented: Exact d9b11c2 workflow39365931197 SUCCESS both lanes: lease7/7, actual SDK/JPA6/6 (including task handover, expired lease, expiry after a proven delivery-row lock wait), selection6, protocol9, cancellation2, zero skips. Source code unchanged through merged main/docs b12a713; tools68/generated checks pass. Scoped checkpoint/lease proof only: consumer, owned matching/reservation, ACK/restore/process/partition/loop/full T13 and reciprocal current-head gates remain open.
+- Implemented: Preserve reviewed reservation-wins-deadline semantics in the new task lease guard: acquire/renew check the current wait deadline; an already-reserved checkpoint checks active registry and exact live owner/epoch without retroactive wait expiry. Cancellation/lease expiry remain fenced. Seventh actual SDK/JPA case added; app test-compile passes, new execution pending. Original d9b11c2 six checkpoint/seven lease cases remain recorded as the prior scoped pass; no SQL rewritten or full T13 claim.
 
 Remaining gates:
 
