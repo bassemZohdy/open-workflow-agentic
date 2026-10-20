@@ -8,6 +8,15 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 ## [Unreleased]
 
 - WP-102 partial: add V65 immutable issuer/jti-to-grant schema with tenant binding and expiry retention. Product admission integration and native-provider lifetime compatibility remain open.
+- WP-107 partial: guard actual Flow checkpoint commits against swallowed lifecycle failures; hold failed/unknown writes, report readiness down and refuse new starts until restore. Durable inbox acknowledgement and full T13 remain open.
+
+- **WP-107 (partial):** persist normalized events before matching and record durable
+  wait signals with duplicate, expiry and cancellation checks. Durable engine
+  delivery/replay remains open; T13 is not promoted.
+- **WP-107 ingress (partial):** receive bounded structured CloudEvents through
+  verified caller, scoped policy and deployment-bound routes; preserve complete
+  canonical envelopes with audit and receipt metrics. Engine consumption remains
+  a separate durable acknowledgement gate.
 
 ### Added
 

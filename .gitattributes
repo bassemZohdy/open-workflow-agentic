@@ -1,0 +1,2 @@
+# Policy snapshot hashes cover exact UTF-8 bytes across development platforms.
+*.cedar text eol=lf

@@ -502,7 +502,8 @@
           "102a audit endpoints bind verified caller subject/kind/scopes before querying; GPT reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858 with green audit CI.",
           "Strict Keycloak consumer a20b1b2 integrated into GPT #40; both strict Java preflights and 55 tool tests pass. Combined-head full/matrix CI pending. GPT review requests H3 verified actor expiry and H4 durable exact issuer+jti-to-grant/chain binding; another equivalent active grant must not revive a revoked credential. WP-102 remains partial; skipped or historical characterization tests do not close it.",
           "Strict matrix39354646523 at665547e: standard3/3 and delegation6/6 real-provider cases pass non-skipped with matching evidence checkers; full CI39354646488 green. H3 actor expiry and H4 exact grant/chain binding still block acceptance; latest0aeb52f route inventory integrated and new combined CI required.",
-          "H3 actor-expiry bound at Claude b0e3b18: full CI39355478836/34 exchanger cases pass. V65 H4 schema provided in GPT f97f193; five direct SQL cases pass in full CI39356040766 atd05fc17. H4 product consumer is still open."
+          "H3 actor-expiry bound at Claude b0e3b18: full CI39355478836/34 exchanger cases pass. V65 H4 schema provided in GPT f97f193; five direct SQL cases pass in full CI39356040766 atd05fc17. H4 product consumer is still open.",
+          "ADR0021 H3 freshness direction selected for implementation, explicitly superseding actor-output-exp acceptance only when replacement including H4 passes. Old strict baseline remains; current #39 1abcfbd is reviewed as incompatibility evidence only, not provider acceptance."
         ],
         "completed_deliverables": [
           "OIDC for users and service identity for agents",
@@ -518,7 +519,8 @@
           "Supply KeycloakStandardIT and KeycloakDelegationIT under the Claude-owned identity test package and pass the H2 real-Java evidence matrix; missing or skipped tests do not close WP-102.",
           "Obtain exact combined-head strict matrix/full CI and independent Claude review; preserve partial status for outstanding acceptance.",
           "Integrate H4 exact issuer+jti binding consumer with expiry/tenant equality, live exact grant/ancestor checks and conflict/outage/revocation tests; V64 must integrate before V65 on main.",
-          "Native strict matrix39356040764 fails a real overlong-input response despite H3 enforcement. Prove deterministic legitimate bounded positive credentials and actual short-actor refusal, or retain provider compatibility as partial/failed; do not weaken guarantees."
+          "Implement actor freshness before request and after slow binding/audit before release, strict signed subject/grant/output bounds and independent resource exp>now/iat<=now+5s admission; resolve H4 metadata/commit/conflict/null-dependency findings and prove deterministic non-skipped native success under the amended contract. Old actor-output-exp tests are historical, not transferable passes.",
+          "Fix the supported-media route discovery probe with Claude: combined bf3e9f4 CI39358079308/matrix39358079363 fail on CloudEvents route415 from hardcoded ordinary JSON; retain401 requirement and all routes. FaultProxyPostgresTest2/2 passes."
         ],
         "evidence": [
           "docs/identity.md",
@@ -740,11 +742,25 @@
       ],
       "notes": "Kafka comes later in WP-406.",
       "progress": {
-        "status": "not-started",
-        "implemented": [],
+        "status": "partial",
+        "implemented": [
+          "JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.",
+          "Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied.",
+          "Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.",
+          "Bounded canonical envelope, audit/metrics and scoped ingress passed full CI 39352802891 at 04b421f (6 unit, 4 HTTP, 1 native policy, 9 JDBC inbox cases).",
+          "Actual JPA writer success observer and bounded fail-closed checkpoint gate implemented; unhealthy readiness/new-start refusal and 14 local unit cases pass. Current-head application binding/full CI and durable inbox acknowledgement remain open.",
+          "Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open."
+        ],
         "completed_deliverables": [],
-        "remaining_tasks": [],
-        "evidence": []
+        "remaining_tasks": [
+          "Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.",
+          "Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.",
+          "Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient."
+        ],
+        "evidence": [
+          "docs/handoffs/gpt/WP-107.md",
+          "docs/lifecycle.md"
+        ]
       }
     },
     {
@@ -777,13 +793,13 @@
         "status": "partial",
         "implemented": [
           "JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.",
-          "Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue."
+          "Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.",
+          "Reviewed99f475d merged to main at2f722cf after Claude current-head PASS and full CI39349314182; remaining package gates stay partial."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
         ],
         "remaining_tasks": [
-          "Obtain passing CI and Claude review of the current head; T03 passed in CI run 39259523945 on the initial component head.",
           "Integrate governed adapters and effect-aware Flow re-execution through the new execution boundary with WP-105/WP-113.",
           "Integrate policy-verified manual decisions and central audit projection through Claude-owned handoffs; add distributed trace spans. Low-cardinality metrics and CDI ambient-rollback tests are included."
         ],

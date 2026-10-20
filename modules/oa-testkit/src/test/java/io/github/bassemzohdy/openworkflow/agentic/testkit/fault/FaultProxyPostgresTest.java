@@ -9,8 +9,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
-import java.net.InetSocketAddress;
-import java.net.Socket;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,15 +47,10 @@ class FaultProxyPostgresTest {
 
     @Test
     void connectionsAreRefusedWhileTheProxyIsStopped() throws Exception {
-        proxy.stop();
-        // A released ephemeral port may be reused by another process on a shared CI host. Reserve our port
-        // without listening during the assertion: TCP still refuses connections, and no unrelated listener can win.
-        try (Socket reservation = new Socket()) {
-            reservation.bind(new InetSocketAddress("127.0.0.1", proxy.port()));
+        try (var stopped = StoppedProxyPort.acquire(proxy,() -> new FaultProxy("127.0.0.1",5432).start())) {
+            proxy = stopped.proxy();
             assertThrows(SQLException.class, () -> {
-                try (Connection unexpected = connect(proxy.port(), 2)) {
-                    scalar(unexpected, "select 1");
-                }
+                try (Connection unexpected = connect(proxy.port(),2)) { scalar(unexpected,"select 1"); }
             });
         }
         proxy.start();

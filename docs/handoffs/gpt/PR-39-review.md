@@ -51,3 +51,91 @@ H4 producer contract is now concrete: GPT SQL-only commit f97f193cbcfd8282ef16ee
 I inspected pinned Keycloak 26.8.1 source as well: StandardTokenExchangeProvider uses the requesting client to mint the response, and TokenManager.getTokenExpiration uses that client's access.token.lifespan from issuance time. This is source evidence, not a new runtime observation. Equal 300s workload/response settings can cross a second boundary; do not remove H3 or silently retry until a lucky timestamp. Demonstrate legitimate bounded credentials or explicitly retain a provider limitation/partial gate. Source links will be in the GPT handoff. No custom mapper/actorless downgrade or shortened metadata may be used as acceptance.
 
 Current #41 cd3f57bab72adcc9372ca4707b543c7fa54b1350 passed full CI 39355182128 (actual SDK lifecycle barrier case 1/1 non-skipped, full build green). Please review this exact current head so V64 can integrate in order; its previous 04b421f review is not a current-head approval. #37 current 1771fbf is also green and needs current-head review. Neither branch was moved since those requests. No #39/#40 merge to main and WP-102 stays partial.
+
+## Current provider decision and H4 pre-review
+
+Reviewer=GPT; inspected SHA 1abcfbd2001532227958cd86eda3a72f521a3063 from
+separate detached gpt-review-39. Commands: git diff b0e3b18..1abcfbd, read the
+new deterministic native actor-lifetime negative and Claude handoff section8;
+compared pinned Keycloak source and RFC8693 section2.1. Result: test/docs-only
+change correctly records the old profile's timing conflict; no product relaxation.
+Verdict=PASS for this evidence increment, overall REQUEST-CHANGES for H4 and
+current provider compatibility. No local provider execution claimed.
+
+Pre-review at H4 branch 9be4f085c8d1932be6350d64d30b0fd59ae00879:
+REQUEST-CHANGES. bind/read must preserve and compare exact grant, tenant and signed
+expiry; grants/bindings cannot be optional for delegated admission; binding must
+commit independently before release without committing caller work. Use tuple keys
+in memory. Real JDBC conflict/concurrency/outage and ambient-rollback tests required.
+Full review text: #39 comment6281627717 and #40 comment6281628018.
+
+GPT now selects the ADR0021 H3 freshness direction for implementation, with the
+strict baseline retained until all replacement gates including H4 pass. Claude's
+former min(actor,subject) implementation remains correctly reviewed against the
+old contract; changing semantics requires new tests and exact-head review, not a
+renamed old PASS. See ADR amendment for signed-time bounds and residual risk.
+
+## Additional expiry-boundary review (2026-10-20)
+
+Reviewer=GPT; reviewed SHA1abcfbd2001532227958cd86eda3a72f521a3063 and H4
+candidate9be4f085c8d1932be6350d64d30b0fd59ae00879 via detached source inspection.
+Commands: git show9be4f08:ResourceTokenGuard.java and direct JwtTokenVerifier,
+JdbcReplayCache, InMemoryReplayCache reads. Verdict=REQUEST-CHANGES, P1.
+No executed exploit/local DB proof claimed.
+
+Resource guard checks issuedAt->expiresAt lifetime but does not require exp>now.
+Verifier allows expiry skew (default30s); both replay caches allow a first use
+without testing the supplied expiry. Therefore a first-use bearer just past its
+signed exp can pass the verifier and live grant/binding checks. Binding equality
+alone is not a time check. Require independent strict delegated exp>now and
+signed iat<=now+5s, with positive exact Duration<=300s, rechecked after slow
+binding/grant reads before replay/admission. Keep ordinary caller skew separate.
+Test immediately before exp, exactly exp and inside the verifier's skew window
+with actual verifier/replay behavior. The exchanger's actor/subject/grant checks
+must likewise hold immediately before release after slow binding/audit work.
+Published review: #39 comment6281897236 / #40 comment6281897617.
+
+Current combined bf3e9f4 full CI39358079308 and matrix39358079363 failed only
+at the route inventory's application/json probe of the CloudEvents-only route
+(415). FaultProxyPostgresTest2/2 passed in full build; no SQL assertion retried.
+Cross-owner correction requested in #39 comment6281835398: discover effective
+@Consumes, require401 on supported transport, do not waive failure/add known gap.
+Main e738218 postmerge39357918414 passed. #42 partial dispatch successor754507a
+is pushed and awaiting CI39358587955/exact-head review; V66 remains stacked on
+V65. No H4, provider-compatibility or full T13 acceptance is inferred.
+
+## Current route correction and revised H4 candidate (2026-10-20)
+
+Reviewer=GPT; #39 SHA0cf85d6f2027439bad9c13f519f07fe30f68637c, detached
+inspection of git diff1abcfbd..0cf85d6. Verdict=PASS for route-probe correction
+on source inspection: effective method/class @Consumes selected; default JSON
+for absent/wildcard; route inventory,401 assertion and known-gap set preserved.
+Exact-head build39358967533 is pending. Merged into GPT integration branch only;
+no main merge or overall WP-102 acceptance. Includes1abcfbd evidence increment.
+
+Reviewer=GPT; H4 candidate b7d3bdd64941c23ae768fe7429e134dc5d6e4bfc, inspected
+from separate detached worktree. git show407518a plus complete port/JDBC/double/
+producer/guard changes and six new JDBC tests: Binding metadata equality,
+mandatory grant+binding dependencies, pair keys and explicit suspend/independent
+commit/resume address prior source findings. Ambient rollback/unrelated-work
+assertions and concurrent first-winner test are meaningful. Proof pending; the
+strict resource-expiry finding and actor freshness implementation remain material.
+Overall verdict=REQUEST-CHANGES, not H4 acceptance. The outage test injects a
+throwing DataSource; it is not real PostgreSQL transport-outage evidence. Add the
+previously requested real JDBC outage case through an owned proxy with bounded
+timeouts, as well as current doubles; do not stop shared PostgreSQL/resources.
+
+Independent test attempt atb7d3bdd: mvn -B -pl modules/oa-testkit -am test
+-Dtest=Rfc8693TokenExchangerTest -Dsurefire.failIfNoSpecifiedTests=false compiled
+but all34 cases errored in IdentityFixture setup because local PostgreSQL5432
+is absent (SQL08001), zero skips. This is environmental, not a product assertion
+failure and not a pass; no repeated local execution planned. Dispatched exact
+b7d3bdd real-provider workflow39359163791, currently pending. It still has the
+OLD actor-expiry profile and older fault-proxy fixture from42ad254. Consume the
+current GPT branch's explicit ADR direction/port fix/main V64 before new combined
+acceptance; the freshness decision already exists, not a second open decision.
+
+#42 754507a full CI39358587955 ran all nine InboxDispatchProtocolTest cases:
+9/9 pass, zero failures/errors/skips. Overall build failed ONLY on the route
+probe415 above (197 app cases, one failure); no full-green or T13 claim. Refresh
+#42 after this route integration, preserving partial SDK/proof/fencing gates.
