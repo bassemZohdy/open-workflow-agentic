@@ -74,3 +74,32 @@ strict baseline retained until all replacement gates including H4 pass. Claude's
 former min(actor,subject) implementation remains correctly reviewed against the
 old contract; changing semantics requires new tests and exact-head review, not a
 renamed old PASS. See ADR amendment for signed-time bounds and residual risk.
+
+## Additional expiry-boundary review (2026-10-20)
+
+Reviewer=GPT; reviewed SHA1abcfbd2001532227958cd86eda3a72f521a3063 and H4
+candidate9be4f085c8d1932be6350d64d30b0fd59ae00879 via detached source inspection.
+Commands: git show9be4f08:ResourceTokenGuard.java and direct JwtTokenVerifier,
+JdbcReplayCache, InMemoryReplayCache reads. Verdict=REQUEST-CHANGES, P1.
+No executed exploit/local DB proof claimed.
+
+Resource guard checks issuedAt->expiresAt lifetime but does not require exp>now.
+Verifier allows expiry skew (default30s); both replay caches allow a first use
+without testing the supplied expiry. Therefore a first-use bearer just past its
+signed exp can pass the verifier and live grant/binding checks. Binding equality
+alone is not a time check. Require independent strict delegated exp>now and
+signed iat<=now+5s, with positive exact Duration<=300s, rechecked after slow
+binding/grant reads before replay/admission. Keep ordinary caller skew separate.
+Test immediately before exp, exactly exp and inside the verifier's skew window
+with actual verifier/replay behavior. The exchanger's actor/subject/grant checks
+must likewise hold immediately before release after slow binding/audit work.
+Published review: #39 comment6281897236 / #40 comment6281897617.
+
+Current combined bf3e9f4 full CI39358079308 and matrix39358079363 failed only
+at the route inventory's application/json probe of the CloudEvents-only route
+(415). FaultProxyPostgresTest2/2 passed in full build; no SQL assertion retried.
+Cross-owner correction requested in #39 comment6281835398: discover effective
+@Consumes, require401 on supported transport, do not waive failure/add known gap.
+Main e738218 postmerge39357918414 passed. #42 partial dispatch successor754507a
+is pushed and awaiting CI39358587955/exact-head review; V66 remains stacked on
+V65. No H4, provider-compatibility or full T13 acceptance is inferred.
