@@ -120,6 +120,12 @@ public class JdbcInboxDispatch {
             String status = registry.status;
             var current = current(c, claim.wait);
             if (current.isEmpty() || terminal(current.get().state)) return Optional.empty();
+            // Close the proof-read/reservation gap: a checkpoint may commit after acknowledge's first read. Its
+            // writer takes these same row locks, so a fresh proof read here either wins or is fenced by our update.
+            if (current.get().state.equals("DISPATCHED")) {
+                InboxMessage prior = signal(c,claim.wait).orElseThrow(() -> new IllegalStateException("dispatch receipt absent"));
+                if (proof.consumed(claim.wait,prior)) return Optional.empty();
+            }
             if (!status.equals("WAITING")) {
                 if (!status.equals("RUNNING") && !status.equals("STARTING")) dispose(c, claim.wait, "CANCELLED");
                 return Optional.empty();
@@ -141,10 +147,11 @@ public class JdbcInboxDispatch {
             }
         });
         reserved.ifPresent(r -> record(r, "event.dispatch.attempt"));
+        if (reserved.isEmpty()) acknowledge(claim,proof);
         return reserved;
     }
 
-    /** The proof is read outside the instance transaction; cancellation is checked again under its row lock. */
+    /** The immutable atomic proof establishes that the checkpoint won its cancellation/attempt race. */
     public Acknowledgement acknowledge(Claim claim, InboxCheckpointProof proof) {
         requireClaim(claim); Objects.requireNonNull(proof);
         Optional<Reserved> pending = inClaim(claim, c -> {
@@ -156,11 +163,10 @@ public class JdbcInboxDispatch {
         if (!proof.consumed(claim.wait, pending.get().receipt)) return Acknowledgement.NO_PROOF;
         record(pending.get(), "event.checkpoint.observed");
         return inClaim(claim, c -> {
-            String status = instance(c, claim.wait).status; var row = current(c, claim.wait);
+            instance(c, claim.wait); var row = current(c, claim.wait);
             if (row.isEmpty() || !row.get().state.equals("DISPATCHED")) return Acknowledgement.NO_RESERVATION;
-            if (!status.equals("WAITING") && !status.equals("RUNNING")) {
-                dispose(c, claim.wait, "CANCELLED"); return Acknowledgement.CANCELLED;
-            }
+            // The instance may complete or be cancelled AFTER the successful checkpoint. That cannot turn actual
+            // consumption into a discard. The proof writer itself checked cancellation under this lock at commit.
             // The reservation accepted before its deadline. A delayed checkpoint acknowledgement must not extend
             // the deadline or replay into a different occurrence. The proof must identify this exact receipt.
             try (var s = c.prepareStatement("update inbox.delivery set state='ACKNOWLEDGED',acknowledged_at=clock_timestamp() "
@@ -210,7 +216,7 @@ public class JdbcInboxDispatch {
                 if (!r.next()) return Optional.empty();
                 var m = new InboxMessage(r.getString("tenant"),r.getString("source"),r.getString("event_id"),
                         r.getString("type"),wait.instanceId(),r.getString("correlation_key"),r.getString("data_json"));
-                if (!m.type().equals(wait.eventType()) || !m.correlationKey().equals(wait.key())) {
+                if (!m.type().equals(wait.eventType()) || !m.correlationKey().equals(wait.route())) {
                     throw new IllegalStateException("signal does not match immutable wait contract");
                 }
                 return Optional.of(m);

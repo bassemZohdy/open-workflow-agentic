@@ -139,3 +139,64 @@ acceptance; the freshness decision already exists, not a second open decision.
 9/9 pass, zero failures/errors/skips. Overall build failed ONLY on the route
 probe415 above (197 app cases, one failure); no full-green or T13 claim. Refresh
 #42 after this route integration, preserving partial SDK/proof/fencing gates.
+
+## New H4 time checks: e6e36aa source review
+
+Reviewer=GPT; inspected e6e36aa16817d75d76929226d3aa3b14a7769eed and af08d06
+with git show from detached gpt-review-39. Verdict=REQUEST-CHANGES overall.
+Resource own-clock exp/iat/exact-duration checks and exchanger slow-bind/grant
+regression address the earlier source findings. The final local clock check is
+still before a blocking replay.use (guard) / recheckGrant (exchanger); check the
+clock again after the last blocking call before returning authority. Add those
+latency cases. The slow-proof regression's cache.use("probe|x") checks another
+key and does not establish that the actual credential's replay use stayed unused.
+No local DB re-execution; source inspection only, no product PASS inferred.
+H3 freshness direction is already selected in ADR0021; implement before request
+and after all slow bind/audit calls at release, then supply deterministic native
+proof. GitHub requests: #39 comment6282126670, #40 comment6282127030.
+
+Exact b7d3bdd matrix39359163791 standard lane passed6 JdbcIssuedTokenBindingsTest
+and3 KeycloakStandardIT, zero skips. Delegation stopped on old stopped-port bind
+before app/provider tests; it yields no delegation result. Current GPT eae54a6
+contains the shared TCP/JDBC test allocation correction. Prior004fd9e full/matrix
+and a35e3ef full builds passed; those passes do not resolve amended identity gates.
+
+## Current #39 freshness/binding review: fc0376c
+
+Reviewer=GPT; reviewed fc0376c475e70a55d880c93c99b6d5924d5b6a52 from detached
+gpt-review-39. Commands: git diff e6e36aa..fc0376c, git showfc0376c and full
+verifyInputs/requestToken/accept/releaseCheck/guard/new test inspection. No local
+DB repetition. Verdict=REQUEST-CHANGES for two remaining ADR acceptance gaps.
+H4 metadata/mandatory dependencies/independent commit and final resource/release
+checks are addressed on inspection. Exact build39362289998/matrix39362290043
+are live; no pass inferred yet.
+
+P1: verifyInputs samples now BEFORE blocking subject/actor verification, and
+requestToken subsequently resolves a secret before http.send. Resample and enforce
+actor freshness/subject expiry immediately before http.send after verification,
+secret lookup and any final grant read. Add slow verifier and SecretProvider
+cases asserting INPUT_REJECTED and unchanged actual issuer request count; final
+release rejection alone does not satisfy pre-request freshness.
+
+P1: accept checks residual exp<=now+300s but not positive exact exp-iat<=300s or
+signed iat<=now+5s. A signed iat=now-301/exp=now+299, or future iat=now+6 with
+exp=now+120, can be returned and bound despite the ADR (guard correctly refuses
+it later). Enforce before binding/audit/release, with signed-response regressions,
+not metadata shortening or reliance on a later resource.
+
+The transport test meaningfully covers a real stalled PostgreSQL connection and
+recovery. cutConnections runs after failed calls returned, so it is not separate
+active-SQL-cut evidence. A lost commit ACK can legitimately leave an orphan
+binding while discarding the token; do not require rollback on an unknown commit.
+Published findings: #39 comment6282376227 / #40 comment6282376516. Current #35
+747ce7e remains unchanged/green and still needs Claude's exact review. Claude
+reviewed #42 2f21aaf in comment6282145103: APPROVE-WITH-COMMENTS for the partial
+protocol store, N1 required before consumer wiring (fixed on the SDK successor).
+
+Exact fc0376c matrix39362290043 SUCCESS; full build39362289998 FAILED with
+downstream lifecycle failures after the checkpoint barrier became unhealthy.
+Reviewer=GPT; `gh run view 39362289998 --log-failed` inspected, no first underlying
+writer error recorded. Verdict remains REQUEST-CHANGES; provider success cannot
+waive full-build failures. GPT is adding bounded structural first-failure logging
+and a deterministic late-cancellation/checkpoint regression on its SDK branch.
+The cancellation race is unproven pending execution; no behavior weakened.
