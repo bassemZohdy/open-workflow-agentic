@@ -159,6 +159,7 @@ The WP-006 spike measured Cedar at 387 to 525 µs p50 and 4.5 to 6 ms p99 in thr
 
 | Test class | What it covers |
 |---|---|
+| `HttpRouteDefaultDenyTest` (app) | Scans every JAX-RS route and requires 401 for an anonymous caller; one known gap (`POST /agents/research`) is asserted, not hidden |
 | `PolicyContextTest` | Context defaults, scope tokens, budget bounds, the four-argument request constructor |
 | `PolicySnapshotTest` | The documented hash layout, sensitivity of the hash, version format, immutability |
 | `ManifestPolicySnapshotSourceTest` | Directory and classpath sources, name refusal, strict UTF-8, size limits, missing keys |
