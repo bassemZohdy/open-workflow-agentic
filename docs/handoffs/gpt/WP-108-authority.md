@@ -21,6 +21,31 @@ No migration beyond V69 is allocated by this handoff.
 
 ## Cross-owner request to Claude
 
+Current interface boundary after #47/#49: Claude60c1c7f adds delegated
+ResourceTokenGuard.revalidate after policy/audit, without consuming replay
+twice. GPT acknowledges that correction. It is not merged yet and does not
+provide fresh ordinary-user/operator authority: CallerContextResolver still
+reduces direct verified claims to CallerContext without signed expiry.
+#49 ResourceCallScope/Binding is attribution data, not an authority handle.
+
+Minimal producer proposal in Claude-owned caller/identity paths: a transient
+admission handle exposing `caller()` and `requireCurrent(requiredScopes)`.
+Construct it only from verified claims/admission, retain the immutable claims
+privately, and expose no raw bearer or writable provenance flag. Ordinary user
+and manual operator paths check signed expiry again AFTER all blocking work;
+delegated paths also check the exact issuing binding/grant/ancestors and
+registered resource requirements, with no second replay admission. DEV_HEADERS
+and UNVERIFIED must refuse production effect/manual release. GPT consumes this
+only after its owned implementation and failure tests are reviewed and merged.
+The exact API names are a proposal, not an implemented dependency or permission.
+
+Required deterministic producer cases: a positive ordinary-user/operator path,
+signed expiry crossed during a blocked policy/audit/store call, exact delegated
+grant/ancestor revoked during it, and unavailable identity dependencies; every
+refusal precedes target/manual-ledger mutation. Existing delegated graph tests
+do not establish those operator/effect boundaries. The explicit manual policy
+and central-audit requests below remain distinct and still need owned producers.
+
 Please supply the following small identity/policy/audit integration in your
 reserved paths, as WP-103/WP-102 interface handoffs rather than a second owner
 of WP-108. GPT implements the effect/lifecycle/adapters/shared configuration and
@@ -80,7 +105,7 @@ failed compensation; process/partition/Flow restart with the SAME operation key.
 Central audit/tracing and complete adapter/manual/lifecycle proof remain open.
 
 The branch is preparation, with no additional active implementation PR while
-#46 is under review. WP-108 does not wait for whole WP-102 completion; it waits
+#49 awaits exact peer review. WP-108 does not wait for whole WP-102 completion; it waits
 only for the particular verified-caller/authority/policy/audit producer APIs
 needed by each exposed consumer. Existing internal ledger/T03 evidence remains
 valid for its scoped capability; this contract does not close M06/M07 or WP-108.
