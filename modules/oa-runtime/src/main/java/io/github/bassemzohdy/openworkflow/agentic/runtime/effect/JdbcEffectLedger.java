@@ -7,6 +7,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Effect;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectCommand;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectKey;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectState;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectScope;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.ManualEffect;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectLedger;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException;
@@ -14,6 +15,8 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Transactions
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.transaction.Transaction;
+import jakarta.transaction.TransactionManager;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -44,11 +47,21 @@ public class JdbcEffectLedger implements EffectLedger {
     // PostgreSQL's two-int advisory namespace is disjoint from the bigint audit/lifecycle locks.
     private static final int LOCK_CLASS = 0x4F414546; // OAEF
     private final DataSource dataSource;
+    private final EffectAuditProducer projection;
+    private final TransactionManager transactions;
 
     public record Prepared(Effect effect, boolean attempted, Instant replayUntil, Instant createdAt) { }
 
     @Inject
-    public JdbcEffectLedger(DataSource dataSource) { this.dataSource = Objects.requireNonNull(dataSource); }
+    public JdbcEffectLedger(DataSource dataSource) {
+        this.dataSource = Objects.requireNonNull(dataSource);this.projection=null;this.transactions=null;
+    }
+
+    /** Explicit opt-in producer; no CDI/Flow registration or target permission. Requires reviewed source schema. */
+    public JdbcEffectLedger(DataSource dataSource,TransactionManager transactions,EffectAuditProducer projection) {
+        this.dataSource=Objects.requireNonNull(dataSource);this.transactions=Objects.requireNonNull(transactions);
+        this.projection=Objects.requireNonNull(projection);
+    }
 
     @Override
     public Effect recordIntent(Effect intent) {
@@ -56,7 +69,7 @@ public class JdbcEffectLedger implements EffectLedger {
         if (intent.state() != EffectState.INTENDED) {
             throw new IllegalArgumentException("an intent must be INTENDED");
         }
-        return Transactions.inTransaction(dataSource, c -> insert(c, intent, null, null, "EFFECT").effect());
+        return transaction(c -> insert(c, intent, null, null, "EFFECT").effect());
     }
 
     /** Fingerprint is bound atomically on first creation and cannot be changed on recovery. */
@@ -71,7 +84,23 @@ public class JdbcEffectLedger implements EffectLedger {
         EffectKey key = command.key();
         Effect intent = new Effect(key.threadId(), key.nodeId(), key.idempotencyKey(), command.target(),
                 EffectState.INTENDED, null, now);
-        return Transactions.inTransaction(dataSource, c -> insert(c, intent, command.requestFingerprint(), until, "EFFECT"));
+        return transaction(c -> insert(c, intent, command.requestFingerprint(), until, "EFFECT"));
+    }
+
+    /**
+     * Atomically retain newly established full-owner provenance, intent/journal and original audit draft. Existing
+     * unproven legacy intents refuse instead of being backfilled. This returns DATA, never audit receipt/dispatch
+     * permission. The governed adapter still proves actual task/target, mandatory central audit and current authority.
+     */
+    public Prepared prepareScoped(EffectScope scope,EffectCommand command,Duration replayWindow,Instant now) {
+        Objects.requireNonNull(scope);Objects.requireNonNull(command);Objects.requireNonNull(replayWindow);Objects.requireNonNull(now);
+        scope.requireKey(command.key());
+        if(projection==null) throw new IllegalStateException("scoped effect audit producer is not configured");
+        if(replayWindow.isNegative() || replayWindow.compareTo(Duration.ofDays(30))>0)
+            throw new IllegalArgumentException("replay window must be between zero and 30 days");
+        Instant until=replayWindow.isZero()?null:now.plus(replayWindow);
+        var key=command.key();var intent=new Effect(key.threadId(),key.nodeId(),key.idempotencyKey(),command.target(),EffectState.INTENDED,null,now);
+        return transaction(c->{projection.lockRoot(c,scope);return insert(c,intent,command.requestFingerprint(),until,"EFFECT",new EffectAuditProducer.Origin(scope,null));});
     }
 
     /** A compensation intent and its original link commit together, before any refund can be sent. */
@@ -85,18 +114,24 @@ public class JdbcEffectLedger implements EffectLedger {
         EffectKey key = command.key();
         Effect intent = new Effect(key.threadId(), key.nodeId(), key.idempotencyKey(), command.target(),
                 EffectState.INTENDED, null, now);
-        return Transactions.inTransaction(dataSource, c -> {
+        return transaction(c -> {
             if (locked(c, original).effect().state() == EffectState.INTENDED) {
                 throw new IllegalStateException("resolve original outcome first");
             }
+            var origin=projection==null?null:projection.compensationOrigin(c,original);
             Prepared result = insert(c, intent, command.requestFingerprint(),
-                    window.isZero() ? null : now.plus(window), "COMPENSATION");
+                    window.isZero() ? null : now.plus(window), "COMPENSATION",origin);
             linkCompensation(c, original, key);
             return result;
         });
     }
 
     private Prepared insert(Connection c, Effect intent, String fingerprint, Instant replayUntil, String purpose) throws SQLException {
+        return insert(c,intent,fingerprint,replayUntil,purpose,null);
+    }
+
+    private Prepared insert(Connection c,Effect intent,String fingerprint,Instant replayUntil,String purpose,
+                            EffectAuditProducer.Origin origin) throws SQLException {
         int inserted;
         try (PreparedStatement s = c.prepareStatement("""
                 insert into effect.ledger (thread_name, node_id, idempotency_key, target, state, detail, recorded_at,
@@ -125,7 +160,13 @@ public class JdbcEffectLedger implements EffectLedger {
                 if (fingerprint != null && !fingerprint.equals(r.getString("request_fingerprint"))) {
                     throw new IllegalStateException("effect key is bound to another or unverified request");
                 }
-                if (inserted == 1) journal(c, intent.key(), null, EffectState.INTENDED, "effect.intended");
+                if(inserted==1) {
+                    var initial=journal(c,intent.key(),null,EffectState.INTENDED,"effect.intended");
+                    if(origin!=null) {
+                        projection.bindFresh(c,Objects.requireNonNull(initial),origin);
+                        projection.capture(c,initial);
+                    }
+                } else if(origin!=null) projection.requireOrigin(c,intent.key(),origin);
                 return stored;
             }
         }
@@ -137,7 +178,7 @@ public class JdbcEffectLedger implements EffectLedger {
         if (detail != null && detail.length() > Effect.MAX_DETAIL_LENGTH) {
             throw new IllegalArgumentException("effect detail is too long");
         }
-        return Transactions.inTransaction(dataSource, c -> {
+        return transaction(c -> {
             Effect current = locked(c, key).effect();
             if (current.state() == outcome) return current;
             if (!current.state().canMoveTo(outcome)) throw new IllegalStateException("illegal effect transition");
@@ -159,7 +200,7 @@ public class JdbcEffectLedger implements EffectLedger {
 
     public Optional<Effect> find(EffectKey key) {
         Objects.requireNonNull(key, "key");
-        return Transactions.inTransaction(dataSource, c -> {
+        return transaction(c -> {
             try (PreparedStatement s = c.prepareStatement(SELECT + WHERE)) {
                 bind(s, key);
                 try (ResultSet r = s.executeQuery()) { return r.next() ? Optional.of(read(r)) : Optional.empty(); }
@@ -170,7 +211,7 @@ public class JdbcEffectLedger implements EffectLedger {
     @Override
     public List<Effect> findUnresolved(ThreadId threadId) {
         Objects.requireNonNull(threadId, "threadId");
-        return Transactions.inTransaction(dataSource, c -> {
+        return transaction(c -> {
             try (PreparedStatement s = c.prepareStatement(SELECT + " where thread_name = ? and state = 'INTENDED' "
                     + "order by created_at, node_id, idempotency_key")) {
                 s.setString(1, threadId.value());
@@ -183,7 +224,7 @@ public class JdbcEffectLedger implements EffectLedger {
 
     /** Committed before dispatch. On a crash, true means a call MAY have reached the target. */
     public void markAttempted(EffectKey key) {
-        Transactions.inTransaction(dataSource, c -> {
+        transaction(c -> {
             Prepared current = locked(c, key);
             if (current.effect().state() != EffectState.INTENDED) throw new IllegalStateException("effect is resolved");
             if (!current.attempted()) {
@@ -198,7 +239,7 @@ public class JdbcEffectLedger implements EffectLedger {
 
     public void requireManualResolution(EffectKey key, String reason) {
         Checks.requireText("reason", reason, 64);
-        Transactions.inTransaction(dataSource, c -> {
+        transaction(c -> {
             Effect current = locked(c, key).effect();
             try (PreparedStatement s = c.prepareStatement("""
                     insert into effect.manual_resolution (thread_name, node_id, idempotency_key, reason)
@@ -215,7 +256,7 @@ public class JdbcEffectLedger implements EffectLedger {
     /** Bounded, thread-scoped internal queue; public operator access requires the verified caller/PEP integration. */
     public List<ManualEffect> manualQueue(ThreadId thread, int limit) {
         Objects.requireNonNull(thread, "thread"); Checks.requireInRange("limit", limit, 1, 200);
-        return Transactions.inTransaction(dataSource, c -> {
+        return transaction(c -> {
             try (PreparedStatement s = c.prepareStatement("select * from effect.manual_resolution "
                     + "where thread_name = ? and closed_at is null order by first_seen, node_id, idempotency_key limit ?")) {
                 s.setString(1, thread.value()); s.setInt(2, limit);
@@ -252,6 +293,10 @@ public class JdbcEffectLedger implements EffectLedger {
 
     /** Session lock, not a network-spanning transaction. Competing workers fail without waiting. */
     public <T> T exclusively(EffectKey key, Supplier<T> work) {
+        return isolated(()->claim(key,work));
+    }
+
+    private <T> T claim(EffectKey key,Supplier<T> work) {
         byte[] digest = java.util.HexFormat.of().parseHex(CanonicalEncoder.sha256Hex(
                 new CanonicalEncoder("oa.effect.lock.v1").text(key.threadId().value())
                         .text(key.nodeId()).text(key.idempotencyKey()).toBytes()));
@@ -312,14 +357,34 @@ public class JdbcEffectLedger implements EffectLedger {
         s.setString(offset + 2, key.idempotencyKey());
     }
 
-    private static void journal(Connection c, EffectKey key, EffectState from, EffectState to, String reason)
+    private EffectAuditProducer.Fact journal(Connection c, EffectKey key, EffectState from, EffectState to, String reason)
             throws SQLException {
+        EffectAuditProducer.Fact fact;
         try (PreparedStatement s = c.prepareStatement("""
                 insert into effect.event (thread_name, node_id, idempotency_key, from_state, to_state, reason)
                 values (?, ?, ?, ?, ?, ?)
-                """)) {
+                """+(projection==null?"":" returning id,occurred_at"))) {
             bind(s, key); s.setString(4, from == null ? null : from.name());
-            s.setString(5, to.name()); s.setString(6, reason); s.executeUpdate();
+            s.setString(5, to.name()); s.setString(6, reason);
+            if(projection==null){s.executeUpdate();return null;}
+            try(var r=s.executeQuery()) {
+                r.next();fact=new EffectAuditProducer.Fact(r.getLong(1),r.getTimestamp(2).toInstant(),key,from,to,reason);
+            }
+        }
+        projection.capture(c,fact);return fact;
+    }
+
+    private <T> T transaction(Transactions.Work<T> work) {
+        return isolated(()->Transactions.inTransaction(dataSource,work));
+    }
+    private <T> T isolated(Supplier<T> work) {
+        if(projection==null)return work.get(); // Existing legacy/CDI behavior remains unchanged.
+        Transaction suspended;
+        try{suspended=transactions.suspend();}catch(Exception failed){throw new StoreUnavailableException("caller transaction cannot be suspended",failed);}
+        try{return work.get();}
+        finally {
+            if(suspended!=null)try{transactions.resume(suspended);}
+            catch(Exception failed){throw new StoreUnavailableException("caller transaction cannot be resumed",failed);}
         }
     }
 }

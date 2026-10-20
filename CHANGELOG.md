@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-108 preparation: explicitly opt in to atomic retained effect audit provenance and original drafts; exact retry preserves source identity after uncertain commit replies. Proposed V77 guards scoped journal/source consistency and keeps legacy rows unproven. Six producer units pass; nine real SQL cases compile pending Linux execution. No central receipt, governed target/Flow activation or package promotion.
+
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 
 - WP-108 preparation: refuse interrupted callers before effect/refund dispatch and after blocking ledger/cleanup work, preserving committed facts and original recovery keys. Six local interruption cases pass; four new PostgreSQL cases compile and need fresh Linux execution. This is cooperative thread handling, not complete Flow/owner/authority cancellation.
