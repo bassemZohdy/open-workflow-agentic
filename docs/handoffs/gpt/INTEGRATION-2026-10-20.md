@@ -112,3 +112,26 @@ policy/binding review request and native-platform finding are in the #41 comment
 and docs/handoffs/gpt/WP-107.md. Durable Flow wait identity/restore/acknowledgement,
 cancellation-after-match and full T13 remain required; no mere in-memory
 publisher result is substituted for that goal.
+
+## Current ingress verification gate
+
+Current #41 head 04b421f follows cb32873 and 34aa94a. At cb32873, Actions
+39352107167 passed all four new HTTP cases, five parser/service cases and nine
+inbox DB cases, but the full reactor failed later from Cedar native static TLS
+exhaustion across Quarkus profiles; a native policy and outbox boot failed and
+later cases skipped. This is a failed build, not partial evidence of a green head.
+
+Startup binding validation is now independent of native PEP initialization, so
+unused ingress profiles do not initialize another Cedar library. A sixth local
+unit case passes and ensures configuration still validates without reading the
+policy folder. The current head also checks producer identity/source/type/wait
+bindings before target lookup, returns indistinguishable 404 for absent or
+unapproved-definition targets, and tests a separately approved producer in a
+second tenant. No native/HTTP case is disabled and current-head CI is required.
+
+Proposed ADR 0025 on this branch records actual SDK evidence: lifecycle listener
+failures can be swallowed, so later listener priority is not checkpoint success.
+The next delivery implementation must use writer-commit evidence or a verified
+persistent checkpoint, preserve loop/parallel identities and cancellation rules,
+and prove restart plus failed compensation. These remain GPT work, not a claim
+that the HTTP/storage increment completes WP-107 or T13.

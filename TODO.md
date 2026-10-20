@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-2026-10-20: Claude PASS records cover plan 1e70464 and effects ca5c239; current commits still need explicit review. GPT resolved WP-108 feedback at 99f475d with green CI 39349314182. GPT scoped PASS covers Claude #39 at 28f6e9b. Combined #40 at a4ac085 has green build and two non-skipped real Keycloak characterization profiles; missing strict consumer tests keep WP-102 partial. WP-107 storage at 8a3a4ca passed full CI 39350891965 with all nine PostgreSQL cases. Current draft #41 cb32873 adds structured authenticated/audited CloudEvents ingress with deployment-bound producer routes and enabled HTTP/native-policy CI tests; durable engine consumption and complete T13 remain open. .gitattributes belongs to GPT build ownership. Nothing is merged to main.
+2026-10-20: Claude PASS records cover plan 1e70464 and effects ca5c239; actual current commits still need review. GPT resolved WP-108 feedback at 99f475d with green CI 39349314182 and scoped PASS covers unchanged Claude #39 at 28f6e9b. #40 a4ac085 has green build and two real Keycloak characterization passes, but missing strict consumer tests keep WP-102 partial. WP-107 storage 8a3a4ca passed full CI 39350891965. Current #41 04b421f adds authorized/audited structured ingress, with six local unit cases passing; full CI must verify privacy ordering and lazy native initialization after cb32873 hit native TLS exhaustion late in the suite. Proposed ADR 0025 requires actual checkpoint success before consumption acknowledgement; delivery/restart and complete T13 remain open. Nothing is merged to main.
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-19).
 
