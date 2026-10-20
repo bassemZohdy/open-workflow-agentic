@@ -13,11 +13,11 @@ removed; no branch in use was switched and no force-push occurred.
 
 | PR | Commit / review state | Gate |
 |---|---|---|
-| #35 / #37 plan | R1-R3 ownership and interface corrections continue to apply; amended plan needs Claude pass | Do not infer approval from the original request-changes |
-| #38 WP-108 | 99f475da7d1f57fc9226a1c40066accdc3629f9c, earlier Claude request-changes was on 222897e | New exact-head Claude pass and CI; partial integration gates stay open |
+| #35 / #37 plan | Claude PASS explicitly covers 1e70464; R1-R3 resolved; later tracking-only current commit needs explicit review | Do not infer approval from the original request-changes |
+| #38 WP-108 | 99f475da7d1f57fc9226a1c40066accdc3629f9c; green full CI 39349314182; Claude PASS explicitly covers older ca5c239 | New exact-head Claude pass; partial integration gates stay open |
 | #39 Claude WP-102 | reviewer=GPT, 28f6e9bcced23fd865a1bd559508175eab8b6858, scoped PASS | Audit increment CI 39262137012 green; Keycloak 10/10 skipped, not provider proof |
-| #40 integration | a4ac085bae94289d15a27b3a900152a2b823e5a2 incorporates reviewed #39 | Claude strict H1 tests/product fixes, exact-head pass and complete CI; WP-102 partial |
-| #41 WP-107 | 63dcab3 storage increment, stacked on #38 | CI and Claude review, HTTP/wait-adapter/restart/T13 gates remain open |
+| #40 integration | a4ac085bae94289d15a27b3a900152a2b823e5a2 incorporates reviewed #39 | Build 39349362871 and both characterization profiles in 39349362972 green; strict classes missing; current-head Claude pass still required; WP-102 partial |
+| #41 WP-107 | 8a3a4cac1803a05554e2b4ae26ea9f134a08a114 storage increment, stacked on #38 | CI and Claude review, HTTP/wait-adapter/restart/T13 gates remain open |
 
 ## Explicit handoffs
 
@@ -56,3 +56,39 @@ from JSON. No merge to main has occurred during this checkpoint.
 Local Java is 25 compiling release 21; CI uses Java 21. The local Docker daemon
 is unavailable and PostgreSQL is not installed. No local database run is
 claimed. CI outcomes and any newer review supersede this dated checkpoint.
+
+## Latest evidence and review audit
+
+Reviewer=Claude explicitly recorded PASS for plan 1e70464ae1adb9e9ee3f1578392293637c0c84e7
+(59 Python tests, generated/diff checks, green CI) and effects
+ca5c2394edfc66f909e3feb85f844d4d087da75a (full Maven verify, 10 effect service +
+4 ledger + 1 process T03 cases and two independent orphan probes). The effect
+review is attached by GitHub to 99f475d, but its body and commands explicitly
+name ca5c239. GPT does not treat the attachment as approval of later code.
+Both PASS records supersede earlier material findings at their reviewed SHAs;
+new-head review requests are posted on #37/#38. N2 is already implemented by
+queue-derived Start here bullets; N4 remains non-blocking validator hardening.
+
+Independent log review for actual #38 head 99f475d: Actions 39349314182 full
+Maven verify, 12 DurableEffectsTest + 4 JdbcEffectLedgerTest + 1 process-death
+T03, no failures/errors/skips; acceptance/tracking and 49 Python checks green.
+
+Actual #40 head a4ac085: build 39349362871 is green. In matrix run 39349362972,
+standard 26.2.5 and delegation 26.8.1 characterization each passed all ten real
+KeycloakInteropIT cases with no skips, including the report checker. The two
+separate strict contract jobs failed preflight for missing Claude-owned
+KeycloakStandardIT/KeycloakDelegationIT classes. These passes prove known
+behavior only, including issuer limitations; no provider closure is inferred.
+
+#41 first CI 39349730452 failed all nine cases in fixture setup because the
+definition reference lacked namespace/name. Corrected 66aa697 uses
+agentic/inbox-test and adds an actual PostgreSQL lock-wait observation for the
+cancel race. CI 39350186941 then failed fixture timestamp precision against the registry
+identity guard. Current 8a3a4ca uses the existing lifecycle test microsecond
+precision; full CI 39350891965 is pending. No database pass is yet claimed. Only this session's superseded 253986c run was cancelled. No other
+session's files or containers were removed.
+
+Integration order: #37 targets #35, so combine approved corrections there and
+review/check the resulting actual #35 head before its merge to main. Merge
+#38 before the stacked V64 inbox change; recheck migration allocation. Do not
+merge any GPT branch based only on the older review records above.
