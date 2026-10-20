@@ -104,8 +104,8 @@ manual decisions; duplicate/lost decision replies; unknown target outcome;
 failed compensation; process/partition/Flow restart with the SAME operation key.
 Central audit/tracing and complete adapter/manual/lifecycle proof remain open.
 
-The branch is preparation, with no additional active implementation PR while
-#49 awaits exact peer review. WP-108 does not wait for whole WP-102 completion; it waits
+Current implementation PR #51 follows merged #49 and still requires exact peer
+review and CI. WP-108 does not wait for whole WP-102 completion; it waits
 only for the particular verified-caller/authority/policy/audit producer APIs
 needed by each exposed consumer. Existing internal ledger/T03 evidence remains
 valid for its scoped capability; this contract does not close M06/M07 or WP-108.

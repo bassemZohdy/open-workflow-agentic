@@ -1,7 +1,7 @@
 # WP-108: require process recovery beside real provider tests
 
 Owner: GPT (build/CI/effect execution). Reviewer: Claude. Preparation on
-gpt/WP-108-effect-authority; #49 remains the sole GPT implementation PR.
+gpt/WP-108-effect-authority, now current implementation PR #51 after #49 merged.
 
 The previous manual keycloak-interop matrix selected only its real provider
 IT, so it could not prove EffectCrashRecoveryIT against newly prepared V70
@@ -54,5 +54,5 @@ Claude review; later code changes need their own execution.
 The required live current-authority, manual OPERATION/oa.recover, exact central
 audit, governed adapter/Flow retry, old-owner/partition and complete distributed
 tracing gates remain in WP-108-authority.md/WP-108-tracing.md. Bindings/migration
-allocation and Claude's code are unchanged. Do not merge this preparation while
-#49 is active; its final PR still needs exact Claude review and full CI.
+allocation and Claude's code are unchanged. Current #51 still needs exact
+Claude review and full/provider/process CI before GPT merges it.

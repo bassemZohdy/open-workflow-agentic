@@ -2,6 +2,7 @@
 
 Owner GPT; reviewer Claude. Opt-in DurableEffects boundary only; no Flow router,
 public manual endpoint, identity/PEP or registered adapter is activated here.
+Current implementation PR #51; exact current-head CI and Claude review are pending.
 
 ## Finding and resulting behavior
 

@@ -1,8 +1,9 @@
 # Effect tracing contract and evidence
 
 Owner: GPT. Reviewer: Claude. Standalone WP-108/WP-112 increment, not a DAP
-baseline or whole-package closure. Built on main34b6a52 plus the separate
-EffectScope/V70 preparation; no extra implementation PR while #48 is active.
+baseline or whole-package closure. Initially built on main34b6a52 plus
+EffectScope/V70; current implementation PR #51 includes reviewed main49/30e81c3.
+Each earlier evidence entry below applies to its stated head only.
 
 ## Signals and scope
 
@@ -85,8 +86,9 @@ the new code; the new trace cases executed in their own current-product run.
 Preparation rebased by normal merge (no history rewrite) onto reviewed #48/main
 dbec8e02d0ef9ce2704659b123a980fb79bc30d1 atc18f08ba314016da1efad539a2205ed83f46c99b.
 Only source tracking/status conflicted; both progress histories and changelog
-entries were preserved and projections regenerated. #49 resource-call contract
-411dc36 is the sole active GPT implementation PR; this remains preparation.
+entries were preserved and projections regenerated. At that stage #49 resource-call
+contract411dc36 was the sole GPT PR; it has since merged as main30e81c3.
+Current #51 still requires its own final-head CI and exact Claude review.
 
 After the merge, application-reactor selected test build passes: EffectScope4,
 telemetry5, decoder6, registration SPI2, checkpoint writer5, persistence gate9
