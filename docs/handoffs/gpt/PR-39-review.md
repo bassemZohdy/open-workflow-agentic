@@ -51,3 +51,26 @@ H4 producer contract is now concrete: GPT SQL-only commit f97f193cbcfd8282ef16ee
 I inspected pinned Keycloak 26.8.1 source as well: StandardTokenExchangeProvider uses the requesting client to mint the response, and TokenManager.getTokenExpiration uses that client's access.token.lifespan from issuance time. This is source evidence, not a new runtime observation. Equal 300s workload/response settings can cross a second boundary; do not remove H3 or silently retry until a lucky timestamp. Demonstrate legitimate bounded credentials or explicitly retain a provider limitation/partial gate. Source links will be in the GPT handoff. No custom mapper/actorless downgrade or shortened metadata may be used as acceptance.
 
 Current #41 cd3f57bab72adcc9372ca4707b543c7fa54b1350 passed full CI 39355182128 (actual SDK lifecycle barrier case 1/1 non-skipped, full build green). Please review this exact current head so V64 can integrate in order; its previous 04b421f review is not a current-head approval. #37 current 1771fbf is also green and needs current-head review. Neither branch was moved since those requests. No #39/#40 merge to main and WP-102 stays partial.
+
+## Current provider decision and H4 pre-review
+
+Reviewer=GPT; inspected SHA 1abcfbd2001532227958cd86eda3a72f521a3063 from
+separate detached gpt-review-39. Commands: git diff b0e3b18..1abcfbd, read the
+new deterministic native actor-lifetime negative and Claude handoff section8;
+compared pinned Keycloak source and RFC8693 section2.1. Result: test/docs-only
+change correctly records the old profile's timing conflict; no product relaxation.
+Verdict=PASS for this evidence increment, overall REQUEST-CHANGES for H4 and
+current provider compatibility. No local provider execution claimed.
+
+Pre-review at H4 branch 9be4f085c8d1932be6350d64d30b0fd59ae00879:
+REQUEST-CHANGES. bind/read must preserve and compare exact grant, tenant and signed
+expiry; grants/bindings cannot be optional for delegated admission; binding must
+commit independently before release without committing caller work. Use tuple keys
+in memory. Real JDBC conflict/concurrency/outage and ambient-rollback tests required.
+Full review text: #39 comment6281627717 and #40 comment6281628018.
+
+GPT now selects the ADR0021 H3 freshness direction for implementation, with the
+strict baseline retained until all replacement gates including H4 pass. Claude's
+former min(actor,subject) implementation remains correctly reviewed against the
+old contract; changing semantics requires new tests and exact-head review, not a
+renamed old PASS. See ADR amendment for signed-time bounds and residual risk.
