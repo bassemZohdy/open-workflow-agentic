@@ -75,7 +75,7 @@ class LateCancelledCheckpointTest {
                             if(event.taskContext().taskName().equals("performEffect")) next.complete(null);
                         }
                     }).build()) {
-                var definition=app.workflowDefinition(WorkflowReader.readWorkflowFromClasspath("event/atomic-receipt.yaml"));
+                var definition=app.workflowDefinition(WorkflowReader.readWorkflowFromClasspath("lifecycle/cancel-checkpoint.yaml"));
                 var instance=definition.instance(Map.of()); instance.start();
                 broker.registered.get(10,TimeUnit.SECONDS);
                 broker.publish(CloudEventBuilder.v1().withId("late").withSource(URI.create("urn:test:late-checkpoint"))
