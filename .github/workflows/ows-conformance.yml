@@ -10,7 +10,7 @@ on:
       - 'apps/app-runtime/src/main/resources/flow/**'
       - 'docs/conformance/**'
   push:
-    branches: [main]
+    branches: [main, 'gpt/**', 'claude/**']
     paths:
       - '.github/workflows/ows-conformance.yml'
       - 'pom.xml'
@@ -34,7 +34,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ows-1.0.3-assessment
+          name: ows-portability-assessment
           path: |
             modules/oa-runtime/target/conformance/
             modules/oa-runtime/target/surefire-reports/*OwsConformanceTest*

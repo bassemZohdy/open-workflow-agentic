@@ -1,13 +1,17 @@
-# OWS 1.0.3 assessment
+# OWS portability assessment
 
 This is an executable portability assessment of the pinned Java SDK, not a full
 conformance certificate or a product authoring/import/export API. WP-605, H01 and
-H02 remain partial. The checked-in [report](ows-1.0.3-report.json) records findings,
+H02 remain partial. The checked-in [report](ows-portability-report.json) records findings,
 including divergences. A green test means the assessment reproduced those facts;
 it does not turn a divergence into a supported feature.
 
 The profile pins Quarkus Flow1.2.0 / Java SDK7.35.3.Final and normative OWS schema
-1.0.3 at specification commit2dd2c84170d5f3e05d58e913e9ca298dcf8d543a. The schema
+1.0.3 DEVELOPMENT profile at specification commit2dd2c84170d5f3e05d58e913e9ca298dcf8d543a.
+The official latest-release API observed2026-10-20 returns [v1.0.1](https://github.com/open-workflow-specification/specification/releases/tag/v1.0.1),
+published2026-07-31. A separate released1.0.1 schema at commitf43a6e3cfb97a724d4b434b0ecc769379af379e9
+is checked for every source and export too. This does not label development1.0.3
+as a published release or infer released-runtime semantic support. Both schemas
 and one official CTK feature are copied under Apache-2.0 with source hashes,
 NOTICE and license in the test resources. No engine/platform version is upgraded.
 
@@ -17,7 +21,7 @@ Run from the repository root:
 mvn -B -pl modules/oa-runtime -am test '-Dtest=OwsConformanceTest' '-Dsurefire.failIfNoSpecifiedTests=false'
 ```
 
-Generated actual report, JSON/YAML model exports and outputs of the eight curated
+Generated actual report, JSON/YAML model exports and outputs of the sixteen curated
 pure fixtures are in modules/oa-runtime/target/conformance. The dedicated
 ows-conformance workflow retains them. An intentional reassessment uses the same
 command with -Dows.updateReport=true, then reviews the changed report and findings.
@@ -30,10 +34,10 @@ only the actual SDK reader/writer APIs, not an alternative hand-written model.
 
 | Evidence | Current result |
 |---|---|
-| 34 sources: authored corpus, one extracted official CTK case, two shipped definitions | 31 pass pinned schema, three deliberate schema-negative controls fail |
-| Actual default/validating SDK imports | 30 accepted; the three negative controls and a schema-valid unknown-root-field case rejected |
-| JSON and YAML export/reimport of the 30 imported models | 60 exports; no authored data field removed or changed in these fixtures; SDK fields are added in21 cases |
-| Eight pure fixtures, each as source/JSON export/YAML export | 24 actual executions:15 match, nine differ from the declared expectation |
+| 42 sources: authored corpus, one extracted development CTK case, released-declared variants, two shipped definitions | 39 pass development1.0.3 schema;36 pass released1.0.1 schema. Three deliberate negative controls remain. |
+| Actual default/validating SDK imports | 38 accepted; the three negative controls and a schema-valid unknown-root-field case rejected |
+| JSON and YAML export/reimport of the 38 imported models | 76 attempts,74 serialized successfully; two nested-metadata writer failures remain explicit. Successful exports do not remove/change authored data fields in this corpus. |
+| Eight pure fixtures plus eight released-declared variants, each as source/JSON/YAML | 48 actual executions:30 match,18 differ from the same explicitly declared expectations |
 | Selected official For CTK case | Matches original upstream input/output in all three forms; hash and extraction independently checked |
 | Lexical source preservation | Serialization changes source text; comments/anchors are not a source-preserving editing format |
 
@@ -58,11 +62,17 @@ retained in generated execution artifacts.
    outputs [{side:left},{side:right}]. The normative [fork description](https://github.com/open-workflow-specification/specification/blob/2dd2c84170d5f3e05d58e913e9ca298dcf8d543a/dsl-reference.md#fork)
    describes an ordered array of branch outputs. Keep this interpretation visible
    and resolve it before promising that output contract across runtimes.
-3. **Schema/model boundary:** an unknown root field is accepted by the pinned
+3. **Nested metadata serialization:** JSON and YAML writes of nested task
+   metadata both fail with JsonMappingException/JsonGenerationException. The
+   actual serializer is Quarkus Flow TaskMetadataSerializer, not an alternative
+   handwritten exporter. The baseline always contained these failures; the first
+   human summary incorrectly counted attempts as successful exports, now corrected.
+   No fixture/value is removed to mask the failure.
+4. **Schema/model boundary:** an unknown root field is accepted by the pinned
    schema but rejected by the SDK model. An arbitrary string schema format passes
    both import stages; runtime support for that format is not established. JSON
    Schema acceptance alone is not full DSL or executable-provider conformance.
-4. **Authoring loss:** model exports are data artifacts. The shipped YAML comments
+5. **Authoring loss:** model exports are data artifacts. The shipped YAML comments
    and the comment/alias fixture are not reproduced as source text. Preserve
    original authored source separately in a future authoring/import/export service.
 
@@ -93,3 +103,12 @@ Remaining work includes the complete official CTK (including provider/event/
 fault semantics), confirmed finding resolution, actual authoring/import/export
 API/source retention and a second-runtime/provider/artifact substitution run.
 No package or acceptance status is promoted by this bounded measurement.
+
+The released-declared execution variants change ONLY document.dsl and
+document.version to1.0.1, retaining the same tasks/input/expected results. A test
+checks that derivation. They are comparisons on the pinned stack, not the complete
+released CTK or a claim that development-text interpretations are all settled.
+Three extra development-valid shapes fail the released schema: the emit URI,
+gRPC host and shell argument forms in this corpus. Protocol execution remains
+unmeasured. The report includes the actual host metadata serializer class so
+stack-specific behavior is not misattributed to a bare upstream SDK.

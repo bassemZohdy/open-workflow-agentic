@@ -1,5 +1,5 @@
 {
-  "profile": "1.0.3",
+  "profile": "released-1.0.1-and-development-1.0.3",
   "specCommit": "2dd2c84170d5f3e05d58e913e9ca298dcf8d543a",
   "schemaSha256": "704ef5e91c5d823167dd8751794edb1dd1a6f9a3bdf9bfd389bf9c6b23ae3816",
   "sdkVersion": "7.35.3.Final",
@@ -409,6 +409,183 @@
         "comments"
       ],
       "schemaExpected": "VALID"
+    },
+    {
+      "id": "released-dataflow",
+      "source": "cases/released-dataflow.yaml",
+      "features": [
+        "released-1.0.1",
+        "set",
+        "input.from",
+        "output.as",
+        "export.as",
+        "if"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "dataflow",
+      "execution": {
+        "input": {
+          "payload": {
+            "value": 41
+          }
+        },
+        "expected": {
+          "answer": 42,
+          "observed": 42
+        }
+      }
+    },
+    {
+      "id": "released-branch",
+      "source": "cases/released-branch.yaml",
+      "features": [
+        "released-1.0.1",
+        "do",
+        "switch",
+        "then"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "branch",
+      "execution": {
+        "input": {
+          "kind": "first"
+        },
+        "expected": {
+          "result": "selected"
+        }
+      }
+    },
+    {
+      "id": "released-iteration",
+      "source": "cases/released-iteration.yaml",
+      "features": [
+        "released-1.0.1",
+        "for",
+        "for.at"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "iteration",
+      "execution": {
+        "input": {
+          "items": [
+            2,
+            3
+          ]
+        },
+        "expected": {
+          "value": 6,
+          "position": 1
+        }
+      }
+    },
+    {
+      "id": "released-parallel",
+      "source": "cases/released-parallel.yaml",
+      "features": [
+        "released-1.0.1",
+        "fork"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "parallel",
+      "execution": {
+        "input": {},
+        "expected": [
+          {
+            "side": "left"
+          },
+          {
+            "side": "right"
+          }
+        ]
+      }
+    },
+    {
+      "id": "released-pause",
+      "source": "cases/released-pause.yaml",
+      "features": [
+        "released-1.0.1",
+        "wait"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "pause",
+      "execution": {
+        "input": {
+          "token": "same"
+        },
+        "expected": {
+          "token": "same"
+        }
+      }
+    },
+    {
+      "id": "released-catch-error",
+      "source": "cases/released-catch-error.yaml",
+      "features": [
+        "released-1.0.1",
+        "try",
+        "raise",
+        "catch"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "catch-error",
+      "execution": {
+        "input": {},
+        "expected": {
+          "handled": true
+        }
+      }
+    },
+    {
+      "id": "released-ctk-for",
+      "source": "cases/released-ctk-for.yaml",
+      "features": [
+        "released-1.0.1",
+        "upstream-ctk",
+        "for"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "ctk-for",
+      "execution": {
+        "input": {
+          "colors": [
+            "red",
+            "green",
+            "blue"
+          ]
+        },
+        "expected": {
+          "processed": {
+            "colors": [
+              "red",
+              "green",
+              "blue"
+            ],
+            "indexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "released-export-context",
+      "source": "cases/released-export-context.yaml",
+      "features": [
+        "released-1.0.1",
+        "export.as",
+        "output.as",
+        "context-reduction"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "export-context",
+      "execution": {
+        "input": {},
+        "expected": {
+          "observed": 42
+        }
+      }
     }
   ]
 }

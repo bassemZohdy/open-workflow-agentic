@@ -1,0 +1,19 @@
+document:
+  dsl: 1.0.1
+  namespace: portability
+  name: dataflow
+  version: 1.0.1
+input:
+  from: ${ .payload }
+do:
+- assemble:
+    set:
+      value: ${ .value + 1 }
+    export:
+      as: '${ { observed: .value } }'
+- skip:
+    if: ${ false }
+    set:
+      value: 0
+output:
+  as: '${ { answer: .value, observed: $context.observed } }'

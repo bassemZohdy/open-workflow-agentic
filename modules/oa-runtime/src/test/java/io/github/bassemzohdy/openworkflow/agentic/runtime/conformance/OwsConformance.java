@@ -8,7 +8,6 @@ import io.serverlessworkflow.api.*;
 import io.serverlessworkflow.api.types.Workflow;
 import io.serverlessworkflow.impl.WorkflowApplication;
 import java.io.*;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.*;
@@ -19,17 +18,24 @@ import java.util.concurrent.TimeUnit;
 final class OwsConformance {
     static final ObjectMapper JSON=new ObjectMapper();
     static final ObjectMapper YAML=WorkflowFormat.YAML.mapper().copy().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
-    static final Set<String> PURE=Set.of("dataflow","branch","iteration","parallel","pause","catch-error","ctk-for","export-context");
+    static final Set<String> PURE_CORE=Set.of("dataflow","branch","iteration","parallel","pause","catch-error","ctk-for","export-context");
+    static final Set<String> PURE=java.util.stream.Stream.concat(PURE_CORE.stream(),PURE_CORE.stream().map(x->"released-"+x)).collect(java.util.stream.Collectors.toUnmodifiableSet());
     static final String SCHEMA_SHA="704ef5e91c5d823167dd8751794edb1dd1a6f9a3bdf9bfd389bf9c6b23ae3816";
+    static final String RELEASED_SCHEMA_SHA="67e328b71ada0516f64ad876a53c2a73eaf102e82d32d0052e6f118c8eeda9eb";
     final Path repository;
     final JsonNode manifest;
     final Schema schema;
+    final Schema releasedSchema;
     OwsConformance(Path repository) throws Exception {
         this.repository=repository.toAbsolutePath().normalize();manifest=JSON.readTree(resource("cases.json"));
         String pinned=resource("schema/workflow-1.0.3.yaml");
         if(!SCHEMA_SHA.equals(sha(pinned)))throw new IllegalStateException("pinned normative schema changed");
         schema=SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12,b->b.schemaRegistryConfig(
                 SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build())).getSchema(JSON.writeValueAsString(YAML.readTree(pinned)));
+        String released=resource("schema/workflow-1.0.1.yaml");
+        if(!RELEASED_SCHEMA_SHA.equals(sha(released)))throw new IllegalStateException("pinned released schema changed");
+        releasedSchema=SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12,b->b.schemaRegistryConfig(
+                SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build())).getSchema(JSON.writeValueAsString(YAML.readTree(released)));
         var properties=new Properties();
         try(var in=WorkflowReader.class.getResourceAsStream("/META-INF/maven/io.serverlessworkflow/serverlessworkflow-api/pom.properties")) {
             if(in==null)throw new IllegalStateException("actual SDK version missing");properties.load(in);
@@ -47,12 +53,33 @@ final class OwsConformance {
         catch(NoSuchAlgorithmException unavailable){throw new IllegalStateException(unavailable);}
     }
     ObjectNode assess() throws Exception {
-        var report=JSON.createObjectNode();report.put("profile","OWS-1.0.3-assessment");report.put("sdkVersion",manifest.path("sdkVersion").asText());
+        var report=JSON.createObjectNode();report.put("profile","OWS-pinned-portability-assessment");report.put("sdkVersion",manifest.path("sdkVersion").asText());
         report.put("specCommit",manifest.path("specCommit").asText());report.put("schemaSha256",SCHEMA_SHA);
         report.put("scope","schema/model roundtrip; selected pure executions only; not full semantic conformance or product import/export");
         report.put("fullSemanticConformance","NOT_ESTABLISHED");
+        report.put("serializationStack","SDK public APIs with Quarkus Flow classpath modules");
+        report.put("metadataSerializerClass",WorkflowFormat.JSON.mapper().getSerializerProviderInstance()
+                .findValueSerializer(io.serverlessworkflow.api.types.TaskMetadata.class).getClass().getName());
+        report.put("developmentSchemaVersion","1.0.3");
+        report.putObject("releasedBaseline").put("version","1.0.1").put("specCommit","f43a6e3cfb97a724d4b434b0ecc769379af379e9")
+                .put("schemaSha256",RELEASED_SCHEMA_SHA).put("latestReleaseObservedAt","2026-10-20");
         var cases=report.putArray("cases");
         for(var entry:manifest.path("cases"))cases.add(assess(entry));
+        var summary=report.putObject("summary");int valid=0,releasedValid=0,accepted=0,attempts=0,serialized=0,failed=0,executions=0,matches=0,diverged=0;
+        for(var sample:cases) {
+            if(sample.path("sourceSchema").path("status").asText().equals("VALID"))valid++;
+            if(sample.path("releasedSourceSchema").path("status").asText().equals("VALID"))releasedValid++;
+            if(sample.path("defaultImport").path("status").asText().equals("ACCEPTED"))accepted++;
+            if(sample.path("exports").isObject())for(var out:sample.path("exports")) {
+                attempts++;if(out.path("serializationStatus").asText().equals("SUCCEEDED"))serialized++;else failed++;
+            }
+            if(sample.path("execution").isObject())for(var out:sample.path("execution"))if(out.isObject()) {
+                executions++;if(out.path("status").asText().equals("MATCH"))matches++;else if(out.path("status").asText().equals("DIVERGED"))diverged++;
+            }
+        }
+        summary.put("sources",cases.size()).put("developmentSchemaValid",valid).put("releasedSchemaValid",releasedValid).put("defaultImportAccepted",accepted)
+                .put("exportAttempts",attempts).put("serializationSucceeded",serialized).put("serializationFailed",failed)
+                .put("pureExecutions",executions).put("matched",matches).put("diverged",diverged);
         return report;
     }
     private ObjectNode assess(JsonNode entry) throws Exception {
@@ -65,8 +92,10 @@ final class OwsConformance {
         var data=YAML.readTree(source);var result=JSON.createObjectNode();result.put("id",id);result.set("features",entry.path("features"));
         result.put("sourceSha256",sha(source));result.put("declaredDsl",data.path("document").path("dsl").asText());
         result.put("expectedSchema",entry.path("schemaExpected").asText());result.set("sourceSchema",validate(data));
+        result.set("releasedSourceSchema",validate(releasedSchema,data));
         if(entry.has("upstream"))result.set("upstream",entry.get("upstream"));
         if(entry.has("expectationSource"))result.set("expectationSource",entry.get("expectationSource"));
+        if(entry.has("derivedFrom"))result.set("derivedFrom",entry.get("derivedFrom"));
         Workflow standard=null,strict=null;
         try{standard=WorkflowReader.readWorkflowFromString(source,WorkflowFormat.YAML);result.set("defaultImport",status("ACCEPTED"));}
         catch(Exception rejected){result.set("defaultImport",failure(rejected));}
@@ -87,8 +116,10 @@ final class OwsConformance {
                 // Independent fresh source model for EACH direction: serializer getter side effects cannot mask loss.
                 var model=useDefault?WorkflowReader.readWorkflowFromString(source,WorkflowFormat.YAML):WorkflowReader.validation().read(source,WorkflowFormat.YAML);
                 String exported=WorkflowWriter.workflowAsString(model,format);
+                out.put("serializationStatus","SUCCEEDED");
                 out.put("lexicallyIdenticalToSource",source.replace("\r\n","\n").equals(exported.replace("\r\n","\n")));
                 JsonNode tree=format.mapper().readTree(exported);out.set("schema",validate(tree));
+                out.set("releasedSchema",validate(releasedSchema,tree));
                 var changes=out.putArray("structuralChanges");diff(data,tree,"",changes);
                 try{WorkflowReader.validation().read(exported,format);out.set("validatedReimport",status("ACCEPTED"));}
                 catch(Exception rejected){out.set("validatedReimport",failure(rejected));}
@@ -98,11 +129,20 @@ final class OwsConformance {
                 Path directory=Path.of("target","conformance","exports");Files.createDirectories(directory);
                 Files.writeString(directory.resolve(id+"."+format.name().toLowerCase(Locale.ROOT)),exported);
                 if(entry.has("execution"))executions.set(format.name(),execute(exported,format,entry.path("execution")));
-            }catch(Exception failed){out.set("failure",failure(failed));}
+            }catch(Exception failed){
+                if(!out.has("serializationStatus"))out.put("serializationStatus","FAILED");
+                out.set("failure",failure(failed));
+                Path diagnostic=Path.of("target","conformance","diagnostics");Files.createDirectories(diagnostic);
+                var stack=new StringWriter();failed.printStackTrace(new PrintWriter(stack));
+                Files.writeString(diagnostic.resolve(id+"-"+format.name()+".txt"),stack.toString());
+            }
         }
         return result;
     }
     ObjectNode validate(JsonNode data) {
+        return validate(schema,data);
+    }
+    static ObjectNode validate(Schema schema,JsonNode data) {
         var errors=schema.validate(data);var stage=status(errors.isEmpty()?"VALID":"INVALID");var issues=stage.putArray("issues");
         errors.stream().map(e->e.getInstanceLocation()+":"+e.getKeyword()).distinct().sorted().forEach(issues::add);return stage;
     }

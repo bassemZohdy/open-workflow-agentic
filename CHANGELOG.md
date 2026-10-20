@@ -1,6 +1,6 @@
 # Changelog
 
-- WP-605 partial preparation: measure34 OWS sources, actual JSON/YAML model roundtrips and24 pure executions with one pinned official CTK case. Record export/context and fork-output differences plus authoring/source and runtime-dependency limits; green reproduction is not semantic certification. Five local assessment/control tests pass. Full CTK, finding resolution, real authoring APIs, substitution and peer/CI gates remain open.
+- WP-605 partial preparation: measure42 sources against released1.0.1/development1.0.3 schemas,76 export attempts (74 successes/two metadata failures) and48 pure execution observations with one pinned official development CTK case. Record export/context, fork-output and metadata-writer differences plus authoring/source and runtime-dependency limits; green reproduction is not semantic certification. Six local assessment/control tests pass. Full CTK, finding resolution, real authoring APIs, substitution and peer/CI gates remain open.
 
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 

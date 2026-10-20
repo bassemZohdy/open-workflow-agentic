@@ -9,13 +9,16 @@ import org.junit.jupiter.api.*;
 class OwsConformanceTest {
     @Test void pinnedCorpusIsAssessedAndCurrentResultsMatchTheRecordedBaseline() throws Exception {
         Path root=OwsConformance.repository();var harness=new OwsConformance(root);var report=harness.assess();
-        Path generated=Path.of("target","conformance","ows-1.0.3-report.json");Files.createDirectories(generated.getParent());
+        Path generated=Path.of("target","conformance","ows-portability-report.json");Files.createDirectories(generated.getParent());
         String text=OwsConformance.JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)+"\n";Files.writeString(generated,text);
-        Path baseline=root.resolve("docs/conformance/ows-1.0.3-report.json");
+        Path baseline=root.resolve("docs/conformance/ows-portability-report.json");
         if(Boolean.getBoolean("ows.updateReport")){Files.createDirectories(baseline.getParent());Files.writeString(baseline,text);}
         assertTrue(Files.exists(baseline),"Generate and inspect assessment with -Dows.updateReport=true");
         assertEquals(OwsConformance.JSON.readTree(Files.readString(baseline)),report,"Actual SDK/schema/roundtrip behavior changed: inspect generated assessment");
-        assertEquals(34,report.path("cases").size());assertEquals("NOT_ESTABLISHED",report.path("fullSemanticConformance").asText());
+        assertEquals(42,report.path("cases").size());assertEquals("NOT_ESTABLISHED",report.path("fullSemanticConformance").asText());
+        assertEquals(76,report.path("summary").path("exportAttempts").asInt());
+        assertEquals(74,report.path("summary").path("serializationSucceeded").asInt());
+        assertEquals(2,report.path("summary").path("serializationFailed").asInt(),"Known metadata failures must stay visible, not count as successful exports");
         int invalid=0;
         for(var sample:report.path("cases")) {
             assertEquals(sample.path("expectedSchema").asText(),sample.path("sourceSchema").path("status").asText(),sample.path("id").asText());
@@ -27,10 +30,10 @@ class OwsConformanceTest {
             for(String format:java.util.List.of("source","JSON","YAML")) {
                 String state=sample.path("execution").path(format).path("status").asText();
                 assertTrue(java.util.Set.of("MATCH","DIVERGED").contains(state),sample.path("id").asText()+" execution did not produce evidence: "+format);measured++;
-                if(java.util.Set.of("branch","iteration","ctk-for","pause","catch-error").contains(sample.path("id").asText()))assertEquals("MATCH",state,sample.path("id").asText()+" lost its positive semantic control");
+                if(java.util.Set.of("branch","iteration","ctk-for","pause","catch-error").contains(sample.path("id").asText().replaceFirst("^released-","")))assertEquals("MATCH",state,sample.path("id").asText()+" lost its positive semantic control");
             }
         }
-        assertEquals(24,measured);
+        assertEquals(48,measured);
     }
     @Test void assessmentDetectsRemovedMetadataAndChangedOrderedTasksWithoutReportingValues() throws Exception {
         var before=OwsConformance.JSON.readTree("{\"metadata\":{\"vendor/key\":\"private-value\"},\"do\":[\"first\",\"second\"]}");
@@ -61,5 +64,17 @@ class OwsConformanceTest {
         java.util.List<JsonNode> data=new java.util.ArrayList<>();while(blocks.find())data.add(OwsConformance.YAML.readTree(blocks.group(1).stripIndent()));
         assertEquals(3,data.size());assertEquals(data.get(0),OwsConformance.YAML.readTree(OwsConformance.resource(selected.path("source").asText())));
         assertEquals(data.get(1),selected.path("execution").path("input"));assertEquals(data.get(2),selected.path("execution").path("expected"));
+    }
+    @Test void releasedExecutionVariantsChangeOnlyDeclaredDialectAndArtifactVersion() throws Exception {
+        var harness=new OwsConformance(OwsConformance.repository());var entries=new java.util.HashMap<String,JsonNode>();
+        harness.manifest.path("cases").forEach(e->entries.put(e.path("id").asText(),e));int variants=0;
+        for(var entry:entries.values())if(entry.has("derivedFrom")) {
+            var original=entries.get(entry.path("derivedFrom").asText());assertNotNull(original);
+            var expected=OwsConformance.YAML.readTree(OwsConformance.resource(original.path("source").asText()));
+            ((com.fasterxml.jackson.databind.node.ObjectNode)expected.path("document")).put("dsl","1.0.1").put("version","1.0.1");
+            assertEquals(expected,OwsConformance.YAML.readTree(OwsConformance.resource(entry.path("source").asText())));
+            assertEquals(original.path("execution"),entry.path("execution"));variants++;
+        }
+        assertEquals(8,variants);
     }
 }

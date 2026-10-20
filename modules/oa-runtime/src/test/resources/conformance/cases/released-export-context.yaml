@@ -1,0 +1,13 @@
+document:
+  dsl: 1.0.1
+  namespace: portability
+  name: export-context
+  version: 1.0.1
+do:
+- produce:
+    set:
+      value: 42
+    export:
+      as: '${ { observed: .value } }'
+output:
+  as: ${ $context }
