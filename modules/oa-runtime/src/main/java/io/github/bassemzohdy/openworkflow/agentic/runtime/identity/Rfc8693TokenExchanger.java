@@ -13,8 +13,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -23,16 +26,22 @@ import java.util.TreeSet;
 /**
  * The RFC 8693 client. It turns a delegation grant into one short-lived token for one audience.
  *
- * <p>What this class enforces itself, because the authorization server cannot know it (Keycloak 26.2 does not know our
- * grant expiry; ADR 0021 section 1):
+ * <p>What this class enforces itself, because the authorization server cannot know it (the server does not know our
+ * grants; ADR 0021 section 1 and the H1 amendment):
  * <ol>
- *   <li>Before any request: the grant is active now (the whole chain), the scopes asked are held by the grant.
- *       Otherwise nothing is sent.</li>
+ *   <li>Before any request: the grant is active now (the whole chain), the scopes asked are held by the grant, and
+ *       both input tokens verify (signature, issuer, time, and the exchanging client as audience). The subject token
+ *       must be the grant's user in the grant's tenant, hold every scope asked for, and carry exactly the delegation chain
+ *       of the grant's parent (none for a root grant); the actor token must be the grant's own workload token. Otherwise nothing is sent.</li>
  *   <li>On the answer: no {@code refresh_token}; token type Bearer; the token verifies (signature, issuer, time) for the
- *       audience asked and for no other; it names the grant's user as subject and the grant's agent as nearest actor and
- *       the grant's tenant; its scopes are a subset of the scopes asked; it lives at most 300 seconds and not past the
- *       grant's expiry; {@code expires_in}, when present, agrees; it is not the subject or actor token handed back.
- *       Any failure discards the token.</li>
+ *       audience asked and for no other; it has a {@code jti} and an issue time; it names the grant's user as subject,
+ *       the grant's tenant and exactly the grant's chain of actors, nearest first (a missing or different chain is refused,
+ *       never flattened); its
+ *       scopes are a subset of the scopes asked; the signed expiry is at most 300 seconds away and not past the verified
+ *       subject token's expiry or the grant's expiry; {@code expires_in}, when present, agrees; it is not the subject or
+ *       actor token handed back. An overlong bearer is refused: only the signed {@code exp} counts, never a shortened
+ *       Java-side expiry. Any failure discards the token.</li>
+ *   <li>The grant is checked again after the answer, so a grant revoked while the request was in flight issues nothing.</li>
  *   <li>An audit event for the issue is written before the token is returned; if it cannot be written the token is
  *       discarded. Refusals are audited best effort.</li>
  * </ol>
@@ -41,8 +50,8 @@ import java.util.TreeSet;
  * used on the next exchange. The endpoint must be https, or http on loopback (tests). Redirects are not followed.
  * The response is read up to 64 KiB.
  *
- * <p>Verified against the in-process authorization server of oa-testkit only. Against Keycloak: unverified; see
- * docs/identity.md section 9.
+ * <p>Verified against the in-process authorization server of oa-testkit and against real Keycloak 26.2.5 (standard
+ * exchange, refused: no {@code act}) and 26.8.1 (native delegation preview); see docs/identity.md section 9.
  */
 public final class Rfc8693TokenExchanger implements TokenExchanger {
 
@@ -89,7 +98,9 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         Objects.requireNonNull(request, "request");
         DelegationGrant grant = activeGrant(request);
         try {
-            IssuedToken token = requestToken(request, grant);
+            Instant subjectExpiry = verifyInputs(request, grant);
+            IssuedToken token = requestToken(request, grant, subjectExpiry);
+            recheckGrant(request, grant);
             try {
                 audit.record(grant.agent(), ISSUED, IdentityAudit.TOKEN, grant.id().toString(), grant.tenant(), null,
                         issuedAttributes(request, token));
@@ -124,9 +135,90 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         return grant;
     }
 
+    /**
+     * Verifies both input tokens before their identity or expiry is used (ADR 0021 H1, item 1). Returns the verified
+     * expiry of the subject token, which bounds the lifetime of the token that may be issued.
+     */
+    private Instant verifyInputs(ExchangeRequest request, DelegationGrant grant) {
+        Instant now = clock.instant();
+        VerifiedToken subject = verifyInput(request.subjectToken(), "subject");
+        List<String> expected = expectedActors(grant);
+        if (!subject.actors().equals(expected.subList(1, expected.size()))) {
+            throw input("the subject token's delegation chain is not the chain of the grant's parent");
+        }
+        if (!subject.subject().equals(grant.delegator())) {
+            throw input("the subject token is not the grant's user");
+        }
+        if (!grant.tenant().equals(subject.tenant())) {
+            throw input("the subject token is for another tenant than the grant's");
+        }
+        if (!subject.expiresAt().isAfter(now)) {
+            throw input("the subject token is expired");
+        }
+        // Keycloak's native delegation takes the scopes of the new token from the actor client's configuration, not
+        // from the subject token (observed on 26.8.1), so the user's own scopes are the bound only if we enforce it
+        if (!subject.scopes().containsAll(request.scopes())) {
+            throw new ExchangeException(ExchangeException.Code.SCOPE_WIDENING,
+                    "the scopes asked for are not all held by the subject token");
+        }
+        VerifiedToken actor = verifyInput(request.actorToken(), "actor");
+        if (actor.isDelegated()) {
+            throw input("the actor token is not the agent's own workload token");
+        }
+        if (!actor.subject().equals(grant.agent())) {
+            throw input("the actor token is not the grant's agent");
+        }
+        if (!actor.expiresAt().isAfter(now)) {
+            throw input("the actor token is expired");
+        }
+        return subject.expiresAt();
+    }
+
+    private VerifiedToken verifyInput(Credential token, String role) {
+        try {
+            return verifier.verify(token.reveal(), clientId);
+        } catch (TokenRejectedException e) {
+            if (e.reason() == TokenRejectedException.Reason.VERIFIER_UNAVAILABLE) {
+                throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
+                        "the " + role + " token could not be verified", e);
+            }
+            throw new ExchangeException(ExchangeException.Code.INPUT_REJECTED,
+                    "the " + role + " token does not verify: " + e.reason(), e);
+        }
+    }
+
+    /** The actors an issued token must carry: the agents of the grant's chain, nearest (the grant's own agent) first. */
+    private static List<String> expectedActors(DelegationGrant grant) {
+        List<String> actors = new ArrayList<>(grant.chain());
+        Collections.reverse(actors);
+        return actors;
+    }
+
+    private static ExchangeException input(String message) {
+        return new ExchangeException(ExchangeException.Code.INPUT_REJECTED, message);
+    }
+
+    /** The grant is checked again after the answer: a grant revoked meanwhile must not yield a usable token. */
+    private void recheckGrant(ExchangeRequest request, DelegationGrant grant) {
+        GrantCheck check;
+        try {
+            check = grants.check(grant.id());
+        } catch (RuntimeException e) {
+            throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
+                    "the grant could not be checked after the exchange; the token was discarded", e);
+        }
+        if (check instanceof GrantCheck.Inactive inactive) {
+            throw new ExchangeException(inactive.reason());
+        }
+        if (!((GrantCheck.Active) check).grant().covers(request.scopes())) {
+            throw new ExchangeException(ExchangeException.Code.SCOPE_WIDENING,
+                    "the scopes asked for are no longer all held by the grant");
+        }
+    }
+
     // ---- the request --------------------------------------------------------------------------------------------
 
-    private IssuedToken requestToken(ExchangeRequest request, DelegationGrant grant) {
+    private IssuedToken requestToken(ExchangeRequest request, DelegationGrant grant, Instant subjectExpiry) {
         Credential secret;
         try {
             secret = secrets.current(clientSecretName);
@@ -170,7 +262,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
             throw new ExchangeException(ExchangeException.Code.BAD_RESPONSE, "the response is too large");
         }
         if (status == 200) {
-            return accept(parse(body), request, grant);
+            return accept(parse(body), request, grant, subjectExpiry);
         }
         if (status == 400 || status == 401 || status == 403) {
             throw new ExchangeException(ExchangeException.Code.REFUSED,
@@ -205,7 +297,8 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
 
     // ---- the answer ---------------------------------------------------------------------------------------------
 
-    private IssuedToken accept(JsonNode response, ExchangeRequest request, DelegationGrant grant) {
+    private IssuedToken accept(JsonNode response, ExchangeRequest request, DelegationGrant grant,
+                               Instant subjectExpiry) {
         if (response.has("refresh_token")) {
             throw bad("the server issued a refresh token");
         }
@@ -244,6 +337,12 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         if (!verified.isDelegated() || !grant.agent().id().equals(verified.actor())) {
             throw bad("the issued token does not name the grant's agent as its actor");
         }
+        if (!verified.actors().equals(expectedActors(grant))) {
+            throw bad("the issued token's chain of actors is not exactly the grant's chain; a chain is never flattened");
+        }
+        if (verified.tokenId() == null || verified.tokenId().isBlank() || verified.issuedAt() == null) {
+            throw bad("the issued token has no jti or no issue time");
+        }
         if (!request.scopes().containsAll(verified.scopes()) || verified.scopes().isEmpty()) {
             throw bad("the issued token has scopes that were not asked for, or none");
         }
@@ -257,6 +356,9 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         }
         if (expires.isAfter(grant.expiresAt())) {
             throw bad("the issued token outlives the delegation grant");
+        }
+        if (expires.isAfter(subjectExpiry)) {
+            throw bad("the issued token outlives the verified subject token; a near-expiry subject needs re-authorization");
         }
         JsonNode expiresIn = response.get("expires_in");
         if (expiresIn != null && (!expiresIn.canConvertToLong() || expiresIn.asLong() > MAX_LIFETIME_SECONDS

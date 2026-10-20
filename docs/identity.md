@@ -58,27 +58,33 @@ What goes out: `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`, the
 agent's own workload token as `actor_token`, one `audience`, the `scope` asked for, client authentication with HTTP Basic.
 The client secret is read from the `SecretProvider` on every call, so a rotated secret is used at once.
 
-What the client refuses, because the authorization server cannot know it (Keycloak does not know our grant expiry):
+What the client refuses, because the authorization server cannot know it (it does not know our grants, and it takes the
+scopes and the lifetime of the new token from its own configuration, not from the user's token; section 9.3). ADR 0021 H1
+lists the checks; they are all in force:
 
 | Rule | Where it is checked |
 |---|---|
 | The grant, and every grant above it, is active now | before the request; nothing is sent otherwise |
-| The scopes asked are all held by the grant | before the request |
-| No `refresh_token` in the answer | on the answer |
-| The token verifies (signature, issuer, time), for exactly the audience asked and no other | on the answer |
-| Subject is the grant's user, tenant is the grant's tenant, nearest actor is the grant's agent | on the answer |
-| Token scopes are a subset of the scopes asked | on the answer |
-| Lifetime at most 300 s, and not beyond the grant's expiry | on the answer |
+| The scopes asked are all held by the grant **and** by the verified subject token | before the request |
+| Both input tokens verify (signature, issuer, time) with the exchanging client as audience; the subject token is the grant's user in the grant's tenant and carries exactly the delegation chain of the grant's parent (none for a root grant); the actor token is the grant's own, undelegated workload token; neither is expired | before the request |
+| No `refresh_token` in the answer; token type Bearer | on the answer |
+| The token verifies (signature, issuer, time), for exactly the audience asked and no other, with a `jti` and an issue time | on the answer |
+| Subject is the grant's user, tenant is the grant's tenant, the actors are exactly the grant's chain, nearest first (a missing or different chain is refused, never flattened) | on the answer |
+| Token scopes are a non-empty subset of the scopes asked | on the answer |
+| The signed `exp` is at most 300 s away and not beyond the grant's expiry **or the verified subject token's expiry**. An overlong bearer is refused; only the signed `exp` counts, never a shortened Java-side expiry | on the answer |
 | The token is not the subject or actor token handed back | on the answer |
+| The grant is active and still covers the scopes **after** the answer | after the answer, before the token is returned |
 
 Any failure discards the token. The audit event `identity.token.exchanged` is written before the token is returned, and
 if it cannot be written the token is discarded. The token itself is held in memory only (`IssuedToken`, a `Credential`).
+Every non-success HTTP status is a failure whatever the OAuth error name says (`REFUSED` for 400/401/403, `UNAVAILABLE`
+otherwise, which a caller may retry); the `oauthError` is diagnostic only.
 
-Consequence worth knowing: an authorization server cannot issue a token shorter than its default, so in the last 300 s of
-a grant the server's token would outlive the grant and is discarded. A grant is usable for exchange until its expiry minus
-the server's token lifetime, unless the server shortens the token to the subject token's expiry (the test server does; Keycloak does not: a 20 s subject token gave a 300 s
-exchanged token, section 9.3). Operators who need the full grant life should set the server's exchanged-token lifetime lower
-than 300 s.
+Consequence worth knowing: an authorization server cannot issue a token shorter than its client's configured lifetime, so in
+the last 300 s of a grant, and in the last 300 s of the user's own token, the server's token would outlive its bound and is
+discarded: such an exchange fails and needs re-authorization. Keycloak does not shorten to the subject token (a 100 s subject
+token gave a 300 s exchanged token; section 9.3). Operators who need the full life should set the exchanging client's
+access-token lifespan below 300 s.
 
 `ResourceTokenGuard` is what a tool or resource runs on the token it receives: audience exactly its own, a delegated token
 (has an actor), an id and an issue time, issued for at most 300 s, the scopes the call needs, optionally an active grant
@@ -86,9 +92,10 @@ for (tenant, user, actor) that covers them, and a bounded number of uses (defaul
 (`JdbcReplayCache` in table `identity.token_use`, or `InMemoryReplayCache`). The user's own token is refused at the
 resource, so a runtime that passes it through fails there.
 
-Status: client and guard **[fake]**, against `DelegationAuthorizationServer` in oa-testkit test scope. Keycloak was probed by
-script (section 9); the client has not been run against it, and the probe shows it would refuse every Keycloak 26.2 token
-(no `act`).
+Status: client and guard run **[verified]** against real Keycloak 26.2.5 (standard exchange: the answer has no `act`, so
+the client refuses it) and 26.8.1 (native delegation preview: the client issues a delegated token), by `KeycloakStandardIT` and
+`KeycloakDelegationIT` (section 9.4), and **[fake]** in the in-process unit tests against `DelegationAuthorizationServer` in oa-testkit.
+The real-provider gate is not closed until those tests pass in CI (section 9.4) and the review of the exact head is recorded.
 
 ## 5. Re-authorization after long waits
 
@@ -215,18 +222,18 @@ available to steps (`InstanceAuthorities.recheck`) and is wired at resume. Verif
 
 ## 9. Keycloak integration: what a real server does (WP-102b)
 
-Run on 2026-10-19 against real Keycloak distributions (no container runtime was available, so the tarballs were started
-with `kc.sh start-dev`): **26.2.5** and **26.8.1**, the latter also with
-`--features=token-exchange-delegation,parameterized-scopes`. The realm and every request are described in 9.6, so
-the run can be repeated by hand. The probing script was removed from the repository on review (research code stays out);
-the results are now asserted by `KeycloakInteropIT` (9.4) when a Keycloak is supplied, and `Rfc8693TokenExchanger` and `JwtTokenVerifier` were not yet run against these
-tokens (the next step, see the handoff).
+Run on 2026-10-19 and 2026-10-20 against real Keycloak distributions (no container runtime in the authoring environment, so
+the tarballs were started with `kc.sh start-dev`): **26.2.5** and **26.8.1**, the latter with
+`--features=token-exchange-delegation,parameterized-scopes`. CI runs the same tests on the pinned images
+`quay.io/keycloak/keycloak:26.2.5` and `:26.8.1` (workflow `keycloak-interop`, PR #40). ADR 0021's H1 amendment decides what
+the product requires: native, issuer-signed actor proof; no actorless downgrade; no `may_act` hard-coded in a mapper.
 
 ### 9.1 Realm set-up that the old text left out (all needed, all found by failing)
 
 1. `tenant` and `sub_kind` must be declared in the realm's **user profile**, or Keycloak silently drops the attribute.
-2. The exchanging client (`oa-agent-runtime`) must appear in the **audience of the subject token** (an audience mapper on
-   `oa-api`), and it needs `standard.token.exchange.enabled=true`.
+2. The exchanging client (`oa-agent-runtime`) must appear in the **audience of the subject token** and in the audience of its
+   own workload token: the product verifies both input tokens for that audience. Standard exchange needs the client attribute
+   `standard.token.exchange.enabled=true`; delegation gets the actor client into `aud` by itself.
 3. The audiences an exchange may name come from the user's **client roles on the target client**. Without a role on
    `tool-cases` the exchange is refused.
 4. `profile` and `email` are default scopes of every client and leak into exchanged tokens unless removed from the agent client.
@@ -235,91 +242,123 @@ tokens (the next step, see the handoff).
 6. Do **not** use hard-coded `tenant`/`sub_kind` mappers on the agent client. They also stamp user-subject exchanged tokens
    (alice's exchanged token became `sub_kind=AGENT`). Use user-attribute mappers and put the attributes on the agent's
    service-account user; then alice's token keeps `tenant-1` and no `sub_kind`.
+7. **Native delegation needs three things, none of them a token mapper:** the realm's *Admin Permissions* (FGAP v2) enabled with
+   a `delegate` permission on the **Users** resource type for the user (here alice), whose policy is the *client* policy of the
+   agent runtime; a client for the login with *Consent required* on and the standard flow; and the user's consent on the screen
+   ("Allow oa-agent-runtime to act on your behalf?"), asked at every login. The login asks for the scope
+   `delegation:client:oa-agent-runtime`. Keycloak then writes `may_act: {sub: <service-account user id>, client_id}` into
+   the user's token itself.
 
 ### 9.2 Results
 
 | Question | 26.2.5 (standard exchange) | 26.8.1 with delegation features |
 |---|---|---|
-| Exchange for `aud=tool-cases`, `scope=cases:read` | 200; `aud` exactly `tool-cases`; `scope` exactly `cases:read`; `sub` = alice; `tenant` kept; the response has no `refresh_token` (it does carry `refresh_expires_in`, and on 26.2.5 `session_state`) | same, once `may_act` is present |
-| `actor_token` | **ignored**: garbage, the user's own token and a wrong `actor_token_type` all still return 200 | validated: garbage, own-token and wrong type are `invalid_request` |
+| Exchange for `aud=tool-cases`, `scope=cases:read` | 200; `aud` exactly `tool-cases`; `scope` exactly `cases:read`; `sub` = alice; `tenant` kept; no `refresh_token` | same, from a subject token that has `may_act` |
+| `actor_token` | **ignored**: garbage and the user's own token still return 200 | validated: garbage, the user's own token, and another service account's token are `400 invalid_request` |
 | `act` claim in the result | **never present** | present: `act.sub` = **Keycloak user id of the agent's service account**, not the client id |
-| What authorises the actor | nothing | the user's token must carry `may_act: {sub: <actor user id>}`, which we must mint with a mapper; without it every exchange is `invalid_request` ("Invalid may_act claim") |
-| Exchange **without** `actor_token` | 200 | refused when the subject token carries `may_act` |
-| Scope the user does not hold (`cases:delete`) | `invalid_scope` | `invalid_scope` |
-| Unregistered audience | **`invalid_client`** ("Audience not found"), not `invalid_target` | same |
-| Narrowing (two scopes to one) | works | works |
-| Garbage subject token | `invalid_request` | `invalid_request` |
-| Subject token already expired | **`invalid_request`** ("Invalid token"), not `invalid_grant` | same |
-| User session logged out, then exchange | `invalid_request` ("Invalid token"): revocation is honoured | same |
-| Lifetime of the exchanged token | 300 s with the client attribute | 300 s |
+| What authorises the actor | nothing | `may_act` in the user's token, issued only after the FGAP permission **and** the user's consent |
+| User refuses consent | n/a | no code is issued: the redirect carries `error=access_denied` |
+| No `delegate` permission for the actor | n/a | the delegation scope is silently dropped; the login works and the token has no `may_act`; an exchange with an actor token is `400` |
+| Exchange **without** `actor_token` | 200 | `400` when the subject token carries `may_act` |
+| A scope the user's token does not hold (`cases:delete`) but the client may use | **200, the scope is granted** | **200, the scope is granted** |
+| Unregistered audience | refused: **`invalid_client`** ("Audience not found"), not `invalid_target` | refused |
+| Subject token already expired / session logged out | refused (`invalid_request`, "Invalid token") | refused |
+| Lifetime of the exchanged token | 300 s (client attribute); **not** bounded by the subject token | 300 s; **not** bounded by the subject token |
+| Signing-key rotation | n/a | a token of the new key is not accepted by a verifier until it has refetched the key set (rate limited to 30 s): refused fail-closed meanwhile |
 
 ### 9.3 What this means for the design
 
-* **ADR 0021 does not hold on a released stable feature.** On standard token exchange (26.2) the actor is not recorded at
-  all, and `Rfc8693TokenExchanger` would refuse every token because there is no `act`. Delegation exists only behind the
-  feature flags (experimental in 26.7, preview in 26.8) and works differently from the ADR: the **user's** token must
-  carry `may_act`, and `act.sub` is a user id.
-* **An exchange from a short user token outlives it**: a 20 s user token produced a 300 s exchanged token (280 s past the
-  subject's expiry). The exchange is refused after the user token expires, so the window is bounded, but a token we hold
-  can outlive the user session by the exchanged lifetime. Our client caps by grant expiry already; it should also cap by
-  the subject token's `exp`. (Needs a code change in `Rfc8693TokenExchanger`; see the handoff.)
-* Our exchanger must not rely on the error code names: `invalid_client` and `invalid_request` stand where this file said
-  `invalid_target` and `invalid_grant`. Refusal must be decided on the HTTP status and a non-200, not on the code.
-* Because the actor is unproven by the server on 26.2, the agent identity can be carried only by the workload token the
-  runtime holds and our own grant check (already in force), not by the issued token. That is a policy decision for the
-  integration owner: the handoff lists the options.
+* **ADR 0021 as first written does not hold on a released stable feature.** Standard exchange (26.2) records no actor, so
+  the product refuses every such token (`actorlessExchangeIsRejected`). Delegation exists only behind preview feature flags
+  and works differently from the first ADR text: the **user's** token carries `may_act`, `act.sub` is a user id, and the user's
+  consent is a live screen. The ADR's H1 amendment adopts strict native delegation as an explicit preview profile.
+* **Keycloak does not enforce three bounds that the product therefore enforces itself** (each is asserted in the tests, the
+  server's behaviour included, so a Keycloak change shows up as a failing test):
+  1. *Scope.* The exchanged token's scopes come from the exchanging client's configuration, not from the user's token: a user
+     who never held `cases:delete` still gets it in the exchanged token if the client may use it. The product refuses a request
+     for a scope the verified subject token does not hold.
+  2. *Subject expiry.* A 100 s subject token produced a 300 s credential. The product refuses any signed `exp` past the verified
+     subject expiry. The consequence is deliberate: a near-expiry subject token needs re-authorization.
+  3. *Grant expiry and revocation.* The server does not know our grants. Expiry is bounded as above; revocation is checked before
+     the request, after the answer, and at every resource.
+* **Revocation granularity (residual limitation).** An exchanged token does not name the grant it was issued under, so a
+  resource asks whether *any* active grant of this user to this actor covers the scopes. Revoking one of several equivalent
+  grants does not stop a token issued under it; ending every grant of the pair does. Carrying a grant reference in the token
+  would need an issuer claim that Keycloak cannot compute.
+* Refusal is decided on the HTTP status, not on OAuth error names (`invalid_client` and `invalid_request` stand where this file
+  once said `invalid_target` and `invalid_grant`).
 
-### 9.4 The Keycloak integration test
+### 9.4 The Keycloak integration tests (the real-provider gate)
 
-`KeycloakInteropIT` (with `KeycloakRealm`, which builds the realm of 9.6 through the admin API) runs the product's own
-`Rfc8693TokenExchanger` and `JwtTokenVerifier` against a real server. It is skipped unless `KEYCLOAK_URL` is set, so the normal
-build does not need Keycloak. It deletes and rebuilds the realm `agentic-it`: use a throw-away server.
+`KeycloakStandardIT` (profile `standard`, Keycloak 26.2.5) and `KeycloakDelegationIT` (profile `delegation`, Keycloak 26.8.1
+with the two features), in `apps/app-runtime/src/test/java/.../identity/`, run the product's own `JwtTokenVerifier`,
+`Rfc8693TokenExchanger`, `DelegationGrants` (PostgreSQL) and `ResourceTokenGuard` against a real server. `KeycloakRealm` builds
+a **uniquely named disposable realm** per class through the admin API and deletes it afterwards; `KeycloakHarness` wires the
+product components; `KeycloakSupport` reads the settings. With `-Dkeycloak.required=true` a missing server, an unreachable
+server or a server of the wrong profile is a **failure**, never a skip; without it the classes skip, so a developer build
+needs no Keycloak.
 
-* Keycloak 26.2.5: `KEYCLOAK_URL=http://localhost:18080 mvn -pl apps/app-runtime -am verify -Dit.test=KeycloakInteropIT`
-* Keycloak 26.8.1 with `--features=token-exchange-delegation,parameterized-scopes`: also `KEYCLOAK_DELEGATION=true`.
-* Server start: `bin/kc.sh start-dev` with `KC_BOOTSTRAP_ADMIN_USERNAME=admin KC_BOOTSTRAP_ADMIN_PASSWORD=admin`
-  (`KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` override); the database is the usual `DB_URL`.
+| Class | Required cases (the CI contract of PR #40) |
+|---|---|
+| `KeycloakStandardIT` | `realIssuerSignatureAndAudienceAreVerified`, `actorlessExchangeIsRejected`; extra: `theServerStillRefusesWhatItCanSee` |
+| `KeycloakDelegationIT` | `nativeDelegationPreservesAuthorityBounds`, `invalidActorIsRejected`, `revokedOrExpiredGrantIsRejected`, `subjectExpiryBoundsIssuedCredential`, `issuerKeyRotationIsHandled`, `delegationRequiresPermissionAndConsent` |
 
-Run on 2026-10-19: **10 of 10 passed on 26.2.5 and 10 of 10 on 26.8.1 (delegation)**, no container runtime, two local
-distributions. It asserts: the verifier reads tenant, scopes, and agent kind from Keycloak tokens; on 26.2.5 the client
-discards the exchanged token because there is no `act` (the gap, asserted as such); on 26.8.1 the client issues a delegated
-token whose actor is the agent's service-account user id; `invalid_scope`, `invalid_client` for an unknown audience,
-`invalid_request` for an expired subject token, refusal after logout; `actor_token` ignored on 26.2.5 and validated on 26.8.1;
-no `profile`/`email` scope; 300 s lifetime that outlives a 20 s subject token (asserted as a KNOWN GAP). Not covered: JWKS key
-rotation, and CI wiring (requested from GPT, handoff H2).
+Run locally against a throw-away server (start it with `bin/kc.sh start-dev --http-port=18080` and the bootstrap admin
+`KC_BOOTSTRAP_ADMIN_USERNAME` / `KC_BOOTSTRAP_ADMIN_PASSWORD`; for delegation add
+`--features=token-exchange-delegation,parameterized-scopes`; the database is the usual `DB_URL`):
+
+    export KEYCLOAK_URL=http://127.0.0.1:18080 KEYCLOAK_PROFILE=delegation \
+           KEYCLOAK_ADMIN_USER=admin KEYCLOAK_ADMIN_PASSWORD=<bootstrap password>
+    mvn -B -pl apps/app-runtime -am verify -Dit.test=KeycloakDelegationIT \
+        -Dfailsafe.failIfNoSpecifiedTests=false -Dkeycloak.required=true \
+        -Dkeycloak.profile=delegation -Dkeycloak.url="$KEYCLOAK_URL"
+    python3 tools/require_keycloak_evidence.py --profile delegation
+
+(profile `standard` and `KeycloakStandardIT` for 26.2.5). `tools/require_keycloak_evidence.py` is the GPT-owned checker of
+PR #40: it rejects missing, failed, errored and skipped cases.
+
+What they establish, with the product code in the loop: the verifier reads tenant, scopes and agent kind from real tokens and
+refuses a wrong audience, a changed signature, another realm's token and an expired token; the exchanger refuses the actorless
+standard-exchange answer; with real permission and consent it issues one delegated token for one audience whose `act` is the
+agent's service-account user, bounded by the user's scopes, the subject expiry and the grant; it refuses another agent's
+workload token, a garbage actor, another tenant, a widened scope, a revoked or expired grant (also one revoked while the request
+is in flight) and an overlong bearer; the resource refuses a replay, another resource's token and a token whose grant was
+ended; a verifier survives rotation fail-closed and an unreachable key set never accepts; and consent refusal, a missing
+permission and a password login never produce `may_act`. Mutation checks: removing the subject-expiry bound, the post-answer
+grant check, the actor identity check or the subject scope bound each makes the matching delegation case fail.
 
 ### 9.5 Still unverified
 
-Rotation of the JWKS signing key against a running verifier; the user's token expiring mid-flight beyond the single case
-tested; Keycloak 26.8 in a stable (non-preview) configuration; any other identity provider.
+Keycloak 26.8 in a stable (non-preview) configuration; any other identity provider; multi-hop chains through a real provider
+(a chain the provider cannot preserve is refused, never flattened, and the in-process tests cover the exact-chain rule);
+an exchanged token that names its grant.
 
 ### 9.6 Reproduction recipe
 
-Start Keycloak 26.2.5 (or 26.8.1) with `bin/kc.sh start-dev` and a bootstrap admin (`KC_BOOTSTRAP_ADMIN_USERNAME` /
-`KC_BOOTSTRAP_ADMIN_PASSWORD`); for delegation add `--features=token-exchange-delegation,parameterized-scopes`. Use the admin
-REST API (`/admin/realms`) with an admin-cli password-grant token. Create, in this order:
+Start Keycloak 26.2.5 (or 26.8.1) as in 9.4. Use the admin REST API (`/admin/realms`) with an admin-cli password-grant token.
+For delegation create the realm with `adminPermissionsEnabled=true`. Then, in this order:
 
-1. Realm `agentic`, access token lifespan 3600 s. Add user-profile attributes `tenant` and `sub_kind`.
-2. Client scopes `cases:read`, `cases:write`, `cases:delete` (include in token scope; hide from consent).
-3. Client `oa-api`: public, direct access grants, standard flow off. Mappers: audience `oa-api`, audience `oa-agent-runtime`,
-   user-attribute `tenant` and `sub_kind`. Optional scopes `cases:read`, `cases:write`. For the expiry case also a copy with
-   client attribute `access.token.lifespan=20`.
-4. Client `oa-agent-runtime`: confidential, secret of your choice, service accounts on, standard flow off, attribute
-   `standard.token.exchange.enabled=true`, `access.token.lifespan=300`. Remove default scopes `profile` and `email`. Mappers:
-   user-attribute `tenant` and `sub_kind`. Optional scopes `cases:read`, `cases:write`. Set the attributes `tenant=tenant-agent`
-   and `sub_kind=AGENT` on its service-account user.
+1. Realm with access token lifespan 3600 s. Add user-profile attributes `tenant` and `sub_kind`.
+2. Client scopes `cases:read`, `cases:write`, `cases:delete` (include in token scope; hide from consent). Never offer
+   `cases:delete` to a user client.
+3. Clients `oa-api` (public, direct access grants) and, for delegation, `oa-console` (public, *consent required*, standard flow,
+   redirect `http://127.0.0.1:9/callback`) and a copy with `access.token.lifespan=100`. Mappers: audience `oa-agent-runtime`,
+   user-attribute `tenant` and `sub_kind`. Optional scopes `cases:read`, `cases:write`.
+4. Clients `oa-agent-runtime` and `oa-other-agent`: confidential, service accounts on, standard flow off, attribute
+   `standard.token.exchange.enabled=true`, `access.token.lifespan=300`; remove default scopes `profile` and `email`. Mappers:
+   audience of the runtime, user-attribute `tenant` and `sub_kind`. Optional case scopes. On each service-account user set
+   `tenant=tenant-agent` and `sub_kind=AGENT`.
 5. Confidential clients `tool-cases` and `tool-search` with a client role `invoke` each.
-6. User `alice` (password, email verified, attribute `tenant=tenant-1`) with the `invoke` role of both tool clients.
-7. For 26.8 delegation: a hard-coded claim mapper on `oa-api` writing the JSON claim `may_act` = `{"sub": "<user id of the
-   oa-agent-runtime service account>"}`.
+6. User `alice` (password, attribute `tenant=tenant-1`) with the `invoke` role of both tool clients.
+7. Delegation only: in the `admin-permissions` client's authorization settings, a *client* policy naming `oa-agent-runtime`, and
+   a scope permission on the resource type `Users` for the resource alice, scope `delegate`, with that policy. The other agent
+   gets no permission, on purpose.
 
-Requests (all to the realm token endpoint): alice's token by password grant against `oa-api` with `scope=cases:read cases:write`;
-the workload token by client credentials of `oa-agent-runtime`; then a `urn:ietf:params:oauth:grant-type:token-exchange` request
-authenticated as `oa-agent-runtime` (HTTP Basic) with `subject_token` = alice's token, `audience`, `scope`, and optionally
-`actor_token` = the workload token with `actor_token_type` of access_token. Variants run: garbage, wrong-type and
-user's-own actor token; scope alice lacks; unregistered audience; garbage subject token; a 20 s user token before and after its
-expiry; alice's token after logout. The results are in 9.2. The assertion-bearing form of this recipe is the Keycloak
-integration test in `apps/app-runtime/src/test/java/.../identity/` (`KeycloakInteropIT`, section 9.4; its realm is `agentic-it`).
+Requests (all to the realm token endpoint): alice's token by password grant against `oa-api`; for delegation, alice's token by
+the browser flow against `oa-console` with `scope=openid cases:read cases:write delegation:client:oa-agent-runtime` (login form,
+then the consent screen, then the authorization code); the workload token by client credentials; then a
+`urn:ietf:params:oauth:grant-type:token-exchange` request authenticated as `oa-agent-runtime` (HTTP Basic) with `subject_token`,
+`audience`, `scope` and `actor_token`. The results are in 9.2; the assertion-bearing form of this recipe is the integration tests of 9.4.
 
 ## 10. Configuration
 
@@ -368,10 +407,10 @@ the wait deadline (`agentic.reconciler.wait-deadline`) cancels it.
 | Statement | Status |
 |---|---|
 | Token verification, grants, narrowing (service and database triggers), replay cache, instance authority, resume gate, reauthorization, secret provider | **[verified]** against PostgreSQL and the real code, with tokens of the fake issuer |
-| Token exchange and resource guard | **[fake]**: the testkit's in-process authorization server and issuer (`DelegationAuthorizationServer`, `FakeIdentityProvider`). It follows the behaviour documented for Keycloak 26.2+, but is not Keycloak |
+| Token exchange and resource guard (in-process unit and acceptance tests) | **[fake]**: the testkit's in-process authorization server and issuer (`DelegationAuthorizationServer`, `FakeIdentityProvider`). It follows the behaviour documented for Keycloak 26.2+, but is not Keycloak |
 | Kill/restart: identity restored, a held instance, no credential stored | **[verified]** with real child JVMs and the real engine (`IdentityRecoveryIT`), tokens from the fake issuer |
 | T07 | `DelegatedAuthorityAcceptanceTest`: widening, expiry and replay with two scripted agents against the fake issuer; policy boundary with the embedded Cedar engine. Real multi-agent flows are WP-207 |
-| A real Keycloak 26.2.5 and 26.8.1: exchange, `actor_token`, `act`/`may_act`, lifetime, expiry, logout | **[probed]** by script on 2026-10-19 (section 9); our client and verifier run against both by `KeycloakInteropIT` (section 9.4); not run in CI; JWKS rotation **[unverified]** |
+| A real Keycloak 26.2.5 and 26.8.1: exchange, `actor_token`, `act`/`may_act` with real permission and consent, scope/lifetime bounds, expiry, revocation, key rotation | **[verified locally]** 2026-10-20 by `KeycloakStandardIT` (3/3) and `KeycloakDelegationIT` (6/6) with the product exchanger, verifier, grants and guard (section 9.4); **CI evidence pending** (PR #40 matrix) until the exact head is green |
 | A live step gated by the grant check | **not built**: only resume is wired; `InstanceAuthorities.recheck` exists for the agent bridge (WP-2xx) |
 | `TokenExchanger` used by a running flow | **not built**: the bean exists, nothing in the runtime injects it yet |
 | Identity carried through asynchronous tasks | the `AuthorityScope` wrappers exist and are unit tested; no runtime component uses them yet except resume |

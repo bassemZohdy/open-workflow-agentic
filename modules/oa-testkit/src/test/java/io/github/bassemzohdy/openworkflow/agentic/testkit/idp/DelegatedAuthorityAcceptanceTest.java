@@ -89,7 +89,7 @@ class DelegatedAuthorityAcceptanceTest {
 
     @BeforeEach
     void twoAgents() throws Exception {
-        fx = new IdentityFixture(RESOURCE);
+        fx = new IdentityFixture(RESOURCE, CLIENT_ID);
         exchanger = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets,
                 fx.grants, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
         guard = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), fx.grants, fx.clock, 1);
@@ -107,9 +107,22 @@ class DelegatedAuthorityAcceptanceTest {
         fx.close();
     }
 
+    /**
+     * A root grant exchanges the user's token. A child grant exchanges its parent's delegated token (addressed to the
+     * runtime), so that the whole chain stays in the token: the exchanger refuses a chain it cannot see in full.
+     */
     private IssuedToken exchange(DelegationGrant grant, String workload, Set<String> scopes) {
-        return exchanger.exchange(new ExchangeRequest(Credential.of(userToken), Credential.of(workload), RESOURCE,
-                scopes, grant));
+        Credential subject = Credential.of(userToken);
+        if (grant.parentId() != null) {
+            try {
+                String parentWorkload = fx.as.workloadToken("planner", fx.tenant, Duration.ofMinutes(30));
+                subject = exchanger.exchange(new ExchangeRequest(subject, Credential.of(parentWorkload), CLIENT_ID,
+                        PLANNER_SCOPES, plannerGrant)).accessToken();
+            } catch (Exception e) {
+                throw e instanceof RuntimeException r ? r : new IllegalStateException(e);
+            }
+        }
+        return exchanger.exchange(new ExchangeRequest(subject, Credential.of(workload), RESOURCE, scopes, grant));
     }
 
     private Reason refusedAtResource(String token, Set<String> scopes) {
@@ -188,8 +201,8 @@ class DelegatedAuthorityAcceptanceTest {
     @Test
     void theExchangeNeverIssuesMoreThanTheGrantAndTheResourceRefusesAForgedWiderToken() throws Exception {
         // The worker's grant covers cases:read. Asking for cases:write is refused before anything is sent.
-        ExchangeException widening = assertThrows(ExchangeException.class,
-                () -> exchange(workerGrant, workerWorkload, Set.of("cases:write")));
+        ExchangeException widening = assertThrows(ExchangeException.class, () -> exchanger.exchange(new ExchangeRequest(
+                Credential.of(userToken), Credential.of(workerWorkload), RESOURCE, Set.of("cases:write"), workerGrant)));
         assertEquals(ExchangeException.Code.SCOPE_WIDENING, widening.code());
         assertEquals(0, fx.as.received().size(), "the request never reached the authorization server");
 
