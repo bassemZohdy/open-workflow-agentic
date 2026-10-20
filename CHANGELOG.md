@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-103 shared model-budget preparation: retain full-ceiling per-node MODEL allowances under original leaf/actual-parent caps and enter a callback only after a known fresh commit. Add explicit non-CDI gate/proposed V79, current post-I/O checks, original deadlines/JTA/connection bounds and corrected uncertain-retry/usage documentation. Local212 contracts pass;24 SQL/protocol cases and15 allocation regressions compile. Current SQL/peer/model-consumer/usage/restore gates remain; no activation or acceptance promotion.
+
 - WP-103 shared preparation: retain one immutable approved task/model allocation and original database lifetime for each canonical resource call. Add explicit non-CDI storage and proposed V78 with actual grant/parent/registry integrity and execution prerequisite; all206 contracts/three codec-preflight tests pass, and15 actual SQL cases pass EACH lane at1ae6886/BOTH39426839423 (all152 actual XML per lane inspected, provider/process/strict checks zero skips). The initial SQL-precedence failure is corrected and retained. Peer/final PR/consumer/budget/model gates remain; no provider permission or activation.
 
 - WP-103 preparation: JDK-only full-scope execution entry, separate private fence signature and exact UUID checkpoint/outcome association with one bounded canonical stored-Base64 fingerprint.189 contracts including6 new and actual pinned serializer interoperability1/application test compilation pass. No durable gate, consumer/dispatch activation or package promotion; exact peer/full/strict review follows sole #55.

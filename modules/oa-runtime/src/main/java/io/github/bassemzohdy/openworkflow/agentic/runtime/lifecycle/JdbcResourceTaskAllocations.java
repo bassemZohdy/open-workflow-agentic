@@ -71,7 +71,7 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
         return stored;
     }
 
-    private static Optional<AllocatedResourceTask> read(Connection connection, ResourceCallScope expected) throws SQLException {
+    static Optional<AllocatedResourceTask> read(Connection connection, ResourceCallScope expected) throws SQLException {
         try (var select = connection.prepareStatement("""
                 select c.*,o.occurrence_key,a.allocation_key,a.parent_task_id,a.contract_id,
                     case when octet_length(a.contract::text)<=65536 then a.contract::text end as contract_text,

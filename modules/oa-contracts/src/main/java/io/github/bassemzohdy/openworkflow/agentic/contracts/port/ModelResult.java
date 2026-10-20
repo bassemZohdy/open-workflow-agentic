@@ -13,7 +13,8 @@ public sealed interface ModelResult permits ModelResult.Completed, ModelResult.R
      *
      * @param text       the response text
      * @param costMicros the cost of the call in millionths of the budget unit, at least 0; charged against the
-     *                   task's {@code ExecutionLimits.maxCostMicros}
+     *                   task's {@code ExecutionLimits.maxCostMicros}. This must be trusted measured/reported usage,
+     *                   never a reservation ceiling or a guessed cost from a string-only response
      */
     record Completed(String text, long costMicros) implements ModelResult {
         public Completed {

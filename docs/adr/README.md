@@ -39,4 +39,6 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 
 | [0029](0029-retain-approved-resource-task-allocations.md) | Retain approved resource-task allocations | Proposed; consumer/budget gates remain |
 
+| [0030](0030-reserve-model-node-allowances-before-callbacks.md) | Reserve model-node allowances before callbacks | Proposed; consumer/usage/restore gates remain |
+
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.

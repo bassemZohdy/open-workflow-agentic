@@ -85,3 +85,9 @@ shared allocation API/backend and proposed V78 are now implemented in separate
 GPT execution preparation, with local contract/preflight/compile evidence; current
 SQL/peer/adoption results belong to that handoff. This original decision is not
 retroactive permission or proof of model-budget/gateway enforcement. No activation.
+
+
+Model reservation preparation: WP-103-model-call-reservations.md and proposed
+ADR0030 now specify the concrete shared model-node/parent-account allowance and
+callback-only gate. Current local/SQL/consumer evidence belongs to that handoff;
+no live model permission, measured usage or activation is implied by this decision.
