@@ -27,15 +27,17 @@ class JdbcEventInboxTest {
         StartRequest request = new StartRequest(tenant, new Subject(SubjectKind.USER, "alice"),
                 new DefinitionRef("agentic/inbox-test", "1"), Map.of(), "start");
         InstanceRecord row = store.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(), request,
-                Instant.now()), "test.start").record();
+                now()), "test.start").record();
         row = move(row, InstanceStatus.RUNNING, null);
         return waiting ? move(row, InstanceStatus.WAITING, null) : row;
     }
 
     private InstanceRecord move(InstanceRecord row, InstanceStatus status, Instant deadline) {
-        return store.replace(row.successor(Instant.now(), status, row.engineInstanceId(), row.startAttempts(),
+        return store.replace(row.successor(now(), status, row.engineInstanceId(), row.startAttempts(),
                 null, deadline), row.version(), "test.transition", row.owner());
     }
+
+    private static Instant now() { return Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS); }
 
     private InboxMessage message(InstanceRecord row, String id, String key) {
         return new InboxMessage(row.tenant(), "urn:test:orders", id, "order.ready", row.id(), key, "{\"ok\":true}");
