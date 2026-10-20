@@ -88,6 +88,13 @@ cases atbaadd56/39378344724 do not cover this missing late-insert path. All11
 compile with the final application reactor. Current V72 execution remains
 pending its own Linux run; no baseline success is transferred to the fix.
 
+Baseline exactbaadd569b1e627568672bd7071a62c65677e5ea6 run39378344724 is
+now SUCCESS BOTH lanes. Complete logs inspected: ListenGroupStoreTest10,
+InboxListenGroupTest9, actual SDK group4, standard3/native8; zero failures/
+errors/skips and strict provider evidence checks pass. Those ten baseline
+SQL cases are executed. New product4d75161/V72 and its late-insert case run
+separately in39379015967 and still require their own execution and review.
+
 Two additional plain runtime cases require ZERO database/audit access for
 duplicate/trailing/non-object snapshot JSON, changed snapshot fingerprint and
 unsupported timeout precision. Together with group9/task2, actual SDK group4,
