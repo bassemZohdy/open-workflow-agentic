@@ -168,6 +168,74 @@ class ListenGroupStoreTest {
         var selected=groups.selected(f.claim,f.group,0,128).getFirst();assertEquals(List.of(f.group.slots(Role.DATA).getFirst()),selected.memberships());
         assertFalse(groups.register(f.claim,f.group,SNAPSHOT,Duration.ofMinutes(5)).captureComplete());
     }
+    @Test void directSqlCannotFinalizeOnlyPartOfAnAllReceiptAndTheRejectedBatchRollsBack() throws Exception {
+        var f=fixture(Strategy.ALL,List.of(A,B),Stop.NONE,List.of());var input=receipt(f,"partial-all");
+        rejectPartialAdvance(f,input,1);
+        assertTrue(groups.selected(f.claim,f.group,0,128).isEmpty());
+        assertEquals(0,count(f,"inbox.listen_item"));assertEquals(0,count(f,"inbox.listen_member"));noLocks(f);
+        var accepted=groups.offer(f.claim,f.group,input,Set.copyOf(f.group.slots(Role.DATA))).orElseThrow();
+        assertEquals(1,accepted.sequence());assertEquals(2,accepted.memberships().size());
+        assertTrue(groups.register(f.claim,f.group,SNAPSHOT,Duration.ofMinutes(5)).captureComplete());
+    }
+    @Test void allMayOmitAnExclusiveSlotOnlyWhenAnEarlierReceiptAlreadyOwnsIt() {
+        var f=fixture(Strategy.ALL,List.of(A,B),Stop.NONE,List.of());
+        groups.offer(f.claim,f.group,receipt(f,"first-exclusive"),Set.of(f.group.slots(Role.DATA).getFirst())).orElseThrow();
+        var accepted=groups.offer(f.claim,f.group,receipt(f,"remaining-exclusive"),Set.copyOf(f.group.slots(Role.DATA))).orElseThrow();
+        assertEquals(2,accepted.sequence());assertEquals(List.of(f.group.slots(Role.DATA).get(1)),accepted.memberships());
+        assertTrue(groups.register(f.claim,f.group,SNAPSHOT,Duration.ofMinutes(5)).captureComplete());
+    }
+    @Test void anyCannotReuseEarlierNonexclusiveMembershipToHideAMatchOnANewReceipt() throws Exception {
+        var f=fixture(Strategy.ANY,List.of(A,B),Stop.EXPRESSION,List.of());
+        groups.offer(f.claim,f.group,receipt(f,"earlier-any"),Set.of(f.group.slots(Role.DATA).get(1))).orElseThrow();
+        var next=receipt(f,"partial-any");rejectPartialAdvance(f,next,2);
+        assertEquals(1,groups.selected(f.claim,f.group,0,128).size());noLocks(f);
+        var accepted=groups.offer(f.claim,f.group,next,Set.of(f.group.slots(Role.DATA).getFirst())).orElseThrow();
+        assertEquals(2,accepted.sequence());assertEquals(List.of(f.group.slots(Role.DATA).getFirst()),accepted.memberships());
+        assertFalse(groups.register(f.claim,f.group,SNAPSHOT,Duration.ofMinutes(5)).captureComplete());
+    }
+    @Test void allUntilMayReuseAnEarlierExclusiveStopMembership() {
+        var f=fixture(Strategy.ANY,List.of(A),Stop.ALL,List.of(A,B));
+        groups.offer(f.claim,f.group,receipt(f,"first-until"),Set.of(f.group.slots(Role.UNTIL).getFirst())).orElseThrow();
+        var accepted=groups.offer(f.claim,f.group,receipt(f,"remaining-until"),Set.copyOf(f.group.slots(Role.UNTIL))).orElseThrow();
+        assertEquals(2,accepted.sequence());assertEquals(List.of(f.group.slots(Role.UNTIL).get(1)),accepted.memberships());
+        assertTrue(groups.register(f.claim,f.group,SNAPSHOT,Duration.ofMinutes(5)).captureComplete());
+    }
+    @Test void aCommittedUnfinalizedReceiptIsHiddenAndCannotBeReplayedAsFinalized() throws Exception {
+        var f=fixture(Strategy.ALL,List.of(A,B),Stop.NONE,List.of());var input=receipt(f,"pending-direct-sql");
+        try(var c=data.getConnection()) {
+            c.setAutoCommit(false);
+            try {insertPartialRows(c,f,input,1);c.commit();} finally {c.rollback();}
+        }
+        assertTrue(groups.selected(f.claim,f.group,0,128).isEmpty());
+        assertThrows(IllegalStateException.class,()->groups.offer(f.claim,f.group,input,Set.copyOf(f.group.slots(Role.DATA))));
+        assertEquals(1,count(f,"inbox.listen_item"));assertEquals(1,count(f,"inbox.listen_member"));
+        assertFalse(groups.register(f.claim,f.group,SNAPSHOT,Duration.ofMinutes(5)).captureComplete());noLocks(f);
+    }
+    private void insertPartialRows(Connection c,Fixture f,InboxMessage input,long sequence) throws SQLException {
+        String matches=f.group.slots(Role.DATA).stream().map(slot->"{\"groupDigest\":\""+slot.groupDigest()+"\",\"role\":\"DATA\",\"ordinal\":"
+                +slot.ordinal()+",\"filterFingerprint\":\""+slot.filterFingerprint()+"\"}").collect(java.util.stream.Collectors.joining(",","[","]"));
+        try(var s=c.prepareStatement("insert into inbox.listen_item(tenant,instance_id,task_digest,sequence,role,source,event_id,receipt_fingerprint,matched_slots,selecting_owner,selecting_epoch) values(?,?,?,?,'DATA',?,?,?,?::jsonb,?,?)")) {
+            key(s,f);s.setLong(4,sequence);s.setString(5,input.source());s.setString(6,input.eventId());s.setString(7,input.fingerprint());
+            s.setString(8,matches);s.setString(9,f.claim.owner());s.setLong(10,f.claim.epoch());assertEquals(1,s.executeUpdate());
+        }
+        var first=f.group.slots(Role.DATA).getFirst();
+        try(var s=c.prepareStatement("insert into inbox.listen_member(tenant,instance_id,task_digest,sequence,role,ordinal,filter_fingerprint,exclusive_slot) values(?,?,?,?,'DATA',?,?,false)")) {
+            key(s,f);s.setLong(4,sequence);s.setInt(5,first.ordinal());s.setString(6,first.filterFingerprint());assertEquals(1,s.executeUpdate());
+        }
+    }
+    private void rejectPartialAdvance(Fixture f,InboxMessage input,long sequence) throws Exception {
+        try(var c=data.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                insertPartialRows(c,f,input,sequence);
+                try(var s=c.prepareStatement("update inbox.listen_group set last_sequence=?,capture_complete=false,write_owner=?,write_epoch=? where tenant=? and instance_id=? and task_digest=?")) {
+                    s.setLong(1,sequence);s.setString(2,f.claim.owner());s.setLong(3,f.claim.epoch());s.setString(4,f.row.tenant());
+                    s.setString(5,f.row.id().value());s.setString(6,f.group.task().digest());
+                    assertEquals("42501",assertThrows(SQLException.class,s::executeUpdate).getSQLState());
+                }
+            } finally {c.rollback();}
+        }
+    }
     private void noLocks(Fixture f) {
         assertDoesNotThrow(()->{try(var c=data.getConnection()) {c.setAutoCommit(false);
             try(var s=c.prepareStatement("select 1 from inbox.listen_group where tenant=? and instance_id=? and task_digest=? for update nowait")) {

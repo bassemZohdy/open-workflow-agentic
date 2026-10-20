@@ -83,7 +83,8 @@ selection committed. A later valid-but-unmatched slot could therefore extend
 that historical receipt. V72 replaces only that guard function, leaving the
 pushed/possibly-applied V71 untouched. It requires the item's live selecting
 owner, an open group/current not-yet-advanced sequence, and membership in both
-the pinned registration AND the original item's complete match set. Java
+the pinned registration AND the original item's retained match set. This checks
+each inserted member, not coverage of every retained match at advancement. Java
 readback independently rejects members outside the retained match set and
 malformed/changed original match carriers. This is an implementation audit,
 not the mandatory independent Claude approval.
@@ -134,3 +135,12 @@ retention/tombstone/archival (history is retained), manual OPERATION, central
 audit delivery/commit-ambiguity contract, terminal metrics/traces and full T13
 including failed compensation remain acceptance gates. Database growth/quotas
 and archival are not solved by bounded per-operation pages. WP-107 stays partial.
+
+## Review N1/N2 follow-up candidate
+
+V72's direct-SQL guarantee covers late additions and per-member match membership.
+It does not establish coverage of every retained selected match. The additive
+72.1 candidate and bounded finalized-read/replay correction are documented in
+[the completeness handoff](WP-107-membership-completeness.md); current SQL/peer
+results must be checked there. No older result or complete callback/storage
+fence is inferred. Historical rows remain retained and are not silently repaired.

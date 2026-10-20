@@ -81,6 +81,7 @@ public class JdbcListenGroups {
             try(var s=statement(c,"select sequence,matched_slots from inbox.listen_item where tenant=? and instance_id=? and task_digest=? and source=? and event_id=?")) {
                 key(s,group,1);s.setString(4,candidate.source());s.setString(5,candidate.eventId());
                 try(var r=s.executeQuery()) {if(r.next()) {
+                    if(r.getLong(1)>row.binding().lastSequence()) throw new IllegalStateException("selected receipt is not finalized");
                     if(!readSlots(r.getString(2)).equals(match.slots())) throw new IllegalStateException("receipt match set changed");
                     var previous=read(c,group,r.getLong(1));leases.requireCurrent(c,claim,true);return Optional.of(previous);
                 }}
@@ -126,9 +127,9 @@ public class JdbcListenGroups {
     public List<Recorded> selected(InboxTaskClaim claim,InboxListenGroup group,long afterSequence,int limit) {
         sameTask(claim,group);if(afterSequence<0 || limit<1 || limit>128) throw new IllegalArgumentException("selection page must be bounded");
         return Transactions.inTransaction(data,c->{
-            leases.requireCurrent(c,claim,false);row(c,group);var found=new ArrayList<Recorded>();
-            try(var s=statement(c,"select sequence from inbox.listen_item where tenant=? and instance_id=? and task_digest=? and sequence>? order by sequence limit ?")) {
-                key(s,group,1);s.setLong(4,afterSequence);s.setInt(5,limit);
+            leases.requireCurrent(c,claim,false);var current=row(c,group);var found=new ArrayList<Recorded>();
+            try(var s=statement(c,"select sequence from inbox.listen_item where tenant=? and instance_id=? and task_digest=? and sequence>? and sequence<=? order by sequence limit ?")) {
+                key(s,group,1);s.setLong(4,afterSequence);s.setLong(5,current.binding().lastSequence());s.setInt(6,limit);
                 try(var r=s.executeQuery()) {while(r.next()) {found.add(read(c,group,r.getLong(1)));leases.requireCurrent(c,claim,false);}}
             }
             leases.requireCurrent(c,claim,false);return List.copyOf(found);

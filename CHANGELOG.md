@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-107 review N1/N2 candidate: additive72.1 requires full retained-match coverage at advancement, allowing only earlier exclusive memberships as substitutes; finalized reads/replay refuse pending rows. V71/V72 remain unchanged and their prior direct-SQL wording is narrowed to late additions/per-member checks. Five new SQL cases compile (16 total), app test compilation/tools76 pass; actual SQL/CI and exact candidate peer review pending. #55 remains frozen at reviewed ea56f33; no package promotion.
+
 - WP-107 pinned group/snapshot/V71-V72 ordered-membership increment is refreshed onto reviewed main54 for exact-head peer/full/strict review.192 contracts/25 selected cases/app test compilation/tools76/four OWS fixtures pass locally; full selector/coordinator/FIFO/restore/T13 and package gates remain open. Main54 postmerge full and both strict provider/process lanes passed; finished logs inspected.
 
 - Combined preparation on reviewed #48 and effect/process-CI foundation passed BOTH39381927960 atc1fd835: snapshots6/group SQL11/actual SDK-JPA11/receipt recovery5/restore gate5/CDI tracing3/core effect process recovery1/standard3/native8, zero skips and strict checkers. Production group selector/coordinator/execution/recovery/T13 remains open.

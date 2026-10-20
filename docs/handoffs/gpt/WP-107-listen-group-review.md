@@ -16,7 +16,10 @@ Delivered increment:
   full task identity, receipt/match membership, arrival-selection sequence and
   selecting owner/epoch. Leases/current registry fence writes; replayed reads
   retain historical attribution without authorizing a new owner. V72 prevents
-  membership additions after an item is finalized, including direct SQL.
+  membership additions after an item is finalized, including direct SQL. That
+  late-addition fence alone does not prove all retained matches are represented.
+  Review N1/N2 and the separate additive72.1 candidate are documented in
+  WP-107-membership-completeness.md; the reviewed #55 SHA stays frozen.
 - JdbcListenGroups registers/retains configuration, offers complete trusted
   matches and reads bounded ordered pages. Mandatory audit is outside owned
   SQL transactions; commit/audit uncertainty requires same-identity readback.
