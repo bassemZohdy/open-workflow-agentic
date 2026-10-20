@@ -339,6 +339,7 @@ Implemented scope:
 - Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open.
 - PR #41 checkpoint/ingress increment merged as e738218 after Claude exact-head APPROVE-partial at cd3f57b and CI39355182128; postmerge main CI39357918414 passed. WP-107/T13 stay partial.
 - Dispatch protocol successor adds immutable occurrence identity, retained deadlines/dispositions, same-session reservations and explicit checkpoint-proof ACK port. Local application test-compile and two identity cases pass; nine PostgreSQL protocol cases await CI. No SDK consumer/proof implementation is activated.
+- Dispatch protocol754507a passed9/9 real PostgreSQL cases, zero skips, in CI39358587955. Overall build failed only the route media probe; Claude0cf85d6 correction integrated via GPT004fd9e and current full CI/review renewed. No actual SDK consumption/T13 proof.
 
 Additional closure/integration tasks:
 
