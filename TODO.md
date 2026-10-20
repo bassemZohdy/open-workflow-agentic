@@ -12,7 +12,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 - [ ] **WP-102 Identity and delegated authority** — Run the real Keycloak test in docs/identity.md section 9; prove actor_token/act mapping, tenant/scope claims, audience narrowing and expiry bounds.
 - [ ] **WP-103 Policy enforcement points** — Wire policy and verified caller identity into the audit query/verification API.
-- [ ] **WP-108 Effect ledger and compensation** — Obtain passing CI and Claude review of the current head; T03 passed in CI run 39259523945 on the initial component head.
+- [ ] **WP-108 Effect ledger and compensation** — Integrate governed adapters and effect-aware Flow re-execution through the new execution boundary with WP-105/WP-113.
 - [ ] **WP-105 Run lifecycle and canonical progress** — Complete idempotent event/schedule initiation with WP-107 and WP-109.
 - [ ] **WP-109 Timers, deadlines and durable failover** — Complete persisted maximum lifetimes, escalation timers and deadline recovery across restart.
 - [ ] **WP-106 Human task service** — Tasks bound to workflow waits; assign, delegate, reassign, approve, reject, escalate
@@ -322,6 +322,7 @@ Implemented scope:
 - Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.
 - Bounded canonical envelope, audit/metrics and scoped ingress passed full CI 39352802891 at 04b421f (6 unit, 4 HTTP, 1 native policy, 9 JDBC inbox cases).
 - Actual JPA writer success observer and bounded fail-closed checkpoint gate implemented; unhealthy readiness/new-start refusal and 14 local unit cases pass. Current-head application binding/full CI and durable inbox acknowledgement remain open.
+- Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open.
 
 Additional closure/integration tasks:
 
@@ -348,10 +349,10 @@ Implemented scope:
 
 - JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.
 - Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.
+- Reviewed99f475d merged to main at2f722cf after Claude current-head PASS and full CI39349314182; remaining package gates stay partial.
 
 Additional closure/integration tasks:
 
-- [ ] Obtain passing CI and Claude review of the current head; T03 passed in CI run 39259523945 on the initial component head.
 - [ ] Integrate governed adapters and effect-aware Flow re-execution through the new execution boundary with WP-105/WP-113.
 - [ ] Integrate policy-verified manual decisions and central audit projection through Claude-owned handoffs; add distributed trace spans. Low-cardinality metrics and CDI ambient-rollback tests are included.
 

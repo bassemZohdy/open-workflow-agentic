@@ -1,0 +1,32 @@
+document:
+  dsl: '1.0.3'
+  namespace: agentic
+  name: checkpoint-gate-test
+  version: '1.0.0'
+  title: Checkpoint failure after event delivery
+  summary: Test fixture receives one event and must checkpoint before the next task. No external calls or secrets.
+input:
+  schema:
+    format: json
+    document:
+      type: object
+output:
+  schema:
+    format: json
+    document:
+      type: object
+      required: [effect]
+      properties:
+        effect: {type: boolean}
+do:
+  - awaitDecision:
+      listen:
+        to:
+          one:
+            with:
+              type: org.openworkflow.agentic.checkpoint.test
+      timeout:
+        after: PT30S
+  - performEffect:
+      set:
+        effect: true

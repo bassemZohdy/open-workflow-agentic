@@ -640,3 +640,11 @@ operation/error class/time and counts, never workflow data or credentials.
 This is partial WP-107 infrastructure. Engine inbox delivery, persisted signal
 acknowledgement, occurrence identity across restart/parallel loops and T13
 still require implementation and process-level proof.
+
+
+CheckpointLifecycleTest also exercises the real pinned SDK event/listen/lifecycle
+path: its negative control advances after a failed writer future; the guarded
+case holds the delivered wait before the next task, with no consumption observer
+and unhealthy readiness. This is a regression of the barrier only. In particular,
+TASK_STARTED is a no-op in the JPA writer and cannot establish consumption. Actual
+inbox ACK/replay and loop/parallel restoration still require end-to-end proof.

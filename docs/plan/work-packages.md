@@ -402,6 +402,7 @@ Implementation status: **partial**.
 - Implemented: Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.
 - Implemented: Bounded canonical envelope, audit/metrics and scoped ingress passed full CI 39352802891 at 04b421f (6 unit, 4 HTTP, 1 native policy, 9 JDBC inbox cases).
 - Implemented: Actual JPA writer success observer and bounded fail-closed checkpoint gate implemented; unhealthy readiness/new-start refusal and 14 local unit cases pass. Current-head application binding/full CI and durable inbox acknowledgement remain open.
+- Implemented: Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open.
 
 Remaining gates:
 
@@ -429,10 +430,10 @@ Deliverables:
 Implementation status: **partial**.
 - Implemented: JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.
 - Implemented: Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.
+- Implemented: Reviewed99f475d merged to main at2f722cf after Claude current-head PASS and full CI39349314182; remaining package gates stay partial.
 
 Remaining gates:
 
-- Obtain passing CI and Claude review of the current head; T03 passed in CI run 39259523945 on the initial component head.
 - Integrate governed adapters and effect-aware Flow re-execution through the new execution boundary with WP-105/WP-113.
 - Integrate policy-verified manual decisions and central audit projection through Claude-owned handoffs; add distributed trace spans. Low-cardinality metrics and CDI ambient-rollback tests are included.
 
