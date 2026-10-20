@@ -102,10 +102,12 @@ class FaultProxyTest {
 
     @Test
     void stopRefusesNewConnectionsAndStartListensAgainOnTheSamePort() throws IOException {
-        int port = proxy.port();
-        proxy.stop();
-        assertEquals(false, proxy.isListening());
-        assertThrows(ConnectException.class, () -> new Socket(InetAddress.getLoopbackAddress(), port).close());
+        int port;
+        try (var stopped = StoppedProxyPort.acquire(proxy,() -> new FaultProxy("127.0.0.1",echo.getLocalPort()).start())) {
+            proxy = stopped.proxy(); port = proxy.port();
+            assertEquals(false, proxy.isListening());
+            assertThrows(ConnectException.class, () -> new Socket(InetAddress.getLoopbackAddress(), port).close());
+        }
         proxy.start();
         assertEquals(port, proxy.port());
         try (Socket c = connect()) {

@@ -9,9 +9,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Properties;
-import java.net.InetSocketAddress;
-import java.net.BindException;
-import java.net.Socket;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,41 +47,16 @@ class FaultProxyPostgresTest {
 
     @Test
     void connectionsAreRefusedWhileTheProxyIsStopped() throws Exception {
-        // Acquire the non-listening reservation before testing refusal. A kernel/client or another process may
-        // acquire a released ephemeral port first; retry only that resource acquisition, never the SQL assertion.
-        try (Socket reservation = reserveStoppedPort()) {
+        try (var stopped = StoppedProxyPort.acquire(proxy,() -> new FaultProxy("127.0.0.1",5432).start())) {
+            proxy = stopped.proxy();
             assertThrows(SQLException.class, () -> {
-                try (Connection unexpected = connect(proxy.port(), 2)) {
-                    scalar(unexpected, "select 1");
-                }
+                try (Connection unexpected = connect(proxy.port(),2)) { scalar(unexpected,"select 1"); }
             });
         }
         proxy.start();
         try (Connection c = connect(proxy.port(), 5)) {
             assertEquals(4, scalar(c, "select 4"));
         }
-    }
-
-    private Socket reserveStoppedPort() throws Exception {
-        BindException last = null;
-        for (int allocation = 0; allocation < 32; allocation++) {
-            proxy.stop();
-            Socket reservation = new Socket();
-            try {
-                // Match the listener's reuse policy so old TCP TIME_WAIT records do not prevent acquisition.
-                reservation.setReuseAddress(true);
-                reservation.bind(new InetSocketAddress("127.0.0.1", proxy.port()));
-                return reservation;
-            } catch (BindException occupied) {
-                reservation.close();
-                last = occupied;
-                if (allocation < 31) proxy = new FaultProxy("127.0.0.1", 5432).start();
-            } catch (Exception failure) {
-                reservation.close();
-                throw failure;
-            }
-        }
-        throw new BindException("could not reserve a stopped proxy port after 32 allocations: " + last);
     }
 
     private static Connection connect(int port, int socketTimeoutSeconds) throws SQLException {
