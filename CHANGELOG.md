@@ -1,6 +1,6 @@
 # Changelog
 
-- WP-605: wire the component URI resolver into the candidate runtime through its main SPI descriptor. Separate native14/seven and platform15/six CTK reports retain all21 original scenarios/45 assertions; only the query case changes.47 focused tests/tools94/package compile pass; actual injected Flow/client URI boot test and artifact retention added. Fresh exact Linux/BOTH boot proof pending, native-image/authority/peer gates open; no merge or status promotion.
+- WP-605: wire the component URI resolver into the candidate runtime through its main SPI descriptor. Separate native14/seven and platform15/six CTK reports retain all21 original scenarios/45 assertions; only the query case changes.47 focused tests/tools94/package compile pass; actual injected Flow/client URI boot test and artifact retention added. Exactea56d7a dedicated39481198334/BOTH39481196782 pass: all83/167/167 actual XML and injected Flow two-request boot observations plus native/platform/codec/recovery artifacts independently checked zero skips. Native-image/authority/peer gates remain open; no merge or status promotion.
 
 - WP-605: prepare an opt-in component URI resolver fixing the pinned full-URI-as-path query failure. Four controls and actual unchanged SDK CTK query case pass; native findings remain unchanged.45 focused tests/tools94 pass. Exact078d4c5 Linux39478627368/BOTH39478634899 pass, all83/166/166 actual XML and adapter/native/codec/recovery artifacts independently inspected zero skips. Production registration/peer gates remain pending.
 
