@@ -7,6 +7,9 @@ on:
       - 'pom.xml'
       - 'modules/oa-runtime/pom.xml'
       - 'modules/oa-runtime/src/test/**/conformance/**'
+      - 'modules/oa-runtime/src/main/**/adapter/source/**'
+      - 'modules/oa-runtime/src/test/**/adapter/source/**'
+      - 'modules/oa-runtime/src/main/resources/conformance/**'
       - 'apps/app-runtime/src/main/resources/flow/**'
       - 'docs/conformance/**'
   push:
@@ -16,6 +19,9 @@ on:
       - 'pom.xml'
       - 'modules/oa-runtime/pom.xml'
       - 'modules/oa-runtime/src/test/**/conformance/**'
+      - 'modules/oa-runtime/src/main/**/adapter/source/**'
+      - 'modules/oa-runtime/src/test/**/adapter/source/**'
+      - 'modules/oa-runtime/src/main/resources/conformance/**'
       - 'apps/app-runtime/src/main/resources/flow/**'
       - 'docs/conformance/**'
 permissions:

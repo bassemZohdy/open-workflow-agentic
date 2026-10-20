@@ -89,6 +89,12 @@ assessment does not retain that initial incorrect assumption as a runtime defect
 
 ## Extension and dependency inventory
 
+The [offline source codec](source-import-export.md) now provides an actual
+source-preserving import/export API for candidate authoring, with pinned schema
+validation and explicit conversion-loss handling. It is separate from SDK model
+serialization and from activation; its remaining authoring/semantic gates are
+documented with the API.
+
 The machine inventory traverses workflow/task structures, not arbitrary set/body/
 schema payload keys. Metadata is a standard extension hook; its application keys
 are not automatically a syntax violation. An HTTP or A2A task remains dependent
