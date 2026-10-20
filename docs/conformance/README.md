@@ -6,11 +6,11 @@ H02 remain partial. The checked-in [report](ows-portability-report.json) records
 including divergences. A green test means the assessment reproduced those facts;
 it does not turn a divergence into a supported feature.
 
-The profile pins Quarkus Flow1.2.0 / Java SDK7.35.3.Final and normative OWS schema
-1.0.3 DEVELOPMENT profile at specification commit2dd2c84170d5f3e05d58e913e9ca298dcf8d543a.
-The official latest-release API observed2026-10-20 returns [v1.0.1](https://github.com/open-workflow-specification/specification/releases/tag/v1.0.1),
-published2026-07-31. A separate released1.0.1 schema at commitf43a6e3cfb97a724d4b434b0ecc769379af379e9
-is checked for every source and export too. This does not label development1.0.3
+The profile pins Quarkus Flow 1.2.0 / Java SDK 7.35.3.Final and normative OWS schema
+1.0.3 DEVELOPMENT profile at specification commit 2dd2c84170d5f3e05d58e913e9ca298dcf8d543a.
+The official latest-release API observed 2026-10-20 returns [v1.0.1](https://github.com/open-workflow-specification/specification/releases/tag/v1.0.1),
+published 2026-07-31. A separate released 1.0.1 schema at commit f43a6e3cfb97a724d4b434b0ecc769379af379e9
+is checked for every source and export too. This does not label development 1.0.3
 as a published release or infer released-runtime semantic support. Both schemas
 and one official CTK feature are copied under Apache-2.0 with source hashes,
 NOTICE and license in the test resources. No engine/platform version is upgraded.
@@ -25,8 +25,9 @@ Generated actual report, JSON/YAML model exports and outputs of the sixteen cura
 pure fixtures are in modules/oa-runtime/target/conformance. The dedicated
 ows-conformance workflow retains them. An intentional reassessment uses the same
 command with -Dows.updateReport=true, then reviews the changed report and findings.
-Ordinary tests and CI never update the baseline. There is no database, provider,
-shell/container/script/agent/model execution in this job. Explicit task/resource
+Ordinary tests and CI never update the baseline. The assessment performs no database, provider, shell, container, script, agent
+or model execution. The workflow also runs the full affected module suites
+against its disposable PostgreSQL service; those existing tests do use the database. Explicit task/resource
 guards protect the pure subset even if a fixture changes. Other cases exercise
 only the actual SDK reader/writer APIs, not an alternative hand-written model.
 
@@ -34,10 +35,10 @@ only the actual SDK reader/writer APIs, not an alternative hand-written model.
 
 | Evidence | Current result |
 |---|---|
-| 42 sources: authored corpus, one extracted development CTK case, released-declared variants, two shipped definitions | 39 pass development1.0.3 schema;36 pass released1.0.1 schema. Three deliberate negative controls remain. |
+| 42 sources: authored corpus, one extracted development CTK case, released-declared variants, two shipped definitions | 39 pass development 1.0.3 schema; 36 pass released 1.0.1 schema. Three deliberate negative controls remain. |
 | Actual default/validating SDK imports | 38 accepted; the three negative controls and a schema-valid unknown-root-field case rejected |
-| JSON and YAML export/reimport of the 38 imported models | 76 attempts,74 serialized successfully; two nested-metadata writer failures remain explicit. Successful exports do not remove/change authored data fields in this corpus. |
-| Eight pure fixtures plus eight released-declared variants, each as source/JSON/YAML | 48 actual executions:30 match,18 differ from the same explicitly declared expectations |
+| JSON and YAML export/reimport of the 38 imported models | 76 attempts, 74 serialized successfully; two nested-metadata writer failures remain explicit. Successful exports do not remove/change authored data fields in this corpus. |
+| Eight pure fixtures plus eight released-declared variants, each as source/JSON/YAML | 48 actual executions: 30 match, 18 differ from the same explicitly declared expectations |
 | Selected official For CTK case | Matches original upstream input/output in all three forms; hash and extraction independently checked |
 | Lexical source preservation | Serialization changes source text; comments/anchors are not a source-preserving editing format |
 
@@ -51,8 +52,8 @@ retained in generated execution artifacts.
 
 ## Open findings
 
-1. **Export/context:** the minimal export-context case sets value42 and exports
-   observed from that task output. It returns observed:null instead of42 in all
+1. **Export/context:** the minimal export-context case sets value 42 and exports
+   observed from that task output. It returns observed:null instead of 42 in all
    three forms. The original dataflow case also returns answer42/observed:null.
    The normative [data-flow rules](https://github.com/open-workflow-specification/specification/blob/2dd2c84170d5f3e05d58e913e9ca298dcf8d543a/dsl.md#data-flow)
    require export.as to use transformed task output and replace workflow context.
@@ -65,9 +66,8 @@ retained in generated execution artifacts.
 3. **Nested metadata serialization:** JSON and YAML writes of nested task
    metadata both fail with JsonMappingException/JsonGenerationException. The
    actual serializer is Quarkus Flow TaskMetadataSerializer, not an alternative
-   handwritten exporter. The baseline always contained these failures; the first
-   human summary incorrectly counted attempts as successful exports, now corrected.
-   No fixture/value is removed to mask the failure.
+   handwritten exporter. These are serialization failures, not successful exports.
+   The nested metadata fixture remains part of the assessment.
 4. **Schema/model boundary:** an unknown root field is accepted by the pinned
    schema but rejected by the SDK model. An arbitrary string schema format passes
    both import stages; runtime support for that format is not established. JSON
@@ -91,7 +91,7 @@ on its service contract even when its definition is standard OWS.
 
 | Surface | Portability boundary |
 |---|---|
-| Shipped research-and-approve and lifecycle-probe YAML | Standard HTTP/listen/set constructs; both still declare DSL1.0.0, not1.0.3. Their source is unchanged. |
+| Shipped research-and-approve and lifecycle-probe YAML | Standard HTTP/listen/set constructs; both still declare DSL 1.0.0, not 1.0.3. Their source is unchanged. |
 | Embedded localhost research URL and input effectUrl | Deployment/service dependencies; credentials, registered targets, identity and policy are separate runtime contracts. No HTTP call is made by this assessment. |
 | Approval and lifecycle CloudEvent types | Required external event contracts, correlation/ingress/producer configuration; syntax validation does not prove durable delivery. |
 | document/task metadata and use.extensions in corpus | Standard opaque metadata/extension hooks. Actual extension behavior is unmeasured. |
@@ -105,7 +105,7 @@ API/source retention and a second-runtime/provider/artifact substitution run.
 No package or acceptance status is promoted by this bounded measurement.
 
 The released-declared execution variants change ONLY document.dsl and
-document.version to1.0.1, retaining the same tasks/input/expected results. A test
+document.version to 1.0.1, retaining the same tasks/input/expected results. A test
 checks that derivation. They are comparisons on the pinned stack, not the complete
 released CTK or a claim that development-text interpretations are all settled.
 Three extra development-valid shapes fail the released schema: the emit URI,
