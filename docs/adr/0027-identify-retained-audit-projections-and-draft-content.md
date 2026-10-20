@@ -43,3 +43,15 @@ Require a coordinated adapter rollout, authentic task/target/owner/live identity
 mandatory verified central receipt and final current execution/authority checks
 after blocking work before activation. Stable manual decisions, full Flow,
 retention/relay/partition/process/backup proof remain open; no legacy backfill.
+
+Prepared delivery uses separate operational work rows, atomically enqueued with
+the immutable source. Pending-only indexes and same-key predecessor checks avoid
+a global committed sequence assumption. ACK is irreversible, references and
+matches the actual co-located central source binding, and grants no permission.
+Close source transactions before calling the trusted IdempotentAuditSink; retain
+pending work after an unknown central reply and the same original receipt after
+an uncertain local ACK. This interface formalizes the agreed appendOnce shape;
+Claude's actual atomic consumer/current stored-chain validation and its evidence
+are still required. Eight added SQL cases use explicit central DATA fixtures,
+not a substitute consumer; see WP-108-audit-delivery.md for exact proof limits.
+No scheduler, remote-store assumptions, callback or applied migration is added.

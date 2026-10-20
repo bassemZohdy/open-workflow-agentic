@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.IdempotentAuditSink;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.quarkus.test.junit.QuarkusTest;
@@ -16,14 +18,17 @@ import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.*;
 import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.postgresql.ds.PGSimpleDataSource;
 
-/** Real journal/source transactions in a database created ONLY by this fixture. No target or central append runs. */
+/** Real source/queue transactions in an owned fresh database. Central receipt DATA fixtures use existing append
+ * plus a separate binding insert; they do NOT implement or prove an atomic/idempotent appendOnce consumer. */
 @QuarkusTest @TestInstance(TestInstance.Lifecycle.PER_CLASS) @Execution(ExecutionMode.SAME_THREAD)
 class EffectAuditProducerStoreTest {
     @Inject TransactionManager manager;
@@ -96,7 +101,7 @@ class EffectAuditProducerStoreTest {
         assertEquals(first,prepare(f));
         var reopened=new JdbcEffectLedger(owned,manager,new EffectAuditProducer());
         assertEquals(first,reopened.prepareScoped(f.scope(),f.command(),Duration.ZERO,now()));assertEquals(saved,history(f));
-        assertEquals(1,count(f,"ledger"));assertEquals(1,count(f,"event"));assertEquals(1,count(f,"audit_scope"));assertEquals(1,count(f,"audit_source"));
+        assertEquals(1,count(f,"ledger"));assertEquals(1,count(f,"event"));assertEquals(1,count(f,"audit_scope"));assertEquals(1,count(f,"audit_source"));assertEquals(1,count(f,"audit_delivery"));
         assertEquals(f.command().key().threadId(),f.scope().threadId());
         var value=saved.getFirst();assertEquals(AuditDraftFingerprint.of(value.draft()),value.source().contentFingerprint());
         try(var c=owned.getConnection();var q=c.prepareStatement("select occurred_at from effect.event where id=?")) {
@@ -126,17 +131,18 @@ class EffectAuditProducerStoreTest {
         assertThrows(IllegalStateException.class,()->ledger.prepareScoped(wrong,another.command(),Duration.ZERO,now()));
         assertEquals(0,count(another,"ledger"));
     }
-    @Test void aSourceInsertFailureRollsBackIntentScopeJournalAndDraft() throws Exception {
+    @ParameterizedTest @ValueSource(strings={"audit_source","audit_delivery"})
+    void aSourceOrQueueInsertFailureRollsBackIntentScopeJournalAndDraft(String table) throws Exception {
         var f=fixture();String name="gpt_source_fault_"+UUID.randomUUID().toString().replace("-","");assertTrue(name.matches("gpt_source_fault_[0-9a-f]{32}"));
         try(var c=owned.getConnection()) {
-            sql(c,"create function effect."+name+"() returns trigger language plpgsql as $$ begin if new.attributes->>'oa.instance'='"+f.scope().instanceId().value()+"' then raise exception 'injected source failure'; end if; return new; end $$");
-            sql(c,"create trigger "+name+" before insert on effect.audit_source for each row execute function effect."+name+"()");
+            sql(c,"create function effect."+name+"() returns trigger language plpgsql as $$ begin if exists(select 1 from effect.event e join effect.audit_scope s using(thread_name,node_id,idempotency_key) where e.id=new.source_event_id and s.registry_instance_id='"+f.scope().instanceId().value()+"') then raise exception 'injected source/queue failure'; end if; return new; end $$");
+            sql(c,"create trigger "+name+" before insert on effect."+table+" for each row execute function effect."+name+"()");
         }
         try {
             assertThrows(StoreUnavailableException.class,()->prepare(f));
-            for(var table:List.of("ledger","event","audit_scope","audit_source"))assertEquals(0,count(f,table));
+            for(var factTable:List.of("ledger","event","audit_scope","audit_source","audit_delivery"))assertEquals(0,count(f,factTable));
         } finally {
-            try(var c=owned.getConnection()){sql(c,"drop trigger "+name+" on effect.audit_source");sql(c,"drop function effect."+name+"()");}
+            try(var c=owned.getConnection()){sql(c,"drop trigger "+name+" on effect."+table);sql(c,"drop function effect."+name+"()");}
         }
         prepare(f);assertEquals(1,history(f).size());
     }
@@ -197,7 +203,7 @@ class EffectAuditProducerStoreTest {
         }
         try(var c=owned.getConnection()) {
             c.setAutoCommit(false);
-            try{assertEquals("42501",assertThrows(SQLException.class,()->sql(c,"truncate effect.audit_scope,effect.audit_source")).getSQLState());}
+            try{assertEquals("42501",assertThrows(SQLException.class,()->sql(c,"truncate effect.audit_scope,effect.audit_source,effect.audit_delivery")).getSQLState());}
             finally{c.rollback();}
         }
         try(var c=owned.getConnection()) {
@@ -210,5 +216,130 @@ class EffectAuditProducerStoreTest {
             } finally{c.rollback();}
         }
         assertEquals(1,history(f).size());
+    }
+
+    EffectAuditDelivery delivery(DataSource ds,IdempotentAuditSink sink){return new EffectAuditDelivery(ds,manager,producer,sink);}
+    EffectAuditProducer.Retained initial(Fixture f){return history(f).getFirst();}
+    String ack(long journal) throws SQLException {
+        try(var c=owned.getConnection();var q=c.prepareStatement("select ack_source_key from effect.audit_delivery where source_event_id=?")) {
+            q.setLong(1,journal);try(var r=q.executeQuery()){assertTrue(r.next());return r.getString(1);}
+        }
+    }
+    /** EXPLICIT CENTRAL DATA FIXTURE: existing append commits BEFORE binding insert. Not an appendOnce implementation
+     * or proof of atomic central commit/idempotence. These cases exercise the REAL delivery queue/JDBC protocol only. */
+    AuditReceipt seedCentralReceipt(EffectAuditProducer.Retained value) throws SQLException {
+        var event=new AuditTrail(owned).append(value.draft());var s=value.source();
+        var receipt=new AuditReceipt(s,event.id(),AuditDraftFingerprint.chainOf(event),event.sequence(),event.hash(),AuditDraftFingerprint.of(event));
+        receipt.requireMatches(s,value.draft());
+        try(var c=owned.getConnection();var q=c.prepareStatement("""
+            insert into audit.source_binding(source_key,schema_version,scope_fingerprint,key_fingerprint,transition,
+              source_sequence,content_fingerprint,event_id,chain_id,chain_sequence,hash) values(?,?,?,?,?,?,?,?,?,?,?)
+            """)) {
+            q.setString(1,s.key());q.setInt(2,s.schemaVersion());q.setString(3,s.scopeFingerprint());q.setString(4,s.keyFingerprint());
+            q.setString(5,s.transition().name());q.setLong(6,s.sequence());q.setString(7,s.contentFingerprint());q.setString(8,event.id().value());
+            q.setString(9,receipt.chainId());q.setLong(10,event.sequence());q.setString(11,event.hash());q.executeUpdate();
+        }
+        return receipt;
+    }
+    @Test void readyQueueAndDirectDeliveryPreservePerKeyPredecessorsAndRejectInvalidBounds() throws Exception {
+        var f=fixture();prepare(f);ledger.markAttempted(f.command().key());var facts=history(f);var calls=new AtomicInteger();
+        var relay=delivery(owned,(s,d)->{calls.incrementAndGet();throw new IllegalStateException("not implemented test consumer");});
+        long first=facts.get(0).source().sequence(),second=facts.get(1).source().sequence();
+        assertTrue(relay.ready(128).contains(first));assertFalse(relay.ready(128).contains(second));
+        assertThrows(IllegalStateException.class,()->relay.deliver(second));assertEquals(0,calls.get());
+        assertThrows(IllegalArgumentException.class,()->relay.ready(0));assertThrows(IllegalArgumentException.class,()->relay.drain(129));
+        assertThrows(IllegalArgumentException.class,()->relay.deliver(0));assertEquals(0,calls.get());
+        var receipt=seedCentralReceipt(facts.getFirst());var secondReceipt=seedCentralReceipt(facts.get(1));
+        try(var c=owned.getConnection()) {
+            c.setAutoCommit(false);
+            try{assertEquals("23514",assertThrows(SQLException.class,()->sql(c,"update effect.audit_delivery set ack_source_key='"+secondReceipt.source().key()+"' where source_event_id="+second)).getSQLState());}
+            finally{c.rollback();}
+        }
+        delivery(owned,(s,d)->receipt).deliver(first);
+        assertTrue(relay.ready(128).contains(second));assertFalse(relay.ready(128).contains(first));
+    }
+    @Test void acknowledgmentRequiresExactStoredBindingAndCannotBeResetOrErased() throws Exception {
+        var f=fixture();prepare(f);var value=initial(f);long id=value.source().sequence();
+        var invented=new AuditReceipt(value.source(),value.draft().id(),AuditDraftFingerprint.chainOf(value.draft()),1,"e".repeat(64),value.source().contentFingerprint());
+        assertThrows(IllegalStateException.class,()->delivery(owned,(s,d)->invented).deliver(id));assertNull(ack(id));
+        var receipt=seedCentralReceipt(value);
+        var wrong=new AuditReceipt(receipt.source(),receipt.eventId(),receipt.chainId(),receipt.chainSequence(),"f".repeat(64),receipt.contentFingerprint());
+        assertNotEquals(receipt.hash(),wrong.hash());assertThrows(IllegalStateException.class,()->delivery(owned,(s,d)->wrong).deliver(id));assertNull(ack(id));
+        var calls=new AtomicInteger();var relay=delivery(owned,(s,d)->{calls.incrementAndGet();assertEquals(value.source(),s);assertEquals(value.draft(),d);return receipt;});
+        assertEquals(receipt,relay.deliver(id));assertEquals(receipt,relay.deliver(id));assertEquals(2,calls.get());assertEquals(receipt.source().key(),ack(id));
+        for(String statement:List.of("update effect.audit_delivery set ack_source_key=null,acked_at=null where source_event_id="+id,
+                "delete from effect.audit_delivery where source_event_id="+id,"truncate effect.audit_delivery"))try(var c=owned.getConnection()) {
+            c.setAutoCommit(false);try{assertEquals("42501",assertThrows(SQLException.class,()->sql(c,statement)).getSQLState());}finally{c.rollback();}
+        }
+    }
+    @Test void centralFailureAfterSeededCommitLeavesSameSourcePendingForExplicitReadback() throws Exception {
+        var f=fixture();prepare(f);var value=initial(f);long id=value.source().sequence();var saved=new AtomicReference<AuditReceipt>();var calls=new AtomicInteger();
+        var relay=delivery(owned,(s,d)->{
+            assertEquals(value.source(),s);assertEquals(value.draft(),d);
+            if(calls.getAndIncrement()==0) {
+                try{saved.set(seedCentralReceipt(value));}catch(SQLException failed){throw new IllegalStateException(failed);}
+                throw new IllegalStateException("injected uncertain consumer reply AFTER seeded central facts");
+            }
+            return saved.get(); // explicit DATA-fixture readback, not a real appendOnce consumer.
+        });
+        assertThrows(IllegalStateException.class,()->relay.deliver(id));assertNull(ack(id));assertTrue(relay.ready(128).contains(id));
+        assertEquals(saved.get(),relay.deliver(id));assertEquals(value.source().key(),ack(id));assertEquals(2,calls.get());assertEquals(value,initial(f));
+    }
+    @Test void actualLocalAcknowledgmentCommitReplyLossReopensSameReceiptWithoutReset() throws Exception {
+        var f=fixture();prepare(f);var value=initial(f);var receipt=seedCentralReceipt(value);long id=value.source().sequence();var armed=new AtomicBoolean(false);
+        var relay=delivery(loseCommitReply(owned,armed),(s,d)->{armed.set(true);return receipt;});
+        assertThrows(StoreUnavailableException.class,()->relay.deliver(id));assertFalse(armed.get());assertEquals(receipt.source().key(),ack(id));
+        var reopened=delivery(owned,(s,d)->receipt);assertEquals(receipt,reopened.deliver(id));assertFalse(reopened.ready(128).contains(id));
+    }
+    static DataSource oneSlot(DataSource delegate,AtomicInteger active) {
+        return (DataSource)Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class<?>[]{DataSource.class},(p,m,a)->{
+            Object value;try{value=m.invoke(delegate,a);}catch(InvocationTargetException failed){throw failed.getCause();}
+            if(!m.getName().equals("getConnection"))return value;
+            var c=(Connection)value;if(active.incrementAndGet()!=1){active.decrementAndGet();c.close();throw new SQLException("test one-slot source pool exhausted");}
+            var closed=new AtomicBoolean();
+            return Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(q,cm,ca)->{
+                try{return cm.invoke(c,ca);}catch(InvocationTargetException failed){throw failed.getCause();}
+                finally{if(cm.getName().equals("close") && closed.compareAndSet(false,true))active.decrementAndGet();}
+            });
+        });
+    }
+    @Test void deliveryClosesSourceConnectionsBeforeConsumerAndSurvivesAmbientCallerRollback() throws Exception {
+        var f=fixture();prepare(f);var value=initial(f);var receipt=seedCentralReceipt(value);var active=new AtomicInteger();
+        var relay=delivery(oneSlot(owned,active),(s,d)->{
+            assertEquals(0,active.get());try{assertEquals(Status.STATUS_NO_TRANSACTION,manager.getStatus());}catch(SystemException failed){throw new IllegalStateException(failed);}
+            return receipt;
+        });
+        caller.begin();try{assertEquals(receipt,relay.deliver(value.source().sequence()));assertEquals(Status.STATUS_ACTIVE,caller.getStatus());}finally{caller.rollback();}
+        assertEquals(0,active.get());assertEquals(value.source().key(),ack(value.source().sequence()));
+    }
+    @Test void delayedLowerIdCommitRemainsReadyAfterHigherIdWasAlreadyAcknowledged() throws Exception {
+        var delayed=fixture();var later=fixture();var atCommit=new CountDownLatch(1);var release=new CountDownLatch(1);var first=new AtomicBoolean(true);
+        var ds=(DataSource)Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class<?>[]{DataSource.class},(p,m,a)->{
+            Object result;try{result=m.invoke(owned,a);}catch(InvocationTargetException failed){throw failed.getCause();}
+            if(!m.getName().equals("getConnection"))return result;var c=(Connection)result;
+            return Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class<?>[]{Connection.class},(q,cm,ca)->{
+                if(cm.getName().equals("commit") && first.compareAndSet(true,false)){atCommit.countDown();if(!release.await(15,TimeUnit.SECONDS))throw new SQLException("test commit release timed out");}
+                try{return cm.invoke(c,ca);}catch(InvocationTargetException failed){throw failed.getCause();}
+            });
+        });
+        var pool=Executors.newSingleThreadExecutor();Future<?> pending=null;
+        try {
+            pending=pool.submit(()->new JdbcEffectLedger(ds,manager,producer).prepareScoped(delayed.scope(),delayed.command(),Duration.ZERO,now()));
+            assertTrue(atCommit.await(10,TimeUnit.SECONDS));prepare(later);var high=initial(later);long highId=high.source().sequence();
+            var receipt=seedCentralReceipt(high);delivery(owned,(s,d)->receipt).deliver(highId);
+            release.countDown();pending.get(10,TimeUnit.SECONDS);
+            long lowId=initial(delayed).source().sequence();assertTrue(lowId<highId);
+            var relay=delivery(owned,(s,d)->{throw new IllegalStateException("no consumer called by ready");});
+            assertTrue(relay.ready(128).contains(lowId));assertFalse(relay.ready(128).contains(highId));
+        } finally {release.countDown();if(pending!=null)pending.cancel(true);pool.shutdownNow();assertTrue(pool.awaitTermination(5,TimeUnit.SECONDS));}
+    }
+    @Test void concurrentDeliveriesRetainOneAcknowledgmentForTheExactSeededCentralReceipt() throws Exception {
+        var f=fixture();prepare(f);var value=initial(f);var receipt=seedCentralReceipt(value);long id=value.source().sequence();
+        var relay=delivery(owned,(s,d)->receipt);var pool=Executors.newFixedThreadPool(4);
+        try {
+            List<Future<AuditReceipt>> results=new ArrayList<>();for(int i=0;i<4;i++)results.add(pool.submit(()->relay.deliver(id)));
+            for(var result:results)assertEquals(receipt,result.get(15,TimeUnit.SECONDS));
+        } finally{pool.shutdownNow();assertTrue(pool.awaitTermination(5,TimeUnit.SECONDS));}
+        assertEquals(receipt.source().key(),ack(id));assertEquals(1,count(f,"audit_delivery"));
     }
 }

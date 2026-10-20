@@ -178,3 +178,71 @@ create trigger audit_scope_no_change before update or delete on effect.audit_sco
 create trigger audit_scope_no_truncate before truncate on effect.audit_scope for each statement execute function effect.audit_no_change();
 create trigger audit_source_no_change before update or delete on effect.audit_source for each row execute function effect.audit_no_change();
 create trigger audit_source_no_truncate before truncate on effect.audit_source for each statement execute function effect.audit_no_change();
+
+-- Operational delivery state is separate from immutable source facts. Pending indexes, NOT a global sequence
+-- watermark, bound recovery work and retain delayed lower-id commits. One ready fact per effect key preserves
+-- intent -> dispatch -> outcome order across competing drainers; the central appendOnce remains idempotent.
+create table effect.audit_delivery (
+    source_event_id bigint primary key references effect.audit_source(source_event_id),
+    thread_name varchar(68) not null,
+    node_id varchar(128) not null,
+    idempotency_key varchar(200) not null,
+    ack_source_key text references audit.source_binding(source_key),
+    acked_at timestamptz,
+    check ((ack_source_key is null) = (acked_at is null))
+);
+create index audit_delivery_pending on effect.audit_delivery(source_event_id) where ack_source_key is null;
+create index audit_delivery_key_pending on effect.audit_delivery(thread_name,node_id,idempotency_key,source_event_id)
+    where ack_source_key is null;
+create function effect.audit_delivery_guard() returns trigger language plpgsql as $$
+declare s effect.audit_source%rowtype; e effect.event%rowtype; b audit.source_binding%rowtype;
+begin
+    select * into s from effect.audit_source where source_event_id=new.source_event_id;
+    select * into e from effect.event where id=new.source_event_id;
+    if s.source_event_id is null or e.id is null or row(new.thread_name,new.node_id,new.idempotency_key)
+        is distinct from row(e.thread_name,e.node_id,e.idempotency_key) then
+        raise exception 'audit delivery source differs' using errcode = 'check_violation';
+    end if;
+    if TG_OP='INSERT' then
+        if new.ack_source_key is not null or new.acked_at is not null then
+            raise exception 'audit delivery starts pending' using errcode = 'check_violation';
+        end if;
+        return new;
+    end if;
+    if row(new.source_event_id,new.thread_name,new.node_id,new.idempotency_key)
+        is distinct from row(old.source_event_id,old.thread_name,old.node_id,old.idempotency_key)
+        or (old.ack_source_key is not null and row(new.ack_source_key,new.acked_at)
+            is distinct from row(old.ack_source_key,old.acked_at)) then
+        raise exception 'audit delivery identity and acknowledgment are retained' using errcode = 'insufficient_privilege';
+    end if;
+    if old.ack_source_key is not null then return new; end if;
+    if new.ack_source_key is null then
+        if new.acked_at is not null then raise exception 'audit acknowledgment is incomplete' using errcode = 'check_violation'; end if;
+        return new;
+    end if;
+    select * into b from audit.source_binding where source_key=new.ack_source_key;
+    if not found or row(b.source_key,b.schema_version,b.scope_fingerprint,b.key_fingerprint,b.transition,
+            b.source_sequence,b.content_fingerprint,b.event_id,b.chain_id)
+        is distinct from row(s.source_key,s.schema_version,s.scope_fingerprint,s.key_fingerprint,s.transition,
+            s.source_sequence,s.content_fingerprint,s.draft_id,s.attributes->>'oa.chain') then
+        raise exception 'audit acknowledgment requires exact retained central binding' using errcode = 'check_violation';
+    end if;
+    if exists(select 1 from effect.audit_delivery p where p.thread_name=new.thread_name and p.node_id=new.node_id
+        and p.idempotency_key=new.idempotency_key and p.source_event_id<new.source_event_id and p.ack_source_key is null) then
+        raise exception 'earlier effect audit fact remains pending' using errcode = 'check_violation';
+    end if;
+    new.acked_at=clock_timestamp();
+    return new;
+end;
+$$;
+create trigger audit_delivery_guard before insert or update on effect.audit_delivery for each row execute function effect.audit_delivery_guard();
+create trigger audit_delivery_no_change before delete on effect.audit_delivery for each row execute function effect.audit_no_change();
+create trigger audit_delivery_no_truncate before truncate on effect.audit_delivery for each statement execute function effect.audit_no_change();
+create function effect.enqueue_audit_source() returns trigger language plpgsql as $$
+begin
+    insert into effect.audit_delivery(source_event_id,thread_name,node_id,idempotency_key)
+        select new.source_event_id,e.thread_name,e.node_id,e.idempotency_key from effect.event e where e.id=new.source_event_id;
+    return new;
+end;
+$$;
+create trigger audit_source_enqueue after insert on effect.audit_source for each row execute function effect.enqueue_audit_source();
