@@ -185,12 +185,13 @@ public class JdbcEventInbox {
      * cancellation and BOTH deadlines are rechecked under locks. A losing/stale snapshot remains non-authoritative.
      */
     public Optional<InboxMessage> matchCandidate(InboxWait wait, InboxMessage candidate) {
-        Objects.requireNonNull(wait); Objects.requireNonNull(candidate);
-        if (!candidate.tenant().equals(wait.tenant()) || !candidate.instanceId().equals(wait.instanceId())
-                || !candidate.correlationKey().equals(wait.route()) || !candidate.type().equals(wait.eventType())) {
-            throw new IllegalArgumentException("candidate is outside this wait's producer route");
-        }
-        return Transactions.inTransaction(dataSource,c -> {
+        requireCandidate(wait,candidate);
+        return Transactions.inTransaction(dataSource,c -> matchCandidate(c,wait,candidate));
+    }
+
+    /** Shares the owning task's transaction; predicates were evaluated before entry, never under these locks. */
+    Optional<InboxMessage> matchCandidate(Connection c,InboxWait wait,InboxMessage candidate) throws SQLException {
+        requireCandidate(wait,candidate);
             if (!status(c,wait.tenant(),wait.instanceId()).equals("WAITING")) return Optional.empty();
             try(var s=c.prepareStatement("select identity_digest,state,deadline from inbox.delivery "
                     + "where tenant=? and instance_id=? and wait_key=? for update")) {
@@ -241,9 +242,14 @@ public class JdbcEventInbox {
                     return Optional.of(actual);
                 }
             }
-        });
     }
 
+    private static void requireCandidate(InboxWait wait,InboxMessage candidate) {
+        Objects.requireNonNull(wait);Objects.requireNonNull(candidate);
+        if(!candidate.tenant().equals(wait.tenant()) || !candidate.instanceId().equals(wait.instanceId())
+                || !candidate.correlationKey().equals(wait.route()) || !candidate.type().equals(wait.eventType()))
+            throw new IllegalArgumentException("candidate is outside this wait's producer route");
+    }
     private static String status(Connection c, String tenant, Ulid instance) throws SQLException {
         try (PreparedStatement s = c.prepareStatement("select status, wait_deadline from task.instance "
                 + "where tenant=? and id=? for update")) {
