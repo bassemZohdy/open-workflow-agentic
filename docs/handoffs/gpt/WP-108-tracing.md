@@ -97,6 +97,14 @@ is running; earlier199cf5b/e2dc636 SQL/CDI passes do not transfer to this new
 combined head. Future final implementation PR must run full process T03 and
 receive exact Claude review again. No package gate is promoted.
 
+Executed follow-up: exactc18f08b passed BOTH39381057653 (tracing3/guards5/
+effects12/telemetry5/standard3/native8, zero skips), both logs inspected. The
+subsequent CI product4325993 then passed BOTH39381656269 with those SQL/CDI
+cases AND the original actual EffectCrashRecoveryIT1. Its new process evidence
+checker passed in both lanes; tools76 pass. See WP-108-process-ci.md for the
+exact core crash/charge/refund scope. Whole governed Flow/old-owner/partition,
+collector/complete distributed trace and final exact-peer/full-CI gates remain.
+
 Claude reviews the exact final head; GPT integrates only after required CI
 and resolved findings. GPT owns the future collector/export/dashboard/runbook
 integration; Claude supplies spans at its owned policy/agent/model boundaries.

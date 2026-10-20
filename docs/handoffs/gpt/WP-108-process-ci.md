@@ -38,9 +38,18 @@ marker, package status or production consumer is promoted by adding CI.
 Local tools76 pass, including8 new negative/positive evidence-check cases;
 both provider/process preflights and generated/diff checks pass. Existing
 combined-main preparationc18f08b separately passes33 selected plain Java cases
-plus application reactor compile. Actual new selected process execution still
-requires fresh Linux CI on this CI-change head; no local PostgreSQL/native
-runtime is available and fabricated XML selftests are never product evidence.
+plus application reactor compile. No local PostgreSQL/native runtime is
+available and fabricated XML selftests are never product evidence.
+
+Executed follow-up: exact CI product4325993605ed50418f321ecdcaff73178d550029
+run39381656269 SUCCESS BOTH lanes. Both complete logs inspected: original real
+EffectCrashRecoveryIT1, V70 guards5, DurableEffectsTest12, actual CDI tracing3,
+standard3/native8; zero failures/errors/skips. Both real provider and the new
+strict process report checks pass. This now re-executes core charge/refund
+process recovery on V70/tracing plus merged main48; earlier provider-only
+successes are not substituted. No whole governed Flow/partition/owner or
+complete tracing proof follows. Future final PR still needs full CI and exact
+Claude review; later code changes need their own execution.
 
 The required live current-authority, manual OPERATION/oa.recover, exact central
 audit, governed adapter/Flow retry, old-owner/partition and complete distributed

@@ -1,10 +1,10 @@
 # Changelog
 
-- WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. Eight new verifier cases and all76 tooling tests pass; new product process execution still needs fresh Linux CI. No acceptance promotion.
+- WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. All76 tooling tests pass. Exact4325993 passed BOTH39381656269 with process recovery1/SQL guards5/effects12/CDI tracing3/standard3/native8, zero skips and strict checks. Full governed Flow/owner/partition/peer gates remain; no acceptance promotion.
 
-- WP-108/WP-112 preparation: bounded, content-free OTel effect/dispatch/lookup/compensation spans, disabled SDK by default with runtime collector opt-in. Five local SDK/fault cases pass; three real ledger/CDI cases compile and await Linux execution. Governed Flow/adapter tracing and complete acceptance stay open.
+- WP-108/WP-112 preparation: bounded, content-free OTel effect/dispatch/lookup/compensation spans, disabled SDK by default with runtime collector opt-in. Five SDK/fault and three real ledger/CDI cases pass in current Linux evidence above. Governed Flow/adapter/collector/complete distributed tracing remain open.
 
-- WP-108 preparation: additive V70 protects effect intent identity, replay contract, irreversible state/attempt evidence and retained journal/compensation links. Five direct-SQL cases compile; Linux execution/review and original governed adapter/manual/audit/recovery gates remain open.
+- WP-108 preparation: additive V70 protects effect intent identity, replay contract, irreversible state/attempt evidence and retained journal/compensation links. Five direct-SQL cases and original core process recovery execute in current Linux evidence above. Final peer/full CI, governed adapter/manual/audit/owner/Flow recovery gates remain open.
 
 This log records implemented capabilities and their requirement coverage. Entries describe unreleased development work.
 A merged component or passing acceptance case does not close an entire platform requirement. The full

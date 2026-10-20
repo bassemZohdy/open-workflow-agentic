@@ -38,3 +38,10 @@ tracing changes have their own new execution/review requirement.
 The authority/PEP/manual/central-audit request remains WP-108-authority.md.
 Governed adapters, actual Flow re-execution, old-owner/partition windows, full
 compensation/manual resolution and distributed tracing remain acceptance gates.
+
+Current preparation product4325993 now passed BOTH39381656269 with V70 guards5,
+original effect service12, actual CDI tracing3 AND the original separate-worker
+EffectCrashRecoveryIT1, zero failures/errors/skips; both full logs and strict
+provider/process evidence checks inspected. This re-executes the original core
+charge/refund abrupt-process recovery under V70 on merged main48. It does not
+prove actual governed Flow/owner/partition recovery or remove the gates above.
