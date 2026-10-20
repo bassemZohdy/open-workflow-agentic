@@ -81,14 +81,20 @@ class AtomicInboxCheckpointTest {
     private void execute(Mode mode) throws Exception {
         assertInstanceOf(InboxCheckpointJpaOperations.class,operations);
         try(var gate = new PersistenceCommitGate(Duration.ofSeconds(15),Clock.systemUTC()); var broker = new Broker()) {
-            var next = new CompletableFuture<Void>();
-            var guarded = new CheckpointingWriter(borrowedWriter(),gate,(op,id)->{});
+            var next = new CompletableFuture<Void>(); var releaseNext = new CompletableFuture<Void>();
+            var cleaned = new CompletableFuture<Void>();
+            var guarded = new CheckpointingWriter(borrowedWriter(),gate,(op,id)-> {
+                if (op == PersistenceCommitGate.Operation.COMPLETED) cleaned.complete(null);
+            });
             try(var app = WorkflowApplication.builder().withId("atomic-"+UUID.randomUUID()).withEventConsumer(broker)
                     .disableLifeCycleCEPublishing().disableStatusChangePublishing()
                     .withListener(new WorkflowPersistenceListener(guarded))
-                    .withListener(new WorkflowExecutionListener() {
-                        @Override public void onTaskStarted(TaskStartedEvent event) {
-                            if (event.taskContext().taskName().equals("performEffect")) next.complete(null);
+                    .withListener(new WorkflowExecutionCompletableListener() {
+                        @Override public CompletableFuture<?> onTaskStarted(TaskStartedEvent event) {
+                            if (event.taskContext().taskName().equals("performEffect")) {
+                                next.complete(null); return releaseNext;
+                            }
+                            return CompletableFuture.completedFuture(null);
                         }
                     }).build()) {
                 var definition = app.workflowDefinition(WorkflowReader.readWorkflowFromClasspath("event/atomic-receipt.yaml"));
@@ -100,6 +106,7 @@ class AtomicInboxCheckpointTest {
                 var completed = instance.start();
                 var listening = broker.listening.get(10,TimeUnit.SECONDS);
                 var task = listening.task();
+                TaskInfoKey key = TaskInfoKey.from(listening.workflow(),task); // Capture the SDK identity before dispatch.
                 var wait = new InboxWait(row.tenant(),row.id(),app.id(),instance.id(),"agentic","atomic-receipt-test","1.0.0",
                         task.position().jsonPointer(),task.iteration(),"orders","org.openworkflow.agentic.atomic.test",
                         "a".repeat(64),Duration.ofMinutes(5));
@@ -122,11 +129,16 @@ class AtomicInboxCheckpointTest {
                     broker.publish(CloudEventBuilder.v1().withId(message.eventId()).withSource(URI.create(message.source()))
                             .withType(message.type()).withData("application/json",message.dataJson().getBytes(StandardCharsets.UTF_8))
                             .build()).get(10,TimeUnit.SECONDS);
-                    TaskInfoKey key = TaskInfoKey.from(listening.workflow(),task);
                     if (mode == Mode.COMMIT) {
-                        completed.get(15,TimeUnit.SECONDS); next.get(5,TimeUnit.SECONDS);
+                        next.get(15,TimeUnit.SECONDS);
+                        assertFalse(completed.isDone(),"observe the committed wait before SDK workflow-completion cleanup");
                         assertTrue(QuarkusTransaction.requiringNew().call(()->em.find(CompletedTaskEntity.class,key)!=null));
                         assertTrue(proof.consumed(wait,message),"actual task and receipt proof committed together");
+                        releaseNext.complete(null);
+                        completed.get(15,TimeUnit.SECONDS); cleaned.get(5,TimeUnit.SECONDS);
+                        assertFalse(QuarkusTransaction.requiringNew().call(()->em.find(CompletedTaskEntity.class,key)!=null),
+                                "the SDK removes completed workflow state; receipt proof must survive that cleanup");
+                        assertTrue(proof.consumed(wait,message));
                         var another = new InboxMessage(message.tenant(),message.source(),message.eventId()+"-other",message.type(),
                                 message.instanceId(),message.correlationKey(),message.dataJson());
                         assertFalse(proof.consumed(wait,another));
@@ -153,6 +165,7 @@ class AtomicInboxCheckpointTest {
                         assertFalse(completed.isDone());
                     }
                 } finally {
+                    releaseNext.complete(null);
                     if (newer != null) newer.close(); claim.close();
                 }
             }

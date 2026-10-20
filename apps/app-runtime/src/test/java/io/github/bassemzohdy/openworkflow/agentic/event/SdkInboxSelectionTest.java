@@ -68,7 +68,9 @@ class SdkInboxSelectionTest {
         var waitA=wait(row,"/do/0/branchA"); dispatch.register(waitA);
         assertEquals(List.of(a),inbox.candidates(waitA,0,16).stream().map(JdbcEventInbox.Candidate::message).toList());
         assertEquals(Optional.of(a),inbox.matchCandidate(waitA,a));
-        assertEquals(Optional.of(b),inbox.matchCandidate(waitB,a),"a later candidate cannot replace an established binding");
+        assertTrue(inbox.matchCandidate(waitB,a).isEmpty(),"a later predicate result cannot authorize a substituted receipt");
+        assertEquals(Optional.of(b),inbox.boundSignal(waitB),"restore can re-evaluate the exact original receipt");
+        assertEquals(Optional.of(b),inbox.matchCandidate(waitB,b));
     }
 
     @Test void aSnapshotCannotOverrideCancellationOrAChangedWaitDeadline() {

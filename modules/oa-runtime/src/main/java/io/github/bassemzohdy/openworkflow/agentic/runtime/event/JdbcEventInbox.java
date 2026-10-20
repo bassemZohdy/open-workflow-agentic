@@ -160,6 +160,26 @@ public class JdbcEventInbox {
         });
     }
 
+    /** Historical binding snapshot for predicate re-evaluation on restore. Dispatch still requires a live reservation. */
+    public Optional<InboxMessage> boundSignal(InboxWait wait) {
+        Objects.requireNonNull(wait);
+        return Transactions.inTransaction(dataSource,c -> {
+            try(var s=c.prepareStatement("select m.* from inbox.delivery d join inbox.signal s using(tenant,instance_id,wait_key) "
+                    + "join inbox.message m on m.tenant=s.tenant and m.source=s.source and m.event_id=s.event_id "
+                    + "where d.tenant=? and d.instance_id=? and d.wait_key=? and d.identity_digest=?")) {
+                route(s,wait.tenant(),wait.instanceId(),wait.key()); s.setString(4,wait.digest());
+                try(var r=s.executeQuery()) {
+                    if (!r.next()) return Optional.empty();
+                    InboxMessage bound=read(r);
+                    if (!bound.type().equals(wait.eventType()) || !bound.correlationKey().equals(wait.route())) {
+                        throw new IllegalStateException("bound receipt is outside the registered producer route");
+                    }
+                    return Optional.of(bound);
+                }
+            }
+        });
+    }
+
     /**
      * Bind a predicate-approved candidate to the registered logical occurrence. All scope/content/retention,
      * cancellation and BOTH deadlines are rechecked under locks. A losing/stale snapshot remains non-authoritative.
@@ -195,7 +215,9 @@ public class JdbcEventInbox {
                         if (!bound.type().equals(wait.eventType()) || !bound.correlationKey().equals(wait.route())) {
                             throw new IllegalStateException("logical wait is bound outside its producer route");
                         }
-                        return Optional.of(bound); // Never replace an already bound receipt with another snapshot.
+                        // Never substitute a different receipt AFTER the caller evaluated a candidate's predicate.
+                        // Restore first loads boundSignal and evaluates that exact receipt instead.
+                        return bound.fingerprint().equals(candidate.fingerprint()) ? Optional.of(bound) : Optional.empty();
                     }
                 }
             }

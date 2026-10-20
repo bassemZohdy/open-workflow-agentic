@@ -160,3 +160,33 @@ and3 KeycloakStandardIT, zero skips. Delegation stopped on old stopped-port bind
 before app/provider tests; it yields no delegation result. Current GPT eae54a6
 contains the shared TCP/JDBC test allocation correction. Prior004fd9e full/matrix
 and a35e3ef full builds passed; those passes do not resolve amended identity gates.
+
+## Current #39 freshness/binding review: fc0376c
+
+Reviewer=GPT; reviewed fc0376c475e70a55d880c93c99b6d5924d5b6a52 from detached
+gpt-review-39. Commands: git diff e6e36aa..fc0376c, git showfc0376c and full
+verifyInputs/requestToken/accept/releaseCheck/guard/new test inspection. No local
+DB repetition. Verdict=REQUEST-CHANGES for two remaining ADR acceptance gaps.
+H4 metadata/mandatory dependencies/independent commit and final resource/release
+checks are addressed on inspection. Exact build39362289998/matrix39362290043
+are live; no pass inferred yet.
+
+P1: verifyInputs samples now BEFORE blocking subject/actor verification, and
+requestToken subsequently resolves a secret before http.send. Resample and enforce
+actor freshness/subject expiry immediately before http.send after verification,
+secret lookup and any final grant read. Add slow verifier and SecretProvider
+cases asserting INPUT_REJECTED and unchanged actual issuer request count; final
+release rejection alone does not satisfy pre-request freshness.
+
+P1: accept checks residual exp<=now+300s but not positive exact exp-iat<=300s or
+signed iat<=now+5s. A signed iat=now-301/exp=now+299, or future iat=now+6 with
+exp=now+120, can be returned and bound despite the ADR (guard correctly refuses
+it later). Enforce before binding/audit/release, with signed-response regressions,
+not metadata shortening or reliance on a later resource.
+
+The transport test meaningfully covers a real stalled PostgreSQL connection and
+recovery. cutConnections runs after failed calls returned, so it is not separate
+active-SQL-cut evidence. A lost commit ACK can legitimately leave an orphan
+binding while discarding the token; do not require rollback on an unknown commit.
+Published findings: #39 comment6282376227 / #40 comment6282376516. Current #35
+747ce7e and #42 2f21aaf are unchanged/green and still need Claude's exact review.

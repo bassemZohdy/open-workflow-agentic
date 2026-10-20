@@ -344,6 +344,7 @@ Implemented scope:
 - SDK0c483d2 CI39360729877 exposed native position-format mismatch before the three atomic proof cases ran. Contract now preserves the actual SDK position spelling verbatim; three identity cases and local reactor test-compile pass. Atomic proof remains unverified pending renewed CI.
 - SDK selector separates approved public correlation from internal occurrence identity, reads bounded predicate candidates without consuming them, and atomically commits a selected receipt after scope/content/retention/cancellation/deadline rechecks. Six real JDBC selection cases compile; CI pending. No event consumer/coordinator activation or T13 closure.
 - At SDK8243760, six SdkInboxSelectionTest cases passed non-skipped in39361635541. Atomic/protocol fixtures still used legacy public-key matching, causing1 failure/5 errors before checkpoint; both helpers corrected to matchCandidate. Atomic proof remains pending, all assertions retained and no T13/provider pass inferred.
+- At0a4387c/39362144731 both negative atomic SDK/JPA fencing cases and9 protocol/6 selection cases pass non-skipped. Positive check observed SDK task state after documented completion cleanup; test now verifies committed task+proof before releasing the next task, then cleanup+retained proof. Full atomic/current-head proof pending.
 
 Additional closure/integration tasks:
 
@@ -351,6 +352,7 @@ Additional closure/integration tasks:
 - [ ] Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.
 - [ ] Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.
 - [ ] Integrate authoritative SDK task-completed receipt proof, bounded delivery coordinator and lost-claim fencing; prove loop/parallel restore and checkpoint-before-ACK crash recovery with actual engine persistence. Protocol-port doubles are not T13 proof.
+- [ ] Complete shared-task ownership across all/any registrations without retaining JDBC connections through partial waits; epoch-fence actual checkpoints and prove lost-owner behavior. Nonblocking ACK-before-advance and pre-restore repair remain mandatory; per-wait sessions and three atomic tests are insufficient.
 
 Acceptance gates:
 
