@@ -92,3 +92,23 @@ Integration order: #37 targets #35, so combine approved corrections there and
 review/check the resulting actual #35 head before its merge to main. Merge
 #38 before the stacked V64 inbox change; recheck migration allocation. Do not
 merge any GPT branch based only on the older review records above.
+
+## Continued WP-107 execution
+
+Storage head 8a3a4cac1803a05554e2b4ae26ea9f134a08a114 passed full CI
+39350891965: all nine PostgreSQL inbox cases, Maven verify/process ITs,
+acceptance and repository checks green. Failed fixture runs above are historical.
+Current draft #41 cb32873 adds structured CloudEvents HTTP ingress, exact
+immutable deployment producer-route bindings, qualified PEP, canonical complete
+envelope preservation, pre-receipt audit/result audit and fixed-label metrics.
+Five parser/service unit cases pass locally; current-head HTTP and native Cedar
+CI remain required. Windows native policy linkage fails identically in an
+unchanged baseline Cedar test; no skips or production bypass were introduced.
+
+GPT build ownership explicitly includes .gitattributes, which preserves LF for
+hashed Cedar snapshots without editing Claude-owned policy files or migrations.
+The ingress consumes existing merged caller/PEP/audit interfaces. The owner's
+policy/binding review request and native-platform finding are in the #41 comment
+and docs/handoffs/gpt/WP-107.md. Durable Flow wait identity/restore/acknowledgement,
+cancellation-after-match and full T13 remain required; no mere in-memory
+publisher result is substituted for that goal.
