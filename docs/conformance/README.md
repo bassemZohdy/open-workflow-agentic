@@ -197,3 +197,11 @@ boot test verifies normal and escaped URI inputs on actual owned loopback HTTP.
 This candidate has not merged or deployed. JVM packaging/discovery does not
 establish native-image discovery, target authority, public TLS or full semantic
 portability. See [runtime integration and exact verification](../handoffs/gpt/WP-605-uri-runtime-integration.md).
+
+The actual injected Flow input-schema boot checks now cover explicit JSON,
+omitted JSON default and unregistered formats, each inline and external.
+They require invalid raw input to stop before filtering/HTTP and valid input
+to complete after filtering. The unregistered-format fallback is an explicit
+remaining interoperability failure, including schema access without a format check.
+The ignored input-validation setting is removed; the existing SDK validator
+is checked directly. See [input schema evidence and preflight gate](../handoffs/gpt/WP-605-input-schema-runtime.md).
