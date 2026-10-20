@@ -63,10 +63,16 @@ def validate_assignments(plan):
         if area['owner'] not in {'GPT', 'Claude'} or not area.get('paths') or not area.get('rule'):
             errors.append('write area needs one registered owner, paths and a handoff rule')
         for path in area['paths']:
-            if path.startswith('/') or '..' in path.split('/') or any(c in path for c in '*?['):
+            # Require one portable literal spelling so aliases cannot evade exclusive ownership.
+            parts = path.rstrip('/').split('/') if isinstance(path, str) else []
+            if (not parts or any(part in {'', '.', '..'} or part.endswith((' ', '.')) for part in parts)
+                    or path != path.strip() or '\\' in path or ':' in path
+                    or any(ord(c) < 32 or ord(c) == 127 or c in '*?[' for c in path)
+                    or path.endswith('//')):
                 errors.append(f'invalid write area path: {path}')
+                continue
             for previous, owner in paths:
-                if (path == previous or (previous.endswith('/') and path.startswith(previous))
+                if (path.rstrip('/') == previous.rstrip('/') or (previous.endswith('/') and path.startswith(previous))
                         or (path.endswith('/') and previous.startswith(path))):
                     errors.append(f'overlapping write areas: {owner}:{previous} and {area["owner"]}:{path}')
             paths.append((path, area['owner']))

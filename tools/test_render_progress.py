@@ -100,6 +100,23 @@ class ProgressValidationTest(unittest.TestCase):
         self.plan['execution_plan']['baseline_dependencies'].append('WP-102')
         self.assertTrue(any('only the evidenced WP-105 core' in e for e in self.errors()))
 
+    def test_write_areas_reject_nonportable_or_aliased_paths(self):
+        import render_agent_backlogs
+        for path in ('', '/', '/absolute', 'C:/absolute', 'C:relative', r'folder\file',
+                     '//host/share', './folder/', 'folder/./file', 'folder/../file',
+                     'folder//file', 'folder//', 'folder./file', 'folder /file',
+                     ' folder/file', 'folder/file ', 'folder/line\nfile', 'folder/*', None):
+            with self.subTest(path=path):
+                plan = copy.deepcopy(self.plan)
+                plan['execution_plan']['write_areas'][0]['paths'] = [path]
+                self.assertTrue(any('invalid write area path:' in e
+                                    for e in render_agent_backlogs.validate_assignments(plan)))
+
+    def test_file_and_directory_alias_cannot_reserve_the_same_path_twice(self):
+        self.plan['execution_plan']['write_areas'].append({
+            'area': 'Alias', 'owner': 'Claude', 'rule': 'Must not overlap', 'paths': ['TODO.md/']})
+        self.assertTrue(any('overlapping write areas' in e for e in self.errors()))
+
     def test_remaining_real_identity_gate_cannot_be_declared_complete(self):
         w = next(w for w in self.plan['work_packages'] if w['id'] == 'WP-102')
         w['progress']['status'] = 'completed'
