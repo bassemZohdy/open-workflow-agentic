@@ -208,7 +208,7 @@ Evidence: [docs/contracts.md](docs/contracts.md)
 Requirements: M11. Owned acceptance tests: T07. Start dependencies: WP-005, WP-006, WP-101.
 
 - [x] OIDC for users and service identity for agents
-- [x] Delegation grants with scope and expiry; token exchange for short-lived credentials; no token passthrough
+- [ ] Delegation grants with scope and expiry; token exchange for short-lived credentials; no token passthrough
 - [x] Re-authorization after long waits
 - [x] Secret handling and rotation
 - [x] Verify identity and correlation propagation through asynchronous Flow tasks and after resume; do not persist credentials in workflow or checkpoint state.
@@ -220,6 +220,7 @@ Implemented scope:
 - 102a audit endpoints bind verified caller subject/kind/scopes before querying; GPT reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858 with green audit CI.
 - Strict Keycloak consumer a20b1b2 integrated into GPT #40; both strict Java preflights and 55 tool tests pass. Combined-head full/matrix CI pending. GPT review requests H3 verified actor expiry and H4 durable exact issuer+jti-to-grant/chain binding; another equivalent active grant must not revive a revoked credential. WP-102 remains partial; skipped or historical characterization tests do not close it.
 - Strict matrix39354646523 at665547e: standard3/3 and delegation6/6 real-provider cases pass non-skipped with matching evidence checkers; full CI39354646488 green. H3 actor expiry and H4 exact grant/chain binding still block acceptance; latest0aeb52f route inventory integrated and new combined CI required.
+- H3 actor-expiry bound at Claude b0e3b18: full CI39355478836/34 exchanger cases pass. V65 H4 schema provided in GPT f97f193; five direct SQL cases pass in full CI39356040766 atd05fc17. H4 product consumer is still open.
 
 PR #40 integrates reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858. KeycloakInteropIT is characterization only; all ten cases were skipped in build run 39262137012. Separate non-skipped characterization CI is wired; strict H1/H2 consumer cases and WP-102 closure remain open. No merge to main or real-provider pass is claimed.
 
@@ -230,9 +231,9 @@ Additional closure/integration tasks:
 - [ ] If the Vault path is selected, implement and run the quarkus-vault 4.9.0 integration/renewal/rotation test required by ADR 0021; mounted static secrets remain the implemented path.
 - [ ] Implement ADR 0021 H1 strict native Keycloak delegation compatibility without an actorless fallback; retain all user/actor/tenant/scope/audience/expiry/replay checks.
 - [ ] Supply KeycloakStandardIT and KeycloakDelegationIT under the Claude-owned identity test package and pass the H2 real-Java evidence matrix; missing or skipped tests do not close WP-102.
-- [ ] H3: bound the actual bearer by independently verified actor expiry as well as subject/grant/300s.
-- [ ] H4: bind issuer+jti durably to the exact issuing grant/ancestor chain; equivalent grants must not revive authority after revocation.
 - [ ] Obtain exact combined-head strict matrix/full CI and independent Claude review; preserve partial status for outstanding acceptance.
+- [ ] Integrate H4 exact issuer+jti binding consumer with expiry/tenant equality, live exact grant/ancestor checks and conflict/outage/revocation tests; V64 must integrate before V65 on main.
+- [ ] Native strict matrix39356040764 fails a real overlong-input response despite H3 enforcement. Prove deterministic legitimate bounded positive credentials and actual short-actor refusal, or retain provider compatibility as partial/failed; do not weaken guarantees.
 
 Acceptance gates:
 

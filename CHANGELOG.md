@@ -7,6 +7,8 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ## [Unreleased]
 
+- WP-102 partial: add V65 immutable issuer/jti-to-grant schema with tenant binding and expiry retention. Product admission integration and native-provider lifetime compatibility remain open.
+
 ### Added
 
 - **Effect ledger (WP-108, partial):** JDBC write-ahead intent and stable operation keys, request conflict
