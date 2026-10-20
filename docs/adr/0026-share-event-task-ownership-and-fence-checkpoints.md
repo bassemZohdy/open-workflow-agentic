@@ -27,6 +27,8 @@ its connection is lost. A callback return is not proof of a durable checkpoint.
    locks. Renewal does not re-arm any registration's original absolute deadline.
    Audit each returned decision before returning authority; audit failure leaves
    a visible lease but returns no permission. Retry audits again before returning.
+   An unreceived ACTIVE claim delays another owner by at most its original30s
+   expiry; an idempotent retry does not extend that expiry.
 4. Carry the task owner/epoch in trusted durable checkpoint metadata. Require
    it in the SAME JPA transaction as the actual SDK task and receipt proof,
    holding registry -> task lease -> delivery row locks until commit. Check
@@ -40,6 +42,8 @@ its connection is lost. A callback return is not proof of a durable checkpoint.
    New markers require format2 and an explicit claim. Missing/old marker authority
    fails closed; historical immutable proofs are not rewritten or reinterpreted
    as ownership grants. No user event field can install this runtime marker.
+   Receipt owner/epoch fields are historical attribution validated at write time
+   under these locks, not a foreign key to an immutable epoch-history table.
 6. Owned matching, reservation and proof-based acknowledgement use short JDBC
    transactions with registry -> task lease -> delivery/message locking. Proof
    reads reuse that connection. No connection spans an audit, callback or idle
@@ -59,7 +63,9 @@ its connection is lost. A callback return is not proof of a durable checkpoint.
 ## Consequences and remaining gates
 
 This component fences the checkpoint transaction, not every later workflow
-continuation or external effect. A production consumer must still serialize task
+continuation or external effect. A former owner's external side effect cannot
+be undone by rolling back its checkpoint; governed effect fencing and whole-task
+recovery remain required. A production consumer must still serialize task
 callbacks, integrate the owned storage path, make `any` losers inert, maintain
 bounded renewals, ACK before allowing advancement, and repair committed receipts
 before restore advances. Its pool and executor limits must be explicit. The old

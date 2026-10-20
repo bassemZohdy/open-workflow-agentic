@@ -105,6 +105,7 @@ public class JdbcInboxTaskLease {
     }
 
     /** Caller owns this short JDBC/JTA transaction. A committed reservation retains its deadline decision. */
+    @Transactional(Transactional.TxType.SUPPORTS)
     void requireCurrent(Connection c,InboxTaskClaim claim,boolean newDispatch) throws SQLException {
         boolean active=registry(c,claim.task(),false,newDispatch); Row row=read(c,claim.task()); Instant now=now(c);
         if(!active || !matches(row,claim) || !row.expiresAt.isAfter(now))

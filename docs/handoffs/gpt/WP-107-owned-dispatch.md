@@ -98,3 +98,30 @@ prove this new interleaving. The complementary cancellation-before-checkpoint
 and cleanup-before-late-write cases remain required and unchanged. This local
 ordering case does not prove cross-process cancellation/cleanup ownership or
 the committed-cancel-request/before-engine-call crash window; retain those gates.
+
+## Executed V69 baseline and observed transaction correction
+
+Exact34a342a workflow39370100027 FAILED both lanes (229 application cases each).
+OwnedInboxDispatchTest10/10 passed in each, zero skips, including real PostgreSQL
+migration and ambiguity/budget cases. AtomicInboxCheckpointTest7 had one
+blocking-observation failure and two positive timeouts; InboxTaskLeaseTest7 had
+one actual JTA error. Root cause: the new package-private requireCurrent helper
+inherited class NOT_SUPPORTED. CDI self-interception suspended the caller's JTA,
+so Agroal rejected its already-enlisted connection (Enlisted connection used
+without active transaction). SUPPORTS on that helper preserves the existing
+caller-owned JTA or the local caller-owned JDBC transaction, as appropriate.
+Neither creates/commits another transaction. All original assertions remain.
+
+The mixed-order successor578d3c2 had not completed; its superseded39370406321
+was cancelled by GPT after this reproducible common cause was identified. That
+is not a pass. New corrected-head execution and exact reciprocal review are
+required; no provider evidence is claimed from these failed/cancelled runs.
+
+GPT merged #44 exacta6bcccf into #40 as2d8761f after Claude6283480485 APPROVE
+and required full39367327487 SUCCESS. Review follow-ups are explicit in ADR0026:
+the checkpoint fence does not undo a callback's external effect; unreceived
+post-audit claims delay another owner at most their original30s expiry; receipt
+epoch fields are write-time fenced historical attribution, not an immutable
+epoch-history FK. No material finding was waived and #44's approved head was
+kept unchanged. This storage successor can now have the single active GPT
+implementation PR; WP-107/full T13 remain partial.
