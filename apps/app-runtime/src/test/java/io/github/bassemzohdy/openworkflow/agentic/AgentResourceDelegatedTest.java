@@ -175,8 +175,11 @@ class AgentResourceDelegatedTest {
         bindCall(refreshed, tenant, grant, first.scope()); // same invocation, new credential
         run(first.token(), null).statusCode(200).body("threadId", equalTo(first.scope().key()));
         run(refreshed.token(), null).statusCode(200).body("threadId", equalTo(first.scope().key()));
-        assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '"
+        // one row per run on the one invocation thread (as for a direct owner's repeat), and no other thread appeared
+        assertEquals(2, scalar("select count(*) from lg4jthread where thread_name = '"
                 + first.scope().threadId().value() + "'"));
+        assertEquals(1, scalar("select count(distinct thread_name) from lg4jthread where thread_name like '%"
+                + first.scope().threadId().value().substring(0, 8) + "%'"));
     }
 
     @Test
