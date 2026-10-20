@@ -66,6 +66,15 @@ Final local application reactor test-compile also BUILD SUCCESS; tooling68,
 generated tracking check and diff check pass. This compile is not a boot/SQL
 test. The new producer head still requires fresh Linux CI.
 
+Executed follow-up: exact productf1842c0afe38fdd8ea8cfb4249a390fc48593491
+run39380401962 SUCCESS BOTH lanes. Both complete logs and strict evidence checks
+inspected: producer6, SQL11, metadata2, group contracts9, actual SDK observations4,
+standard3/native8; zero failures/errors/skips. These component cases execute on
+the producer head, not just the earlier V72 baseline. #48 is subsequently merged
+as maindbec8e0 after exact peer/CI; this preparation must incorporate reviewed
+main before a final PR. #49 shared resource-call contract411dc36 is now the sole
+GPT implementation PR. Independent group review/full integration remain open.
+
 Complete selector/ingress FIFO, callback attempts/winners/per-item/parent proof,
 bounded serial coordinator/renewals, actual SDK Flow/loop/parallel integration,
 whole-group process/partition/old-owner/cancellation restoration remain open.
