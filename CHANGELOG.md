@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-103 GPT preparation: V73 and JDBC resource-call attribution atomically retain immutable invocation contracts and issuer/jti mappings, enforce full registry and exact issuing metadata, preserve historical readback and refuse unknown commit replies.23 selected plain cases/application test compilation/tools76 pass;12 new actual PostgreSQL cases await Linux execution. No credential release, dispatch, workflow401 fix or acceptance promotion.
+
 - Combined preparation on reviewed #48 and effect/process-CI foundation passed BOTH39381927960 atc1fd835: snapshots6/group SQL11/actual SDK-JPA11/receipt recovery5/restore gate5/CDI tracing3/core effect process recovery1/standard3/native8, zero skips and strict checkers. Production group selector/coordinator/execution/recovery/T13 remains open.
 
 - WP-107 preparation: derive pinned group snapshots from actual SDK listen tasks, scoped approved producer routes and explicit correlation parameters. Preserve duplicate ordinals and empty ANY arrays. Forty selected plain cases pass; full consumer/coordinator/recovery remains open. Exact V72 product4d75161 independently passed both39379015967 lanes (11 SQL cases, zero skips).
