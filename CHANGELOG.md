@@ -1,5 +1,7 @@
 # Changelog
 
+- Combined preparation on reviewed #48 and effect/process-CI foundation passed BOTH39381927960 atc1fd835: snapshots6/group SQL11/actual SDK-JPA11/receipt recovery5/restore gate5/CDI tracing3/core effect process recovery1/standard3/native8, zero skips and strict checkers. Production group selector/coordinator/execution/recovery/T13 remains open.
+
 - WP-107 preparation: derive pinned group snapshots from actual SDK listen tasks, scoped approved producer routes and explicit correlation parameters. Preserve duplicate ordinals and empty ANY arrays. Forty selected plain cases pass; full consumer/coordinator/recovery remains open. Exact V72 product4d75161 independently passed both39379015967 lanes (11 SQL cases, zero skips).
 
 - WP-107 storage hardening: additive V72 closes late membership INSERTs after selection and binds members to the original match set; readback also fails closed on changed membership. Thirty local plain cases pass; eleven SQL cases compile and await fresh CI. V71 remains unchanged.

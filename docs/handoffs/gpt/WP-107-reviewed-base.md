@@ -24,10 +24,15 @@ cases (contracts17/runtime43), zero failures/errors/skips. Application tests
 compile. Tools76, generated projections and diff checks pass. No local SQL/
 native/boot result is inferred from the selected build.
 
-Fresh combined productc1fd835 runs39381927960. Exact previous producerf1842c0
-passed BOTH39380401962 (producer6/SQL11/metadata2/group9/SDK observations4/
-standard3/native8), but that does not prove this combined head. The new run
-must execute its own SQL/CDI/provider/process cases and strict checkers.
+Executed combined productc1fd8351ea1dffaaa5095401fd011f50cba66843:
+run39381927960 SUCCESS BOTH lanes. Both complete logs inspected: snapshot6,
+group SQL11, actual SDK/JPA atomic checkpoint11, receipt recovery5, restored
+execution gate5, CDI tracing3, actual core effect process recovery1, standard3/
+native8; zero failures/errors/skips. Both real-provider and strict process
+checkers pass. These execute on the combined head; previousf1842c0 evidence
+is not transferred. Group selector/coordinator/correlation/execution remains
+absent, so this is component compatibility, not production group conformance
+or full group/loop/partition recovery. A later code change needs its own CI.
 
 The final PR still needs independent Claude review and full CI after its
 prerequisites merge. Complete selector and durable correlation, ingress FIFO,
