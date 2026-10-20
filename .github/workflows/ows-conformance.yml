@@ -24,6 +24,13 @@ jobs:
   assess:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_DB: agentic, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -37,5 +44,6 @@ jobs:
           name: ows-portability-assessment
           path: |
             modules/oa-runtime/target/conformance/
-            modules/oa-runtime/target/surefire-reports/*OwsConformanceTest*
+            modules/oa-runtime/target/surefire-reports/
+            modules/oa-contracts/target/surefire-reports/
           if-no-files-found: error
