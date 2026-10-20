@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-2026-10-20: GPT merged #35 exact747ce7e as c01cef4 after Claude6282864843 APPROVE and full CI39360512505 SUCCESS; main postmerge39366191268 pending. Ownership/dependency corrections are now on main; WP-108 has no WP-102 start prerequisite. #38/#41 merged components retain partial WP-108/WP-107 closure gates. Current #40 6a0081d full39364933849/matrix39364933841 and #43 2cb33c1 full39364985191 pass their scoped tests; both await current Claude review. #39 a1b1c0b GPT SOURCE-PASS addresses both P1 findings; current full39365958905/matrix39365958968 pending, no merge approval or amended H3/H4 acceptance inferred. Task-ownership successor d9b11c2 normally includes merged main at e0b4076; new V68 lease/checkpoint cases pending39365931197. All68 tools/generated checks pass after source-array merge; packages stay partial and ADR0025/0026 Proposed..
+2026-10-20: GPT merged #35 exact747ce7e as c01cef4 after Claude6282864843 APPROVE and full CI39360512505 SUCCESS; main postmerge39366191268 pending. Ownership/dependency corrections are now on main; WP-108 has no WP-102 start prerequisite. #38/#41 merged components retain partial WP-108/WP-107 closure gates. Current #40 6a0081d full39364933849/matrix39364933841 and #43 2cb33c1 full39364985191 pass their scoped tests; both await current Claude review. #39 a1b1c0b GPT SOURCE-PASS addresses both P1 findings; current full39365958905/matrix39365958968 pending, no merge approval or amended H3/H4 acceptance inferred. Task-ownership successor d9b11c2 normally includes merged main at e0b4076; V68 lease7/checkpoint6 cases passed non-skipped in both lanes of39365931197 atd9b11c2; subsequent plan/docs merges leave product code unchanged. All68 tools/generated checks pass after source-array merge; packages stay partial and ADR0025/0026 Proposed..
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-19).
 
@@ -457,6 +457,7 @@ Implemented scope:
 - Draft #41 implements durable inbox signals and authorized/audited scoped CloudEvents receipt; ingress/privacy04b421f full CI39352802891 green.
 - Actual JPA checkpoint guard, unhealthy readiness and new-start refusal implemented at499550a; full CI39354335254 passes, including selected guarded writer/original reader and existing restart tests. This is not end-to-end inbox consumption.
 - PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open.
+- Exact d9b11c2 workflow39365931197 SUCCESS both lanes: lease7/7, actual SDK/JPA6/6 (including task handover, expired lease, expiry after a proven delivery-row lock wait), selection6, protocol9, cancellation2, zero skips. Source code unchanged through merged main/docs b12a713; tools68/generated checks pass. Scoped checkpoint/lease proof only: consumer, owned matching/reservation, ACK/restore/process/partition/loop/full T13 and reciprocal current-head gates remain open.
 
 Additional closure/integration tasks:
 

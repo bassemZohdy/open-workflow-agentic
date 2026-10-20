@@ -437,6 +437,7 @@ Implementation status: **partial**.
 - Implemented: Draft #41 implements durable inbox signals and authorized/audited scoped CloudEvents receipt; ingress/privacy04b421f full CI39352802891 green.
 - Implemented: Actual JPA checkpoint guard, unhealthy readiness and new-start refusal implemented at499550a; full CI39354335254 passes, including selected guarded writer/original reader and existing restart tests. This is not end-to-end inbox consumption.
 - Implemented: PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open.
+- Implemented: Exact d9b11c2 workflow39365931197 SUCCESS both lanes: lease7/7, actual SDK/JPA6/6 (including task handover, expired lease, expiry after a proven delivery-row lock wait), selection6, protocol9, cancellation2, zero skips. Source code unchanged through merged main/docs b12a713; tools68/generated checks pass. Scoped checkpoint/lease proof only: consumer, owned matching/reservation, ACK/restore/process/partition/loop/full T13 and reciprocal current-head gates remain open.
 
 Remaining gates:
 
