@@ -104,8 +104,34 @@ on its service contract even when its definition is standard OWS.
 | InboxCheckpointMarker oa.inbox.checkpoint.* metadata | Platform-specific runtime receipt/checkpoint protocol; not authored source metadata or permission. |
 | ResearchAgent / LlmClient and workflow-references.json | Agent implementation, model/service and registry dependencies; artifact and framework substitution remains unproven. |
 
-Remaining work includes the complete official CTK (including provider/event/
-fault semantics), confirmed finding resolution, actual authoring/import/export
+The [official CTK coverage report](official-ctk-report.json) now accounts for all
+21 scenarios across the 11 feature files at the same development commit. Original
+feature and README bytes, lengths and SHA-256 digests are retained under
+`conformance/upstream/ctk/`; its Apache-2.0 license is retained in the adjacent
+schema corpus. This is a strict reader for those pinned Gherkin steps, not a
+general Cucumber implementation. Unknown steps and malformed docstrings fail.
+
+Eleven unchanged pure definitions execute with the actual SDK. All 24 official
+assertions are evaluated, including real task-start order and structured fault
+fields: nine scenarios MATCH and two DIVERGE. The raised error has
+`instance: do/0/raiseError`, while the official CTK expects `/do/0/raiseError`.
+The implicit-default switch completes with `colors: [red, green, blue]` and
+starts the three following tasks, rather than retaining `color: yellow` and
+ending at `switchColor`. These are observed CTK differences requiring resolution
+or adjudication; neither expectation is rewritten. Actual output/error/task-start
+observations are retained as CI artifacts, including competing-fork results whose
+winning color may vary. The baseline compares official assertion outcomes rather
+than sorting or discarding the actual observations.
+
+Ten scenarios remain explicitly UNMEASURED: five calls, two HTTP-backed data-flow
+cases, two HTTP-backed try cases and one emit case. The pure-execution guard runs
+before constructing an executable definition; this suite never contacts the
+public Petstore/httpbin services or publishes an event. An inventory entry is
+not execution proof. The two new differences supplement the earlier round-trip,
+context and noncompeting-fork findings; the 48-execution assessment is unchanged.
+
+Remaining work includes executing the external official CTK scenarios with
+controlled provider/event contracts, confirmed finding resolution, actual authoring/import/export
 API/source retention and a second-runtime/provider/artifact substitution run.
 No package or acceptance status is promoted by this bounded measurement.
 

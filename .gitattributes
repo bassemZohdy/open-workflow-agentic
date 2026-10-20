@@ -3,3 +3,4 @@
 # Pinned upstream conformance schema/licence bytes stay identical on Windows and Linux.
 modules/oa-runtime/src/test/resources/conformance/schema/* text eol=lf
 modules/oa-runtime/src/test/resources/conformance/upstream/* text eol=lf
+modules/oa-runtime/src/test/resources/conformance/upstream/ctk/** text eol=lf
