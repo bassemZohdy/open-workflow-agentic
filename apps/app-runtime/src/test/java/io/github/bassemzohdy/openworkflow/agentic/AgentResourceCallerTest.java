@@ -5,7 +5,9 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.api.AgentResource;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.specification.RequestSpecification;
@@ -85,7 +87,7 @@ class AgentResourceCallerTest {
         // one thread name per owner (the SDK writes one row per run): alice of A ran twice, the others once
         java.util.Map<String, Integer> runs = new java.util.TreeMap<>();
         for (String[] who : new String[][] {{tenantA, "alice"}, {tenantA, "bob"}, {tenantB, "alice"}, {tenantA, "alice"}}) {
-            runs.merge(ThreadId.derive(who[0], "USER:" + who[1], "direct:" + thread).value(), 1, Integer::sum);
+            runs.merge(AgentResource.threadOf(who[0], new Subject(SubjectKind.USER, who[1]), "direct:" + thread).value(), 1, Integer::sum);
         }
         assertEquals(3, runs.size(), "three distinct owners derive three distinct threads; the owner's repeat reuses its own");
         for (var e : runs.entrySet()) {
@@ -112,6 +114,16 @@ class AgentResourceCallerTest {
     private long deniedDecisions() throws SQLException {
         return scalar("select count(*) from audit.event where event_type = 'policy.decision'"
                 + " and resource_id = 'agent:research:run' and attributes ->> 'policy.outcome' = 'DENY'");
+    }
+
+    @Test
+    void theLongestValidSubjectAndEveryKindDeriveDistinctBoundedThreads() {
+        String longest = "u".repeat(256);
+        var a = AgentResource.threadOf("t", new Subject(SubjectKind.USER, longest), "direct:x");
+        var b = AgentResource.threadOf("t", new Subject(SubjectKind.AGENT, longest), "direct:x");
+        var c = AgentResource.threadOf("t", new Subject(SubjectKind.USER, longest.substring(1)), "direct:x");
+        assertEquals(68, a.value().length());
+        assertEquals(3, java.util.Set.of(a, b, c).size(), "kind and id are both part of the owner, nothing is truncated");
     }
 
     private long threadRows(String name) throws SQLException {

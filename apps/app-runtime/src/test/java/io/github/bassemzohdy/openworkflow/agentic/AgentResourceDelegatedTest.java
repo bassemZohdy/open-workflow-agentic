@@ -5,7 +5,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.api.AgentResource;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
@@ -85,7 +85,8 @@ class AgentResourceDelegatedTest {
 
     private static ValidatableResponse run(String token, String thread) {
         return given().header("Authorization", "Bearer " + token).contentType("application/json")
-                .body("{\"topic\":\"agentic workflows\",\"threadId\":\"" + thread + "\"}")
+                .body(thread == null ? "{\"topic\":\"agentic workflows\"}"
+                        : "{\"topic\":\"agentic workflows\",\"threadId\":\"" + thread + "\"}")
                 .when().post("/agents/research").then();
     }
 
@@ -98,32 +99,48 @@ class AgentResourceDelegatedTest {
     }
 
     @Test
-    void aBoundDelegatedTokenRunsTheAgentForTheUserOnTheUsersThreadAndWorksOnce() throws Exception {
+    void aBoundDelegatedTokenRunsOnceOnAFreshGovernedThreadOfTheUser() throws Exception {
         String tenant = newTenant();
-        String thread = newThread();
         Issued issued = valid(tenant, "alice");
-        run(issued.token(), thread).statusCode(200).body("threadId", equalTo(thread))
-                .body("plan", containsString("[stub]"));
-        String name = ThreadId.derive(tenant, "USER:alice", "direct:" + thread).value();
+        String thread = run(issued.token(), null).statusCode(200).body("plan", containsString("[stub]")).extract()
+                .path("threadId");
+        String name = AgentResource.threadOf(tenant, new Subject(SubjectKind.USER, "alice"), "governed:" + thread).value();
         assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '" + name + "'"));
         // single use: the same token again is refused and opens nothing new
         long threads = threads();
-        run(issued.token(), thread).statusCode(401);
+        run(issued.token(), null).statusCode(401);
         assertEquals(threads, threads());
+    }
+
+    @Test
+    void aDelegatedCallCannotChooseAThreadSoItCannotReachADirectOrAnotherInvocationsThread() throws Exception {
+        String tenant = newTenant();
+        String direct = newThread();
+        long threads = threads();
+        run(valid(tenant, "alice").token(), direct).statusCode(400);
+        assertEquals(threads, threads(), "a refused call opens no thread");
+        // two delegated calls never share a thread, and neither is the direct namespace of the same visible id
+        String t1 = run(valid(tenant, "alice").token(), null).statusCode(200).extract().path("threadId");
+        String t2 = run(valid(tenant, "alice").token(), null).statusCode(200).extract().path("threadId");
+        assertEquals(false, t1.equals(t2));
+        Subject alice = new Subject(SubjectKind.USER, "alice");
+        assertEquals(false, AgentResource.threadOf(tenant, alice, "direct:" + t1)
+                .equals(AgentResource.threadOf(tenant, alice, "governed:" + t1)));
+        assertEquals(0, scalar("select count(*) from lg4jthread where thread_name = '"
+                + AgentResource.threadOf(tenant, alice, "direct:" + t1).value() + "'"));
     }
 
     @Test
     void theDelegatedPrincipalIsTheUserNotTheActor() throws Exception {
         String tenant = newTenant();
-        String thread = newThread();
-        run(valid(tenant, "alice").token(), thread).statusCode(200);
-        run(valid(tenant, "bob").token(), thread).statusCode(200);
-        for (String user : new String[] {"alice", "bob"}) {
-            String name = ThreadId.derive(tenant, "USER:" + user, "direct:" + thread).value();
-            assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '" + name + "'"), user);
-        }
-        String actor = ThreadId.derive(tenant, "WORKFLOW:" + WORKFLOW.id(), "direct:" + thread).value();
-        assertEquals(0, scalar("select count(*) from lg4jthread where thread_name = '" + actor + "'"));
+        String thread = run(valid(tenant, "alice").token(), null).statusCode(200).extract().path("threadId");
+        String bobs = run(valid(tenant, "bob").token(), null).statusCode(200).extract().path("threadId");
+        assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '" + AgentResource.threadOf(tenant,
+                new Subject(SubjectKind.USER, "alice"), "governed:" + thread).value() + "'"));
+        assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '" + AgentResource.threadOf(tenant,
+                new Subject(SubjectKind.USER, "bob"), "governed:" + bobs).value() + "'"));
+        assertEquals(0, scalar("select count(*) from lg4jthread where thread_name = '" + AgentResource.threadOf(tenant,
+                WORKFLOW, "governed:" + thread).value() + "'"), "the actor owns no thread");
     }
 
     @Test

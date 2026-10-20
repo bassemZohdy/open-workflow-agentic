@@ -30,7 +30,8 @@ public class AgentResourceAdmission {
     public static final String SCOPE = "oa.agent.run";
 
     /** Who a delegated call is for and who makes it. */
-    public record Principal(String tenant, Subject user, String actor, List<String> actors, Set<String> scopes) {
+    public record Principal(String tenant, Subject user, String actor, List<String> actors, Set<String> scopes,
+                            VerifiedToken token) {
     }
 
     private final ResourceTokenGuard guard;
@@ -62,6 +63,19 @@ public class AgentResourceAdmission {
             throw new TokenRejectedException(TokenRejectedException.Reason.AUDIENCE);
         }
         VerifiedToken token = guard.admit(Objects.requireNonNull(bearer, "bearer"), Set.of(SCOPE));
-        return new Principal(token.tenant(), token.subject(), token.actor(), token.actors(), token.scopes());
+        return new Principal(token.tenant(), token.subject(), token.actor(), token.actors(), token.scopes(), token);
+    }
+
+    /**
+     * Re-checks an admitted principal's signed expiry and exact issuing grant chain, without consuming the single use
+     * again. The resource calls it after its policy and audit work, immediately before it acts.
+     *
+     * @throws TokenRejectedException the authority is gone
+     */
+    public void revalidate(Principal principal) {
+        if (guard == null) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.AUDIENCE);
+        }
+        guard.revalidate(principal.token(), Set.of(SCOPE));
     }
 }

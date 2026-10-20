@@ -107,6 +107,20 @@ public final class ResourceTokenGuard {
         return token;
     }
 
+    /**
+     * Re-checks a token this guard admitted earlier, immediately before the resource acts on it: the signed expiry and
+     * the exact issuing grant and its ancestors, with the same checks as {@link #admit}. It does not use the replay
+     * counter again, so a use is consumed once. Call it after any slow work (policy, audit) that followed admission.
+     *
+     * @throws TokenRejectedException the token is no longer acceptable (expired, grant revoked or expired, store down)
+     */
+    public void revalidate(VerifiedToken token, Set<String> requiredScopes) {
+        Objects.requireNonNull(token, "token");
+        checkTime(token);
+        checkGrant(token, requiredScopes);
+        checkTime(token);
+    }
+
     /** Fail closed at {@code exp} (exp must be strictly after now) and refuse an issue time beyond a small clock skew. */
     private Instant checkTime(VerifiedToken token) {
         Instant now = clock.instant();
