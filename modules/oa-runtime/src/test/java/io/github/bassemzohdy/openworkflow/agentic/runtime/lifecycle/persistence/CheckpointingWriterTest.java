@@ -23,7 +23,7 @@ class CheckpointingWriterTest {
     @Test
     void allWriterOperationsObserveOnlyActualSuccessWithImmutableTaskOccurrenceIdentity() throws Exception {
         var definition = fixture(WorkflowDefinitionData.class, Map.of("id", new WorkflowDefinitionId("agentic", "orders", "1")));
-        var instance = fixture(WorkflowInstanceData.class, Map.of("id", "engine-1"));
+        var instance = fixture(WorkflowInstanceData.class, Map.of("id", "engine-1", "status", WorkflowStatus.RUNNING));
         var workflow = fixture(WorkflowContextData.class, Map.of("definition", definition, "instanceData", instance));
         AtomicInteger iteration = new AtomicInteger(7);
         var position = fixture(WorkflowPosition.class, Map.of("jsonPointer", "/do/0/listen"));

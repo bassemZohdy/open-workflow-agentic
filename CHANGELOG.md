@@ -7,6 +7,9 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ## [Unreleased]
 
+- WP-107 partial: add retained wait identities, dispatch reservations and a checkpoint-proof acknowledgement port. SDK delivery, lost-claim fencing and full T13 remain open; the protocol is not activated.
+
+- WP-102 partial: add V65 immutable issuer/jti-to-grant schema with tenant binding and expiry retention. Product admission integration and native-provider lifetime compatibility remain open.
 - WP-107 partial: guard actual Flow checkpoint commits against swallowed lifecycle failures; hold failed/unknown writes, report readiness down and refuse new starts until restore. Durable inbox acknowledgement and full T13 remain open.
 
 - **WP-107 (partial):** persist normalized events before matching and record durable
@@ -26,6 +29,14 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
   before merge. [Scope and handoff](docs/handoffs/gpt/WP-108.md).
 
 ### Tracking
+
+- Integrate the reviewed PR #39 audit-caller increment into PR #40; run its real
+  Keycloak characterization on both pinned issuers separately from strict authority
+  contract gates. Skips and characterization never close WP-102.
+
+- **WP-102 H1/H2 (partial):** retain strict signed actor proof, reject actorless standard exchange,
+  and add an isolated real-Keycloak Java CI matrix with missing/skipped-evidence rejection. The Java
+  identity tests remain Claude-owned; harness availability does not complete provider interoperability.
 
 - Split the 42 unfinished packages into GPT and Claude backlogs with 21 primary owners each, reciprocal
   reviews, explicit prerequisite handoffs and exclusive write areas. Generate both queues in TODO.md and

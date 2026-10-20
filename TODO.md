@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-2026-10-20: GPT merged reviewed #38 head99f475d to main at2f722cf after explicit Claude PASS and green CI39349314182; WP-108 remains partial for adapters/recovery/manual-policy/audit/tracing. This plan branch includes the merged prerequisite and T03 evidence, preserving all ownership/dependency corrections. Claude PASS for plan e5e255d is recorded; current N4/ownership/tracking head needs review. #39 c6a9228 docs-only delta reviewed by GPT: scoped docs PASS, overall REQUEST-CHANGES for H3 actor-expiry and H4 exact issuing-grant/chain binding. #40 399fda1 full CI39353733186 passed; delegation strict six cases passed in39353733197, standard stopped before its IT on GPT fault-proxy outage test. Fix and latest Claude docs integrated at665547e; full39354646488/matrix39354646523 running. #41 qualifier correction499550a passed full CI39354335254 including actual guarded-handler binding; main prerequisite merged normally and base retargeted to main. Durable signal ACK/restart/parallel-loop proof and complete T13 remain open. WP-102/WP-107 remain partial and ADR0025 remains proposed..
+2026-10-20: #35 exact747ce7e merged by GPT as c01cef4 after Claude6282864843 APPROVE and full39360512505; main postmerge39366191268 SUCCESS. Ownership/dependency corrections now on main, WP-108 starts independently of WP-102 completion. Current #39 a1b1c0b GPT SOURCE-PASS; matrix39365958968 passed standard3/native8/binding7 each lane. Full39365958905 Maven passed and only acceptance index check failed (12/12 passing markers); GPT744a534 applies its exact generated T07.where update and this carrier resolves main-plan conflicts without product/workflow changes. Corrected exact-head CI remains mandatory. #43 exact2cb33c1 merged into #40 as2c03869 after Claude6282954159 APPROVE and full39364985191; shared #40 6a0081d review6282963014 APPROVE and full/matrix passed. Remaining package gates stay partial and ADR0025 Proposed; current integration heads require review/CI..
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-19).
 
@@ -300,7 +300,7 @@ Requirements: M11. Owned acceptance tests: T07. Start dependencies: WP-005, WP-0
 Implementation owner: **Claude**; reviewer: **GPT**; backlog: Claude-01. Shared paths follow the exclusive write areas above.
 
 - [x] OIDC for users and service identity for agents
-- [x] Delegation grants with scope and expiry; token exchange for short-lived credentials; no token passthrough
+- [ ] Delegation grants with scope and expiry; token exchange for short-lived credentials; no token passthrough
 - [x] Re-authorization after long waits
 - [x] Secret handling and rotation
 - [x] Verify identity and correlation propagation through asynchronous Flow tasks and after resume; do not persist credentials in workflow or checkpoint state.
@@ -309,13 +309,27 @@ Implemented scope:
 
 - JWT verification, scoped grants, replay protection, RFC 8693 client, mounted-secret rotation and wait reauthorization are implemented.
 - T07 is automated using in-process stand-ins; issuer interoperability is not proven.
+- 102a audit endpoints bind verified caller subject/kind/scopes before querying; GPT reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858 with green audit CI.
+- Strict Keycloak consumer a20b1b2 integrated into GPT #40; both strict Java preflights and 55 tool tests pass. Combined-head full/matrix CI pending. GPT review requests H3 verified actor expiry and H4 durable exact issuer+jti-to-grant/chain binding; another equivalent active grant must not revive a revoked credential. WP-102 remains partial; skipped or historical characterization tests do not close it.
+- Strict matrix39354646523 at665547e: standard3/3 and delegation6/6 real-provider cases pass non-skipped with matching evidence checkers; full CI39354646488 green. H3 actor expiry and H4 exact grant/chain binding still block acceptance; latest0aeb52f route inventory integrated and new combined CI required.
+- H3 actor-expiry bound at Claude b0e3b18: full CI39355478836/34 exchanger cases pass. V65 H4 schema provided in GPT f97f193; five direct SQL cases pass in full CI39356040766 atd05fc17. H4 product consumer is still open.
+- ADR0021 H3 freshness direction selected for implementation, explicitly superseding actor-output-exp acceptance only when replacement including H4 passes. Old strict baseline remains; current #39 1abcfbd is reviewed as incompatibility evidence only, not provider acceptance.
+- Shared checkpoint correction: diagnostic SDK1893c17/39364160057 reproduced late task completion after SDK cancellation deleting its parent (real JPA23503, one new failing case in both lanes). Gate now holds known-cancelled work without ACK/success or poisoning independent work; transaction-scoped SDK mutation/cleanup ordering prevents resurrection. Active failures and required ABORTED cleanup retain their gates. Ten local gate/writer/SDK unit cases pass; two real-JPA regressions and corrected current CI remain pending. Current #39 fc0376c still has two P1 acceptance findings and failed full build despite green matrix; H3/H4 unintegrated, package partial.
 - Claude c6a9228 strict Java tests and product hardening integrated into GPT #40; prior399fda1 full CI and six real delegation cases pass, standard never reached its IT. Current665547e reruns after a GPT fault-proxy fixture correction; H3/H4 remain open.
+
+PR #40 integrates reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858. KeycloakInteropIT is characterization only; all ten cases were skipped in build run 39262137012. Separate non-skipped characterization CI is wired; strict H1/H2 consumer cases and WP-102 closure remain open. No merge to main or real-provider pass is claimed.
 
 Additional closure/integration tasks:
 
 - [ ] Run the real Keycloak test in docs/identity.md section 9; prove actor_token/act mapping, tenant/scope claims, audience narrowing and expiry bounds.
 - [ ] Resolve any issuer mismatch, record the real-IdP evidence, and add the repeatable integration test to an appropriate CI profile.
 - [ ] If the Vault path is selected, implement and run the quarkus-vault 4.9.0 integration/renewal/rotation test required by ADR 0021; mounted static secrets remain the implemented path.
+- [ ] Implement ADR 0021 H1 strict native Keycloak delegation compatibility without an actorless fallback; retain all user/actor/tenant/scope/audience/expiry/replay checks.
+- [ ] Supply KeycloakStandardIT and KeycloakDelegationIT under the Claude-owned identity test package and pass the H2 real-Java evidence matrix; missing or skipped tests do not close WP-102.
+- [ ] Obtain exact combined-head strict matrix/full CI and independent Claude review; preserve partial status for outstanding acceptance.
+- [ ] Integrate H4 exact issuer+jti binding consumer with expiry/tenant equality, live exact grant/ancestor checks and conflict/outage/revocation tests; V64 must integrate before V65 on main.
+- [ ] Implement actor freshness before request and after slow binding/audit before release, strict signed subject/grant/output bounds and independent resource exp>now/iat<=now+5s admission; resolve H4 metadata/commit/conflict/null-dependency findings and prove deterministic non-skipped native success under the amended contract. Old actor-output-exp tests are historical, not transferable passes.
+- [ ] Fix the supported-media route discovery probe with Claude: combined bf3e9f4 CI39358079308/matrix39358079363 fail on CloudEvents route415 from hardcoded ordinary JSON; retain401 requirement and all routes. FaultProxyPostgresTest2/2 passes.
 - [ ] H3: bound actual signed credential by verified actor expiry as well as subject/grant/300s; H4: durable exact issuer+jti-to-grant/chain binding, with equivalent-grant revocation tests.
 - [ ] Strict combined-head matrix/reciprocal review still required; ordinary builds running zero Keycloak cases are not provider evidence.
 
@@ -323,7 +337,7 @@ Acceptance gates:
 
 - [x] T07: automated
 
-Evidence: [docs/identity.md](docs/identity.md), [docs/audit.md](docs/audit.md)
+Evidence: [docs/identity.md](docs/identity.md), [docs/audit.md](docs/audit.md), [docs/handoffs/gpt/WP-102.md](docs/handoffs/gpt/WP-102.md)
 
 ### WP-103 Policy enforcement points — partial
 
@@ -339,12 +353,14 @@ Implemented scope:
 
 - Cedar PDP, versioned decisions, fail-closed decorator and an explicit 64-evaluation PEP bulkhead are implemented.
 - Operator safe-recovery checks and the shared durable audit sink are integrated.
+- Claude route-inventory test0aeb52f passes one scoped case in CI39354688069; /agents/research is an explicit anonymous-route gap, not a default-deny pass.
 
 Additional closure/integration tasks:
 
 - [ ] Wire policy and verified caller identity into the audit query/verification API.
 - [ ] Prove tool/model/human-task/publication boundaries cannot bypass the PEP as their product implementations land; enforce and test default deny on uncovered HTTP paths.
 - [ ] Keep T23 emergency containment work with WP-305; production approved-state freshness is owned by WP-304.
+- [ ] Protect Claude-owned AgentResource with verified caller/PEP and no-business-invocation tests; GPT supplies dispatch-only credential integration outside persisted workflow state. Harden route inventory coverage/exemptions; do not treat known-gap exceptions as complete denial proof.
 
 Evidence: [docs/policy.md](docs/policy.md), [docs/audit.md](docs/audit.md)
 
@@ -425,6 +441,9 @@ Implemented scope:
 - Bounded canonical envelope, audit/metrics and scoped ingress passed full CI 39352802891 at 04b421f (6 unit, 4 HTTP, 1 native policy, 9 JDBC inbox cases).
 - Actual JPA writer success observer and bounded fail-closed checkpoint gate implemented; unhealthy readiness/new-start refusal and 14 local unit cases pass. Current-head application binding/full CI and durable inbox acknowledgement remain open.
 - Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open.
+- PR #41 checkpoint/ingress increment merged as e738218 after Claude exact-head APPROVE-partial at cd3f57b and CI39355182128; postmerge main CI39357918414 passed. WP-107/T13 stay partial.
+- Dispatch protocol successor adds immutable occurrence identity, retained deadlines/dispositions, same-session reservations and explicit checkpoint-proof ACK port. Local application test-compile and two identity cases pass; nine PostgreSQL protocol cases await CI. No SDK consumer/proof implementation is activated.
+- Dispatch protocol754507a passed9/9 real PostgreSQL cases, zero skips, in CI39358587955. Overall build failed only the route media probe; Claude0cf85d6 correction integrated via GPT004fd9e and current full CI/review renewed. No actual SDK consumption/T13 proof.
 - Draft #41 implements durable inbox signals and authorized/audited scoped CloudEvents receipt; ingress/privacy04b421f full CI39352802891 green.
 - Actual JPA checkpoint guard, unhealthy readiness and new-start refusal implemented at499550a; full CI39354335254 passes, including selected guarded writer/original reader and existing restart tests. This is not end-to-end inbox consumption.
 - PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open.
@@ -434,6 +453,7 @@ Additional closure/integration tasks:
 - [ ] Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.
 - [ ] Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.
 - [ ] Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.
+- [ ] Integrate authoritative SDK task-completed receipt proof, bounded delivery coordinator and lost-claim fencing; prove loop/parallel restore and checkpoint-before-ACK crash recovery with actual engine persistence. Protocol-port doubles are not T13 proof.
 - [ ] Complete durable Flow wait delivery and persisted signal ACK; prove receipt-before-registration, restart/crash windows and stable loop/parallel occurrence identity.
 - [ ] Recheck cancellation under the dispatch reservation lock; use named system:event-recovery SERVICE principal and audit every attempt before releasing callbacks; manual changes require authorized oa.recover operation.
 - [ ] Complete event-triggered starts, retention/tombstones and delivery tracing; automate full T13 including failed compensation.
@@ -1096,7 +1116,7 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-21. Shared pat
 
 ## Decisions and conditional follow-ups
 
-- [ ] **D-1 Identity provider** (WP-102): Recommended: Keycloak OIDC/token exchange; confirm the deployment issuer and complete real integration.
+- [ ] **D-1 Identity provider** (WP-102): Keycloak for authentication; delegated authority requires strict actor-bearing token exchange and real-Java evidence. Native Keycloak delegation remains an explicit preview test profile, not a production acceptance claim.
 - [x] **D-2 Policy engine** (WP-103): Cedar embedded; OPA sidecar remains an organizational alternative (ADR 0021).
 - [ ] **D-3 Target platform** (WP-403): Recommended: OpenShift and plain Kubernetes, packaged with Helm.
 - [ ] **D-4 Console technology** (WP-603): Recommended: Qute unless the console needs a TypeScript SPA.

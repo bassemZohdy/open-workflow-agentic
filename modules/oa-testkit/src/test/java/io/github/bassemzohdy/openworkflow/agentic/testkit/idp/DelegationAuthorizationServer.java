@@ -67,6 +67,10 @@ public final class DelegationAuthorizationServer implements AutoCloseable {
         NOT_JSON,
         /** Answers 200 with a body larger than the client reads. */
         HUGE_BODY,
+        /** Signs iat 301 s in the past with exp 299 s ahead: a 600 s signed lifetime whose residual is under 300 s. */
+        BACKDATED_IAT,
+        /** Signs iat 6 s in the future (inside an ordinary 30 s verifier skew) with exp 120 s ahead. */
+        FUTURE_IAT,
         /** Answers 200 with an {@code expires_in} of 3600 while the token itself is short. */
         LYING_EXPIRES_IN
     }
@@ -136,12 +140,15 @@ public final class DelegationAuthorizationServer implements AutoCloseable {
         Map<String, Object> claims = idp.baseClaims(user, audience, lifetime);
         claims.put("scope", String.join(" ", scopes));
         claims.put("tenant", tenant);
+        // the exchanging client is in the audience, as a Keycloak delegation token has it (ADR 0021 H1: inputs are
+        // verified for the exchanging client)
+        claims.put("aud", List.of(audience, clientId.get()));
         return idp.signClaims(claims);
     }
 
     /** The workload identity of an agent (client credentials): subject is the agent, kind AGENT. */
     public String workloadToken(String agent, String tenant, Duration lifetime) throws Exception {
-        Map<String, Object> claims = idp.baseClaims(agent, "token-endpoint", lifetime);
+        Map<String, Object> claims = idp.baseClaims(agent, clientId.get(), lifetime);
         claims.put("sub_kind", "AGENT");
         claims.put("tenant", tenant);
         return idp.signClaims(claims);
@@ -238,6 +245,13 @@ public final class DelegationAuthorizationServer implements AutoCloseable {
         Map<String, Object> claims = idp.baseClaims(f == Fault.OTHER_SUBJECT ? "mallory" : user,
                 f == Fault.WRONG_AUDIENCE ? "some-other-resource" : audience, Duration.ofSeconds(1));
         claims.put("exp", expiry.getEpochSecond());
+        if (f == Fault.BACKDATED_IAT) {
+            claims.put("iat", now.minusSeconds(301).getEpochSecond());
+            claims.put("exp", now.plusSeconds(299).getEpochSecond());
+        } else if (f == Fault.FUTURE_IAT) {
+            claims.put("iat", now.plusSeconds(6).getEpochSecond());
+            claims.put("exp", now.plusSeconds(120).getEpochSecond());
+        }
         claims.put("scope", String.join(" ", scopes.stream().sorted().toList()));
         claims.put("tenant", subject.path("tenant").asText());
         if (f != Fault.NO_ACTOR) {

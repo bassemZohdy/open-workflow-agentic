@@ -19,12 +19,15 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ExchangeExcep
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ExchangeRequest;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.GrantCheck;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedTokenBindings;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Rfc8693TokenExchanger;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenExchanger;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenVerifier;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.VerifiedToken;
 import io.github.bassemzohdy.openworkflow.agentic.testkit.idp.DelegationAuthorizationServer.Fault;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +51,7 @@ class Rfc8693TokenExchangerTest {
 
     @BeforeEach
     void start() throws Exception {
-        fx = new IdentityFixture(AUDIENCE, "tool-search");
+        fx = new IdentityFixture(AUDIENCE, "tool-search", CLIENT_ID);
         exchanger = exchanger();
         grant = fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, SCOPES, fx.clock.instant().plus(Duration.ofHours(1)),
                 "corr-1");
@@ -67,7 +70,7 @@ class Rfc8693TokenExchangerTest {
     }
 
     private Rfc8693TokenExchanger exchanger() {
-        return new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants,
+        return new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings,
                 fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
     }
 
@@ -118,7 +121,9 @@ class Rfc8693TokenExchangerTest {
 
     @Test
     void anAgentToAgentDelegationRecordsTheWholeChainInTheToken() throws Exception {
-        IssuedToken first = exchanger.exchange(request(Set.of("cases:read", "cases:write")));
+        // the parent hop is addressed to the runtime that delegates further: input tokens are verified for the client
+        IssuedToken first = exchanger.exchange(new ExchangeRequest(Credential.of(userToken), Credential.of(workload),
+                CLIENT_ID, Set.of("cases:read", "cases:write"), grant));
         DelegationGrant child = fx.grants.delegate(grant.id(), PLANNER, WORKER, Set.of("cases:read"),
                 fx.clock.instant().plus(Duration.ofMinutes(30)), "corr-2");
         String workerWorkload = fx.as.workloadToken("worker", fx.tenant, Duration.ofMinutes(30));
@@ -281,7 +286,7 @@ class Rfc8693TokenExchangerTest {
     @Test
     void aServerThatIsNotListeningIsUnavailable() {
         Rfc8693TokenExchanger dead = new Rfc8693TokenExchanger("http://127.0.0.1:1/token", CLIENT_ID,
-                CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(1));
+                CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(1));
 
         assertEquals(Code.UNAVAILABLE, assertThrows(ExchangeException.class, () -> dead.exchange(request(
                 Set.of("cases:read")))).code());
@@ -299,25 +304,227 @@ class Rfc8693TokenExchangerTest {
     }
 
     @Test
-    void aScopeTheUsersOwnTokenLacksIsRefusedByTheServerEvenThoughTheGrantHoldsIt() throws Exception {
+    void aScopeTheUsersOwnTokenLacksIsRefusedBeforeAnythingIsSentEvenThoughTheGrantHoldsIt() throws Exception {
         userToken = fx.as.userToken("alice", fx.tenant, "oa-api", Set.of("cases:read"), Duration.ofMinutes(30));
 
         ExchangeException e = refused(request(Set.of("cases:write")));
 
-        assertEquals(Code.REFUSED, e.code());
-        assertEquals("invalid_scope", e.oauthError());
+        assertEquals(Code.SCOPE_WIDENING, e.code());
+        assertTrue(fx.as.received().isEmpty(), "the product bounds the scopes itself; it does not rely on the server");
     }
 
     @Test
-    void anExpiredSubjectTokenIsRefusedByTheServer() throws Exception {
+    void anExpiredSubjectTokenIsRefusedBeforeAnythingIsSent() throws Exception {
         userToken = fx.as.userToken("alice", fx.tenant, "oa-api", SCOPES, Duration.ofSeconds(10));
         workload = fx.as.workloadToken("planner", fx.tenant, Duration.ofMinutes(30));
-        fx.clock.advance(Duration.ofSeconds(11));
+        fx.clock.advance(Duration.ofSeconds(41)); // past exp plus the 30 s skew: the verifier refuses it
 
         ExchangeException e = refused(request(Set.of("cases:read")));
 
-        assertEquals(Code.REFUSED, e.code());
-        assertEquals("invalid_grant", e.oauthError());
+        assertEquals(Code.INPUT_REJECTED, e.code());
+        assertTrue(fx.as.received().isEmpty(), "an expired subject token is never sent to the server");
+    }
+
+    @Test
+    void aSubjectTokenOfAnotherUserTenantOrChainIsRefusedBeforeAnythingIsSent() throws Exception {
+        String otherUser = fx.as.userToken("mallory", fx.tenant, "oa-api", SCOPES, Duration.ofMinutes(30));
+        String otherTenant = fx.as.userToken("alice", "tenant-other", "oa-api", SCOPES, Duration.ofMinutes(30));
+
+        userToken = otherUser;
+        assertEquals(Code.INPUT_REJECTED, refused(request(Set.of("cases:read"))).code());
+        userToken = otherTenant;
+        assertEquals(Code.INPUT_REJECTED, refused(request(Set.of("cases:read"))).code());
+        userToken = fx.as.userToken("alice", fx.tenant, "oa-api", SCOPES, Duration.ofMinutes(30));
+        workload = fx.as.workloadToken("worker", fx.tenant, Duration.ofMinutes(30)); // not the grant's agent
+        assertEquals(Code.INPUT_REJECTED, refused(request(Set.of("cases:read"))).code());
+        workload = "not-a-token";
+        assertEquals(Code.INPUT_REJECTED, refused(request(Set.of("cases:read"))).code());
+
+        assertTrue(fx.as.received().isEmpty(), "nothing reached the server");
+    }
+
+    @Test
+    void aGrantRevokedWhileTheRequestIsInFlightIssuesNothing() throws Exception {
+        TokenVerifier revokeWhenTheAnswerIsVerified = (token, audience) -> {
+            VerifiedToken verified = fx.verifier.verify(token, audience);
+            if (audience.equals(AUDIENCE)) {
+                fx.grants.revoke(grant.id(), ALICE, "revoked in flight", null);
+            }
+            return verified;
+        };
+        Rfc8693TokenExchanger racing = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME,
+                fx.secrets, fx.grants, fx.bindings, revokeWhenTheAnswerIsVerified, fx.audit(), fx.clock, Duration.ofSeconds(2));
+
+        ExchangeException e = assertThrows(ExchangeException.class, () -> racing.exchange(request(SCOPES)));
+
+        assertEquals(Code.GRANT_INACTIVE, e.code());
+        assertEquals(1, fx.as.received().size(), "the request was sent; the token is discarded after the answer");
+    }
+
+    @Test
+    void anIssuedTokenThatOutlivesTheSubjectTokenIsRefusedNotShortened() throws Exception {
+        userToken = fx.as.userToken("alice", fx.tenant, "oa-api", SCOPES, Duration.ofSeconds(100));
+        fx.as.fault(DelegationAuthorizationServer.Fault.IGNORE_SUBJECT_EXPIRY); // the server does not end its token with the subject token
+
+        ExchangeException e = refused(request(Set.of("cases:read")));
+
+        assertEquals(Code.BAD_RESPONSE, e.code());
+        assertTrue(e.getMessage().contains("subject"), e.getMessage());
+    }
+
+    // ---- actor freshness (ADR 0021 H3 freshness amendment; replaces the superseded actor-output-exp refusal) ----------
+
+    private String actorWith(java.util.function.Consumer<Map<String, Object>> change) throws Exception {
+        Map<String, Object> claims = fx.idp.baseClaims("planner", CLIENT_ID, Duration.ofMinutes(30));
+        claims.put("sub_kind", "AGENT");
+        claims.put("tenant", fx.tenant);
+        change.accept(claims);
+        return fx.idp.signClaims(claims);
+    }
+
+    @Test
+    void aFreshActorWhoseTokenEndsBeforeTheIssuedOneStillGetsTheSignedCredential() throws Exception {
+        workload = fx.as.workloadToken("planner", fx.tenant, Duration.ofSeconds(60));
+        fx.as.fault(DelegationAuthorizationServer.Fault.IGNORE_SUBJECT_EXPIRY); // the server issues its full lifetime
+
+        IssuedToken token = exchanger.exchange(request(Set.of("cases:read")));
+
+        // the credential carries its own signed lifetime and outlives the workload proof; subject/grant still bound it
+        assertTrue(token.expiresAt().isAfter(fx.clock.instant().plusSeconds(60)));
+        assertTrue(Duration.between(fx.clock.instant(), token.expiresAt()).compareTo(Duration.ofSeconds(300)) <= 0);
+    }
+
+    @Test
+    void aSignedResponseWithAnOverlongSignedLifetimeIsRefusedEvenWhenTheResidualLooksFine() {
+        assertBadResponse(Fault.BACKDATED_IAT); // iat now-301, exp now+299: 600 s signed lifetime
+    }
+
+    @Test
+    void aSignedResponseIssuedMoreThanFiveSecondsInTheFutureIsRefusedInsideTheVerifierSkew() {
+        assertBadResponse(Fault.FUTURE_IAT);    // iat now+6 is inside the verifier's 30 s skew but beyond 5 s
+    }
+
+    @Test
+    void anActorThatTurnsStaleWhileTheInputsAreVerifiedOrTheSecretIsFetchedGetsNoRequestSent() throws Exception {
+        long now = fx.clock.instant().getEpochSecond();
+        // 59 s old when the exchange begins; two slow seconds later it is 61 s old
+        workload = actorWith(c -> { c.put("iat", now - 59); c.put("exp", now + 600); });
+        io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenVerifier slowVerifier = (token, audience) -> {
+            var verified = fx.verifier.verify(token, audience);
+            if (audience.equals(CLIENT_ID)) {
+                fx.clock.advance(Duration.ofSeconds(2));
+            }
+            return verified;
+        };
+        Rfc8693TokenExchanger slowVerification = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID,
+                CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings, slowVerifier, fx.audit(), fx.clock,
+                Duration.ofSeconds(2));
+        int before = fx.as.requestCount();
+        ExchangeException e = assertThrows(ExchangeException.class,
+                () -> slowVerification.exchange(request(Set.of("cases:read"))));
+        assertEquals(Code.INPUT_REJECTED, e.code());
+        assertTrue(e.getMessage().contains("stale"), e.getMessage());
+        assertEquals(before, fx.as.requestCount(), "nothing was sent to the issuer");
+
+        // the same through a slow secret lookup
+        fx.clock.advance(Duration.ofSeconds(0));
+        long later = fx.clock.instant().getEpochSecond();
+        workload = actorWith(c -> { c.put("iat", later - 59); c.put("exp", later + 600); });
+        io.github.bassemzohdy.openworkflow.agentic.runtime.identity.SecretProvider slowSecret = name -> {
+            fx.clock.advance(Duration.ofSeconds(2));
+            return fx.secrets.current(name);
+        };
+        Rfc8693TokenExchanger slowSecrets = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID,
+                CLIENT_SECRET_NAME, slowSecret, fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock,
+                Duration.ofSeconds(2));
+        ExchangeException secret = assertThrows(ExchangeException.class,
+                () -> slowSecrets.exchange(request(Set.of("cases:read"))));
+        assertEquals(Code.INPUT_REJECTED, secret.code());
+        assertEquals(before, fx.as.requestCount(), "nothing was sent to the issuer");
+    }
+
+    @Test
+    void aMissingStaleFutureOrExpiredActorIsRefusedBeforeAnythingIsSent() throws Exception {
+        long now = fx.clock.instant().getEpochSecond();
+        Map<String, java.util.function.Consumer<Map<String, Object>>> cases = new java.util.LinkedHashMap<>();
+        cases.put("missing iat", c -> c.remove("iat"));
+        cases.put("stale by 61 s", c -> { c.put("iat", now - 61); c.put("exp", now + 600); });
+        cases.put("future by 6 s", c -> { c.put("iat", now + 6); c.put("exp", now + 600); });
+        cases.put("expired", c -> { c.put("iat", now - 30); c.put("exp", now - 1); });
+        for (var entry : cases.entrySet()) {
+            workload = actorWith(entry.getValue());
+            int before = fx.as.requestCount();
+            ExchangeException e = assertThrows(ExchangeException.class,
+                    () -> exchanger.exchange(request(Set.of("cases:read"))), entry.getKey());
+            assertEquals(Code.INPUT_REJECTED, e.code(), entry.getKey());
+            assertEquals(before, fx.as.requestCount(), entry.getKey() + ": nothing was sent");
+        }
+    }
+
+    @Test
+    void theEdgesOfTheFreshnessWindowAreAcceptedAndOneSecondBeyondIsNot() throws Exception {
+        long now = fx.clock.instant().getEpochSecond();
+        workload = actorWith(c -> { c.put("iat", now - 60); c.put("exp", now + 600); });
+        assertNotNull(exchanger.exchange(request(Set.of("cases:read"))));
+        workload = actorWith(c -> { c.put("iat", now + 5); c.put("exp", now + 600); });
+        assertNotNull(exchanger.exchange(request(Set.of("cases:read"))));
+    }
+
+    @Test
+    void anActorThatTurnsStaleWhileTheIssuerIsAnsweringOrTheStoreIsSlowIsNeverReleased() {
+        IssuedTokenBindings slow = new IssuedTokenBindings() {
+            @Override
+            public void bind(String issuer, String tokenId, Binding binding) {
+                fx.bindings.bind(issuer, tokenId, binding);
+                fx.clock.advance(Duration.ofSeconds(61)); // the workload proof is now older than 60 s
+            }
+
+            @Override
+            public java.util.Optional<Binding> find(String issuer, String tokenId) {
+                return fx.bindings.find(issuer, tokenId);
+            }
+        };
+        Rfc8693TokenExchanger slowExchanger = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID,
+                CLIENT_SECRET_NAME, fx.secrets, fx.grants, slow, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
+
+        ExchangeException e = assertThrows(ExchangeException.class,
+                () -> slowExchanger.exchange(request(Set.of("cases:read"))));
+
+        assertEquals(Code.INPUT_REJECTED, e.code());
+        assertTrue(e.getMessage().contains("stale"), e.getMessage());
+    }
+
+    @Test
+    void aTokenThatExpiresOrLosesItsGrantWhileBeingBoundIsNeverReleased() {
+        for (boolean revoke : new boolean[] {false, true}) {
+            IssuedTokenBindings slow = new IssuedTokenBindings() {
+                @Override
+                public void bind(String issuer, String tokenId, Binding binding) {
+                    fx.bindings.bind(issuer, tokenId, binding);
+                    if (revoke) {
+                        fx.grants.revoke(grant.id(), ALICE, "revoked during binding", null);
+                    } else {
+                        fx.clock.advance(Duration.ofSeconds(301)); // a slow store: the token is now past exp
+                    }
+                }
+
+                @Override
+                public java.util.Optional<Binding> find(String issuer, String tokenId) {
+                    return fx.bindings.find(issuer, tokenId);
+                }
+            };
+            Rfc8693TokenExchanger slowExchanger = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID,
+                    CLIENT_SECRET_NAME, fx.secrets, fx.grants, slow, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
+
+            ExchangeException e = assertThrows(ExchangeException.class,
+                    () -> slowExchanger.exchange(request(Set.of("cases:read"))));
+
+            assertNotNull(e.getMessage());
+            assertFalse(e.getMessage().contains("eyJ"), "no token text in the refusal");
+            if (!revoke) {
+                assertEquals(Code.BAD_RESPONSE, e.code());
+            }
+        }
     }
 
     // ---- secrets ---------------------------------------------------------------------------------------------------
@@ -377,13 +584,13 @@ class Rfc8693TokenExchangerTest {
     @Test
     void theEndpointMustBeHttpsUnlessItIsLoopback() {
         assertThrows(IllegalArgumentException.class, () -> new Rfc8693TokenExchanger("http://sso.example/token",
-                CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.verifier, fx.audit(), fx.clock,
+                CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock,
                 Duration.ofSeconds(1)));
         assertThrows(IllegalArgumentException.class, () -> new Rfc8693TokenExchanger("https://u:p@sso.example/token",
-                CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.verifier, fx.audit(), fx.clock,
+                CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock,
                 Duration.ofSeconds(1)));
         assertNotNull(new Rfc8693TokenExchanger("https://sso.example/token", CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets,
-                fx.grants, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(1)));
+                fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(1)));
     }
 
     @Test

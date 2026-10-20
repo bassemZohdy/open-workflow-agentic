@@ -3,6 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.audit;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.api.PageRequest;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerContextResolver;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.GET;
@@ -12,6 +13,8 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
+import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
@@ -30,7 +33,9 @@ import java.util.function.Supplier;
  *   <li>{@code POST /audit/verify}: verifies every chain, or the one named by {@code chainId}.</li>
  * </ul>
  *
- * Every endpoint first asks {@link AuditAccess}. Errors are RFC 9457 problem documents.
+ * Every endpoint first establishes the caller ({@link CallerContextResolver}: 401 without a usable credential, 503 when
+ * the token cannot be checked) and then asks {@link AuditAccess} about that caller (403 when refused). Nothing is read
+ * before both have passed. Errors are RFC 9457 problem documents.
  */
 @Path("/audit")
 @Produces(MediaType.APPLICATION_JSON)
@@ -64,6 +69,9 @@ public class AuditResource {
     AuditAccess access;
 
     @Inject
+    CallerContextResolver callers;
+
+    @Inject
     AuditQuery query;
 
     @Inject
@@ -71,7 +79,8 @@ public class AuditResource {
 
     @GET
     @Path("/events")
-    public EventPage events(@QueryParam("instanceId") String instanceId,
+    public EventPage events(@Context HttpHeaders headers,
+                            @QueryParam("instanceId") String instanceId,
                             @QueryParam("correlationId") String correlationId,
                             @QueryParam("chainId") String chainId,
                             @QueryParam("type") String type,
@@ -79,7 +88,7 @@ public class AuditResource {
                             @QueryParam("to") String to,
                             @QueryParam("cursor") String cursor,
                             @QueryParam("limit") Integer limit) {
-        access.require(AuditAccess.READ);
+        access.require(AuditAccess.READ, callers.resolve(headers));
         AuditQuery.Filter filter = new AuditQuery.Filter(instanceId, correlationId, badRequestOnInvalid(
                 () -> chainId == null ? null : AuditKeys.requireChainId(chainId)), type, instant("from", from),
                 instant("to", to));
@@ -89,8 +98,8 @@ public class AuditResource {
 
     @GET
     @Path("/events/{eventId}")
-    public EventView event(@PathParam("eventId") String eventId) {
-        access.require(AuditAccess.READ);
+    public EventView event(@Context HttpHeaders headers, @PathParam("eventId") String eventId) {
+        access.require(AuditAccess.READ, callers.resolve(headers));
         Ulid id = badRequestOnInvalid(() -> Ulid.parse(eventId));
         return query.byId(id).map(EventView::of)
                 .orElseThrow(() -> new NotFoundException("no audit event with that id"));
@@ -98,8 +107,8 @@ public class AuditResource {
 
     @POST
     @Path("/verify")
-    public VerifyResult verify(@QueryParam("chainId") String chainId) {
-        access.require(AuditAccess.VERIFY);
+    public VerifyResult verify(@Context HttpHeaders headers, @QueryParam("chainId") String chainId) {
+        access.require(AuditAccess.VERIFY, callers.resolve(headers));
         List<ChainReport> reports = chainId == null
                 ? verifier.verifyAll()
                 : List.of(verifier.verify(badRequestOnInvalid(() -> AuditKeys.requireChainId(chainId))));

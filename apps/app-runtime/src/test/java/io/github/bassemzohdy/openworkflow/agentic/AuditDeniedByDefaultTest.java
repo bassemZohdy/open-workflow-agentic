@@ -6,29 +6,33 @@ import static org.hamcrest.Matchers.equalTo;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
 
-/** Without a bound policy and without agentic.dev.audit-open, every audit endpoint answers 403 (M15, WP-111). */
+/**
+ * By default the audit API serves nobody (M15, WP-111, WP-102). A request that identifies nobody is 401: there is no
+ * anonymous caller, so there is nothing to authorize. An identified caller is still refused (403) while no policy is
+ * bound and agentic.dev.audit-open is false; that is {@code audit.AuditCallerDefaultDenyTest}.
+ */
 @QuarkusTest
 class AuditDeniedByDefaultTest {
 
     @Test
-    void listingEventsIsForbidden() {
+    void listingEventsIsUnauthorized() {
         given().when().get("/audit/events")
-                .then().statusCode(403)
+                .then().statusCode(401)
                 .contentType("application/problem+json")
-                .body("status", equalTo(403));
+                .body("status", equalTo(401));
     }
 
     @Test
-    void readingOneEventIsForbiddenBeforeTheLookup() {
+    void readingOneEventIsUnauthorizedBeforeTheLookup() {
         given().when().get("/audit/events/01ARZ3NDEKTSV4RRFFQ69G5FAV")
-                .then().statusCode(403)
+                .then().statusCode(401)
                 .contentType("application/problem+json");
     }
 
     @Test
-    void verifyingIsForbidden() {
+    void verifyingIsUnauthorized() {
         given().when().post("/audit/verify")
-                .then().statusCode(403)
+                .then().statusCode(401)
                 .contentType("application/problem+json");
     }
 }

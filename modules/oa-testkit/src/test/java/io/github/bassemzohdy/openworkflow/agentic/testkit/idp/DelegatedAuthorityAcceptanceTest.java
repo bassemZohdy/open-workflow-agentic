@@ -89,10 +89,10 @@ class DelegatedAuthorityAcceptanceTest {
 
     @BeforeEach
     void twoAgents() throws Exception {
-        fx = new IdentityFixture(RESOURCE);
+        fx = new IdentityFixture(RESOURCE, CLIENT_ID);
         exchanger = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets,
-                fx.grants, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
-        guard = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), fx.grants, fx.clock, 1);
+                fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
+        guard = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), fx.grants, fx.bindings, fx.clock, 1);
         Instant in1h = fx.clock.instant().plus(Duration.ofHours(1));
         plannerGrant = fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, PLANNER_SCOPES, in1h, null);
         workerGrant = fx.grants.delegate(plannerGrant.id(), PLANNER, WORKER, Set.of("cases:read"),
@@ -107,9 +107,22 @@ class DelegatedAuthorityAcceptanceTest {
         fx.close();
     }
 
+    /**
+     * A root grant exchanges the user's token. A child grant exchanges its parent's delegated token (addressed to the
+     * runtime), so that the whole chain stays in the token: the exchanger refuses a chain it cannot see in full.
+     */
     private IssuedToken exchange(DelegationGrant grant, String workload, Set<String> scopes) {
-        return exchanger.exchange(new ExchangeRequest(Credential.of(userToken), Credential.of(workload), RESOURCE,
-                scopes, grant));
+        Credential subject = Credential.of(userToken);
+        if (grant.parentId() != null) {
+            try {
+                String parentWorkload = fx.as.workloadToken("planner", fx.tenant, Duration.ofMinutes(30));
+                subject = exchanger.exchange(new ExchangeRequest(subject, Credential.of(parentWorkload), CLIENT_ID,
+                        PLANNER_SCOPES, plannerGrant)).accessToken();
+            } catch (Exception e) {
+                throw e instanceof RuntimeException r ? r : new IllegalStateException(e);
+            }
+        }
+        return exchanger.exchange(new ExchangeRequest(subject, Credential.of(workload), RESOURCE, scopes, grant));
     }
 
     private Reason refusedAtResource(String token, Set<String> scopes) {
@@ -188,8 +201,8 @@ class DelegatedAuthorityAcceptanceTest {
     @Test
     void theExchangeNeverIssuesMoreThanTheGrantAndTheResourceRefusesAForgedWiderToken() throws Exception {
         // The worker's grant covers cases:read. Asking for cases:write is refused before anything is sent.
-        ExchangeException widening = assertThrows(ExchangeException.class,
-                () -> exchange(workerGrant, workerWorkload, Set.of("cases:write")));
+        ExchangeException widening = assertThrows(ExchangeException.class, () -> exchanger.exchange(new ExchangeRequest(
+                Credential.of(userToken), Credential.of(workerWorkload), RESOURCE, Set.of("cases:write"), workerGrant)));
         assertEquals(ExchangeException.Code.SCOPE_WIDENING, widening.code());
         assertEquals(0, fx.as.received().size(), "the request never reached the authorization server");
 
@@ -254,12 +267,27 @@ class DelegatedAuthorityAcceptanceTest {
                 () -> exchange(workerGrant, workerWorkload, Set.of("cases:read"))).code());
     }
 
+    @Test
+    void revokingTheIssuingChainStopsTheTokenWhileAnEquivalentChainStaysActive() {
+        Instant in1h = fx.clock.instant().plus(Duration.ofHours(1));
+        DelegationGrant otherPlanner = fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, PLANNER_SCOPES, in1h, null);
+        DelegationGrant otherWorker = fx.grants.delegate(otherPlanner.id(), PLANNER, WORKER, Set.of("cases:read"),
+                fx.clock.instant().plus(Duration.ofMinutes(30)), null);
+        IssuedToken live = exchange(workerGrant, workerWorkload, Set.of("cases:read"));
+
+        fx.grants.revoke(plannerGrant.id(), ALICE, "alice withdrew this planner grant", null);
+
+        assertTrue(fx.grants.check(otherWorker.id()).active(), "another chain with the same agents and scopes is active");
+        assertEquals(Reason.GRANT_INACTIVE, refusedAtResource(live.accessToken().reveal(), Set.of("cases:read")),
+                "the token was issued under the revoked chain; the equivalent chain cannot revive it");
+    }
+
     // ---- replayed tokens --------------------------------------------------------------------------------------------
 
     @Test
     void aTokenIsAcceptedOnceAndEveryLaterUseIsAReplayEvenAfterARestart() {
         JdbcReplayCache shared = new JdbcReplayCache(IdentityFixture.dataSource());
-        ResourceTokenGuard first = new ResourceTokenGuard(fx.verifier, RESOURCE, shared, fx.grants, fx.clock, 1);
+        ResourceTokenGuard first = new ResourceTokenGuard(fx.verifier, RESOURCE, shared, fx.grants, fx.bindings, fx.clock, 1);
         String token = exchange(workerGrant, workerWorkload, Set.of("cases:read")).accessToken().reveal();
 
         first.admit(token, Set.of("cases:read"));
@@ -267,7 +295,7 @@ class DelegatedAuthorityAcceptanceTest {
         assertEquals(Reason.REPLAYED, assertThrows(TokenRejectedException.class,
                 () -> first.admit(token, Set.of("cases:read"))).reason());
         ResourceTokenGuard afterRestart = new ResourceTokenGuard(fx.verifier, RESOURCE,
-                new JdbcReplayCache(IdentityFixture.dataSource()), fx.grants, fx.clock, 1);
+                new JdbcReplayCache(IdentityFixture.dataSource()), fx.grants, fx.bindings, fx.clock, 1);
         assertEquals(Reason.REPLAYED, assertThrows(TokenRejectedException.class,
                 () -> afterRestart.admit(token, Set.of("cases:read"))).reason(), "a new process remembers the token");
     }
@@ -278,7 +306,7 @@ class DelegatedAuthorityAcceptanceTest {
 
         // Another resource server does not accept it (audience binding).
         ResourceTokenGuard other = new ResourceTokenGuard(fx.verifier, "tool-search", new InMemoryReplayCache(10),
-                fx.grants, fx.clock, 1);
+                fx.grants, fx.bindings, fx.clock, 1);
         assertEquals(Reason.AUDIENCE, assertThrows(TokenRejectedException.class,
                 () -> other.admit(workerToken, Set.of("cases:read"))).reason());
         // The user's own token is not a delegated token.

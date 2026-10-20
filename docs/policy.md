@@ -16,6 +16,7 @@ Every boundary where the runtime lets something happen asks the PEP first. The P
 | Publication or activation | `Pep.publication(publisher, scopes, artifactRef)` | `artifact:<kind>/<name>@<version>#<sha256>` | `PUBLICATION` |
 | Operator recovery | `Pep.operation(op, operator, scopes, taskId)` | `operation:cancel`, `operation:pause`, `operation:drain` | `OPERATION` |
 | Operator operation on a registry instance (WP-105d) | `Pep.instanceOperation(op, operator, scopes, instanceId)` | `operation:inspect`, `operation:retry`, `operation:recover` | `OPERATION` |
+| Structured event receipt (WP-107, `EventIngress`) | `Pep.decide(AuthorizationRequest(producer, DATA_ACCESS, resource, instance, context))` through the dedicated `@EventPolicy` Pep | `event:receive:<sha256 of tenant, source, type, correlation>` | `DATA_ACCESS` |
 
 For the operations API (`docs/lifecycle.md`, section 11), the request's task id carries the registry instance id, since the request shape has no instance field. Cancel and pause use `Pep.operation` with that id; inspect, retry and recover use `Pep.instanceOperation`. Only the first two are named by the safe-recovery rule, so the other three are refused when the main policy is unavailable.
 
@@ -158,6 +159,7 @@ The WP-006 spike measured Cedar at 387 to 525 µs p50 and 4.5 to 6 ms p99 in thr
 
 | Test class | What it covers |
 |---|---|
+| `HttpRouteDefaultDenyTest` (app) | Scans every JAX-RS route and requires 401 for an anonymous caller; one known gap (`POST /agents/research`) is asserted, not hidden |
 | `PolicyContextTest` | Context defaults, scope tokens, budget bounds, the four-argument request constructor |
 | `PolicySnapshotTest` | The documented hash layout, sensitivity of the hash, version format, immutability |
 | `ManifestPolicySnapshotSourceTest` | Directory and classpath sources, name refusal, strict UTF-8, size limits, missing keys |
@@ -168,3 +170,12 @@ The WP-006 spike measured Cedar at 387 to 525 µs p50 and 4.5 to 6 ms p99 in thr
 | `PepLatencyTest` | Latency at the three measured paths (printed, not asserted) |
 | `PolicyArchitectureTest` | The policy package does not depend on any framework, with a violating fixture |
 | `CheckDependencyPolicy` tests (`tools/`) | Licence normalisation, including `Apache 2` inheritance |
+
+### Event ingress policy (WP-107)
+
+The event ingress asks the policy once per receipt for `DATA_ACCESS` on a hashed route resource; the shipped rule
+(`policy/events/ingress.cedar`) requires the scope `oa.events.receive`, taken from the producer's verified token. The exact
+producer binding (tenant, subject kind, subject, source, type, correlation, definition) is configuration enforced in code and
+cannot be loosened by policy. Policy therefore cannot express per-source or per-type rules (the resource is a hash). If that is
+wanted, request a typed route resource (`docs/handoffs/claude/WP-107.md`). `DATA_ACCESS` never uses safe recovery, so an
+unavailable engine or audit sink refuses receipt (503).

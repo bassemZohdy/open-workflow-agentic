@@ -112,12 +112,16 @@ Rules are validated at startup: redacted paths need the redacted form, and any r
 
 Pages are keyset pages on `(chain_id, seq)`, the order in which each chain commits. A new event only gets a higher sequence in its own chain, so a page never shifts under concurrent appends. The cursor is opaque base64url text; a malformed cursor is a 400. Errors are RFC 9457 problem documents with the correlation id.
 
-**Access (`AuditAccess`).** Authentication (WP-102) and policy (WP-103) do not exist yet, so:
+**Access (`AuditResource`, `AuditAccess`).** There is no anonymous caller (WP-102). Every endpoint first establishes who is calling, with the same `CallerContextResolver` as the instance and operations APIs (`docs/identity.md` section 2), and only then asks the access rule:
 
-- If a `PolicyDecisionPoint` is bound, every audit request asks it. Only `ALLOW` passes; `DENY`, `ERROR` and a null decision are refused.
-- Otherwise every request is refused with 403, unless `agentic.dev.audit-open=true`. That setting is for development only and is `false` by default.
+1. **Authentication.** A verified bearer token gives the caller (subject, kind, tenant, scopes). No usable credential is **401** with a `WWW-Authenticate` challenge: a missing, malformed, expired, wrongly signed, wrong-audience or delegated (`act`) token. A token that cannot be checked is 503. Only in a development or test profile with `agentic.dev.trust-caller-headers=true` do `X-Tenant` and `X-Subject` identify a caller; the headers are never read when a token is sent. Nothing is read from the trail before this step succeeds.
+2. **Authorization (`AuditAccess.require(action, caller)`).** The caller must have been established by the resolver: a caller built by hand (`UNVERIFIED`) or a missing one is refused without asking any policy.
+   - If a `PolicyDecisionPoint` is bound, it is asked about **the caller's own subject** (a user or an agent, as the token says) for action `audit.events.read` or `audit.chains.verify`, with the token's scopes as the policy context. Only `ALLOW` passes; `DENY`, `ERROR` and a null decision are refused, and so are scopes that cannot form a policy context. The policy is never asked about a placeholder subject.
+   - Otherwise every identified caller is refused with **403**, unless `agentic.dev.audit-open=true`. That setting is for development only and is `false` by default. It removes the policy requirement, not the authentication requirement.
 
-`AuditDeniedByDefaultTest` checks the 403 for the three endpoints. `AuditApiTest` (with the flag on) checks the behaviour.
+A request is therefore 401 when nobody is identified and 403 when somebody is identified and not allowed. Before WP-102 an unidentified request was 403; this is a deliberate change of status, not a change of access: such a request was never served and still is not.
+
+`AuditDeniedByDefaultTest` checks the 401 for the three endpoints by default; `AuditCallerDefaultDenyTest` checks that an identified caller is still 403 without a policy or the dev flag. `AuditVerifiedCallerApiTest` runs real RS256 tokens through the running application with a recording policy bound. `AuditApiTest` (flag on, header seam on) checks the behaviour.
 
 ## 8. Deployment hardening
 
@@ -161,9 +165,11 @@ Operational rules:
 | `RetentionPolicyTest` | Rule validation, salt requirement, redacted-path form |
 | `AuditRecorderTest` | Each retention form, salted redaction, reference deletion keeps the chain, stamps hashed, envelope written, tamper of an inline field detected |
 | `AuditQueryTest` | Filters, time range (inclusive start, exclusive end), cursor paging without gaps or repeats, malformed cursor, lookup by id |
-| `AuditAccessTest` | Deny by default, dev flag, bound policy allow and deny, null decision |
-| `AuditDeniedByDefaultTest` (app-runtime) | 403 problems for the three endpoints by default |
-| `AuditApiTest` (app-runtime) | REST behaviour, 400 and 404 problems, verification endpoint, configured redaction rule end to end, scheduled job runs |
+| `AuditAccessTest` | Deny by default, dev flag needs an identified caller, bound policy allow and deny, null decision, the policy is asked about the caller's own subject and scopes (a user and an agent), a hand-built or missing caller is refused before the policy is asked, malformed scopes are a denial |
+| `AuditDeniedByDefaultTest` (app-runtime) | 401 problems for the three endpoints when nobody is identified (the default) |
+| `AuditCallerDefaultDenyTest` (app-runtime) | An identified caller is 403 without a policy or the dev flag; an incomplete or missing identity is 401 even with the header seam on |
+| `AuditVerifiedCallerApiTest` (app-runtime) | Real bearer tokens against the fake issuer: the bound policy sees the token's subject, kind and scopes for read and verify; a denied caller is 403; expired, forged, wrong-audience and delegated tokens are 401 and never reach the policy; request headers cannot change the identity |
+| `AuditApiTest` (app-runtime) | REST behaviour, 400 and 404 problems, verification endpoint, configured redaction rule end to end, scheduled job runs; dev-open does not remove authentication |
 
 These tests are plain JUnit or `@QuarkusTest` classes. None of them is annotated with `@Acceptance`: no test in [test-cases.md](test-cases.md) describes this package's behaviour in full (T04, T31 and T34 depend on other packages).
 
@@ -184,8 +190,9 @@ The operation events carry the version stamps of their decision (`stamp.policy`,
 | Item | Owner | Note |
 |---|---|---|
 | External anchor of the chain head (write-once storage, periodic export of the last hash per chain) | Out of scope for WP-111; list it in the operations work (WP-401) | Without it, an owner who rewrites events and head records together is not detected |
-| Verified caller identity for audit access | WP-102 / WP-103 | Identity verification exists, but `AuditAccess` still supplies an anonymous subject; bind the verified caller and PDP before treating this API as a production-authorized query path |
-| Policy decision point bound for the audit API | WP-103 | The PEP and audit API use the shared audit port; policy decision events are recorded as `AuditEvent` |
+| Verified caller identity for audit access | WP-102 (done in this change, against the fake issuer) | The caller is the verified token subject and scopes (section 7). Real-Keycloak token layout is the open WP-102 gate in `docs/identity.md` section 9 |
+| Policy decision point bound for the audit API | WP-103 | The running application binds no `PolicyDecisionPoint` for audit, so in production the audit API serves nobody until a policy is bound; only the dev flag opens it. WP-103 adds the audit rules and routes the decision through the PEP, which records `policy.decision` events and bounds concurrency. `AuditAccess` asks the port directly today |
+| Tenant filtering of audit reads | WP-404 | The trail is global. A caller's tenant is established but not yet applied to queries |
 | Recording effects and reconciler actions | WP-108, WP-105 | Use `AuditRecorder` or `AuditSink` |
 | Acceptance tests T04, T31, T34 | WP-301, WP-501, WP-203 | Not owned here |
 | Head log growth (one row per event) and archival of old chains | Operations (WP-401) | Verification reads the whole chain in memory; large chains need paged verification |

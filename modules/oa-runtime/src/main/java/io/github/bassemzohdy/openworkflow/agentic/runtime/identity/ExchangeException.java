@@ -15,6 +15,8 @@ public final class ExchangeException extends RuntimeException {
         GRANT_INACTIVE,
         /** The scopes asked for are not all in the grant. Nothing was sent. */
         SCOPE_WIDENING,
+        /** A subject or actor token does not verify or does not match the grant. Nothing was sent. */
+        INPUT_REJECTED,
         /** The authorization server refused with an OAuth error ({@link #oauthError()}). */
         REFUSED,
         /** The authorization server, the network or a needed secret was unavailable. No token was obtained. */
