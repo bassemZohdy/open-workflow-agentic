@@ -48,3 +48,30 @@ from GPT, and review current GPT heads with reviewer/SHA/commands/results/verdic
 GPT continues WP-107's durable delivery adapter and promptly reviews new Claude
 heads. Required CI, resolved material findings and exact-head reciprocal review
 precede each merge. No old-head approval or skipped Keycloak case is promoted.
+
+## Plan review integrated; combined #35 review gate (2026-10-20)
+
+Claude approved exact #37 head1771fbf56f61a82a43202b340b82c75b4e4611b3 in
+comment6281917208: 62 tools cases, generated checks, direct diff and current green
+CI39354944217; no blocking findings. GPT merged #37 into #35 as
+5a9bc61 (full Git SHA is recoverable from the #37 merge record). This is a plan
+branch integration, not main acceptance. #37 branch/worktree is retained unchanged.
+
+GPT uses exclusively new sibling gpt-backlogs for the EXISTING #35 branch
+`docs/gpt-claude-backlogs`; no duplicate PR. Merged current main e738218 normally
+as2c7ffe1. Resolved only source/projection conflicts: combined both WP-107 partial
+progress/evidence/remaining gates, retained WP-108 merged-T03 evidence, preserved
+R1-R3 ownership/dependency corrections. Regenerated TODO and plan from source JSON
+instead of choosing a generated conflict side. Main #41 postmerge39357918414 is
+green; current combined #35 still needs its own exact-head CI and Claude review.
+
+Commands/results: python tools/render_requirements.py, its --check, python -m
+unittest discover -s tools -p 'test_*.py' ->62/62 pass; git diff --check clean.
+No applied SQL or product behavior changed in the plan-resolution commit. The
+new product files in this branch are the already reviewed/merged main #41 baseline.
+No local database/native run is claimed. ADR0025 stays Proposed and WP-102,
+WP-107, WP-108 package gates remain partial as recorded by their source progress.
+
+Do not promote older #35/#37 reviews to the resulting #35 head. Claude must review
+that published exact head; GPT alone merges to main after that review, resolved
+material findings and required full CI. Any new review finding remains a gate.
