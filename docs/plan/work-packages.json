@@ -824,7 +824,8 @@
           "JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.",
           "Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.",
           "Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial.",
-          "Governed-boundary preparation publishes framework-free EffectScope (tenant, registry instance, full owner Subject) and exact authority/manual-policy/central-audit handoff. Reuses existing ws1/ef1 derivation without key/schema changes; requires verified registry/full-owner checks because historical thread hashing omits subject kind. Four new scope and two existing key unit cases pass zero skips. This is attribution data, not an authority grant or consumer activation. Specific current-authority-after-blocking-I/O, resolve-effect OPERATION policy, audit producer/consumer and real Flow/effect/manual execution gates remain open; no whole-WP-102 start dependency."
+          "Governed-boundary preparation publishes framework-free EffectScope (tenant, registry instance, full owner Subject) and exact authority/manual-policy/central-audit handoff. Reuses existing ws1/ef1 derivation without key/schema changes; requires verified registry/full-owner checks because historical thread hashing omits subject kind. Four new scope and two existing key unit cases pass zero skips. This is attribution data, not an authority grant or consumer activation. Specific current-authority-after-blocking-I/O, resolve-effect OPERATION policy, audit producer/consumer and real Flow/effect/manual execution gates remain open; no whole-WP-102 start dependency.",
+          "Additive V70 storage guards preserve effect key/target/request/purpose/creation/replay binding, irreversible attempts and existing state transitions, immutable repeated outcome evidence and retained journal/compensation links. Five new direct-SQL cases compile with app reactor; execution/review pending. No public authority/manual/adapter activation or acceptance closure."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -837,7 +838,8 @@
           "docs/handoffs/gpt/WP-108.md",
           "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java",
           "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java",
-          "docs/handoffs/gpt/WP-108-authority.md"
+          "docs/handoffs/gpt/WP-108-authority.md",
+          "docs/handoffs/gpt/WP-108-storage-guards.md"
         ]
       }
     },

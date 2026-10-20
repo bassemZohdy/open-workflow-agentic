@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-108 preparation: additive V70 protects effect intent identity, replay contract, irreversible state/attempt evidence and retained journal/compensation links. Five direct-SQL cases compile; Linux execution/review and original governed adapter/manual/audit/recovery gates remain open.
+
 This log records implemented capabilities and their requirement coverage. Entries describe unreleased development work.
 A merged component or passing acceptance case does not close an entire platform requirement. The full
 remaining checklist is [TODO.md](TODO.md); implementation status is maintained in
