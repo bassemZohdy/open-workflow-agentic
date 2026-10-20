@@ -568,11 +568,13 @@
           "Wire policy and verified caller identity into the audit query/verification API.",
           "Prove tool/model/human-task/publication boundaries cannot bypass the PEP as their product implementations land; enforce and test default deny on uncovered HTTP paths.",
           "Keep T23 emergency containment work with WP-305; production approved-state freshness is owned by WP-304.",
-          "Protect Claude-owned AgentResource with verified caller/PEP and no-business-invocation tests; GPT supplies dispatch-only credential integration outside persisted workflow state. Harden route inventory coverage/exemptions; do not treat known-gap exceptions as complete denial proof."
+          "Protect Claude-owned AgentResource with verified caller/PEP and no-business-invocation tests; GPT supplies dispatch-only credential integration outside persisted workflow state. Harden route inventory coverage/exemptions; do not treat known-gap exceptions as complete denial proof.",
+          "Resolve GPT #47 exact bb58420 material review: bind direct agent checkpoint access to verified user/instance/tenant ownership and reconcile workflow dispatch-only exchanged credentials with resource admission, proving the actual HTTP step and denial/no-effect cases; full39374220592 alone does not close these boundaries. See docs/handoffs/gpt/WP-103-review.md."
         ],
         "evidence": [
           "docs/policy.md",
-          "docs/audit.md"
+          "docs/audit.md",
+          "docs/handoffs/gpt/WP-103-review.md"
         ]
       }
     },
@@ -2631,7 +2633,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-19",
-    "status": "2026-10-20: #40 exactdbe3bd8 merged main7c36d17 after Claude6283757505/6283759173/full39370961537/matrix39370996254; main postmerge39372837340 SUCCESS. #46 exact89b0f0d remains unchanged targeting main with full39371032850/matrix39370993287 SUCCESS; exact Claude review pending. ACK-before-advance50ce5af passed both lanes39373064706, actualSDK11/owned10/writer5, standard3/native8 zero skips. Successor now adds bounded pre-start actual-proof repair and before/after authority/cancellation checks, failed-repair readiness;25 local cases/app compile/OWS fixture pass,10 new SQL/reader/lifecycle cases await execution. No extra active implementation PR. WP-102/M11 partial for original unwired live-Flow identity/exchange propagation; core/provider interfaces adopted/available. WP-107/WP-108 partial, ADR0025/0026 Proposed; complete group/fan-out/FIFO/foreach/until/coordinator/process/partition/old-owner/loop/effect/manual/starts/retention/tracing/full T13 retained.",
+    "status": "2026-10-20: #40 exactdbe3bd8 merged main7c36d17 after Claude6283757505/6283759173/full39370961537/matrix39370996254; main postmerge39372837340 SUCCESS. #46 exact89b0f0d remains unchanged targeting main with full39371032850/matrix39370993287 SUCCESS; exact Claude review pending. ACK-before-advance50ce5af passed both lanes39373064706, actualSDK11/owned10/writer5, standard3/native8 zero skips. Successor now adds bounded pre-start actual-proof repair and before/after authority/cancellation checks, failed-repair readiness;25 local cases/app compile/OWS fixture pass,10 new SQL/reader/lifecycle cases await execution. No extra active implementation PR. WP-102/M11 partial for original unwired live-Flow identity/exchange propagation; core/provider interfaces adopted/available. WP-107/WP-108 partial, ADR0025/0026 Proposed; complete group/fan-out/FIFO/foreach/until/coordinator/process/partition/old-owner/loop/effect/manual/starts/retention/tracing/full T13 retained. GPT reviewed Claude #47 exact bb584204606593102ad164ca4f2ce5bf9de197d3: REQUEST_CHANGES6284057207 for same-tenant cross-user checkpoint ownership and exchanged delegated credential rejected by caller admission; local PEP5 pass, full39374220592 SUCCESS does not resolve findings. Shared handoff WP-103-review.md. GPT preparation199cf5b reserves additive V70 effect identity/state/retained-evidence guards, 5 new SQL cases/app reactor compile and tools68 pass; manual39374918657 pending. #46 remains frozen awaiting exact Claude verdict; no additional GPT implementation PR.",
     "agents": [
       {
         "id": "GPT",

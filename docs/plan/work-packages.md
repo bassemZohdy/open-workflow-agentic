@@ -331,8 +331,9 @@ Remaining gates:
 - Prove tool/model/human-task/publication boundaries cannot bypass the PEP as their product implementations land; enforce and test default deny on uncovered HTTP paths.
 - Keep T23 emergency containment work with WP-305; production approved-state freshness is owned by WP-304.
 - Protect Claude-owned AgentResource with verified caller/PEP and no-business-invocation tests; GPT supplies dispatch-only credential integration outside persisted workflow state. Harden route inventory coverage/exemptions; do not treat known-gap exceptions as complete denial proof.
+- Resolve GPT #47 exact bb58420 material review: bind direct agent checkpoint access to verified user/instance/tenant ownership and reconcile workflow dispatch-only exchanged credentials with resource admission, proving the actual HTTP step and denial/no-effect cases; full39374220592 alone does not close these boundaries. See docs/handoffs/gpt/WP-103-review.md.
 
-Evidence: [docs/policy.md](../../docs/policy.md), [docs/audit.md](../../docs/audit.md)
+Evidence: [docs/policy.md](../../docs/policy.md), [docs/audit.md](../../docs/audit.md), [docs/handoffs/gpt/WP-103-review.md](../../docs/handoffs/gpt/WP-103-review.md)
 
 Reuse: OPA or Cedar (per WP-006)
 
