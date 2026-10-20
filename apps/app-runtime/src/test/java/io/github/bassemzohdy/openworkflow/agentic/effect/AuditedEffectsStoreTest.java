@@ -9,6 +9,11 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.opentelemetry.api.OpenTelemetry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.agroal.api.AgroalDataSource;
+import io.agroal.api.configuration.supplier.AgroalDataSourceConfigurationSupplier;
+import io.agroal.api.security.NamePrincipal;
+import io.agroal.api.security.SimplePassword;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.transaction.*;
@@ -28,6 +33,10 @@ import org.junit.jupiter.api.parallel.*;
 class AuditedEffectsStoreTest {
     @Inject TransactionManager manager;
     @Inject UserTransaction caller;
+    @Inject AgroalDataSource applicationPool;
+    SimpleMeterRegistry metrics;
+    @BeforeEach void createOnlyOwnMetrics(){metrics=new SimpleMeterRegistry();}
+    @AfterEach void closeOnlyOwnMetrics(){metrics.close();}
     EffectAuditTestDatabase db;
     JdbcInstanceStore registry;
     EffectAuditProducer producer;
@@ -58,7 +67,7 @@ class AuditedEffectsStoreTest {
         registry.replace(row.successor(Instant.now(),row.status(),row.engineInstanceId(),1,null,Instant.now().minusSeconds(1)),row.version(),"test.deadline",OWNER);
     }
     static EffectTelemetry telemetry(){return new EffectTelemetry(OpenTelemetry.noop());}
-    AuditedEffects gate(IdempotentAuditSink sink){return new AuditedEffects(db.dataSource,manager,sink,telemetry());}
+    AuditedEffects gate(IdempotentAuditSink sink){return new AuditedEffects(db.dataSource,manager,sink,telemetry(),metrics);}
     EffectExecutionFence current(){return (i,b)->{};} // Explicit protocol spy, never production identity evidence.
     List<EffectAuditProducer.Retained> history(EffectKey key) {
         return Transactions.inTransaction(db.dataSource,c->producer.forKey(c,key,0,128));
@@ -134,8 +143,10 @@ class AuditedEffectsStoreTest {
         var f=fixture();var t=target(f);
         assertThrows(IllegalStateException.class,()->gate((s,d)->{if(s.transition()==AuditSource.Transition.OUTCOME)throw new IllegalStateException("outcome audit unavailable");return fixtureReceipt(s,d);}).invoke(f.invocation(),t,current()));
         assertEquals(EffectState.CONFIRMED,effect(f).state());assertEquals(1,pending(f.command().key()));assertEquals(1,t.sends.get());
+        assertEquals(1,metrics.get("agentic.effects.outcomes").tag("outcome","confirmed").counter().count());
         var saved=history(f.command().key());assertEquals(EffectState.CONFIRMED,gate(this::fixtureReceipt).invoke(f.invocation(),t,current()).state());
         assertEquals(saved,history(f.command().key()));assertEquals(1,t.sends.get());assertEquals(0,t.reads.get());assertEquals(0,pending(f.command().key()));
+        assertEquals(1,metrics.get("agentic.effects.outcomes").tag("outcome","confirmed").counter().count(),"cached readback does not observe another outcome transition");
     }
     @Test void registryClosureOrDeadlineDuringBlockingAuditMakesNoTargetCall() {
         for(boolean deadline:List.of(false,true)) {
@@ -259,14 +270,14 @@ class AuditedEffectsStoreTest {
         var f=fixture();var t=target(f);var hooks=new AtomicInteger();Runnable probe=()->{try{assertNull(manager.getTransaction());hooks.incrementAndGet();}catch(SystemException e){throw new AssertionError(e);}};
         t.send=()->{probe.run();return new EffectTarget.Reply(EffectTarget.Outcome.CONFIRMED,null);};
         var tracing=new EffectTelemetry(OpenTelemetry.noop()){@Override public Effect effect(Operation op,Supplier<Effect> work){var answer=super.effect(op,work);probe.run();return answer;}};
-        var g=new AuditedEffects(db.dataSource,manager,(s,d)->{probe.run();return fixtureReceipt(s,d);},tracing);
+        var g=new AuditedEffects(db.dataSource,manager,(s,d)->{probe.run();return fixtureReceipt(s,d);},tracing,metrics);
         caller.begin();try{assertEquals(EffectState.CONFIRMED,g.invoke(f.invocation(),t,(i,b)->probe.run()).state());assertEquals(Status.STATUS_ACTIVE,caller.getStatus());}finally{caller.rollback();}
         assertTrue(hooks.get()>=6);assertEquals(EffectState.CONFIRMED,effect(f).state());assertEquals(0,pending(f.command().key()));
     }
     @Test void registryClosureDuringTelemetryCleanupStillRefusesPrivateOutput() {
         var f=fixture();var t=target(f);
         var tracing=new EffectTelemetry(OpenTelemetry.noop()){@Override public Effect effect(Operation op,Supplier<Effect> work){var answer=super.effect(op,work);end(f);return answer;}};
-        assertThrows(IllegalStateException.class,()->new AuditedEffects(db.dataSource,manager,this::fixtureReceipt,tracing).invoke(f.invocation(),t,current()));
+        assertThrows(IllegalStateException.class,()->new AuditedEffects(db.dataSource,manager,this::fixtureReceipt,tracing,metrics).invoke(f.invocation(),t,current()));
         assertEquals(EffectState.CONFIRMED,effect(f).state());assertEquals(1,t.sends.get());assertEquals(0,pending(f.command().key()));
     }
     @Test void changedHistoryDuringAuditCannotHideAnUnacknowledgedTail() {
@@ -300,5 +311,140 @@ class AuditedEffectsStoreTest {
         try{assertThrows(CancellationException.class,()->gate((s,d)->{var receipt=fixtureReceipt(s,d);if(s.transition()==AuditSource.Transition.DISPATCH && once.compareAndSet(true,false))Thread.currentThread().interrupt();return receipt;}).invoke(f.invocation(),t,current()));assertTrue(Thread.currentThread().isInterrupted());}
         finally{Thread.interrupted();} // Clear ONLY the test's own thread after proving flag preservation.
         assertFalse(once.get());assertEquals(0,t.sends.get());assertEquals(0,t.reads.get());assertEquals(EffectState.INTENDED,effect(f).state());assertEquals(2,history(f.command().key()).size());
+    }
+
+    static SQLException sqlCause(Throwable failure) {
+        for(Throwable t=failure;t!=null;t=t.getCause())if(t instanceof SQLException sql)return sql;
+        throw new AssertionError("expected an actual JDBC refusal",failure);
+    }
+    void lock(Connection c,String table,Fixture f) throws SQLException {
+        assertTrue(Set.of("task.instance","effect.ledger","effect.audit_delivery").contains(table));
+        String query=table.equals("task.instance")?"select id from task.instance where id=? for update":
+                "select 1 from "+table+" where thread_name=? and node_id=? and idempotency_key=? for update";
+        try(var q=c.prepareStatement(query)) {
+            if(table.equals("task.instance"))q.setString(1,f.scope().instanceId().value());
+            else {var key=f.command().key();q.setString(1,key.threadId().value());q.setString(2,key.nodeId());q.setString(3,key.idempotencyKey());}
+            try(var r=q.executeQuery()){assertTrue(r.next());}
+        }
+    }
+    @Test void registryLockAcquiredInsidePrepareFenceCannotBlockTheFollowingIntentTransactionIndefinitely() throws Exception {
+        var f=fixture();var t=target(f);
+        try(var owner=db.dataSource.getConnection()) {
+            owner.setAutoCommit(false);
+            try {
+                long start=System.nanoTime();
+                var failure=assertThrows(StoreUnavailableException.class,()->gate(this::fixtureReceipt).invoke(f.invocation(),t,(i,b)->{
+                    if(b==EffectExecutionFence.Boundary.PREPARE)try{lock(owner,"task.instance",f);}catch(SQLException e){throw new AssertionError(e);}
+                }));
+                assertEquals("55P03",sqlCause(failure).getSQLState());assertTrue(Duration.ofNanos(System.nanoTime()-start).compareTo(Duration.ofSeconds(9))<0);
+                assertEquals(0,t.sends.get());assertEquals(0,t.reads.get());assertTrue(ledger.find(f.command().key()).isEmpty());assertEquals(0,pending(f.command().key()));
+                try(var q=owner.createStatement();var r=q.executeQuery("select 1")){assertTrue(r.next());assertEquals(1,r.getInt(1));} // Caller connection/transaction still works.
+            }finally{owner.rollback();}
+        }
+        assertEquals(EffectState.CONFIRMED,gate(this::fixtureReceipt).invoke(f.invocation(),t,current()).state());assertEquals(1,t.sends.get());
+    }
+    @Test void outcomeRowLockTimeoutRetainsUncertaintyAndRecoveryUsesLookupInsteadOfAnotherSend() throws Exception {
+        var f=fixture();var t=target(f);
+        try(var owner=db.dataSource.getConnection()) {
+            owner.setAutoCommit(false);
+            t.send=()->{try{lock(owner,"effect.ledger",f);}catch(SQLException e){throw new AssertionError(e);}return new EffectTarget.Reply(EffectTarget.Outcome.CONFIRMED,null);};
+            try{var failure=assertThrows(StoreUnavailableException.class,()->gate(this::fixtureReceipt).invoke(f.invocation(),t,current()));assertEquals("55P03",sqlCause(failure).getSQLState());}
+            finally{owner.rollback();}
+        }
+        assertEquals(1,t.sends.get());assertEquals(EffectState.INTENDED,effect(f).state());assertEquals(2,history(f.command().key()).size());
+        t.read=()->new EffectTarget.Reply(EffectTarget.Outcome.CONFIRMED,null); // Protocol-spy authoritative lookup, not an actual business target.
+        assertEquals(EffectState.CONFIRMED,gate(this::fixtureReceipt).invoke(f.invocation(),t,current()).state());assertEquals(1,t.sends.get());assertEquals(1,t.reads.get());
+    }
+    @Test void actualSourceStatementTimeoutRollsBackAllFiveFactsBeforeAnyTargetCall() throws Exception {
+        var f=fixture();var t=target(f);String name="gpt_effect_slow_"+UUID.randomUUID().toString().replace("-","");
+        assertTrue(name.matches("gpt_effect_slow_[0-9a-f]{32}"));
+        try(var c=db.dataSource.getConnection()) {
+            EffectAuditTestDatabase.sql(c,"create function effect."+name+"() returns trigger language plpgsql as $$ begin if new.attributes->>'oa.instance'='"+f.scope().instanceId().value()+"' then perform pg_sleep(6); end if; return new; end $$");
+            EffectAuditTestDatabase.sql(c,"create trigger "+name+" before insert on effect.audit_source for each row execute function effect."+name+"()");
+        }
+        try{var failure=assertThrows(StoreUnavailableException.class,()->gate(this::fixtureReceipt).invoke(f.invocation(),t,current()));assertEquals("57014",sqlCause(failure).getSQLState());}
+        finally{try(var c=db.dataSource.getConnection()){EffectAuditTestDatabase.sql(c,"drop trigger "+name+" on effect.audit_source");EffectAuditTestDatabase.sql(c,"drop function effect."+name+"()");}}
+        assertEquals(0,t.sends.get());assertEquals(0,t.reads.get());assertTrue(ledger.find(f.command().key()).isEmpty());assertTrue(history(f.command().key()).isEmpty());assertEquals(0,pending(f.command().key()));
+        try(var c=db.dataSource.getConnection()) {
+            for(String table:List.of("ledger","event","audit_scope","audit_delivery"))try(var q=c.prepareStatement("select count(*) from effect."+table+" where thread_name=?")) {
+                q.setString(1,f.scope().threadId().value());try(var r=q.executeQuery()){assertTrue(r.next());assertEquals(0,r.getInt(1));}
+            }
+            try(var q=c.prepareStatement("select count(*) from effect.audit_source where attributes->>'oa.instance'=?")) {
+                q.setString(1,f.scope().instanceId().value());try(var r=q.executeQuery()){assertTrue(r.next());assertEquals(0,r.getInt(1));}
+            }
+        }
+        gate(this::fixtureReceipt).invoke(f.invocation(),t,current());assertEquals(1,t.sends.get());
+    }
+    @Test void localAckLockTimeoutLeavesTheCommittedCentralDataFixturePendingAndNeverSends() throws Exception {
+        var f=fixture();var t=target(f);var retained=new AtomicReference<AuditReceipt>();var once=new AtomicBoolean(true);
+        try(var owner=db.dataSource.getConnection()) {
+            owner.setAutoCommit(false);
+            try{var failure=assertThrows(StoreUnavailableException.class,()->gate((s,d)->{
+                var receipt=fixtureReceipt(s,d);
+                if(once.compareAndSet(true,false)){retained.set(receipt);try{lock(owner,"effect.audit_delivery",f);}catch(SQLException e){throw new AssertionError(e);}}
+                return receipt;
+            }).invoke(f.invocation(),t,current()));assertEquals("55P03",sqlCause(failure).getSQLState());}
+            finally{owner.rollback();}
+        }
+        assertNotNull(retained.get());assertEquals(2,pending(f.command().key()));assertEquals(0,t.sends.get());assertEquals(0,t.reads.get());
+        assertEquals(EffectState.INTENDED,gate(this::fixtureReceipt).invoke(f.invocation(),t,current()).state());assertEquals(0,t.sends.get());assertEquals(1,t.reads.get());assertEquals(0,pending(f.command().key()));
+        var initial=history(f.command().key()).getFirst();assertEquals(retained.get(),fixtureReceipt(initial.source(),initial.draft()));
+    }
+    @Test void readyAndDirectDeliveryMetadataReadsHaveActualLockTimeoutsBeforeTheConsumer() throws Exception {
+        for(boolean ready:List.of(false,true)) {
+            var f=fixture();ledger.prepareScoped(f.scope(),f.command(),Duration.ZERO,now());long id=history(f.command().key()).getFirst().source().sequence();var calls=new AtomicInteger();
+            var relay=new EffectAuditDelivery(db.dataSource,manager,producer,(s,d)->{calls.incrementAndGet();return fixtureReceipt(s,d);});
+            try(var owner=db.dataSource.getConnection()) {
+                owner.setAutoCommit(false);
+                try{EffectAuditTestDatabase.sql(owner,"lock table effect."+(ready?"audit_delivery":"audit_source")+" in access exclusive mode");
+                    var failure=assertThrows(StoreUnavailableException.class,()->{if(ready)relay.ready(128);else relay.deliver(id);});assertEquals("55P03",sqlCause(failure).getSQLState());assertEquals(0,calls.get());
+                }finally{owner.rollback();}
+            }
+            assertEquals(1,pending(f.command().key()));assertEquals(id,relay.deliver(id).source().sequence());assertEquals(1,calls.get());
+        }
+    }
+    AgroalDataSource ownedPool(int size,Duration acquisition) throws SQLException {
+        return AgroalDataSource.from(new AgroalDataSourceConfigurationSupplier().connectionPoolConfiguration(p->p
+                .maxSize(size).acquisitionTimeout(acquisition).connectionFactoryConfiguration(c->c.jdbcUrl(db.dataSource.getUrl())
+                        .principal(new NamePrincipal(db.dataSource.getUser())).credential(new SimplePassword(db.dataSource.getPassword()))
+                        .jdbcProperty("connectTimeout","5").jdbcProperty("socketTimeout","10"))));
+    }
+    @Test void realAgroalAdmissionTimeoutMakesNoTargetCallAndTheConfiguredDefaultIsFinite() throws Exception {
+        assertEquals(Duration.ofSeconds(5),applicationPool.getConfiguration().connectionPoolConfiguration().acquisitionTimeout());
+        var f=fixture();var t=target(f);
+        try(var pool=ownedPool(1,Duration.ofSeconds(2))) {
+            try(var held=pool.getConnection()) {
+                long start=System.nanoTime();var failure=assertThrows(StoreUnavailableException.class,()->new AuditedEffects(pool,manager,this::fixtureReceipt,telemetry(),metrics).invoke(f.invocation(),t,current()));
+                assertTrue(sqlCause(failure).getMessage().toLowerCase(Locale.ROOT).contains("acquisition"));assertTrue(Duration.ofNanos(System.nanoTime()-start).compareTo(Duration.ofSeconds(5))<0);
+                assertFalse(held.isClosed());assertTrue(held.isValid(1));assertEquals(0,t.sends.get());assertEquals(0,t.reads.get());assertTrue(ledger.find(f.command().key()).isEmpty());
+            }
+            try(var probe=pool.getConnection()){assertTrue(probe.isValid(1));} // Only our held connection was returned; the pool remains usable.
+        }
+    }
+    List<String> settings(Connection c) throws SQLException {
+        try(var q=c.createStatement();var r=q.executeQuery("select pg_backend_pid()::text,current_setting('lock_timeout'),current_setting('statement_timeout')")) {
+            assertTrue(r.next());return List.of(r.getString(1),r.getString(2),r.getString(3));
+        }
+    }
+    @Test void transactionLocalTimeoutsDoNotLeakIntoTheNextBorrowOfTheSamePhysicalConnection() throws Exception {
+        var f=fixture();
+        try(var pool=ownedPool(1,Duration.ofSeconds(1))) {
+            List<String> before;try(var c=pool.getConnection()){before=settings(c);}
+            new JdbcEffectLedger(pool,manager,producer).prepareScoped(f.scope(),f.command(),Duration.ZERO,now());
+            try(var c=pool.getConnection()){assertEquals(before,settings(c),"same backend and original session settings survive commit");}
+        }
+    }
+    @Test void explicitlyWiredOutcomeMetricsCountTransitionsWithOnlyFixedLabels() {
+        var f=fixture();var first=target(f);var g=gate(this::fixtureReceipt);
+        g.invoke(f.invocation(),first,current());g.invoke(f.invocation(),first,current());
+        assertEquals(1,metrics.get("agentic.effects.outcomes").tag("outcome","confirmed").counter().count());
+        var undo=f.scope().command("refund","undo","approved-refund","amount=10");var other=new Target(undo.target());
+        g.invoke(new EffectInvocation(f.scope(),undo,f.command().key()),other,current());
+        assertEquals(2,metrics.get("agentic.effects.outcomes").tag("outcome","confirmed").counter().count());
+        assertEquals(1,metrics.get("agentic.effects.outcomes").tag("outcome","compensated").counter().count());assertEquals(2,metrics.getMeters().size());
+        for(var meter:metrics.getMeters()) {
+            assertEquals("agentic.effects.outcomes",meter.getId().getName());assertEquals(1,meter.getId().getTags().size());
+            assertEquals("outcome",meter.getId().getTags().getFirst().getKey());assertTrue(Set.of("confirmed","compensated").contains(meter.getId().getTags().getFirst().getValue()));
+        }
     }
 }

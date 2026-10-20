@@ -3,6 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.effect;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.transaction.Transaction;
 import jakarta.transaction.TransactionManager;
 import java.sql.*;
@@ -30,14 +31,14 @@ public final class AuditedEffects {
     private final EffectAuditDelivery delivery;
     private final DurableEffects effects;
 
-    public AuditedEffects(DataSource data,TransactionManager manager,IdempotentAuditSink sink,EffectTelemetry telemetry) {
+    public AuditedEffects(DataSource data,TransactionManager manager,IdempotentAuditSink sink,EffectTelemetry telemetry,MeterRegistry metrics) {
         this.data=Objects.requireNonNull(data);this.manager=Objects.requireNonNull(manager);
         ledger=new JdbcEffectLedger(data,manager,producer);
         Objects.requireNonNull(sink);
         delivery=new EffectAuditDelivery(data,manager,producer,(source,draft)->{
             interrupted();var receipt=sink.appendOnce(source,draft);interrupted();return receipt;
         });
-        effects=new DurableEffects(ledger,Clock.systemUTC(),Objects.requireNonNull(telemetry));
+        effects=new DurableEffects(ledger,Clock.systemUTC(),Objects.requireNonNull(telemetry),Objects.requireNonNull(metrics));
     }
     public Effect invoke(EffectInvocation invocation,EffectTarget target,EffectExecutionFence current) {
         Objects.requireNonNull(invocation);Objects.requireNonNull(target);Objects.requireNonNull(current);
@@ -80,8 +81,7 @@ public final class AuditedEffects {
             requireCurrent(EffectExecutionFence.Boundary.RESULT,true);
         }
         private Optional<EffectKey> confirmedCompensation(EffectKey original) {
-            return Transactions.inTransaction(data,c->{
-                c.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+            return EffectStoreTransactions.snapshot(data,c->{
                 try(var q=c.prepareStatement("""
                     select o.state,x.compensation_node,x.compensation_key,u.state as undo_state,u.purpose,
                       s.initial_event_id,t.parent_initial_event_id
@@ -106,8 +106,7 @@ public final class AuditedEffects {
         }
         private void requireCurrent(EffectExecutionFence.Boundary boundary,boolean requireRetained) {
             interrupted();
-            Transactions.inTransaction(data,c->{
-                try(var limits=c.createStatement()){limits.execute("set local lock_timeout='2s'; set local statement_timeout='5s'");}
+            EffectStoreTransactions.readCommitted(data,c->{
                 producer.lockRoot(c,invocation.scope());
                 if(requireRetained) {
                     var bound=producer.bound(c,invocation.command().key()).orElseThrow();

@@ -35,7 +35,7 @@ public final class EffectAuditDelivery {
     /** One ready pending fact per key. No global committed watermark: delayed lower-id commits remain visible. */
     public List<Long> ready(int limit) {
         if(limit<1 || limit>128)throw new IllegalArgumentException("audit delivery batch must be between 1 and 128");
-        return isolated(()->Transactions.inTransaction(dataSource,c->{
+        return isolated(()->EffectStoreTransactions.readCommitted(dataSource,c->{
             var ids=new ArrayList<Long>();
             try(var q=c.prepareStatement("select w.source_event_id from effect.audit_delivery w where w.ack_source_key is null and not "+EARLIER+" order by w.source_event_id limit ?")) {
                 q.setInt(1,limit);try(var r=q.executeQuery()){while(r.next())ids.add(r.getLong(1));}
@@ -48,7 +48,7 @@ public final class EffectAuditDelivery {
     public AuditReceipt deliver(long journalId) {
         if(journalId<1)throw new IllegalArgumentException("journal id must be positive");
         return isolated(()->{
-            var retained=Transactions.inTransaction(dataSource,c->{
+            var retained=EffectStoreTransactions.readCommitted(dataSource,c->{
                 try(var q=c.prepareStatement("select "+EARLIER+" from effect.audit_delivery w where w.source_event_id=?")) {
                     q.setLong(1,journalId);try(var r=q.executeQuery()) {
                         if(!r.next() || r.getBoolean(1))throw new IllegalStateException("audit delivery missing or earlier fact remains pending");
@@ -59,7 +59,7 @@ public final class EffectAuditDelivery {
             // No source connection/transaction survives across this dependency call, even with a one-slot pool.
             var receipt=Objects.requireNonNull(sink.appendOnce(retained.source(),retained.draft()),"audit receipt");
             receipt.requireMatches(retained.source(),retained.draft());
-            Transactions.inTransaction(dataSource,c->{
+            EffectStoreTransactions.readCommitted(dataSource,c->{
                 if(!retained.equals(producer.find(c,journalId).orElseThrow()))throw new IllegalStateException("retained audit source changed");
                 try(var q=c.prepareStatement("""
                     select 1 from audit.source_binding where source_key=? and event_id=? and chain_id=?
@@ -107,9 +107,7 @@ public final class EffectAuditDelivery {
     }
     private List<EffectAuditProducer.Retained> snapshot(EffectScope scope,EffectKey key,List<AuditReceipt> receipts) {
         scope.requireKey(key);
-        return Transactions.inTransaction(dataSource,c->{
-            c.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
-            try(var limits=c.createStatement()){limits.execute("set local lock_timeout='2s'; set local statement_timeout='5s'");}
+        return EffectStoreTransactions.snapshot(dataSource,c->{
             if(!producer.bound(c,key).orElseThrow().scope().equals(scope))
                 throw new IllegalStateException("effect audit full scope differs");
             var facts=new ArrayList<EffectAuditProducer.Retained>();

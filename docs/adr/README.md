@@ -43,4 +43,6 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 
 | [0031](0031-require-complete-effect-audit-before-io.md) | Require complete effect audit before target I/O and private results | Proposed; consumer/authority/Flow gates remain |
 
+| [0032](0032-bound-effect-storage-and-wire-outcome-metrics.md) | Bound short effect transactions and require outcome metrics | Proposed; whole-call/consumer/authority gates remain |
+
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.

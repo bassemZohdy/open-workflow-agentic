@@ -386,7 +386,7 @@ public class JdbcEffectLedger implements EffectLedger {
     }
 
     private <T> T transaction(Transactions.Work<T> work) {
-        return isolated(()->Transactions.inTransaction(dataSource,work));
+        return isolated(()->projection==null?Transactions.inTransaction(dataSource,work):EffectStoreTransactions.readCommitted(dataSource,work));
     }
     private <T> T isolated(Supplier<T> work) {
         if(projection==null)return work.get(); // Existing legacy/CDI behavior remains unchanged.

@@ -173,3 +173,10 @@ identity/setup errors; source17/model24/allocation 15 pass, with no whole-run or
 provider/process proof. The timestamp fix keeps the immutable store check intact.
 A further actual undo/original-audit recovery case and PREPARE-denial assertion
 bring current boundary cases to 23. No test failure was retried without a fix.
+
+
+Follow-up preparation: WP-108-storage-bounds.md / ADR0032 supersedes this tested
+product's unmerged four-argument constructor: the current explicit API requires
+MeterRegistry as a fifth argument. It also bounds the older owned SQL paths.
+Fresh current evidence belongs to that handoff; the cd8ef8b results above are
+historical scope, not current-limit/metrics/31-case proof. No activation.

@@ -54,6 +54,11 @@ public class DurableEffects {
         this.ledger = Objects.requireNonNull(ledger); this.clock = Objects.requireNonNull(clock);this.telemetry=Objects.requireNonNull(telemetry);
     }
 
+    /** Explicit opt-in construction cannot rely on CDI field injection for outcome observations. */
+    public DurableEffects(JdbcEffectLedger ledger,Clock clock,EffectTelemetry telemetry,MeterRegistry metrics) {
+        this(ledger,clock,telemetry);this.metrics=Objects.requireNonNull(metrics);
+    }
+
     public Effect execute(EffectCommand command, EffectTarget target) {
         return execute(command,target,null);
     }
