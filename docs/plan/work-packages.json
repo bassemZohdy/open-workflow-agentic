@@ -734,7 +734,8 @@
           "JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.",
           "Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied.",
           "Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.",
-          "Bounded canonical envelope preservation, before/after central audit and fixed-label receipt metrics; HTTP/native-policy CI for this increment remains required."
+          "Bounded canonical envelope, audit/metrics and scoped ingress passed full CI 39352802891 at 04b421f (6 unit, 4 HTTP, 1 native policy, 9 JDBC inbox cases).",
+          "Actual JPA writer success observer and bounded fail-closed checkpoint gate implemented; unhealthy readiness/new-start refusal and 14 local unit cases pass. Current-head application binding/full CI and durable inbox acknowledgement remain open."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [

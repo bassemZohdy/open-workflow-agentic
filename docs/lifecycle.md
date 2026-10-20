@@ -611,3 +611,32 @@ instance lock. Early and out-of-order occurrences wait for their matching route;
 committed cancellation, terminal status and expired waits prevent new matching.
 The durable Flow adapter, restart delivery acknowledgement and complete T13
 remain open. See [the WP-107 contract and verification](handoffs/gpt/WP-107.md).
+
+
+### 12.1 Required checkpoint commit gate
+
+The actual JPA persistence writer is wrapped at the existing handler injection
+point. Original restore reads, workflow persistence exclusions and all-strategy
+correlation wiring remain in the existing Quarkus Flow customizer. A success
+observer receives immutable engine/definition/task-position/iteration identity
+only after the actual writer future succeeds. It is an internal acknowledgement
+seam; inbox consumption is not connected yet.
+
+The SDK logs and swallows exceptional lifecycle futures. Returning a failed
+future would therefore allow progress without the required checkpoint. On a
+write exception, cancelled writer, unknown outcome or timeout, the gate leaves
+its lifecycle stage pending without holding a waiting thread or connection. It
+never converts a failure or late commit into progress. The process latches
+unhealthy, readiness reports DOWN, and new starts/retries are refused before
+registry/engine changes. Existing identical idempotency keys still return the
+original result. Cancellation writes may still be attempted independently.
+
+`agentic.persistence.commit-timeout` defaults to PT30S (positive, at most PT5M).
+There is no automatic reset or retry using the mutable in-memory workflow
+context. Restore from durable state in a healthy replacement process after
+storage recovers; an uncertain in-flight commit needs that same recovery path.
+The gate does not cancel a database operation already executing. Health exposes
+operation/error class/time and counts, never workflow data or credentials.
+This is partial WP-107 infrastructure. Engine inbox delivery, persisted signal
+acknowledgement, occurrence identity across restart/parallel loops and T13
+still require implementation and process-level proof.

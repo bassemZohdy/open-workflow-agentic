@@ -6,6 +6,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.PersistenceCommitGate;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -59,6 +60,7 @@ public class InstanceService {
     private final LifecycleFaults faults;
     private final Clock clock;
     private final UlidGenerator ids;
+    @Inject PersistenceCommitGate checkpoints;
 
     @Inject
     public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults) {
@@ -154,6 +156,16 @@ public class InstanceService {
 
     private StartResult startAs(StartRequest request, String reason, Subject actor,
                                 InstanceStore.InsertHook onCreate) {
+        if (checkpoints != null && !checkpoints.status().healthy()) {
+            Optional<InstanceRecord> same = store.findByKey(request.tenant(), request.idempotencyKey());
+            if (same.isPresent()) {
+                if (!same.get().requestFingerprint().equals(request.fingerprint())) {
+                    throw new IdempotencyKeyReusedException(same.get().id());
+                }
+                return new StartResult(same.get(), false);
+            }
+            checkpoints.requireAvailable();
+        }
         if (!engine.hasDefinition(request.definition())) {
             throw new DefinitionNotFoundException(request.definition());
         }
