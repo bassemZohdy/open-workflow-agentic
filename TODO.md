@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-2026-10-20: #40/#46 merged after exact Claude approvals and full/real-provider CI. Main34b6a52 postmerge39375207519 SUCCESS. GPT #48 frozen e2e9b89: full39375306470 and both matrix lanes39375306597 SUCCESS, exact Claude review pending. Claude #47 revised8d63727 is GPT REQUEST_CHANGES6284271821 for post-policy/audit freshness, trusted workflow instance/task binding and maximum subject length; GPT owns the shared dispatch adapter/configuration, with the producer mapping retained in the cross-owner handoff. WP-108 preparation V70 at199cf5b passed both lanes39374918657; tracese2dc636 independently passed both lanes39376019493 (ledger/CDI3, SDK/fault5, guard5, standard3/native8, zero skips). Separate WP-107 group preparation adds four actual SDK full-workflow behavior cases and four schema/lint-valid fixtures: ALL arrival order/overlap, and explicit negative controls exposing post-completion ANY output mutation plus overlapping foreach/early until completion. They are not conformance/durability/acceptance passes. No additional implementation PR or migration allocation. Original complete group/coordinator/FIFO/foreach/until, loop/parallel and process/partition/old-owner, every later effect/identity boundary, manual/starts/retention/audit/tracing/full T13 gates remain; all affected packages stay partial. Group preparation now defines framework-free ONE/ANY/ALL and event/expression-until membership identities, wildcard normalization, complete pinned configuration fingerprint and bounded foreign-match-safe classification. All172 contracts (new8) pass; no durable winner/order/ownership/proof or runtime consumer is inferred..
+2026-10-20: Main34b6a52 includes #40/#46 with exact peer/full/real-provider CI; postmerge39375207519 SUCCESS. Single GPT PR #48 frozen e2e9b89 has full39375306470 and matrix39375306597 SUCCESS, exact Claude review pending. Revised Claude #47 at8d63727 is GPT REQUEST_CHANGES6284271821 for freshness after policy/audit, governed instance/task binding and maximum-subject length. WP-108 preparation V70 and tracing independently passed both lanes39374918657/39376019493, no whole feature or process-T03 transfer. Group preparation ec25e8a adds four actual full-workflow negative controls and bounded framework-free ordered group/role/ordinal identities; all172 contracts (new8) pass. Normal GPT-owned foundation merge retains V70 before proposed V71 group storage; no additional implementation PR and no applied migration rewrite. Group storage uses merged V68/V69 ownership only; the V70 relationship is migration ordering, not an identity-provider start dependency. Full selector/coordinator/FIFO/foreach/until, ownership/process/partition/loop, governed adapter/manual/central audit, starts/retention/distributed traces/full T13 and live async identity/exchange gates remain partial..
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-19).
 
@@ -355,8 +355,9 @@ Additional closure/integration tasks:
 - [ ] Prove tool/model/human-task/publication boundaries cannot bypass the PEP as their product implementations land; enforce and test default deny on uncovered HTTP paths.
 - [ ] Keep T23 emergency containment work with WP-305; production approved-state freshness is owned by WP-304.
 - [ ] Protect Claude-owned AgentResource with verified caller/PEP and no-business-invocation tests; GPT supplies dispatch-only credential integration outside persisted workflow state. Harden route inventory coverage/exemptions; do not treat known-gap exceptions as complete denial proof.
+- [ ] Resolve GPT revised #47 exact8d63727 review: retain/revalidate signed expiry and exact current grant after blocking policy/audit, bind governed invocation to trusted registry instance/task/occurrence separate from direct threads, preserve valid maximum subject lengths, and integrate the actual GPT-owned workflow credential adapter with denial/no-effect evidence. See WP-103-admission-review.md; no whole WP-102 start gate.
 
-Evidence: [docs/policy.md](docs/policy.md), [docs/audit.md](docs/audit.md)
+Evidence: [docs/policy.md](docs/policy.md), [docs/audit.md](docs/audit.md), [docs/handoffs/gpt/WP-103-admission-review.md](docs/handoffs/gpt/WP-103-admission-review.md)
 
 ### WP-104 Definition validation and agent output contract — completed
 
@@ -457,6 +458,9 @@ Implemented scope:
 - V69 baseline34a342a/39370100027 FAILED both lanes: new OwnedInboxDispatchTest10/10 passed each, but SDK positives/block observation and one existing JTA lease test failed. Extracted lease helper inherited NOT_SUPPORTED through CDI self-interception, suspending real checkpoint JTA; corrected to SUPPORTS (preserve caller JTA/local JDBC). Assertions unchanged, new current-head DB/peer review required. Mixed-order578d3c2 superseded run39370406321 cancelled, not passed. #44 exacta6bcccf merged into #40 as2d8761f after Claude6283480485 APPROVE/full39367327487; scope remains partial.
 - Four actual pinned SDK full-workflow group cases pass locally with zero skips; four OWS1.0.3 fixtures validate. ALL distinct filters preserve arrival order and one receipt satisfies overlapping ALL memberships. Explicit negative controls prove captured ANY loser output mutation after workflow completion, and foreach children overlapping with until completing before an earlier child finishes. These expose required winner/serialization/per-item-proof work; they are not FIFO, durable delivery, full conformance or T13 passes. No production consumer/coordinator or SQL activation. See WP-107-groups.md.
 - Framework-free InboxListenGroup preparation preserves ordered duplicate filter slots, DATA/UNTIL roles, ONE/ANY/ALL and event/expression until, wildcard ANY, task-scoped ig1/ir1 identity and a complete listen/read/foreach/producer/correlation configuration fingerprint. classify validates one receipt match set, keeps ALL memberships, selects one ANY slot and excludes stopping events from data. Total logical slots bounded128. All172 contract tests pass, including8 new group cases; no selector/authority/durable winner/ordered store/coordinator/checkpoint/T13 claim or SQL activation. See WP-107-groups.md for producer obligations and full remaining scope.
+- SDK consumer preparation from #46 exact89b0f0d adds complete bounded stored CloudEvent decoding, exact receipt source/id/type checks and independent callback data. Keeps untrusted extensions separate from receipt routing and rejects legacy payload-only/malformed data. Initial precise-decimal regression exposed pinned JsonFormat5.0.0 rounding; reuse existing precise JSON tree after SDK envelope validation, preserving durable canonical bytes. Local actual-library decoder6/parser2 cases pass zero skips. No consumer/coordinator activation, DB/process/restore/T13 claim; #46 is still the only active implementation PR.
+- Two actual pinned registration-SPI unit cases pass: one event completes both identical all-filter registrations; default any broadcast still invokes a captured loser after winner-triggered unregistration, with later publications correctly unsubscribed. Together decoder6/parser2/SPI2=10 local non-skipped cases. V64 global per-receipt signal uniqueness cannot simply represent overlapping group fan-out; additive group/membership/winner design and ordered/FIFO actual-engine cases remain required. No persistence/consumer/T13 promotion; complete scope retained in consumer handoff.
+- Corrected #46 exact89b0f0d workflow39370993287 SUCCESS both lanes: actual SDK/JPA8, owned dispatch10, task lease7, protocol9, selection6, late cancellation2, binding7 each; native8/standard3, all zero failures/errors/skips and strict evidence checks pass. Confirms caller-JTA SUPPORTS fix and actual checkpoint/cancellation lock-order case. Full39371032850/current exact Claude review still pending; no full T13/consumer/partition/committed-cancel-request crash-window claim. #40 exactdbe3bd8 full39370961537/matrix39370996254 also SUCCESS, exact peer review/main integration pending.
 
 Additional closure/integration tasks:
 
@@ -473,7 +477,7 @@ Acceptance gates:
 
 - [ ] T13: implement, run in CI and record passing evidence
 
-Evidence: [docs/handoffs/gpt/WP-107.md](docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](docs/lifecycle.md), [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](docs/handoffs/gpt/INTEGRATION-2026-10-20.md), [docs/handoffs/gpt/WP-107-owned-dispatch.md](docs/handoffs/gpt/WP-107-owned-dispatch.md), [docs/handoffs/gpt/WP-107-groups.md](docs/handoffs/gpt/WP-107-groups.md)
+Evidence: [docs/handoffs/gpt/WP-107.md](docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](docs/lifecycle.md), [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](docs/handoffs/gpt/INTEGRATION-2026-10-20.md), [docs/handoffs/gpt/WP-107-owned-dispatch.md](docs/handoffs/gpt/WP-107-owned-dispatch.md), [docs/handoffs/gpt/WP-107-groups.md](docs/handoffs/gpt/WP-107-groups.md), [docs/handoffs/gpt/WP-107-consumer.md](docs/handoffs/gpt/WP-107-consumer.md)
 
 ### WP-108 Effect ledger and compensation — partial
 
@@ -491,6 +495,11 @@ Implemented scope:
 - JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.
 - Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.
 - Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial.
+- Governed-boundary preparation publishes framework-free EffectScope (tenant, registry instance, full owner Subject) and exact authority/manual-policy/central-audit handoff. Reuses existing ws1/ef1 derivation without key/schema changes; requires verified registry/full-owner checks because historical thread hashing omits subject kind. Four new scope and two existing key unit cases pass zero skips. This is attribution data, not an authority grant or consumer activation. Specific current-authority-after-blocking-I/O, resolve-effect OPERATION policy, audit producer/consumer and real Flow/effect/manual execution gates remain open; no whole-WP-102 start dependency.
+- Additive V70 storage guards preserve effect key/target/request/purpose/creation/replay binding, irreversible attempts and existing state transitions, immutable repeated outcome evidence and retained journal/compensation links. Five new direct-SQL cases compile with app reactor; execution/review pending. No public authority/manual/adapter activation or acceptance closure.
+- Effect tracing preparation adds schema1 fixed logical/dispatch/lookup/compensation spans with current parent context, finite outcome attributes and no payload/key/subject/target/credential/exception events. SDK defaults disabled with runtime collector opt-in, bounded batch queue/export and content capture disabled. Five local real-SDK/fault cases pass; app reactor test-compile and dependency/license checks pass; three actual ledger/CDI trace cases compile pending Linux. V70 standard lane39374918657 passed guard5/existing service12/ledger4/standard3; delegation lane pending. No governed Flow/adapter/manual/audit or whole tracing/acceptance closure.
+- Exact199cf5b workflow39374918657 SUCCESS BOTH lanes: storage guard5, existing DurableEffects12/ledger4 and standard3/native8 all zero failures/errors/skips with strict evidence checks. Matrix does not rerun process-kill T03; final implementation PR full CI retains that gate. Separate tracese2dc636 workflow39376019493 pending; no pass transfers to new tracing code.
+- Exact trace producte2dc636 workflow39376019493 SUCCESS BOTH lanes, logs independently inspected: actual ledger/CDI EffectTracingTest3, real-SDK/fault telemetry5, V70 guard5, original effect service12, standard3/native8, zero failures/errors/skips and strict provider evidence checks pass. No external production collector/whole Flow/distributed trace or process-T03 rerun is claimed; final implementation PR full CI/current Claude review still gates merge.
 
 Additional closure/integration tasks:
 
@@ -501,7 +510,7 @@ Acceptance gates:
 
 - [x] T03: automated
 
-Evidence: [docs/handoffs/gpt/WP-108.md](docs/handoffs/gpt/WP-108.md), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java](modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java), [apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java](apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java)
+Evidence: [docs/handoffs/gpt/WP-108.md](docs/handoffs/gpt/WP-108.md), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java](modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java), [apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java](apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java), [docs/handoffs/gpt/WP-108-authority.md](docs/handoffs/gpt/WP-108-authority.md), [docs/handoffs/gpt/WP-108-storage-guards.md](docs/handoffs/gpt/WP-108-storage-guards.md), [docs/handoffs/gpt/WP-108-tracing.md](docs/handoffs/gpt/WP-108-tracing.md)
 
 ### WP-109 Timers, deadlines and durable failover — partial
 
@@ -579,13 +588,15 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-07. Shared pat
 Implemented scope:
 
 - Correlation IDs, health endpoints, Prometheus metrics and outbox-lag metrics exist.
+- WP-108 preparation supplies bounded OTel effect/dispatch/lookup/compensation spans using pinned existing Quarkus3.39.5 BOM/API1.62.0, custom schema1 and disabled SDK by default. Five in-process SDK/fault cases pass; actual ledger/CDI trace execution and end-to-end Flow/agent/tool/model, async/restart propagation, collector/runbook/dashboard/alert/SLO evidence remain open. No full observability deliverable or acceptance promotion.
+- Effect trace producte2dc636 executed in39376019493 SUCCESS both Linux lanes: ledger/CDI3 and SDK/fault5 zero skips, plus existing service/guard/provider regressions. This proves only component emission/privacy/failure semantics; production collector/deployment, complete Flow/agent/tool/model and async/restart/outbound correlation, runbook/dashboard/alert/SLO gates remain open.
 
 Additional closure/integration tasks:
 
 - [ ] Add OpenTelemetry across workflow, graph, tool and model spans under one correlation ID.
 - [ ] Finish structured operational logs and dashboards as code; document collection and alerting.
 
-Evidence: [README.md](README.md), [docs/lifecycle.md](docs/lifecycle.md)
+Evidence: [README.md](README.md), [docs/lifecycle.md](docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](docs/handoffs/gpt/WP-108-tracing.md)
 
 ### WP-113 Enterprise service adapters — not-started
 

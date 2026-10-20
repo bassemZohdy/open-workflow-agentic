@@ -26,6 +26,7 @@
     <!-- Tests: boot the whole application against Postgres on localhost:5432 -->
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-junit5</artifactId><scope>test</scope></dependency>
     <dependency><groupId>io.rest-assured</groupId><artifactId>rest-assured</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>io.opentelemetry</groupId><artifactId>opentelemetry-sdk-testing</artifactId><scope>test</scope></dependency>
     <!-- Test support: scripted model (StubLlm) and the process launcher used by ProcessRestartIT -->
     <dependency><groupId>io.github.bassemzohdy.openworkflow</groupId><artifactId>oa-testkit</artifactId><version>${project.version}</version><scope>test</scope></dependency>
   </dependencies>

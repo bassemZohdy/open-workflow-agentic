@@ -4,12 +4,20 @@
 
 - WP-107 preparation: four actual SDK full-workflow listen-group cases establish ALL order/overlap and negative controls for ANY post-completion mutation and concurrent foreach/until completion. All four fixtures validate; these observations do not close durable delivery, FIFO or T13 gates.
 
+- WP-108/WP-112 preparation: bounded, content-free OTel effect/dispatch/lookup/compensation spans, disabled SDK by default with runtime collector opt-in. Five local SDK/fault cases pass; three real ledger/CDI cases compile and await Linux execution. Governed Flow/adapter tracing and complete acceptance stay open.
+
+- WP-108 preparation: additive V70 protects effect intent identity, replay contract, irreversible state/attempt evidence and retained journal/compensation links. Five direct-SQL cases compile; Linux execution/review and original governed adapter/manual/audit/recovery gates remain open.
+
 This log records implemented capabilities and their requirement coverage. Entries describe unreleased development work.
 A merged component or passing acceptance case does not close an entire platform requirement. The full
 remaining checklist is [TODO.md](TODO.md); implementation status is maintained in
 [work-packages.json](docs/plan/work-packages.json).
 
 ## [Unreleased]
+
+- WP-108 partial: publish an explicit effect scope/registry-owner contract that preserves existing recovery keys, plus the current authority/manual-policy/central-audit handoff. Four scope and two existing key cases pass; no effect/operator consumer or package gate is activated by the value type.
+
+- WP-107 partial: decode complete stored CloudEvents for the future SDK consumer, validate receipt metadata and preserve precise JSON/binary/null data. Six decoder and two parser unit cases pass; production coordinator/recovery and full T13 remain open.
 
 - WP-107 partial: add task-fenced matching, one audited dispatch permission per epoch and historical proof-based ACK using short transactions and one connection at a time. Unknown replies retain reservations without returning permission. Production coordinator/restore and complete T13 remain open; V69/database evidence and reciprocal review are required.
 

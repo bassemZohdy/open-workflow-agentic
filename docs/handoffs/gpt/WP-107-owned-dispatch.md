@@ -125,3 +125,23 @@ epoch fields are write-time fenced historical attribution, not an immutable
 epoch-history FK. No material finding was waived and #44's approved head was
 kept unchanged. This storage successor can now have the single active GPT
 implementation PR; WP-107/full T13 remain partial.
+
+## Corrected owned storage executed on real PostgreSQL and SDK
+
+Exact89b0f0d39c9fe5dae9d24bb488427a668f12a6c5 workflow39370993287 SUCCESS
+in BOTH lanes. GPT inspected complete run logs and head metadata: actual SDK/JPA
+checkpoint8, owned dispatch10, lease7, protocol9, selection6, late cancellation2,
+binding7 each lane; native Keycloak8 and standard3. Every listed class has zero
+failures/errors/skips, and both strict provider evidence checkers pass. This
+verifies the SUPPORTS correction and the eighth mixed-order cancellation case,
+rather than transferring the failed34a342a or cancelled578d3c2 result.
+
+The tested checkpoint case proves actual advisory/registry ownership plus a
+blocked real cancellation command, then earlier checkpoint completion, cleanup,
+retained proof/ACK and healthy independent work. It does not prove the separate
+committed-cancel-request/before-engine-call crash window or distributed cleanup.
+Full required #46 build39371032850 and exact Claude review still gate integration.
+Published #46 head stays frozen; this evidence is recorded on its consumer
+successor without invalidating the current review target. Parent #40 exactdbe3bd8
+full39370961537 and matrix39370996254 are also SUCCESS; its exact Claude review
+still gates main integration. No package or complete T13 status is promoted.
