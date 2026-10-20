@@ -66,7 +66,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Require the real Java test before starting a server
-        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS --preflight
+        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS --effect-recovery --preflight
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Start an isolated pinned Keycloak server
@@ -90,22 +90,24 @@ jobs:
           done
           docker logs keycloak-interop
           exit 1
-      - name: Run the product Java exchanger, verifier and resource guard
+      - name: Run the product Java exchanger, resource guard and process recovery
         env:
           JAVA_IT: ${{ matrix.test }}
         run: >-
           mvn -B -pl apps/app-runtime -am verify
-          -Dit.test="$JAVA_IT" -Dfailsafe.failIfNoSpecifiedTests=false
+          -Dit.test="$JAVA_IT,EffectCrashRecoveryIT" -Dfailsafe.failIfNoSpecifiedTests=false
           -Dkeycloak.required=true -Dkeycloak.profile="$KEYCLOAK_PROFILE"
           -Dkeycloak.url="$KEYCLOAK_URL"
       - name: Require passing non-skipped Java evidence
-        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS
+        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS --effect-recovery
       - name: Save test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: keycloak-${{ matrix.profile }}-${{ matrix.evidence }}-java-results
-          path: apps/app-runtime/target/failsafe-reports/
+          path: |
+            apps/app-runtime/target/failsafe-reports/
+            apps/app-runtime/target/process-logs/
           if-no-files-found: ignore
       - name: Stop the disposable server
         if: always()

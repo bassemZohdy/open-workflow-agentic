@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. Eight new verifier cases and all76 tooling tests pass; new product process execution still needs fresh Linux CI. No acceptance promotion.
+
 - WP-108/WP-112 preparation: bounded, content-free OTel effect/dispatch/lookup/compensation spans, disabled SDK by default with runtime collector opt-in. Five local SDK/fault cases pass; three real ledger/CDI cases compile and await Linux execution. Governed Flow/adapter tracing and complete acceptance stay open.
 
 - WP-108 preparation: additive V70 protects effect intent identity, replay contract, irreversible state/attempt evidence and retained journal/compensation links. Five direct-SQL cases compile; Linux execution/review and original governed adapter/manual/audit/recovery gates remain open.
