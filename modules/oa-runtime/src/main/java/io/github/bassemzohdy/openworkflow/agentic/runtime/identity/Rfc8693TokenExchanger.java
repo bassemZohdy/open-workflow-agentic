@@ -171,7 +171,8 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         if (!actor.expiresAt().isAfter(now)) {
             throw input("the actor token is expired");
         }
-        return subject.expiresAt();
+        // both verified inputs bound the credential: a valid actor with seconds left must not authorize a longer token
+        return subject.expiresAt().isBefore(actor.expiresAt()) ? subject.expiresAt() : actor.expiresAt();
     }
 
     private VerifiedToken verifyInput(Credential token, String role) {
@@ -358,7 +359,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
             throw bad("the issued token outlives the delegation grant");
         }
         if (expires.isAfter(subjectExpiry)) {
-            throw bad("the issued token outlives the verified subject token; a near-expiry subject needs re-authorization");
+            throw bad("the issued token outlives a verified input token (subject or actor); a near-expiry input needs re-authorization");
         }
         JsonNode expiresIn = response.get("expires_in");
         if (expiresIn != null && (!expiresIn.canConvertToLong() || expiresIn.asLong() > MAX_LIFETIME_SECONDS
