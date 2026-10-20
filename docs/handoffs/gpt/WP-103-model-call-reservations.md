@@ -105,16 +105,54 @@ authenticity or administrator immunity. No physical provider/whole T06/T03 claim
 
 ## Verification and open gates
 
-Author verification=GPT; current-product SHA/SQL results recorded after CI.
-Local all212 contracts (six new) pass, zero skips. Application test sources compile;
-compilation is NOT database execution.24 new actual SQL/callback-protocol cases
-compile, beside the preserved15 allocation regressions. These include concurrent
+Author verification=GPT (self-check, not Claude peer approval); exact tested
+product SHA 4bbf02906c54168bb194fc35c3d7dc8ea501408b.
+Local 212 contracts (six new) pass with zero skips. Local application test
+compilation is separate from execution. The 24 new SQL/callback-protocol cases
+and 15 preserved allocation regressions execute in both fresh CI lanes below.
+These include concurrent
 same/distinct nodes and aggregate sibling caps, commit/JTA reply loss, no-call/
 output refusal after lifecycle/grant/parent/deadline/private-fence/interruption,
 one-connection admission and caller-held-lock timeouts, missing/corrupt metadata,
 direct SQL cost/batch/retention, and original historical facts. Callback spies and
 JDBC failure injection are labelled; they are not actual model/JWT/PEP/transport proof.
-CURRENT_PRODUCT_BUDGET_CI_PENDING
+Current product 4bbf029 passes [BOTH39434232554](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39434232554).
+Both completed full logs inspected: standard job 118666920763 / delegation job 118666920039.
+Each executes contracts 212 / runtime 344 / testkit 196 / app unit 343, with zero failures,
+errors or skips. ModelCallReservationStoreTest 24 and all 15 prior allocation
+regressions pass, including the corrected active-trigger corruption check (SQLSTATE 23514).
+Exact current source method names match all 24 + 15 actual XML cases; contracts 6,
+allocation contracts7/preflight3/conformance7/binding17/proposed execution6/source6
+also pass. Real standard 3 / delegation 8 / core process 1 EACH and strict checks pass.
+The standard lane has 4 failsafe cases; delegation has 9. These real Keycloak tests
+exercise the existing identity contract, not an actual model provider.
+
+Downloaded artifacts 12269298608 (standard) and 12269578641 (delegation); ALL 154
+actual suite XML reports per lane parsed, counters/unique identities/cases checked,
+zero failures/errors/skips, strict provider checker rerun with matching --profile
+plus --effect-recovery. GitHub reports artifact SHA256 digests respectively
+bf0b86d9f7f3ef7e34b03774e84f4fc191c71af950375e54e62fdd721aafb372 and
+efa3a6cc7b81f69147b8800252b477ed2c5dd60f7cc71d0fdb9ecc3bb3c9cb9f.
+Both actual conformance reports match the assessment with ONLY the two bounded
+known wrong fork-order fingerprints admitted: 42 sources / 76 serialization attempts,
+74 successes/two metadata writer diagnostics/48 outputs (30 MATCH,18 DIVERGED).
+Actual 48 output files, 74 export files and two expected diagnostics inspected per
+lane. No full semantic-conformance or separate WP-108 audit-process4 proof transfers.
+
+Commands/results: CI mvn -B -pl apps/app-runtime -am verify with required real
+provider profile and EffectCrashRecoveryIT succeeds; Python evidence checker above
+succeeds. Local 212 contracts/six new tests and selected 6 + 3 codec/preflight pass;
+current all-eight-module mvn -B verify -DskipTests compiles/packages, and actual
+dependency policy holds from fresh dependency lists. That skipped command is NOT
+a full local suite. Application test sources compile; tools 76 / generated/diff pass.
+Local full Cedar JNI/SQL/provider execution is not claimed.
+
+Verdict: preparation verified; integration HOLD for exact Claude peer/final PR
+and actual consumer gates. #55 remains frozen ea56f3319d0e896d54703d9f4d857252906ed2a4
+without a Claude review; no second GPT implementation PR or merge. Signed identity,
+real PEP/audit, registered profile/model scope/price/retry/transport and physical
+model calls were NOT supplied by callback spies. No migration/CDI/gateway activation,
+full task budget/T06/T03, restore or package/acceptance promotion.
 
 Claude: review the protected-allowance PDP input, original profile/cost/retry and
 synchronous-closure requirements before adopting. Implement actual non-bypass
