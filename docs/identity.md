@@ -67,14 +67,14 @@ lists the checks; they are all in force:
 | The grant, and every grant above it, is active now | before the request; nothing is sent otherwise |
 | The token is bound to its issuing grant (`IssuedTokenBindings`) before it is returned; a failed binding discards it | before return |
 | The scopes asked are all held by the grant **and** by the verified subject token | before the request |
-| Both input tokens verify (signature, issuer, time) with the exchanging client as audience; the subject token is the grant's user in the grant's tenant and carries exactly the delegation chain of the grant's parent (none for a root grant); the actor token is the grant's own, undelegated workload token; neither is expired | before the request |
+| Both input tokens verify (signature, issuer, time) with the exchanging client as audience; the subject token is the grant's user in the grant's tenant and carries exactly the delegation chain of the grant's parent (none for a root grant); the actor token is the grant's own, undelegated workload token, **fresh**: signed `iat` with `now-60s <= iat <= now+5s` and `exp > now` (missing, stale, future or expired fails closed; fixed bounds, not settings); the subject is not expired | before the request, and the actor window again before the token is returned |
 | No `refresh_token` in the answer; token type Bearer | on the answer |
 | The token verifies (signature, issuer, time), for exactly the audience asked and no other, with a `jti` and an issue time | on the answer |
 | Subject is the grant's user, tenant is the grant's tenant, the actors are exactly the grant's chain, nearest first (a missing or different chain is refused, never flattened) | on the answer |
 | Token scopes are a non-empty subset of the scopes asked | on the answer |
-| The signed `exp` is at most 300 s away and not beyond the grant's expiry **or the expiry of either verified input token (subject or actor)**. An overlong bearer is refused; only the signed `exp` counts, never a shortened Java-side expiry | on the answer |
+| The signed `exp` is at most 300 s away and not beyond the grant's expiry **or the verified subject token's expiry**. The signed token need not end with the workload proof (ADR 0021 H3 freshness amendment). An overlong bearer is refused; only the signed `exp` counts, never a shortened Java-side expiry | on the answer |
 | The token is not the subject or actor token handed back | on the answer |
-| The grant is active and still covers the scopes **after** the answer | after the answer, before the token is returned |
+| The grant is active and still covers the scopes **after** the answer; then, as the last step after the binding and audit writes, the signed `exp` is still in the future and the actor is still fresh | after the answer, immediately before the token is returned |
 
 Any failure discards the token. The audit event `identity.token.exchanged` is written before the token is returned, and
 if it cannot be written the token is discarded. The token itself is held in memory only (`IssuedToken`, a `Credential`).
@@ -292,7 +292,7 @@ the product requires: native, issuer-signed actor proof; no actorless downgrade;
   stops the token even while an equivalent grant (or an equivalent chain) stays active; a token with no binding (never
   exchanged, forged with the issuer's key, or a lost row) is refused; a binding-store outage refuses at the resource and
   discards the token at the exchange.
-* **Actor expiry (H3).** The issued token may not outlive the earlier of the verified subject and actor token expiry.
+* **Actor freshness (H3 amendment).** The workload proof must be fresh (signed `iat` within 60 s, 5 s future allowance, not expired) before the request and again right before release; the issued token may not outlive the verified subject token or the grant. It may outlive the workload proof (maximum 300 s); emergency containment is the live grant checks and policy at the resource.
 * Refusal is decided on the HTTP status, not on OAuth error names (`invalid_client` and `invalid_request` stand where this file
   once said `invalid_target` and `invalid_grant`).
 
@@ -418,7 +418,7 @@ the wait deadline (`agentic.reconciler.wait-deadline`) cancels it.
 | Token exchange and resource guard (in-process unit and acceptance tests) | **[fake]**: the testkit's in-process authorization server and issuer (`DelegationAuthorizationServer`, `FakeIdentityProvider`). It follows the behaviour documented for Keycloak 26.2+, but is not Keycloak |
 | Kill/restart: identity restored, a held instance, no credential stored | **[verified]** with real child JVMs and the real engine (`IdentityRecoveryIT`), tokens from the fake issuer |
 | T07 | `DelegatedAuthorityAcceptanceTest`: widening, expiry and replay with two scripted agents against the fake issuer; policy boundary with the embedded Cedar engine. Real multi-agent flows are WP-207 |
-| A real Keycloak 26.2.5 and 26.8.1: exchange, `actor_token`, `act`/`may_act` with real permission and consent, scope/lifetime bounds, expiry, revocation, key rotation | **[verified locally]** 2026-10-20 by `KeycloakStandardIT` (3/3) and `KeycloakDelegationIT` (6/6) with the product exchanger, verifier, grants and guard (section 9.4); **CI evidence pending** (PR #40 matrix) until the exact head is green |
+| A real Keycloak 26.2.5 and 26.8.1: exchange, `actor_token`, `act`/`may_act` with real permission and consent, scope/lifetime bounds, expiry, revocation, key rotation | **[verified locally]** 2026-10-20 by `KeycloakStandardIT` (3/3) and `KeycloakDelegationIT` (8/8 with actor freshness) with the product exchanger, verifier, grants and guard (section 9.4); **CI evidence pending** (PR #40 matrix) until the exact head is green |
 | A live step gated by the grant check | **not built**: only resume is wired; `InstanceAuthorities.recheck` exists for the agent bridge (WP-2xx) |
 | `TokenExchanger` used by a running flow | **not built**: the bean exists, nothing in the runtime injects it yet |
 | Identity carried through asynchronous tasks | the `AuthorityScope` wrappers exist and are unit tested; no runtime component uses them yet except resume |

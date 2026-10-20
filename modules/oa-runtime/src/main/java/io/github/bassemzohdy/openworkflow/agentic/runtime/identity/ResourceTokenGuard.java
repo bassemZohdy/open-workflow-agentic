@@ -101,6 +101,9 @@ public final class ResourceTokenGuard {
         if (!allowed) {
             throw new TokenRejectedException(TokenRejectedException.Reason.REPLAYED);
         }
+        // the replay store is a blocking call too: authority is never returned past the signed exp. A late first use may
+        // have consumed its use; it is refused, never admitted.
+        checkTime(token);
         return token;
     }
 

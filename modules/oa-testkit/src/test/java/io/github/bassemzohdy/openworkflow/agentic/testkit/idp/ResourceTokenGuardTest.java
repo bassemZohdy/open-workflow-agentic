@@ -199,7 +199,26 @@ class ResourceTokenGuardTest {
 
         assertEquals(Reason.EXPIRED, assertThrows(TokenRejectedException.class,
                 () -> slowGuard.admit(token.accessToken().reveal(), Set.of("cases:read"))).reason());
-        assertTrue(cache.use("probe|x", fx.clock.instant().plusSeconds(60), 1, fx.clock.instant()), "cache still usable");
+        assertTrue(cache.use(token.issuer() + "|" + token.tokenId(), token.expiresAt(), 1, fx.clock.instant().minusSeconds(10)),
+                "the actual token's use was not consumed");
+    }
+
+    @Test
+    void aTokenThatExpiresWhileTheReplayStoreIsSlowIsNeverReturnedAsAuthority() {
+        IssuedToken token = issue(RESOURCE, Set.of("cases:read"));
+        fx.clock.advance(Duration.ofSeconds(299));
+        InMemoryReplayCache inner = new InMemoryReplayCache(100);
+        ReplayCache slow = (key, expiresAt, maxUses, now) -> {
+            boolean allowed = inner.use(key, expiresAt, maxUses, now);
+            fx.clock.advance(Duration.ofSeconds(2)); // a slow blocking store: now it is past exp
+            return allowed;
+        };
+        ResourceTokenGuard slowGuard = new ResourceTokenGuard(fx.verifier, RESOURCE, slow, fx.grants, fx.bindings, fx.clock, 1);
+
+        assertEquals(Reason.EXPIRED, assertThrows(TokenRejectedException.class,
+                () -> slowGuard.admit(token.accessToken().reveal(), Set.of("cases:read"))).reason());
+        // the late first use consumed its use (a denied late use may), and nothing was returned
+        assertFalse(inner.use(token.issuer() + "|" + token.tokenId(), token.expiresAt(), 1, fx.clock.instant().minusSeconds(10)));
     }
 
     // ---- replay -----------------------------------------------------------------------------------------------

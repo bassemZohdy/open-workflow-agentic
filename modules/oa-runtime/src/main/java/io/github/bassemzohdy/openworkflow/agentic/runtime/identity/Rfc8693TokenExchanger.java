@@ -100,8 +100,8 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         Objects.requireNonNull(request, "request");
         DelegationGrant grant = activeGrant(request);
         try {
-            Instant subjectExpiry = verifyInputs(request, grant);
-            IssuedToken token = requestToken(request, grant, subjectExpiry);
+            Inputs inputs = verifyInputs(request, grant);
+            IssuedToken token = requestToken(request, grant, inputs.subjectExpiry());
             recheckGrant(request, grant);
             bind(token, grant);
             try {
@@ -111,7 +111,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
                 throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
                         "the token was discarded because its audit event could not be written", e);
             }
-            releaseCheck(request, grant, token);
+            releaseCheck(request, grant, token, inputs);
             return token;
         } catch (ExchangeException e) {
             auditRefusal(grant, request, e);
@@ -119,17 +119,43 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         }
     }
 
+    /** What the verified inputs contribute: the subject bounds the credential, the actor must be fresh (ADR 0021 H3). */
+    private record Inputs(Instant subjectExpiry, Instant actorIssuedAt, Instant actorExpiresAt) { }
+
+    /** The actor window of ADR 0021 H3: fixed upper bounds, not operator settings. */
+    static final java.time.Duration ACTOR_MAX_AGE = java.time.Duration.ofSeconds(60);
+    static final java.time.Duration ACTOR_FUTURE_ALLOWANCE = java.time.Duration.ofSeconds(5);
+
+    /** A missing, stale, future or expired actor proof fails closed: {@code now-60s <= iat <= now+5s} and {@code exp > now}. */
+    private void requireFreshActor(Inputs inputs, Instant now) {
+        if (inputs.actorIssuedAt() == null) {
+            throw input("the actor token has no issue time");
+        }
+        if (inputs.actorIssuedAt().isBefore(now.minus(ACTOR_MAX_AGE))) {
+            throw input("the actor token is stale: the workload must authenticate within the last 60 seconds");
+        }
+        if (inputs.actorIssuedAt().isAfter(now.plus(ACTOR_FUTURE_ALLOWANCE))) {
+            throw input("the actor token was issued in the future");
+        }
+        if (!inputs.actorExpiresAt().isAfter(now)) {
+            throw input("the actor token is expired");
+        }
+    }
+
     /**
-     * The last look before the bearer leaves: binding and audit can be slow, so the token must still be inside its signed
-     * lifetime now (it was bounded by the grant and both input tokens when it was requested) and the grant must still
-     * cover the request. Release time is the enforced time; a token refused here is bound but never returned.
+     * The last look before the bearer leaves. The grant is read first because that is the last blocking call; the pure time
+     * checks follow it, so release time is the enforced time: the signed token must still be inside its lifetime (it was
+     * bounded by the subject and the grant chain when requested) and the actor must still be fresh. A token refused here
+     * is bound but never returned.
      */
-    private void releaseCheck(ExchangeRequest request, DelegationGrant grant, IssuedToken token) {
-        if (!token.expiresAt().isAfter(clock.instant())) {
+    private void releaseCheck(ExchangeRequest request, DelegationGrant grant, IssuedToken token, Inputs inputs) {
+        recheckGrant(request, grant);
+        Instant now = clock.instant();
+        if (!token.expiresAt().isAfter(now)) {
             throw new ExchangeException(ExchangeException.Code.BAD_RESPONSE,
                     "the issued token expired before it could be released; it was discarded");
         }
-        recheckGrant(request, grant);
+        requireFreshActor(inputs, now);
     }
 
     /**
@@ -170,7 +196,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
      * Verifies both input tokens before their identity or expiry is used (ADR 0021 H1, item 1). Returns the verified
      * expiry of the subject token, which bounds the lifetime of the token that may be issued.
      */
-    private Instant verifyInputs(ExchangeRequest request, DelegationGrant grant) {
+    private Inputs verifyInputs(ExchangeRequest request, DelegationGrant grant) {
         Instant now = clock.instant();
         VerifiedToken subject = verifyInput(request.subjectToken(), "subject");
         List<String> expected = expectedActors(grant);
@@ -199,11 +225,11 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         if (!actor.subject().equals(grant.agent())) {
             throw input("the actor token is not the grant's agent");
         }
-        if (!actor.expiresAt().isAfter(now)) {
-            throw input("the actor token is expired");
-        }
-        // both verified inputs bound the credential: a valid actor with seconds left must not authorize a longer token
-        return subject.expiresAt().isBefore(actor.expiresAt()) ? subject.expiresAt() : actor.expiresAt();
+        // The actor authenticates the workload at exchange (fresh), the subject and the grant chain bound the credential;
+        // the credential need not expire with the workload proof (ADR 0021 H3 freshness amendment).
+        Inputs inputs = new Inputs(subject.expiresAt(), actor.issuedAt(), actor.expiresAt());
+        requireFreshActor(inputs, now);
+        return inputs;
     }
 
     private VerifiedToken verifyInput(Credential token, String role) {
@@ -390,7 +416,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
             throw bad("the issued token outlives the delegation grant");
         }
         if (expires.isAfter(subjectExpiry)) {
-            throw bad("the issued token outlives a verified input token (subject or actor); a near-expiry input needs re-authorization");
+            throw bad("the issued token outlives the verified subject token; a near-expiry subject needs re-authorization");
         }
         JsonNode expiresIn = response.get("expires_in");
         if (expiresIn != null && (!expiresIn.canConvertToLong() || expiresIn.asLong() > MAX_LIFETIME_SECONDS

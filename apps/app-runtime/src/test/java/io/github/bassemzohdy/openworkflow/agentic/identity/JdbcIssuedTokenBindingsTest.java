@@ -203,4 +203,31 @@ class JdbcIssuedTokenBindingsTest {
                 () -> broken.bind(ISSUER, jti(), new Binding(grant.id(), grant.tenant(), exp())));
         assertThrows(IllegalStateException.class, () -> broken.find(ISSUER, jti()));
     }
+
+    /** A real transport outage: the connection goes through a proxy that stalls, then cuts, the PostgreSQL traffic. */
+    @Test
+    void aStalledOrCutDatabaseTransportFailsReadAndWriteAndNothingIsStored() throws Exception {
+        DelegationGrant grant = grant("tenant-b7");
+        String jti = jti();
+        Binding binding = new Binding(grant.id(), grant.tenant(), exp());
+        try (var proxy = new io.github.bassemzohdy.openworkflow.agentic.testkit.fault.FaultProxy("127.0.0.1", 5432).start()) {
+            org.postgresql.ds.PGSimpleDataSource viaProxy = new org.postgresql.ds.PGSimpleDataSource();
+            viaProxy.setUrl("jdbc:postgresql://127.0.0.1:" + proxy.port() + "/agentic");
+            viaProxy.setUser(System.getenv().getOrDefault("DB_USER", "postgres"));
+            viaProxy.setPassword(System.getenv().getOrDefault("DB_PASSWORD", "postgres"));
+            viaProxy.setConnectTimeout(3);
+            viaProxy.setSocketTimeout(2);
+            JdbcIssuedTokenBindings overProxy = new JdbcIssuedTokenBindings(viaProxy);
+            overProxy.bind(ISSUER, "jti-warm-" + UUID.randomUUID(), binding); // the transport works while healthy
+
+            proxy.pause(); // stalled: the write and the read must fail, not wait forever or succeed
+            assertThrows(IllegalStateException.class, () -> overProxy.bind(ISSUER, jti, binding));
+            assertThrows(IllegalStateException.class, () -> overProxy.find(ISSUER, jti));
+
+            proxy.resume();
+            proxy.cutConnections(); // cut mid-session
+            assertTrue(overProxy.find(ISSUER, jti).isEmpty(), "after the cut a fresh connection reads the truth");
+        }
+        assertTrue(bindings.find(ISSUER, jti).isEmpty(), "a bind that failed on the wire left no binding behind");
+    }
 }
