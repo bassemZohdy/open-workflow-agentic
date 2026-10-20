@@ -16,10 +16,21 @@ lifecycle registry/outbox/recovery/operator APIs and identity/delegation. Full r
 WP-102 cannot close until the real Keycloak integration in identity.md section 9 is run and recorded; the passing
 T07 suite uses in-process stand-ins. Audit caller/PDP wiring also remains open.
 
-Next: close the real-IdP and policy integration gates, implement the durable WP-108 effect ledger, then close
-WP-105's complete recovery/T16 proof. Finish timers/two-replica recovery (WP-109), human tasks (WP-106),
-idempotent inbox/event correlation (WP-107) and general resilience (WP-110). T23 belongs to WP-305 because
-it tests emergency revocation across active/waiting tasks, not only the policy library.
+Execution now uses [two backlogs in TODO.md](../../TODO.md#two-agent-delivery-plan): **GPT owns 21 unfinished
+packages** across execution/platform/evaluation; **Claude owns 21** across identity/policy/agents/governance.
+Each reviews the other's implementation PRs at the current commit. GPT starts with WP-108's durable effect
+ledger independently of a WP-102 design handoff; Claude starts with WP-102's audit-caller binding and real-IdP evidence. Consumers gate on their required merged interface, not whole WP-102 closure. Claude review of each exact implementation head and passing CI remain mandatory before merge.
+Both queues specify merged prerequisite handoffs and outcomes, while the detailed package checklists retain
+all closure gates. WP-105's existing core can support new work; its full T16 recovery proof follows ledger,
+inbox and timer integration. T23 stays with WP-305 for cross-task emergency revocation.
+
+The `execution_plan` object in work-packages.json is the source for assignments, review rules and exclusive
+write areas. Shared contracts, lifecycle integration, migrations, build/configuration and generated tracking
+have GPT as their sole writer; Claude submits explicit handoffs for those changes. Claude-owned caller,
+policy, audit and agent paths use the reciprocal process. CI checks assignment coverage, reciprocal reviewers,
+prerequisites, cycles and overlapping reserved paths. It does not authenticate which AI wrote a change;
+the recorded reciprocal PR review and writer agreement remain required. No implementation status or
+acceptance evidence changes merely because a package has been assigned.
 
 Work-package progress, evidence, completed deliverables, remaining gates and decisions are maintained in
 work-packages.json. The size table and critical path remain original full-scope estimates; they include completed

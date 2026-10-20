@@ -504,7 +504,8 @@
           "Strict matrix39354646523 at665547e: standard3/3 and delegation6/6 real-provider cases pass non-skipped with matching evidence checkers; full CI39354646488 green. H3 actor expiry and H4 exact grant/chain binding still block acceptance; latest0aeb52f route inventory integrated and new combined CI required.",
           "H3 actor-expiry bound at Claude b0e3b18: full CI39355478836/34 exchanger cases pass. V65 H4 schema provided in GPT f97f193; five direct SQL cases pass in full CI39356040766 atd05fc17. H4 product consumer is still open.",
           "ADR0021 H3 freshness direction selected for implementation, explicitly superseding actor-output-exp acceptance only when replacement including H4 passes. Old strict baseline remains; current #39 1abcfbd is reviewed as incompatibility evidence only, not provider acceptance.",
-          "Shared checkpoint correction: diagnostic SDK1893c17/39364160057 reproduced late task completion after SDK cancellation deleting its parent (real JPA23503, one new failing case in both lanes). Gate now holds known-cancelled work without ACK/success or poisoning independent work; transaction-scoped SDK mutation/cleanup ordering prevents resurrection. Active failures and required ABORTED cleanup retain their gates. Ten local gate/writer/SDK unit cases pass; two real-JPA regressions and corrected current CI remain pending. Current #39 fc0376c still has two P1 acceptance findings and failed full build despite green matrix; H3/H4 unintegrated, package partial."
+          "Shared checkpoint correction: diagnostic SDK1893c17/39364160057 reproduced late task completion after SDK cancellation deleting its parent (real JPA23503, one new failing case in both lanes). Gate now holds known-cancelled work without ACK/success or poisoning independent work; transaction-scoped SDK mutation/cleanup ordering prevents resurrection. Active failures and required ABORTED cleanup retain their gates. Ten local gate/writer/SDK unit cases pass; two real-JPA regressions and corrected current CI remain pending. Current #39 fc0376c still has two P1 acceptance findings and failed full build despite green matrix; H3/H4 unintegrated, package partial.",
+          "Claude c6a9228 strict Java tests and product hardening integrated into GPT #40; prior399fda1 full CI and six real delegation cases pass, standard never reached its IT. Current665547e reruns after a GPT fault-proxy fixture correction; H3/H4 remain open."
         ],
         "completed_deliverables": [
           "OIDC for users and service identity for agents",
@@ -521,7 +522,9 @@
           "Obtain exact combined-head strict matrix/full CI and independent Claude review; preserve partial status for outstanding acceptance.",
           "Integrate H4 exact issuer+jti binding consumer with expiry/tenant equality, live exact grant/ancestor checks and conflict/outage/revocation tests; V64 must integrate before V65 on main.",
           "Implement actor freshness before request and after slow binding/audit before release, strict signed subject/grant/output bounds and independent resource exp>now/iat<=now+5s admission; resolve H4 metadata/commit/conflict/null-dependency findings and prove deterministic non-skipped native success under the amended contract. Old actor-output-exp tests are historical, not transferable passes.",
-          "Fix the supported-media route discovery probe with Claude: combined bf3e9f4 CI39358079308/matrix39358079363 fail on CloudEvents route415 from hardcoded ordinary JSON; retain401 requirement and all routes. FaultProxyPostgresTest2/2 passes."
+          "Fix the supported-media route discovery probe with Claude: combined bf3e9f4 CI39358079308/matrix39358079363 fail on CloudEvents route415 from hardcoded ordinary JSON; retain401 requirement and all routes. FaultProxyPostgresTest2/2 passes.",
+          "H3: bound actual signed credential by verified actor expiry as well as subject/grant/300s; H4: durable exact issuer+jti-to-grant/chain binding, with equivalent-grant revocation tests.",
+          "Strict combined-head matrix/reciprocal review still required; ordinary builds running zero Keycloak cases are not provider evidence."
         ],
         "evidence": [
           "docs/identity.md",
@@ -753,18 +756,25 @@
           "Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open.",
           "PR #41 checkpoint/ingress increment merged as e738218 after Claude exact-head APPROVE-partial at cd3f57b and CI39355182128; postmerge main CI39357918414 passed. WP-107/T13 stay partial.",
           "Dispatch protocol successor adds immutable occurrence identity, retained deadlines/dispositions, same-session reservations and explicit checkpoint-proof ACK port. Local application test-compile and two identity cases pass; nine PostgreSQL protocol cases await CI. No SDK consumer/proof implementation is activated.",
-          "Dispatch protocol754507a passed9/9 real PostgreSQL cases, zero skips, in CI39358587955. Overall build failed only the route media probe; Claude0cf85d6 correction integrated via GPT004fd9e and current full CI/review renewed. No actual SDK consumption/T13 proof."
+          "Dispatch protocol754507a passed9/9 real PostgreSQL cases, zero skips, in CI39358587955. Overall build failed only the route media probe; Claude0cf85d6 correction integrated via GPT004fd9e and current full CI/review renewed. No actual SDK consumption/T13 proof.",
+          "Draft #41 implements durable inbox signals and authorized/audited scoped CloudEvents receipt; ingress/privacy04b421f full CI39352802891 green.",
+          "Actual JPA checkpoint guard, unhealthy readiness and new-start refusal implemented at499550a; full CI39354335254 passes, including selected guarded writer/original reader and existing restart tests. This is not end-to-end inbox consumption.",
+          "PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
           "Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.",
           "Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.",
           "Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.",
-          "Integrate authoritative SDK task-completed receipt proof, bounded delivery coordinator and lost-claim fencing; prove loop/parallel restore and checkpoint-before-ACK crash recovery with actual engine persistence. Protocol-port doubles are not T13 proof."
+          "Integrate authoritative SDK task-completed receipt proof, bounded delivery coordinator and lost-claim fencing; prove loop/parallel restore and checkpoint-before-ACK crash recovery with actual engine persistence. Protocol-port doubles are not T13 proof.",
+          "Complete durable Flow wait delivery and persisted signal ACK; prove receipt-before-registration, restart/crash windows and stable loop/parallel occurrence identity.",
+          "Recheck cancellation under the dispatch reservation lock; use named system:event-recovery SERVICE principal and audit every attempt before releasing callbacks; manual changes require authorized oa.recover operation.",
+          "Complete event-triggered starts, retention/tombstones and delivery tracing; automate full T13 including failed compensation."
         ],
         "evidence": [
           "docs/handoffs/gpt/WP-107.md",
-          "docs/lifecycle.md"
+          "docs/lifecycle.md",
+          "docs/handoffs/gpt/INTEGRATION-2026-10-20.md"
         ]
       }
     },
@@ -799,7 +809,7 @@
         "implemented": [
           "JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.",
           "Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.",
-          "Reviewed99f475d merged to main at2f722cf after Claude current-head PASS and full CI39349314182; remaining package gates stay partial."
+          "Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -2600,5 +2610,638 @@
       "decision": "Mounted Kubernetes Secrets for static values. Vault where already operated; validate the BOM-pinned 4.9.0 binding before selecting that path.",
       "owner": "WP-102"
     }
-  ]
+  ],
+  "execution_plan": {
+    "date": "2026-10-19",
+    "status": "2026-10-20: #35 exact747ce7e merged by GPT as c01cef4 after Claude6282864843 APPROVE and full39360512505; main postmerge39366191268 SUCCESS. Ownership/dependency corrections now on main, WP-108 starts independently of WP-102 completion. Current #39 a1b1c0b GPT SOURCE-PASS; matrix39365958968 passed standard3/native8/binding7 each lane. Full39365958905 Maven passed and only acceptance index check failed (12/12 passing markers); GPT744a534 applies its exact generated T07.where update and this carrier resolves main-plan conflicts without product/workflow changes. Corrected exact-head CI remains mandatory. #43 exact2cb33c1 merged into #40 as2c03869 after Claude6282954159 APPROVE and full39364985191; shared #40 6a0081d review6282963014 APPROVE and full/matrix passed. Remaining package gates stay partial and ADR0025 Proposed; current integration heads require review/CI.",
+    "agents": [
+      {
+        "id": "GPT",
+        "reviewer": "Claude",
+        "focus": "Execution durability, human tasks, events, platform operations, evaluation and integration",
+        "backlog": [
+          {
+            "wp": "WP-108",
+            "after": [],
+            "outcome": "Implement JDBC write-ahead intent, stable effect keys, unknown-outcome reconciliation and compensation/manual resolution; prove T03 with crash/lost-ack tests.",
+            "handoff": "Use the merged WP-105 lifecycle core; request no identity/policy edits. Publish the effect port and recovery handoff before WP-105 closes."
+          },
+          {
+            "wp": "WP-107",
+            "after": [],
+            "outcome": "Implement transactional inbox, CloudEvents correlation and deduplication; prove T13 and event-triggered start idempotency.",
+            "handoff": "Use the merged WP-105 start API; publish event correlation and duplicate-delivery fixtures."
+          },
+          {
+            "wp": "WP-106",
+            "after": [
+              "WP-102",
+              "WP-103"
+            ],
+            "outcome": "Implement durable human tasks, assignment/delegation, separation of duties and persisted decisions before wakeup; prove T02.",
+            "handoff": "Consume Claude verified-caller/PEP contracts; provide task/decision/wait APIs to WP-208 and WP-603."
+          },
+          {
+            "wp": "WP-109",
+            "after": [
+              "WP-106"
+            ],
+            "outcome": "Complete durable deadlines, maximum lifetime, escalation and two-replica lease/failover proof; automate T12.",
+            "handoff": "Use the existing lifecycle core; integrate human wait expiry only after WP-106 APIs merge."
+          },
+          {
+            "wp": "WP-105",
+            "after": [
+              "WP-108",
+              "WP-107",
+              "WP-109"
+            ],
+            "outcome": "Integrate effect-aware recovery with API/event/scheduled starts; prove T16 without duplicate business effects.",
+            "handoff": "Preserve readiness=false on reconciliation failure and propagate arbitrary resume failures; never replay from start as a catch-all."
+          },
+          {
+            "wp": "WP-110",
+            "after": [
+              "WP-105",
+              "WP-108"
+            ],
+            "outcome": "Apply bounded retries, timeouts, circuit breakers, bulkheads and load shedding; prove T17 without work loss.",
+            "handoff": "Leave the explicit policy bulkhead bound under Claude WP-103 ownership; request any PEP changes through that owner."
+          },
+          {
+            "wp": "WP-112",
+            "after": [
+              "WP-105"
+            ],
+            "outcome": "Complete end-to-end OTel spans, structured logs, dashboards and alerts across Flow/graph/tool/model execution.",
+            "handoff": "Claude supplies instrumentation hooks in its packages; GPT integrates shared exporters/configuration."
+          },
+          {
+            "wp": "WP-113",
+            "after": [
+              "WP-103",
+              "WP-108"
+            ],
+            "outcome": "Implement governed OpenAPI enterprise adapters with effect keys, timeout contracts, error mapping and correlation.",
+            "handoff": "Publish the adapter invocation contract and fixtures needed by Claude WP-204; deny and unknown-outcome behavior must be demonstrated."
+          },
+          {
+            "wp": "WP-406",
+            "after": [
+              "WP-107"
+            ],
+            "outcome": "Add Kafka/AMQP adapters through the inbox/outbox contract, with redelivery and broker-outage tests.",
+            "handoff": "Preserve the transport-neutral WP-107 contract; coordinate dependencies and deployment settings through GPT."
+          },
+          {
+            "wp": "WP-401",
+            "after": [
+              "WP-108"
+            ],
+            "outcome": "Prove backup/restore and effect/audit recovery, external audit anchors, archival and paged verification; automate T18.",
+            "handoff": "Claude supplies audit verification API requirements; GPT owns operational tooling and restore drills."
+          },
+          {
+            "wp": "WP-403",
+            "after": [
+              "WP-201"
+            ],
+            "outcome": "Deliver images, deployment manifests, air-gap/provider independence and native Cedar architecture checks; automate T21.",
+            "handoff": "Record D-3 platform choice before packaging; Claude supplies control-role settings without editing shared deployment files."
+          },
+          {
+            "wp": "WP-302",
+            "after": [
+              "WP-105",
+              "WP-301"
+            ],
+            "outcome": "Pin prompt/model/tool/policy/config versions and demonstrate version coexistence and rollback; automate T14/T28.",
+            "handoff": "Consume the Claude registry reference contract; deliver immutable pin/resolution APIs before WP-303 publication integration."
+          },
+          {
+            "wp": "WP-307",
+            "after": [
+              "WP-303"
+            ],
+            "outcome": "Add SBOM, signing, provenance and verification to governed artifacts and CI.",
+            "handoff": "Consume WP-303 artifact/publication contracts; GPT owns build and release pipelines."
+          },
+          {
+            "wp": "WP-402",
+            "after": [
+              "WP-105",
+              "WP-302"
+            ],
+            "outcome": "Implement rolling-upgrade compatibility and rollback drills; automate T24 and assess issue #26 before dependency changes.",
+            "handoff": "Serialize BOM/POM changes and database upgrade checks; do not bundle an untested framework upgrade."
+          },
+          {
+            "wp": "WP-404",
+            "after": [
+              "WP-102",
+              "WP-206",
+              "WP-306"
+            ],
+            "outcome": "Implement tenant isolation, RLS/role boundaries when enabled and cross-tenant denial tests; automate T20.",
+            "handoff": "Record D-6 scope; Claude supplies identity, memory and privacy boundaries; GPT integrates schema/configuration."
+          },
+          {
+            "wp": "WP-405",
+            "after": [
+              "WP-109",
+              "WP-110"
+            ],
+            "outcome": "Establish scale/latency baselines and overload/failover performance gates.",
+            "handoff": "Use production-like replica/queue limits and publish reproducible workload/results, including limits of the test environment."
+          },
+          {
+            "wp": "WP-501",
+            "after": [
+              "WP-303",
+              "WP-305"
+            ],
+            "outcome": "Implement versioned evaluation datasets/scorers, security gates and retirement/substitution policy; automate T10/T31.",
+            "handoff": "Own oa-eval; publish verdict/gate contracts to Claude publication, routing and authoring through oa-contracts."
+          },
+          {
+            "wp": "WP-502",
+            "after": [
+              "WP-112",
+              "WP-305",
+              "WP-501"
+            ],
+            "outcome": "Implement production quality monitoring, regression detection and review queues; automate T38.",
+            "handoff": "Consume Claude containment/incident APIs and GPT telemetry/evaluation ports; hand review-queue API to the console."
+          },
+          {
+            "wp": "WP-602",
+            "after": [
+              "WP-108",
+              "WP-302"
+            ],
+            "outcome": "Implement coexistence and safe shadow execution without duplicated real effects; automate T27.",
+            "handoff": "Reuse the ledger and pinned version APIs; shadow mode must suppress consequential side effects."
+          },
+          {
+            "wp": "WP-605",
+            "after": [],
+            "outcome": "Implement OWS conformance and portability evidence using product validation and portable samples.",
+            "handoff": "Can be picked while higher-priority rows wait on Claude; keep research code removed and document supported boundaries."
+          },
+          {
+            "wp": "WP-606",
+            "after": [
+              "WP-601"
+            ],
+            "outcome": "Implement replay, simulation and explanation using recorded evidence and governed authoring artifacts.",
+            "handoff": "Consume Claude WP-601 artifact contracts; prove replay cannot silently repeat live business effects."
+          }
+        ]
+      },
+      {
+        "id": "Claude",
+        "reviewer": "GPT",
+        "focus": "Identity/policy, governed agents, knowledge/memory, governance, model routing and console",
+        "backlog": [
+          {
+            "wp": "WP-102",
+            "after": [],
+            "outcome": "Run and automate real Keycloak interoperability: actor_token/act, tenant/scope, audience/target and credential TTL; bind audit access to verified callers.",
+            "handoff": "First assignment. Keep WP-102 partial until real-provider evidence exists; request CI/profile/dependency changes from GPT. Vault work applies only if selected."
+          },
+          {
+            "wp": "WP-103",
+            "after": [
+              "WP-102"
+            ],
+            "outcome": "Finish non-bypassable identity/PDP/audit enforcement at tool/model/human/publication boundaries with default denial.",
+            "handoff": "Preserve the explicit PEP concurrency bound (currently 64). Deliver reusable guards now; close freshness/revocation gates only with WP-304/WP-305 and consumer tests."
+          },
+          {
+            "wp": "WP-201",
+            "after": [
+              "WP-103"
+            ],
+            "outcome": "Implement governed graph patterns/catalog, ModelGateway convergence, policy/limits/audit hooks and checkpoint schema compatibility.",
+            "handoff": "Use GPT-owned contracts and publish extension hooks for budgets, tools, telemetry and deployment before their consumers start."
+          },
+          {
+            "wp": "WP-202",
+            "after": [
+              "WP-201"
+            ],
+            "outcome": "Implement bounded task/token/time/step/concurrency budgets and durable exhaustion decisions; automate T06.",
+            "handoff": "Own agent budget enforcement; GPT integrates any lifecycle stop/timeout hooks through a separate handoff."
+          },
+          {
+            "wp": "WP-204",
+            "after": [
+              "WP-103",
+              "WP-113",
+              "WP-201"
+            ],
+            "outcome": "Implement the tool gateway and MCP with non-bypassable denial/timeout behavior and per-call exchanged credentials.",
+            "handoff": "Consume GPT OpenAPI/effect contracts. Do not rely on a native MCP listener to deny calls or treat timeout text as success."
+          },
+          {
+            "wp": "WP-203",
+            "after": [
+              "WP-201",
+              "WP-202",
+              "WP-204"
+            ],
+            "outcome": "Implement planning/re-planning, bounded plan changes and safe promoted plans; automate T34/T26.",
+            "handoff": "Keep planner authority bounded by budget/tool contracts; coordinate lifecycle changes with GPT."
+          },
+          {
+            "wp": "WP-205",
+            "after": [
+              "WP-102",
+              "WP-201",
+              "WP-204"
+            ],
+            "outcome": "Implement governed knowledge and unstructured-input ingestion/retrieval; automate T35.",
+            "handoff": "Publish provenance/access contracts for memory and untrusted-input defenses."
+          },
+          {
+            "wp": "WP-206",
+            "after": [
+              "WP-102",
+              "WP-201"
+            ],
+            "outcome": "Implement scoped durable memory with provenance, consent and protected retrieval; automate T08/T15.",
+            "handoff": "Deliver tenant/privacy extension points to WP-306 and GPT WP-404; request migrations from GPT."
+          },
+          {
+            "wp": "WP-207",
+            "after": [
+              "WP-102",
+              "WP-105",
+              "WP-203",
+              "WP-204"
+            ],
+            "outcome": "Implement product A2A delegation, served agent cards, send/observe/cancel, cycle and failure handling; automate T36/T25/T05.",
+            "handoff": "Reproduce SDK/runtime issues in product integration tests; do not restore spikes. GPT owns lifecycle/cancellation integration."
+          },
+          {
+            "wp": "WP-208",
+            "after": [
+              "WP-106",
+              "WP-201"
+            ],
+            "outcome": "Implement durable human-agent interrupts, redirection and takeover; automate T37.",
+            "handoff": "Use GPT human-task decision/wait APIs; evaluate AG-UI behavior beyond artifact presence."
+          },
+          {
+            "wp": "WP-209",
+            "after": [
+              "WP-204",
+              "WP-205"
+            ],
+            "outcome": "Implement prompt-injection defenses, untrusted-data handling and sandbox isolation; automate T09.",
+            "handoff": "Reuse WP-104 structured validation; GPT owns deployment isolation/configuration requested by this package."
+          },
+          {
+            "wp": "WP-301",
+            "after": [
+              "WP-204"
+            ],
+            "outcome": "Implement inventory/artifact registry, approval metadata and runtime approved-artifact enforcement; automate T04.",
+            "handoff": "Publish registry/version reference contracts to GPT WP-302 before publication work starts."
+          },
+          {
+            "wp": "WP-304",
+            "after": [
+              "WP-103",
+              "WP-301"
+            ],
+            "outcome": "Complete author/approver/operator/runtime authority separation, approved snapshot freshness and admin-outage safety; automate T22/T32.",
+            "handoff": "Claude owns policy/snapshot behavior and control code; GPT writes database roles, audit datasource and deployment configuration from the agreed handoff."
+          },
+          {
+            "wp": "WP-303",
+            "after": [
+              "WP-301",
+              "WP-302",
+              "WP-304"
+            ],
+            "outcome": "Implement governed publication/activation with separation of duties and immutable pins; automate T19/T30.",
+            "handoff": "Publish an evaluation gate port first; integrate the GPT WP-501 verdict later. Keep closure partial until that integration is proved."
+          },
+          {
+            "wp": "WP-305",
+            "after": [
+              "WP-105",
+              "WP-301",
+              "WP-304"
+            ],
+            "outcome": "Implement emergency containment, revocation across active/waiting work and incident response; automate T11/T23.",
+            "handoff": "GPT implements lifecycle/operator hook changes; Claude implements policy/control decisions and records D-7 reporting scope."
+          },
+          {
+            "wp": "WP-306",
+            "after": [
+              "WP-206"
+            ],
+            "outcome": "Implement encryption, privacy/retention/deletion and location constraints with evidence.",
+            "handoff": "Deliver schema/retention/tenant boundaries to GPT; runtime audit remains append-only with documented lawful retention handling."
+          },
+          {
+            "wp": "WP-503",
+            "after": [
+              "WP-301",
+              "WP-306",
+              "WP-501"
+            ],
+            "outcome": "Implement approved task model bindings, risk/cost/location routing, fallback and substitution; automate T39.",
+            "handoff": "Consume GPT evaluation verdicts; record D-5 model-access choice and test every fallback against policy."
+          },
+          {
+            "wp": "WP-504",
+            "after": [
+              "WP-202",
+              "WP-503"
+            ],
+            "outcome": "Implement attributable usage/cost budgets, reporting and enforcement.",
+            "handoff": "Use existing budget/routing decisions; GPT integrates shared telemetry/exporter changes."
+          },
+          {
+            "wp": "WP-601",
+            "after": [
+              "WP-303",
+              "WP-501"
+            ],
+            "outcome": "Implement authoring lifecycle, validation, evaluation and approved plan promotion; automate T29/T33.",
+            "handoff": "Publish versioned authored artifacts to GPT replay/simulation; preserve human approval boundaries."
+          },
+          {
+            "wp": "WP-603",
+            "after": [
+              "WP-105",
+              "WP-106",
+              "WP-208",
+              "WP-301",
+              "WP-303"
+            ],
+            "outcome": "Implement operator console and approver inbox over authorized runtime/control APIs.",
+            "handoff": "Record D-4 UI choice; use GPT task/operations APIs and evaluation review queue, with no new control dependency from runtime."
+          },
+          {
+            "wp": "WP-604",
+            "after": [
+              "WP-102",
+              "WP-603"
+            ],
+            "outcome": "Implement the optional governance assistant through approved APIs and explicit human decisions.",
+            "handoff": "Keep actions attributable, policy checked and audited; do not bypass console approval contracts."
+          }
+        ]
+      }
+    ],
+    "baseline_dependencies": [
+      "WP-105"
+    ],
+    "rules": [
+      "Each unfinished work package has exactly one implementation owner and the other agent as reviewer. Completed packages are historical evidence, outside both backlogs; regression fixes go through their path owner.",
+      "The numbered rows are priority queues, not a promise of equal effort or simultaneous delivery. Each agent works on one implementation PR at a time and picks the first unblocked row; review the other agent promptly before starting another PR.",
+      "An After gate means the needed API, implementation and failure tests have merged and been reviewed, not merely proposed. Original start dependencies remain visible in the detailed checklist. WP-105 is the only explicitly accepted partial baseline for starting dependent work; its remaining recovery gate closes after WP-108/WP-107/WP-109. WP-102 gates are interface-specific, not whole-package closure: WP-103/WP-106/WP-404 need merged verified-caller and tenant/authority mapping with denial tests; WP-205/WP-206 need merged scoped caller and delegation-grant verification; WP-207 needs the merged exchanged-credential/target/TTL/replay contract and interoperability evidence for its selected provider; WP-604 needs merged verified user-delegation and caller guards. Real-Keycloak evidence is a separate WP-102 closure gate and does not block consumers of already evidenced interfaces. If Keycloak rejects actor_token/act semantics, Claude requests a GPT-owned ADR/contract handoff before any affected provider-dependent consumer proceeds.",
+      "WP-103 and WP-303 may merge useful increments while their consumer/freshness/evaluation closure gates remain partial. A merged prerequisite is usable only for its evidenced interface; no package becomes completed until every existing deliverable and acceptance gate passes.",
+      "Use separate branches from current main: gpt/<WP-id>-<scope> and claude/<WP-id>-<scope>. Do not edit the other agent branch, shared checkout, or write areas. Rebase after every prerequisite merge and rerun affected checks.",
+      "For a cross-area change, write docs/handoffs/<agent>/<WP-id>.md with producer/consumer, exact affected paths, port/schema/config proposal, acceptance/failure cases and evidence. The registered writer implements and merges that small handoff before the consumer depends on it. It is a subtask of the requesting package, never a second owner of the same work package.",
+      "Shared-file writes are serialized by GPT integration ownership. Claude must request contract, migration, build, configuration, lifecycle, acceptance-status and tracking changes; GPT requests Claude-owned policy/caller/audit/agent edits the same way. No simultaneous edits to a shared file, including generated documents.",
+      "Before each implementation PR merges, the other agent reviews the exact current head SHA for behavior, boundary bypasses and failure/recovery cases, verifies relevant tests independently, and records findings plus a pass/request-changes verdict. Any later code change requires another review of the new head; unresolved material findings block merge.",
+      "If both agents use the same GitHub identity, record reviewer=GPT or reviewer=Claude, head SHA, commands/results and verdict explicitly in the PR review/comment; do not claim a distinct GitHub approval or self-review. GPT updates execution status after each review, implementation start and merge; record outstanding findings and the reviewed SHA without claiming a later head was approved.",
+      "GPT collects Claude evidence and updates plan/status JSON, CHANGELOG and generated TODO in a serialized integration commit on main or the current integration PR. A package is not closed before that update, reciprocal review and green CI. Planning this work does not change current implementation or acceptance status.",
+      "Claude reviews this ownership/dependency plan and GPT addresses recorded findings. WP-108 starts on the merged WP-105 core independently of WP-102 design/real-IdP evidence; GPT and Claude may implement their owned first packages concurrently. Cross-area consumers still wait for their required merged interface handoffs. Claude review of the exact implementation head, no unresolved material findings, and passing CI remain mandatory before GPT merges. Preserve outcome-only research documentation and do not restore spike implementations."
+    ],
+    "write_areas": [
+      {
+        "area": "Contracts and common test support",
+        "owner": "GPT",
+        "paths": [
+          "modules/oa-contracts/",
+          "modules/oa-testkit/pom.xml",
+          "modules/oa-testkit/src/main/java/io/github/bassemzohdy/openworkflow/agentic/testkit/package-info.java",
+          "modules/oa-testkit/src/main/java/io/github/bassemzohdy/openworkflow/agentic/testkit/acceptance/",
+          "modules/oa-testkit/src/main/java/io/github/bassemzohdy/openworkflow/agentic/testkit/fault/",
+          "modules/oa-testkit/src/main/java/io/github/bassemzohdy/openworkflow/agentic/testkit/process/",
+          "modules/oa-testkit/src/main/java/io/github/bassemzohdy/openworkflow/agentic/testkit/time/",
+          "modules/oa-testkit/src/test/java/io/github/bassemzohdy/openworkflow/agentic/testkit/acceptance/",
+          "modules/oa-testkit/src/test/java/io/github/bassemzohdy/openworkflow/agentic/testkit/fault/",
+          "modules/oa-testkit/src/test/java/io/github/bassemzohdy/openworkflow/agentic/testkit/process/",
+          "modules/oa-testkit/src/test/java/io/github/bassemzohdy/openworkflow/agentic/testkit/time/"
+        ],
+        "rule": "GPT owns framework-free contracts and common acceptance/fault/process/time fixtures; Claude requests contract changes. Domain fixtures belong to Claude."
+      },
+      {
+        "area": "Runtime execution and integration",
+        "owner": "GPT",
+        "paths": [
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/lifecycle/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/operations/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/outbox/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/human/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/timer/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/resilience/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/observability/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/adapter/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/replay/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/InstanceResource.java",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/OperationsResource.java",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/correlation/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/problem/"
+        ],
+        "rule": "Includes InstanceService, Reconciler, resume/readiness and operator integration. Claude supplies required hooks as a handoff."
+      },
+      {
+        "area": "Runtime identity, policy and agent features",
+        "owner": "Claude",
+        "paths": [
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/identity/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/audit/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/tool/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/knowledge/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/memory/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/collaboration/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/governance/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/privacy/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/model/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/caller/",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/AgentResource.java",
+          "modules/oa-runtime/src/main/resources/policy/",
+          "apps/app-runtime/src/main/resources/policy/events/ingress.cedar"
+        ],
+        "rule": "Includes caller verification, PEP and audit access. GPT requests changes rather than editing these paths. Claude owns shipped event Cedar content; GPT retains the deployment manifest/hash/configuration and its tests. Request manifest refresh through the handoff after policy changes; register new policy files explicitly before coding."
+      },
+      {
+        "area": "Runtime feature tests",
+        "owner": "GPT",
+        "paths": [
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/lifecycle/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/operations/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/outbox/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/human/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/timer/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/resilience/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/observability/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/adapter/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/replay/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/outbox/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/human/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/event/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/timer/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/resilience/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/observability/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/adapter/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/replay/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/correlation/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/problem/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/InstanceResourceTest.java",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/OperationsResourceTest.java"
+        ],
+        "rule": "Claude sends lifecycle/API integration-test cases to GPT; no parallel changes to existing recovery fixtures."
+      },
+      {
+        "area": "Claude feature tests",
+        "owner": "Claude",
+        "paths": [
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/identity/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/audit/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/tool/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/knowledge/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/memory/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/collaboration/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/governance/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/privacy/",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/model/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/identity/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/policy/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/audit/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/agent/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/tool/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/knowledge/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/memory/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/collaboration/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/governance/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/privacy/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/model/",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/AuditOpenProfile.java",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/AuditApiTest.java",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/AuditDeniedByDefaultTest.java",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/StubLlm.java",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/caller/"
+        ],
+        "rule": "New Claude application tests use these reserved package directories. Other root-level boot/process fixtures stay with GPT."
+      },
+      {
+        "area": "Control and console",
+        "owner": "Claude",
+        "paths": [
+          "modules/oa-control/src/main/java/",
+          "modules/oa-control/src/test/java/",
+          "apps/app-control/src/main/java/",
+          "apps/app-control/src/test/java/",
+          "apps/app-control/src/main/resources/templates/",
+          "apps/app-control/src/main/resources/META-INF/resources/",
+          "apps/console/"
+        ],
+        "rule": "Control/console product code; GPT owns their POMs, launch configuration and deployment packaging."
+      },
+      {
+        "area": "Evaluation",
+        "owner": "GPT",
+        "paths": [
+          "modules/oa-eval/src/"
+        ],
+        "rule": "Claude consumes contracts/verdicts and requests evaluator changes."
+      },
+      {
+        "area": "Schema and build/configuration",
+        "owner": "GPT",
+        "paths": [
+          "modules/oa-runtime/src/main/resources/db/",
+          ".github/",
+          "tools/",
+          "pom.xml",
+          "docker-compose.yml",
+          "deploy/",
+          "scripts/",
+          "apps/app-runtime/pom.xml",
+          "apps/app-control/pom.xml",
+          "modules/oa-runtime/pom.xml",
+          "modules/oa-control/pom.xml",
+          "modules/oa-eval/pom.xml",
+          ".gitattributes",
+          "apps/app-runtime/src/main/resources/application.properties",
+          "apps/app-runtime/src/main/resources/workflow-references.json",
+          "apps/app-runtime/src/main/resources/flow/",
+          "apps/app-runtime/src/main/resources/policy/events/snapshot.properties"
+        ],
+        "rule": "One migration allocator: use the next free version above main, merge in numerical order and recheck before merge. Never reserve disjoint agent ranges or modify applied migrations. Claude provides dependency/config/schema requests in its handoff."
+      },
+      {
+        "area": "Shared tracking and architecture documents",
+        "owner": "GPT",
+        "paths": [
+          "TODO.md",
+          "CHANGELOG.md",
+          "README.md",
+          "CONTRIBUTING.md",
+          "docs/plan/",
+          "docs/requirements/",
+          "docs/test-cases.md",
+          "docs/traceability.md",
+          "docs/repository-structure.md",
+          "docs/adr/"
+        ],
+        "rule": "GPT alone edits source JSON, acceptance status and generated tracking. Claude submits evidence/status/decision changes in its per-WP handoff; GPT integrates and regenerates before completion."
+      },
+      {
+        "area": "Claude feature documentation and handoffs",
+        "owner": "Claude",
+        "paths": [
+          "docs/identity.md",
+          "docs/policy.md",
+          "docs/audit.md",
+          "docs/handoffs/claude/"
+        ],
+        "rule": "Keep domain documentation with implementation; request shared ADR/plan changes through GPT."
+      },
+      {
+        "area": "GPT feature documentation and handoffs",
+        "owner": "GPT",
+        "paths": [
+          "docs/lifecycle.md",
+          "docs/operations.md",
+          "docs/testing.md",
+          "docs/handoffs/gpt/"
+        ],
+        "rule": "Unlisted existing paths default to GPT integration ownership. Register one owner for new shared paths before coding."
+      },
+      {
+        "area": "Identity, policy and model test support",
+        "owner": "Claude",
+        "paths": [
+          "modules/oa-testkit/src/main/java/io/github/bassemzohdy/openworkflow/agentic/testkit/idp/",
+          "modules/oa-testkit/src/main/java/io/github/bassemzohdy/openworkflow/agentic/testkit/policy/",
+          "modules/oa-testkit/src/main/java/io/github/bassemzohdy/openworkflow/agentic/testkit/model/",
+          "modules/oa-testkit/src/test/java/io/github/bassemzohdy/openworkflow/agentic/testkit/idp/",
+          "modules/oa-testkit/src/test/java/io/github/bassemzohdy/openworkflow/agentic/testkit/policy/",
+          "modules/oa-testkit/src/test/java/io/github/bassemzohdy/openworkflow/agentic/testkit/model/"
+        ],
+        "rule": "Claude owns domain test doubles and their tests, including T07. GPT owns the testkit build and shared acceptance machinery."
+      }
+    ],
+    "baseline_commit": "e23471d40e8eb4b57a06950a89233b8c0a5a971b"
+  }
 }
