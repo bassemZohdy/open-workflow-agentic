@@ -9,6 +9,13 @@ V68/V69 task ownership, not an unmerged identity/provider interface.
 
 ## What this stores
 
+Current executed evidence: exact V72 product4d751617720e17a78fdad2ba3c50a393803706bc
+run39379015967 SUCCESS BOTH lanes. Complete logs inspected: ListenGroupStoreTest11
+(including refused late INSERT), metadata2, group contracts9, actual SDK group4,
+standard3/native8; zero failures/errors/skips and strict checkers. Earlier pending
+notes below are chronological. New ListenGroupSnapshots preparation has its own
+scope/local evidence in WP-107-snapshot-producer.md; later heads require fresh CI.
+
 JdbcListenGroups registers the exact InboxListenGroup, full producer-provided
 configuration JSON and first timeout/deadline. It binds exact UTF-8 snapshot
 bytes to the domain-separated configuration fingerprint; snapshots must be
