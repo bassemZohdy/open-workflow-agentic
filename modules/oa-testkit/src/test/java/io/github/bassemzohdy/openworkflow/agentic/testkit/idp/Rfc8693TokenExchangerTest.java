@@ -21,6 +21,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.GrantCheck;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Rfc8693TokenExchanger;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenExchanger;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenVerifier;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.VerifiedToken;
 import io.github.bassemzohdy.openworkflow.agentic.testkit.idp.DelegationAuthorizationServer.Fault;
 import java.time.Duration;
@@ -48,7 +49,7 @@ class Rfc8693TokenExchangerTest {
 
     @BeforeEach
     void start() throws Exception {
-        fx = new IdentityFixture(AUDIENCE, "tool-search");
+        fx = new IdentityFixture(AUDIENCE, "tool-search", CLIENT_ID);
         exchanger = exchanger();
         grant = fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, SCOPES, fx.clock.instant().plus(Duration.ofHours(1)),
                 "corr-1");
@@ -118,7 +119,9 @@ class Rfc8693TokenExchangerTest {
 
     @Test
     void anAgentToAgentDelegationRecordsTheWholeChainInTheToken() throws Exception {
-        IssuedToken first = exchanger.exchange(request(Set.of("cases:read", "cases:write")));
+        // the parent hop is addressed to the runtime that delegates further: input tokens are verified for the client
+        IssuedToken first = exchanger.exchange(new ExchangeRequest(Credential.of(userToken), Credential.of(workload),
+                CLIENT_ID, Set.of("cases:read", "cases:write"), grant));
         DelegationGrant child = fx.grants.delegate(grant.id(), PLANNER, WORKER, Set.of("cases:read"),
                 fx.clock.instant().plus(Duration.ofMinutes(30)), "corr-2");
         String workerWorkload = fx.as.workloadToken("worker", fx.tenant, Duration.ofMinutes(30));
@@ -299,25 +302,72 @@ class Rfc8693TokenExchangerTest {
     }
 
     @Test
-    void aScopeTheUsersOwnTokenLacksIsRefusedByTheServerEvenThoughTheGrantHoldsIt() throws Exception {
+    void aScopeTheUsersOwnTokenLacksIsRefusedBeforeAnythingIsSentEvenThoughTheGrantHoldsIt() throws Exception {
         userToken = fx.as.userToken("alice", fx.tenant, "oa-api", Set.of("cases:read"), Duration.ofMinutes(30));
 
         ExchangeException e = refused(request(Set.of("cases:write")));
 
-        assertEquals(Code.REFUSED, e.code());
-        assertEquals("invalid_scope", e.oauthError());
+        assertEquals(Code.SCOPE_WIDENING, e.code());
+        assertTrue(fx.as.received().isEmpty(), "the product bounds the scopes itself; it does not rely on the server");
     }
 
     @Test
-    void anExpiredSubjectTokenIsRefusedByTheServer() throws Exception {
+    void anExpiredSubjectTokenIsRefusedBeforeAnythingIsSent() throws Exception {
         userToken = fx.as.userToken("alice", fx.tenant, "oa-api", SCOPES, Duration.ofSeconds(10));
         workload = fx.as.workloadToken("planner", fx.tenant, Duration.ofMinutes(30));
-        fx.clock.advance(Duration.ofSeconds(11));
+        fx.clock.advance(Duration.ofSeconds(41)); // past exp plus the 30 s skew: the verifier refuses it
 
         ExchangeException e = refused(request(Set.of("cases:read")));
 
-        assertEquals(Code.REFUSED, e.code());
-        assertEquals("invalid_grant", e.oauthError());
+        assertEquals(Code.INPUT_REJECTED, e.code());
+        assertTrue(fx.as.received().isEmpty(), "an expired subject token is never sent to the server");
+    }
+
+    @Test
+    void aSubjectTokenOfAnotherUserTenantOrChainIsRefusedBeforeAnythingIsSent() throws Exception {
+        String otherUser = fx.as.userToken("mallory", fx.tenant, "oa-api", SCOPES, Duration.ofMinutes(30));
+        String otherTenant = fx.as.userToken("alice", "tenant-other", "oa-api", SCOPES, Duration.ofMinutes(30));
+
+        userToken = otherUser;
+        assertEquals(Code.INPUT_REJECTED, refused(request(Set.of("cases:read"))).code());
+        userToken = otherTenant;
+        assertEquals(Code.INPUT_REJECTED, refused(request(Set.of("cases:read"))).code());
+        userToken = fx.as.userToken("alice", fx.tenant, "oa-api", SCOPES, Duration.ofMinutes(30));
+        workload = fx.as.workloadToken("worker", fx.tenant, Duration.ofMinutes(30)); // not the grant's agent
+        assertEquals(Code.INPUT_REJECTED, refused(request(Set.of("cases:read"))).code());
+        workload = "not-a-token";
+        assertEquals(Code.INPUT_REJECTED, refused(request(Set.of("cases:read"))).code());
+
+        assertTrue(fx.as.received().isEmpty(), "nothing reached the server");
+    }
+
+    @Test
+    void aGrantRevokedWhileTheRequestIsInFlightIssuesNothing() throws Exception {
+        TokenVerifier revokeWhenTheAnswerIsVerified = (token, audience) -> {
+            VerifiedToken verified = fx.verifier.verify(token, audience);
+            if (audience.equals(AUDIENCE)) {
+                fx.grants.revoke(grant.id(), ALICE, "revoked in flight", null);
+            }
+            return verified;
+        };
+        Rfc8693TokenExchanger racing = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME,
+                fx.secrets, fx.grants, revokeWhenTheAnswerIsVerified, fx.audit(), fx.clock, Duration.ofSeconds(2));
+
+        ExchangeException e = assertThrows(ExchangeException.class, () -> racing.exchange(request(SCOPES)));
+
+        assertEquals(Code.GRANT_INACTIVE, e.code());
+        assertEquals(1, fx.as.received().size(), "the request was sent; the token is discarded after the answer");
+    }
+
+    @Test
+    void anIssuedTokenThatOutlivesTheSubjectTokenIsRefusedNotShortened() throws Exception {
+        userToken = fx.as.userToken("alice", fx.tenant, "oa-api", SCOPES, Duration.ofSeconds(100));
+        fx.as.fault(DelegationAuthorizationServer.Fault.IGNORE_SUBJECT_EXPIRY); // the server does not end its token with the subject token
+
+        ExchangeException e = refused(request(Set.of("cases:read")));
+
+        assertEquals(Code.BAD_RESPONSE, e.code());
+        assertTrue(e.getMessage().contains("subject"), e.getMessage());
     }
 
     // ---- secrets ---------------------------------------------------------------------------------------------------

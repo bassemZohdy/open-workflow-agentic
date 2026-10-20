@@ -136,12 +136,15 @@ public final class DelegationAuthorizationServer implements AutoCloseable {
         Map<String, Object> claims = idp.baseClaims(user, audience, lifetime);
         claims.put("scope", String.join(" ", scopes));
         claims.put("tenant", tenant);
+        // the exchanging client is in the audience, as a Keycloak delegation token has it (ADR 0021 H1: inputs are
+        // verified for the exchanging client)
+        claims.put("aud", List.of(audience, clientId.get()));
         return idp.signClaims(claims);
     }
 
     /** The workload identity of an agent (client credentials): subject is the agent, kind AGENT. */
     public String workloadToken(String agent, String tenant, Duration lifetime) throws Exception {
-        Map<String, Object> claims = idp.baseClaims(agent, "token-endpoint", lifetime);
+        Map<String, Object> claims = idp.baseClaims(agent, clientId.get(), lifetime);
         claims.put("sub_kind", "AGENT");
         claims.put("tenant", tenant);
         return idp.signClaims(claims);
