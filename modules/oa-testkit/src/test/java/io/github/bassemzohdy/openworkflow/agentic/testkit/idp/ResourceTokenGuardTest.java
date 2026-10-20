@@ -5,6 +5,7 @@ import static io.github.bassemzohdy.openworkflow.agentic.testkit.idp.IdentityFix
 import static io.github.bassemzohdy.openworkflow.agentic.testkit.idp.IdentityFixture.CLIENT_SECRET_NAME;
 import static io.github.bassemzohdy.openworkflow.agentic.testkit.idp.IdentityFixture.PLANNER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -15,6 +16,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ExchangeReque
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InMemoryReplayCache;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ExchangeException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedTokenBindings;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.JdbcReplayCache;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ReplayCache;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ResourceTokenGuard;
@@ -166,8 +168,8 @@ class ResourceTokenGuardTest {
 
     @Test
     void aTokenMayBeUsedAsOftenAsTheResourceAllowsAndNoMore() {
-        ResourceTokenGuard three = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), null, null,
-                fx.clock, 3);
+        ResourceTokenGuard three = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), fx.grants,
+                fx.bindings, fx.clock, 3);
         String token = issue(RESOURCE, Set.of("cases:read")).accessToken().reveal();
 
         for (int i = 0; i < 3; i++) {
@@ -200,7 +202,7 @@ class ResourceTokenGuardTest {
         ReplayCache broken = (key, expiresAt, maxUses, now) -> {
             throw new IllegalStateException("database down");
         };
-        ResourceTokenGuard failing = new ResourceTokenGuard(fx.verifier, RESOURCE, broken, null, null, fx.clock, 1);
+        ResourceTokenGuard failing = new ResourceTokenGuard(fx.verifier, RESOURCE, broken, fx.grants, fx.bindings, fx.clock, 1);
         String token = issue(RESOURCE, Set.of("cases:read")).accessToken().reveal();
 
         assertEquals(Reason.VERIFIER_UNAVAILABLE, assertThrows(TokenRejectedException.class,
@@ -227,14 +229,11 @@ class ResourceTokenGuardTest {
     }
 
     @Test
-    void withoutAGrantLookupARevokedGrantStillWaitsForTheTokenToExpire() {
-        ResourceTokenGuard noLookup = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), null, null,
-                fx.clock, 1);
-        String token = issue(RESOURCE, Set.of("cases:read")).accessToken().reveal();
-        fx.grants.revoke(grant.id(), ALICE, "withdrawn", null);
-
-        assertEquals("alice", noLookup.admit(token, Set.of("cases:read")).subject().id(),
-                "this is the revocation latency docs/identity.md describes: at most the token lifetime");
+    void aGuardWithoutGrantsOrBindingsCannotBeBuilt() {
+        assertThrows(NullPointerException.class, () -> new ResourceTokenGuard(fx.verifier, RESOURCE,
+                new InMemoryReplayCache(100), null, fx.bindings, fx.clock, 1));
+        assertThrows(NullPointerException.class, () -> new ResourceTokenGuard(fx.verifier, RESOURCE,
+                new InMemoryReplayCache(100), fx.grants, null, fx.clock, 1));
     }
 
     // ---- the replay caches themselves ------------------------------------------------------------------------
@@ -324,7 +323,10 @@ class ResourceTokenGuardTest {
     void theTokenIsBoundToItsGrantBeforeItIsReturned() {
         IssuedToken token = issue(RESOURCE, Set.of("cases:read"));
 
-        assertEquals(grant.id(), fx.bindings.grantOf(fx.idp.issuer(), token.tokenId()).orElseThrow());
+        IssuedTokenBindings.Binding binding = fx.bindings.find(fx.idp.issuer(), token.tokenId()).orElseThrow();
+        assertEquals(grant.id(), binding.grantId());
+        assertEquals(fx.tenant, binding.tenant());
+        assertEquals(token.expiresAt(), binding.expiresAt());
     }
 
     @Test
@@ -353,5 +355,33 @@ class ResourceTokenGuardTest {
         fx.bindings.fail(false);
         assertEquals("alice", guard.admit(token.accessToken().reveal(), Set.of("cases:read")).subject().id(),
                 "nothing was used up while the store was down");
+    }
+
+    @Test
+    void anOldProofWithTheSameJtiButAnotherSignedExpiryIsRefused() throws Exception {
+        IssuedToken issued = issue(RESOURCE, Set.of("cases:read"));
+        Map<String, Object> claims = forged(RESOURCE);
+        claims.put("jti", issued.tokenId());
+        // same issuer, same jti, same grant facts, but a different signed exp than the one that was bound
+        assertNotEquals(issued.expiresAt(), Instant.ofEpochSecond(((Number) claims.get("exp")).longValue()));
+
+        assertEquals(Reason.GRANT_INACTIVE, refusedWith(fx.idp.signClaims(claims), Set.of("cases:read")));
+    }
+
+    @Test
+    void bindingTheSameTokenAgainChangesNothingUnlessEverythingIsIdentical() {
+        IssuedToken issued = issue(RESOURCE, Set.of("cases:read"));
+        IssuedTokenBindings.Binding same = fx.bindings.find(fx.idp.issuer(), issued.tokenId()).orElseThrow();
+
+        fx.bindings.bind(fx.idp.issuer(), issued.tokenId(), same); // an idempotent retry is accepted
+
+        for (IssuedTokenBindings.Binding changed : List.of(
+                new IssuedTokenBindings.Binding(same.grantId(), same.tenant(), same.expiresAt().plusSeconds(1)),
+                new IssuedTokenBindings.Binding(same.grantId(), "another-tenant", same.expiresAt()),
+                new IssuedTokenBindings.Binding(fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, SCOPES,
+                        fx.clock.instant().plus(Duration.ofHours(1)), null).id(), same.tenant(), same.expiresAt()))) {
+            assertThrows(IllegalStateException.class, () -> fx.bindings.bind(fx.idp.issuer(), issued.tokenId(), changed));
+        }
+        assertEquals(same, fx.bindings.find(fx.idp.issuer(), issued.tokenId()).orElseThrow(), "nothing was updated");
     }
 }

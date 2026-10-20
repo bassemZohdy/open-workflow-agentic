@@ -201,7 +201,7 @@ class KeycloakDelegationIT {
         DelegationGrant later = h.grant(READ, Duration.ofHours(1));
         DelegationGrant equivalent = h.grant(READ, Duration.ofHours(1));
         IssuedToken live = h.exchanger.exchange(h.request(subject, TOOL, READ, later));
-        assertEquals(later.id(), h.bindings.grantOf(live.issuer(), live.tokenId()).orElseThrow());
+        assertEquals(later.id(), h.bindings.find(live.issuer(), live.tokenId()).orElseThrow().grantId());
         h.grants.revoke(later.id(), h.alice, "alice withdrew later", null);
         assertTrue(h.grants.check(equivalent.id()).active(), "an equivalent grant is still active");
         assertEquals(Reason.GRANT_INACTIVE, rejected(h.guard(TOOL), live.accessToken().reveal(), READ),

@@ -285,7 +285,7 @@ the product requires: native, issuer-signed actor proof; no actorless downgrade;
 * **Revocation granularity (resolved by the grant binding, H4).** An exchanged token does not name its grant, and the issuer
   cannot compute one. The exchanger therefore records `(issuer, jti) -> grant id` durably (`identity.issued_token_binding`)
   **before** returning the token, and a resource admits a delegated token only through that binding: the bound grant and every
-  ancestor must be active, and the token's user, tenant, exact actor chain and scopes must match it. Revoking the issuing grant
+  ancestor must be active, the binding's tenant and signed expiry must equal the token's, and the token's user, tenant, exact actor chain and scopes must match the grant. A binding is immutable: binding the same issuer and jti again is accepted only when grant, tenant and signed expiry are all identical, so an old proof cannot be re-bound or extended. The write commits on its own connection, outside any caller transaction (the caller's rollback cannot erase it and its unrelated work is not committed by it). A guard cannot be built without grants and bindings. Revoking the issuing grant
   stops the token even while an equivalent grant (or an equivalent chain) stays active; a token with no binding (never
   exchanged, forged with the issuer's key, or a lost row) is refused; a binding-store outage refuses at the resource and
   discards the token at the exchange.

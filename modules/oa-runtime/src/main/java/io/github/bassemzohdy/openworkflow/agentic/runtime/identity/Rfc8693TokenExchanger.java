@@ -124,7 +124,8 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
      */
     private void bind(IssuedToken token, DelegationGrant grant) {
         try {
-            bindings.bind(token.issuer(), token.tokenId(), grant.id(), grant.tenant(), token.expiresAt());
+            bindings.bind(token.issuer(), token.tokenId(),
+                    new IssuedTokenBindings.Binding(grant.id(), grant.tenant(), token.expiresAt()));
         } catch (RuntimeException e) {
             throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
                     "the token was discarded because its grant binding could not be stored", e);

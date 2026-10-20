@@ -36,8 +36,8 @@ public final class ResourceTokenGuard {
     private final int maxUses;
 
     /**
-     * @param grants   the grants a token is checked against; null to skip the grant check (then bindings is ignored)
-     * @param bindings the token-to-grant bindings; required when grants is set
+     * @param grants   the grants a token is checked against; required: a delegated token is never admitted on its signature alone
+     * @param bindings the token-to-grant bindings; required
      * @param maxUses how many times one token may be accepted; 1 makes a token a one-call credential
      */
     public ResourceTokenGuard(TokenVerifier verifier, String audience, ReplayCache replay, DelegationGrants grants,
@@ -48,11 +48,8 @@ public final class ResourceTokenGuard {
         }
         this.audience = audience;
         this.replay = Objects.requireNonNull(replay, "replay");
-        this.grants = grants;
-        if (grants != null) {
-            Objects.requireNonNull(bindings, "bindings are required with grants");
-        }
-        this.bindings = bindings;
+        this.grants = Objects.requireNonNull(grants, "grants are required: a delegated token needs its grant");
+        this.bindings = Objects.requireNonNull(bindings, "bindings are required: a delegated token needs its binding");
         this.clock = Objects.requireNonNull(clock, "clock");
         if (maxUses < 1) {
             throw new IllegalArgumentException("maxUses must be at least 1");
@@ -85,9 +82,7 @@ public final class ResourceTokenGuard {
             throw new TokenRejectedException(TokenRejectedException.Reason.SCOPE);
         }
         Instant now = clock.instant();
-        if (grants != null) {
-            checkGrant(token, requiredScopes);
-        }
+        checkGrant(token, requiredScopes);
         boolean allowed;
         try {
             allowed = replay.use(token.issuer() + "|" + token.tokenId(), token.expiresAt(), maxUses, now);
@@ -105,14 +100,13 @@ public final class ResourceTokenGuard {
             throw new TokenRejectedException(TokenRejectedException.Reason.MISSING_CLAIM);
         }
         GrantCheck check;
-        DelegationGrant bound;
+        IssuedTokenBindings.Binding binding;
         try {
-            java.util.Optional<io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid> id =
-                    bindings.grantOf(token.issuer(), token.tokenId());
-            if (id.isEmpty()) {
+            binding = bindings.find(token.issuer(), token.tokenId()).orElse(null);
+            if (binding == null) {
                 throw new TokenRejectedException(TokenRejectedException.Reason.GRANT_INACTIVE);
             }
-            check = grants.check(id.get());
+            check = grants.check(binding.grantId());
         } catch (TokenRejectedException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -121,11 +115,13 @@ public final class ResourceTokenGuard {
         if (!(check instanceof GrantCheck.Active active)) {
             throw new TokenRejectedException(TokenRejectedException.Reason.GRANT_INACTIVE);
         }
-        bound = active.grant();
+        DelegationGrant bound = active.grant();
         // the token must be what this grant issues: the same user, tenant and exact chain, within the grant's scopes
         List<String> chain = new java.util.ArrayList<>(bound.chain());
         java.util.Collections.reverse(chain);
-        boolean matches = bound.tenant().equals(token.tenant())
+        // the binding must be exactly what this token proves: its tenant and its signed expiry, not another's
+        boolean matches = binding.tenant().equals(token.tenant()) && binding.expiresAt().equals(token.expiresAt())
+                && bound.tenant().equals(token.tenant())
                 && bound.delegator().equals(token.subject())
                 && token.actors().equals(chain)
                 && bound.covers(requiredScopes) && bound.covers(token.scopes());

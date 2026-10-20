@@ -63,8 +63,9 @@ public class IdentityProducers {
 
     @Produces
     @Singleton
-    public IssuedTokenBindings issuedTokenBindings(DataSource dataSource) {
-        return new JdbcIssuedTokenBindings(dataSource);
+    public IssuedTokenBindings issuedTokenBindings(DataSource dataSource,
+                                                   jakarta.transaction.TransactionManager transactions) {
+        return new JdbcIssuedTokenBindings(dataSource, transactions);
     }
 
     @Produces
