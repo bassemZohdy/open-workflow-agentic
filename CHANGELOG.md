@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-108 preparation: refuse interrupted callers before effect/refund dispatch and after blocking ledger/cleanup work, preserving committed facts and original recovery keys. Six local interruption cases pass; four new PostgreSQL cases compile and need fresh Linux execution. This is cooperative thread handling, not complete Flow/owner/authority cancellation.
+
 - WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. All76 tooling tests pass. Exact4325993 passed BOTH39381656269 with process recovery1/SQL guards5/effects12/CDI tracing3/standard3/native8, zero skips and strict checks. Full governed Flow/owner/partition/peer gates remain; no acceptance promotion.
 
 - WP-108/WP-112 preparation: bounded, content-free OTel effect/dispatch/lookup/compensation spans, disabled SDK by default with runtime collector opt-in. Five SDK/fault and three real ledger/CDI cases pass in current Linux evidence above. Governed Flow/adapter/collector/complete distributed tracing remain open.
