@@ -41,3 +41,17 @@ Sources were read from the pinned Maven source artifacts in ignored target;
 no POM change, SDK upgrade or third-party source copy is committed. V74 guards
 already retained complete occurrences; it does not derive their coordinates.
 V75 remains reserved for Claude's audit source-binding DDL proposal.
+
+## Actual execution record
+
+reviewer=GPT; verified SHA=c2decc1e9d88b08c358fe19abf21a7579a88d546.
+Verdict: PASS this scoped storage-boundary regression; integration/producer/
+whole-package gates remain OPEN. BOTH39396747028 SUCCESS. Downloaded finished
+standard118541255118/native118541254972 raw job logs, read Maven case summaries
+and strict checker output. Each lane passed both new actual PostgreSQL cases,
+binding SQL17/SDK observations3, core effect process recovery1. Standard3/native8
+and their strict evidence checks pass, zero failures/errors/skips. Reactor totals
+contracts184/runtime333/testkit196/app292; no skipped-provider substitution.
+Local tools76 pass, generated tracking and diff checks pass. This supersedes
+new-SQL-pending statements for that exact product only. Final-head full/peer/
+ordered integration and the full producer/restore/execution gates remain.

@@ -1,5 +1,7 @@
 # Changelog
 
+- Exact c2decc1 passed BOTH39396747028: both actual PostgreSQL task-start/completion boundary controls, binding17/SDK3/process1 per provider/standard3/native8 and strict checkers, zero skips; both logs inspected. Publish the cross-owner graph execution versus immutable outcome-readback proposal. Complete occurrence/restore/execution and final peer/integration gates remain open.
+
 - WP-103 preparation: exercise actual SDK/JPA task-start versus task-completion metadata storage, with a negative control against treating task-start success as a durable occurrence reservation. New two PostgreSQL cases compile and both full workflow fixtures validate; Linux execution and production occurrence/restore gates remain open.
 
 - Exact canonical-occurrence productb051776 passed BOTH39393353409:17 actual PostgreSQL cases including Unicode backfill and conflicting-history refusal, scope7/SDK observations3/core process1/standard3/native8, zero skips/strict checkers. Both finished logs inspected. Full producer/restore/execution and final-head peer/integration gates remain open.
