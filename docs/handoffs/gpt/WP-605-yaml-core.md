@@ -1,7 +1,9 @@
 # WP-605 YAML core source semantics
 
-Reviewer=GPT (author verification, not peer approval). Integration HOLD; exact
-product SHA and fresh Linux/real-provider evidence will be appended when done.
+Reviewer=GPT (author verification, not peer approval).
+Reviewed SHA: **ce779d1a9a8be7d1247eb1a79bd34106d8b802c1**.
+Verdict: bounded source/core API verified; **integration HOLD** for exact peer
+and final required implementation-PR gates.
 Sole GPT #55 remains frozen ea56f3319d0e896d54703d9f4d857252906ed2a4.
 
 ## Producer and actual consumer boundary
@@ -78,5 +80,63 @@ expected scalar meanings, rejection and expansion assertions remain intact.
 Full local Windows runtime testing still has the separately reproduced Cedar
 JNI limitation; current full runtime/provider proof must come from fresh Linux.
 
-Tracking stays partial. Fresh exact Linux/BOTH CI, current peer and final PR
-checks remain pending. No second GPT PR, activation, merge or acceptance claim.
+Tools94, actual dependency policy, source-regenerated tracking/check and authored
+diff checks pass. Current peer/final implementation-PR checks remain required.
+No second GPT PR, activation, merge or acceptance claim.
+
+
+## Fresh exact-product Linux and real-provider evidence
+
+All runs below are SUCCESS at the reviewed SHA, attempt1/no rerun. Full logs
+were inspected. Every actual XML suite was checked for positive/consistent
+counts, unique method names and zero failures/errors/skips. Actual ZIP bytes
+match GitHub length/SHA-256 and pass CRC plus bounded safe-path checks.
+
+- [Dedicated39471330241](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39471330241),
+  job118795855130: contracts220/runtime380 including codec26/conformance10;
+  all81 XML/600 tests inspected.
+- [BOTH39471331117](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39471331117),
+  standard118795865012/delegation118795865668: contracts220/runtime380/testkit196/
+  app417 EACH, failsafe23/28; all164 XML per lane (1236/1241 tests) inspected.
+  Actual standard3/delegation8/core1/audit-process4/HTTP7/manual-process8 EACH
+  pass, all five strict pre/post markers present. Matching-profile checker reruns
+  against both actual archives, with all four recovery flags, pass without skips.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| dedicated12287062914 | 844978 | 42d3763b48d75dd4cbac755665933e17d757faee24d69a1507270776226ced44 |
+| standard12288475138 | 2627917 | a227ddad856fb0db1485b07494c215bdc27be110af8aa5d5e627525edfae76c1 |
+| delegation12288300357 | 2626241 | 28bf292e2b1e7ac1e07ead41a7bd9dc7348c56163feafdd64c848039b01fc992 |
+
+ALL three archives contain exact26 codec method names,42 originals matching
+Gitce779d1 bytes AND their reported hashes, and78 converted files independently
+reparsed and compared as typed data. The independent comparator explicitly
+refuses bool/int/string coercion while comparing exact numeric values. Profiles
+are exactly released8/development34; precisely three SCHEMA_INVALID controls
+refuse and have no converted file. The alias fixture is now correctly expanded.
+All three actual alias-sdk-observation files contain the exact wrong original
+SDK output, correct materialized output and expected data described above.
+
+All three also retain the unchanged official21-scenario report/11 observations,
+and earlier42-source model report/48 outputs/74 successful SDK exports/two
+writer diagnostics. The78 source-data conversions are distinct from the74 SDK
+model serializations; no SDK failure is erased. Only the previously admitted two
+wrong noncompeting-fork fingerprints are equivalent for regression comparison,
+always DIVERGED, with actual output/order retained. Official CTK remains nine
+MATCH/two DIVERGED among eleven executed, ten external scenarios UNMEASURED.
+
+Both strict archives retain exact process8/storage26/contracts8/HTTP7/boundary31/
+model24/allocation15 method sets, original14 audit/13 HTTP logs,32 manual worker
+logs/eight original decisions/56 recorded backend observations each and the
+correct halt/outcome/purpose matrices. No owned HTTP cleanup interruption occurs
+in these two runs. Bootstrap LogManager warnings remain in raw logs. These are
+current bounded DATA-fixture regression facts, not signed operator, production
+model/authority or atomic audit-consumer proof.
+
+Later evidence updates change only handoff/tracking/CHANGELOG. Code, resources,
+schema, contract and acceptance trees stay unchanged from testedce779d1. #55 is
+still frozen with no current Claude review; #53 d38776c/#56 26def97 are unchanged.
+Durable authoring/approved materialization/reference/publication callers, broader
+YAML/SDK/external CTK semantics, substitution and owner/peer/final PR gates stay
+open. WP-605/H01/H02 partial, tracking11 completed/13 partial/29 not started,
+acceptance3/39. No activation, second GPT PR, merge or status promotion.
