@@ -286,6 +286,7 @@ Implementation status: **partial**.
 - Implemented: JWT verification, scoped grants, replay protection, RFC 8693 client, mounted-secret rotation and wait reauthorization are implemented.
 - Implemented: T07 is automated using in-process stand-ins; issuer interoperability is not proven.
 - Implemented: 102a audit endpoints bind verified caller subject/kind/scopes before querying; GPT reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858 with green audit CI.
+- Implemented: Strict Keycloak consumer a20b1b2 integrated into GPT #40; both strict Java preflights and 55 tool tests pass. Combined-head full/matrix CI pending. GPT review requests H3 verified actor expiry and H4 durable exact issuer+jti-to-grant/chain binding; another equivalent active grant must not revive a revoked credential. WP-102 remains partial; skipped or historical characterization tests do not close it.
 
 PR #40 integrates reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858. KeycloakInteropIT is characterization only; all ten cases were skipped in build run 39262137012. Separate non-skipped characterization CI is wired; strict H1/H2 consumer cases and WP-102 closure remain open. No merge to main or real-provider pass is claimed.
 
@@ -296,6 +297,9 @@ Remaining gates:
 - If the Vault path is selected, implement and run the quarkus-vault 4.9.0 integration/renewal/rotation test required by ADR 0021; mounted static secrets remain the implemented path.
 - Implement ADR 0021 H1 strict native Keycloak delegation compatibility without an actorless fallback; retain all user/actor/tenant/scope/audience/expiry/replay checks.
 - Supply KeycloakStandardIT and KeycloakDelegationIT under the Claude-owned identity test package and pass the H2 real-Java evidence matrix; missing or skipped tests do not close WP-102.
+- H3: bound the actual bearer by independently verified actor expiry as well as subject/grant/300s.
+- H4: bind issuer+jti durably to the exact issuing grant/ancestor chain; equivalent grants must not revive authority after revocation.
+- Obtain exact combined-head strict matrix/full CI and independent Claude review; preserve partial status for outstanding acceptance.
 
 Evidence: [docs/identity.md](../../docs/identity.md), [docs/audit.md](../../docs/audit.md), [docs/handoffs/gpt/WP-102.md](../../docs/handoffs/gpt/WP-102.md)
 
