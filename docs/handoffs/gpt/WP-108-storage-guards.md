@@ -26,9 +26,14 @@ Five new PostgreSQL cases compile: complete state-pair matrix (including final
 and repeated states), immutable identity/replay binding, irreversible attempts
 and outcome evidence, refusal of forged initial outcomes/attempts, and retained
 intent/event/compensation evidence. The original component and process-kill T03
-assertions remain. Local app reactor test-compile succeeds; SQL execution and
-upgrade/regression evidence are pending Linux CI. These cases are not claimed
-passing merely because compilation passed.
+assertions remain. Local app reactor test-compile succeeds. Exact199cf5b
+workflow39374918657 SUCCESS BOTH Linux lanes; complete job logs inspected:
+EffectLedgerGuardTest5, existing DurableEffectsTest12 and JdbcEffectLedgerTest4,
+standard3/native8, all zero failures/errors/skips; both strict evidence checkers
+pass. The new SQL guards are now executed, not compile-only. This matrix runs
+the selected provider IT, so it does not re-execute process-kill T03; final
+implementation PR full CI must retain that existing regression gate. Later
+tracing changes have their own new execution/review requirement.
 
 The authority/PEP/manual/central-audit request remains WP-108-authority.md.
 Governed adapters, actual Flow re-execution, old-owner/partition windows, full
