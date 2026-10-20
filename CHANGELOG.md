@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-107 preparation: four actual SDK full-workflow listen-group cases establish ALL order/overlap and negative controls for ANY post-completion mutation and concurrent foreach/until completion. All four fixtures validate; these observations do not close durable delivery, FIFO or T13 gates.
+
 This log records implemented capabilities and their requirement coverage. Entries describe unreleased development work.
 A merged component or passing acceptance case does not close an entire platform requirement. The full
 remaining checklist is [TODO.md](TODO.md); implementation status is maintained in
