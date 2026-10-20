@@ -185,6 +185,10 @@ Contract for Claude's implementation:
    grant dependencies at delegated admission; every ancestor live; one-use replay
    and policy/audit failure closed. A missing binding is never reconstructed by
    searching for an equivalent active grant. See the GPT H4 review on #39.
+   Delegated resource admission must independently enforce `exp > now` and
+   `iat <= now+5s`, with positive signed lifetime at most 300s. Do not inherit
+   ordinary JWT verification's expiry tolerance as extra delegated authority.
+   Recheck time after slow binding/grant reads, before replay-use/admission.
 5. Preserve meaningful adversarial tests. Replace the superseded actor-output-exp
    refusal expectation explicitly; retain historical failure evidence. Add missing,
    stale, future and expired actor cases, actor aging/expiry while the issuer is

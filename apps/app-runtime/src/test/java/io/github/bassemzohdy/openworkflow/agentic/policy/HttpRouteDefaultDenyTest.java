@@ -58,14 +58,16 @@ class HttpRouteDefaultDenyTest {
         assertTrue(routes.size() >= 10, () -> "route discovery found too few routes: " + routes);
         List<String> failures = new ArrayList<>();
         for (String route : routes) {
-            String[] parts = route.split(" ", 2);
+            String[] parts = route.split(" ", 3);
             String path = parts[1];
+            String contentType = parts[2];
             if (PUBLIC.keySet().stream().anyMatch(path::startsWith)) {
                 continue;
             }
-            int status = given().redirects().follow(false).contentType("application/json").body("{}")
+            route = parts[0] + " " + path; // the report names the route, not the probe media type
+            int status = given().redirects().follow(false).contentType(contentType).body("{}")
                     .when().request(parts[0], path).statusCode();
-            if (KNOWN_GAPS.contains(route)) {
+            if (KNOWN_GAPS.contains(parts[0] + " " + path)) {
                 if (status == 401) {
                     failures.add(route + " is now authenticated: remove it from KNOWN_GAPS");
                 }
@@ -94,10 +96,23 @@ class HttpRouteDefaultDenyTest {
                 }
                 Path sub = m.getAnnotation(Path.class);
                 String path = "/" + trim(base.value()) + (sub == null ? "" : "/" + trim(sub.value()));
-                found.add(verb + " " + path.replaceAll("/+", "/").replaceAll("\\{[^}/]+\\}", "01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+                found.add(verb + " " + path.replaceAll("/+", "/").replaceAll("\\{[^}/]+\\}", "01ARZ3NDEKTSV4RRFFQ69G5FAV")
+                        + " " + consumes(type, m));
             }
         }
         return new ArrayList<>(found);
+    }
+
+    /** The media type the route consumes: the method's {@code @Consumes}, else the class's, else JSON. */
+    private static String consumes(Class<?> type, Method m) {
+        jakarta.ws.rs.Consumes declared = m.getAnnotation(jakarta.ws.rs.Consumes.class);
+        if (declared == null) {
+            declared = type.getAnnotation(jakarta.ws.rs.Consumes.class);
+        }
+        if (declared == null || declared.value().length == 0 || declared.value()[0].contains("*")) {
+            return "application/json";
+        }
+        return declared.value()[0];
     }
 
     private static String trim(String s) {

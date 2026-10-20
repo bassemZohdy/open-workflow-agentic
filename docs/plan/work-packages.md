@@ -289,6 +289,7 @@ Implementation status: **partial**.
 - Implemented: Strict Keycloak consumer a20b1b2 integrated into GPT #40; both strict Java preflights and 55 tool tests pass. Combined-head full/matrix CI pending. GPT review requests H3 verified actor expiry and H4 durable exact issuer+jti-to-grant/chain binding; another equivalent active grant must not revive a revoked credential. WP-102 remains partial; skipped or historical characterization tests do not close it.
 - Implemented: Strict matrix39354646523 at665547e: standard3/3 and delegation6/6 real-provider cases pass non-skipped with matching evidence checkers; full CI39354646488 green. H3 actor expiry and H4 exact grant/chain binding still block acceptance; latest0aeb52f route inventory integrated and new combined CI required.
 - Implemented: H3 actor-expiry bound at Claude b0e3b18: full CI39355478836/34 exchanger cases pass. V65 H4 schema provided in GPT f97f193; five direct SQL cases pass in full CI39356040766 atd05fc17. H4 product consumer is still open.
+- Implemented: ADR0021 H3 freshness direction selected for implementation, explicitly superseding actor-output-exp acceptance only when replacement including H4 passes. Old strict baseline remains; current #39 1abcfbd is reviewed as incompatibility evidence only, not provider acceptance.
 
 PR #40 integrates reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858. KeycloakInteropIT is characterization only; all ten cases were skipped in build run 39262137012. Separate non-skipped characterization CI is wired; strict H1/H2 consumer cases and WP-102 closure remain open. No merge to main or real-provider pass is claimed.
 
@@ -301,7 +302,8 @@ Remaining gates:
 - Supply KeycloakStandardIT and KeycloakDelegationIT under the Claude-owned identity test package and pass the H2 real-Java evidence matrix; missing or skipped tests do not close WP-102.
 - Obtain exact combined-head strict matrix/full CI and independent Claude review; preserve partial status for outstanding acceptance.
 - Integrate H4 exact issuer+jti binding consumer with expiry/tenant equality, live exact grant/ancestor checks and conflict/outage/revocation tests; V64 must integrate before V65 on main.
-- Native strict matrix39356040764 fails a real overlong-input response despite H3 enforcement. Prove deterministic legitimate bounded positive credentials and actual short-actor refusal, or retain provider compatibility as partial/failed; do not weaken guarantees.
+- Implement actor freshness before request and after slow binding/audit before release, strict signed subject/grant/output bounds and independent resource exp>now/iat<=now+5s admission; resolve H4 metadata/commit/conflict/null-dependency findings and prove deterministic non-skipped native success under the amended contract. Old actor-output-exp tests are historical, not transferable passes.
+- Fix the supported-media route discovery probe with Claude: combined bf3e9f4 CI39358079308/matrix39358079363 fail on CloudEvents route415 from hardcoded ordinary JSON; retain401 requirement and all routes. FaultProxyPostgresTest2/2 passes.
 
 Evidence: [docs/identity.md](../../docs/identity.md), [docs/audit.md](../../docs/audit.md), [docs/handoffs/gpt/WP-102.md](../../docs/handoffs/gpt/WP-102.md)
 
