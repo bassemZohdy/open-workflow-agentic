@@ -38,6 +38,10 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
   and add an isolated real-Keycloak Java CI matrix with missing/skipped-evidence rejection. The Java
   identity tests remain Claude-owned; harness availability does not complete provider interoperability.
 
+- Split the 42 unfinished packages into GPT and Claude backlogs with 21 primary owners each, reciprocal
+  reviews, explicit prerequisite handoffs and exclusive write areas. Generate both queues in TODO.md and
+  validate assignment coverage, reviewer independence, dependency cycles and reserved-path conflicts.
+  These assignments do not add product capability or acceptance coverage.
 - Reconcile all 53 work packages and 64 requirements with merged code and evidence. Keep component completion,
   partial integration and unstarted work explicit. Generate TODO.md and progress pages from the plan JSON;
   CI checks for stale documents and unsupported completion claims.
