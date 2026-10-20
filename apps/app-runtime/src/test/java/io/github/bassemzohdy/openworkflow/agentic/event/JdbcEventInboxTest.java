@@ -25,7 +25,7 @@ class JdbcEventInboxTest {
     private InstanceRecord instance(boolean waiting) {
         String tenant = "inbox-test-" + UUID.randomUUID();
         StartRequest request = new StartRequest(tenant, new Subject(SubjectKind.USER, "alice"),
-                new DefinitionRef("inbox-test", "1"), Map.of(), "start");
+                new DefinitionRef("agentic/inbox-test", "1"), Map.of(), "start");
         InstanceRecord row = store.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(), request,
                 Instant.now()), "test.start").record();
         row = move(row, InstanceStatus.RUNNING, null);
