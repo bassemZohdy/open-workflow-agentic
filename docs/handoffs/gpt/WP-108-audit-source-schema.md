@@ -49,3 +49,21 @@ the FK, delete fixtures or accept an unexpected successful TRUNCATE. Writer-role
 permission-denial tests remain distinct. GPT leaves your audit tests unchanged.
 Please review the proposed DDL through this handoff before GPT moves the SAME
 SQL into V75 in db/migration in ordered V71/V72/V73/V74/V75 integration.
+
+## Exact proposed-schema execution
+
+reviewer=GPT; verified SHA=4a45515d7910e77f604fec1b151631531f13ec7c.
+Verdict PASS the six proposed-schema cases; activation/consumer/whole-package
+gates remain OPEN. BOTH39399264703 SUCCESS. Inspected finished
+standard118549605277/native118549604764 logs: AuditSourceBindingSchemaTest6,
+binding17, group11, core process1 in each lane, standard3/native8 and strict
+checkers pass, zero failures/errors/skips. This proves actual proposed DDL on
+cloned foundations, NOT an applied V75, appendOnce consumer, durable producer,
+real commit-loss/readback or one-head concurrency protocol. Main54 postmerge
+full39398700002/BOTH39398724222 also SUCCESS (all three logs inspected).
+
+Sole GPT #55 remains frozenea56f3319d0e896d54703d9f4d857252906ed2a4:
+full39399896351/BOTH39399894929 SUCCESS. GPT inspected all three finished logs:
+actual group SQL11/snapshot6/SDK observations4, core process1 per strict lane,
+standard3/native8/checkers, zero failures/errors/skips. Exact Claude review
+still required; no transfer of this evidence to a later edit or preparation.

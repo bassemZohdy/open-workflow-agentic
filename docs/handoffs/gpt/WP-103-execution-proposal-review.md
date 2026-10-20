@@ -63,3 +63,36 @@ GPT retains storage, entry linearization, cancellation-race and manual-resolutio
 API work. Claude retains read-only graph inspection, current identity/PEP and
 node/output consumer work. Final actual workflow/restore/concurrent-entry/uncertain
 commit/model-no-repeat/owner-loss evidence remains open; no package promotion.
+
+## Pinned source findings for the shared adapter contract
+
+Read primary Maven source artifacts langgraph4j-postgres-saver/core1.9.5 in
+ignored target; no POM/SDK upgrade or third-party source committed. Current
+ResearchAgent uses PostgresSaver (not PostgresSaverV2). Its selected
+v1.1__init.sql gives UUID thread_id and checkpoint_id; thread_name is varchar255.
+PostgresSaver.insertCheckpoint passes encodeState via setString into TEXT
+state_data. StdSerializer.writeDataAsString uses standard padded Base64 over
+Java-serialized bytes; content type is application/octet-stream. Therefore
+raw SQL TEXT bytes and decoded Java stream bytes are DIFFERENT hash inputs.
+The exact representation must be pinned once in a shared helper, without
+calling the object deserializer during inspect.
+
+PostgresSaver.releaseCheckpointsOnError calls releaseCheckpoints too: released
+alone is NOT completion. Inspect needs actual terminal-node/next-node/parent/run
+consistency, plus real thrown-node tests. AbstractPostgresSaver.updatedCheckpoint
+and v1.1 sqlUpdateCheckpoint can UPDATE state and replace checkpoint ids; the
+backend is not an immutable-table guarantee. A retained association must pin
+exact UUIDs and verify content on every release, refuse disappearance/change and
+never fall back to a latest checkpoint or another graph invocation.
+
+GPT proposes the interim research-v1 digest over CanonicalEncoder domain
+oa.agent.research.output.v1, text(application/octet-stream), text(EXACT retained
+canonical Base64 state_data). No deserialize or semantic reserialization. Bound
+the encoded state before fetching/hashing; reject invalid/unpadded/noncanonical
+Base64 and unsupported content type. The backend profile is explicitly pinned
+to LangGraph4j1.9.5/PostgresSaver schema1.1/ObjectStream serialization. Full entry
+= bound ResourceCallScope + positive execution epoch; association = that exact
+entry/profile + physical run UUID + checkpoint UUID + content type + digest.
+This is data consistency, not terminal proof, current authority or permission.
+The transient private fence remains separate, bound to the exact entry and
+composing BOTH owner/registry/target and live CallerAuthority at every boundary.
