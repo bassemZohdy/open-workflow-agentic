@@ -1,5 +1,7 @@
+# WP-103: what a failing research node leaves (ResearchRunInspector)
 
-## Measured: what a failing node leaves (ResearchRunInspector)
+Companion to the execution-adapter proposal (branch claude/WP-103-execution-proposal).
+
 
 Measured with the real graph, a scripted model and the real checkpoint tables (`ResearchRunInspectorTest`):
 
