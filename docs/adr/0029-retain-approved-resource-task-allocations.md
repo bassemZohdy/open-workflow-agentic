@@ -62,12 +62,15 @@ The extra retained record needs foreign-key retention and explicit archival/
 restore policy. Goal/owner/config data is confidential; use bounded approved
 references, datasource access controls and current authorization before exposing
 it. Fingerprints are not secrecy or storage authenticity. Direct calls still need
-their own genuine authorized allocation and remain refused until supplied.
+their own genuine authorized allocation; their consumer MUST refuse until it is
+supplied. That required refusal is not implemented by these data records.
 
 ## Verification and adoption gates
 
-Local contract and preflight/codec tests execute; proposed SQL/store tests are
-compiled for real PostgreSQL CI. The handoff records exact current results and
+Local contract and preflight/codec tests execute. At exact product 1ae6886,
+BOTH39426839423 passes all 15 proposed SQL/store cases in EACH Linux PostgreSQL
+lane, with full logs/all actual XML inspected; the handoff records counts and
+remaining gate scope. The handoff records exact current results and
 never treats compilation as database execution. Actual concurrent creation,
 changed approval, committed-reply loss, caller JTA rollback, parent/grant/clock
 refusals, historical data, corruption, retention and deployment-precondition
