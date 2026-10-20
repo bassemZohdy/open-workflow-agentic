@@ -7,6 +7,20 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ## [Unreleased]
 
+- WP-103 shared contract preparation: immutable registry/task resource-call attribution, stable invocation keys distinct from target/request fingerprints, governed thread derivation and verified issuer/jti binding port. All170 contracts pass; backend/admission/dispatch and actual workflow success remain open.
+
+- WP-107 integration: #48 merged after exact Claude approval, independent full verification and green full/strict provider CI. Group/coordinator/FIFO/foreach/until/loop, process/partition, effect and full T13 gates remain partial.
+
+- WP-107 partial: repair actual committed receipt ACKs in bounded batches before the reconciler starts restored work, preserving identity/cancellation gates and failed-repair readiness. Ten new database/reader/lifecycle cases compile; execution/review and complete distributed consumer/T13 gates remain open.
+
+- WP-107 partial: compose asynchronous receipt ACK and a fresh ownership check after actual JPA commit and before protected SDK advancement. Bounded workers leave unmarked tasks immediate;24 plain cases pass and three new real-SDK ACK/owner-loss cases compile. Current database execution, pre-restore/group recovery and full T13 remain open.
+
+- WP-107 partial: decode complete stored CloudEvents for the future SDK consumer, validate receipt metadata and preserve precise JSON/binary/null data. Six decoder and two parser unit cases pass; production coordinator/recovery and full T13 remain open.
+
+- WP-107 partial: add task-fenced matching, one audited dispatch permission per epoch and historical proof-based ACK using short transactions and one connection at a time. Unknown replies retain reservations without returning permission. Production coordinator/restore and complete T13 remain open; V69/database evidence and reciprocal review are required.
+
+- WP-107 partial: add task-scoped renewable event ownership and fence the actual SDK checkpoint with its owner/epoch. The producer/consumer coordinator, ACK-before-advance, restore/partition proof and full T13 remain open; no consumer is activated.
+
 - WP-107 partial: add retained wait identities, dispatch reservations and a checkpoint-proof acknowledgement port. SDK delivery, lost-claim fencing and full T13 remain open; the protocol is not activated.
 
 - WP-102 partial: add V65 immutable issuer/jti-to-grant schema with tenant binding and expiry retention. Product admission integration and native-provider lifetime compatibility remain open.

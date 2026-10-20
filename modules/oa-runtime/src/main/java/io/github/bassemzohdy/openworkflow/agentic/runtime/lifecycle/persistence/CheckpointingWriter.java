@@ -13,16 +13,26 @@ public final class CheckpointingWriter implements PersistenceInstanceWriter {
     private final PersistenceInstanceWriter delegate;
     private final PersistenceCommitGate gate;
     private final CheckpointCommitObserver observer;
+    private final CheckpointFinalizer finalizer;
 
     public CheckpointingWriter(PersistenceInstanceWriter delegate, PersistenceCommitGate gate, CheckpointCommitObserver observer) {
+        this(delegate,gate,observer,CheckpointFinalizer.none());
+    }
+    public CheckpointingWriter(PersistenceInstanceWriter delegate,PersistenceCommitGate gate,CheckpointCommitObserver observer,
+                               CheckpointFinalizer finalizer) {
         this.delegate = Objects.requireNonNull(delegate); this.gate = Objects.requireNonNull(gate); this.observer = Objects.requireNonNull(observer);
+        this.finalizer=Objects.requireNonNull(finalizer);
     }
     private CompletableFuture<Void> write(PersistenceCommitGate.Operation op, WorkflowContextData workflow, TaskContextData task,
                                           Supplier<CompletableFuture<Void>> action) {
         var definition = workflow.definition().id();
         var checkpoint = new CheckpointCommitObserver.Checkpoint(workflow.instanceData().id(), definition.namespace(),
                 definition.name(), definition.version(), task == null ? null : task.position().jsonPointer(), task == null ? 0 : task.iteration());
-        return gate.commit(op, action, () -> observer.committed(op, checkpoint),
+        return gate.commit(op, () -> {
+            var prepared=Objects.requireNonNull(finalizer.prepare(op,workflow,task),"prepared checkpoint finalization");
+            return Objects.requireNonNull(action.get(),"actual checkpoint future").thenCompose(
+                    __->Objects.requireNonNull(prepared.afterCommit(),"checkpoint finalization future"));
+        }, () -> observer.committed(op, checkpoint),
                 () -> op == ABORTED || workflow.instanceData().status() != io.serverlessworkflow.impl.WorkflowStatus.CANCELLED);
     }
     public CompletableFuture<Void> started(WorkflowContextData w) { return write(STARTED, w, null, () -> delegate.started(w)); }

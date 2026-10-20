@@ -1,0 +1,24 @@
+document:
+  dsl: '1.0.3'
+  namespace: agentic
+  name: atomic-receipt-test
+  version: '1.0.0'
+  title: Atomic checkpoint receipt fixture
+  summary: A durable receipt must commit with the delivered wait before the following task runs.
+input:
+  schema:
+    format: json
+    document:
+      type: object
+do:
+  - awaitDecision:
+      listen:
+        to:
+          one:
+            with:
+              type: org.openworkflow.agentic.atomic.test
+      timeout:
+        after: PT30S
+  - performEffect:
+      set:
+        effect: true

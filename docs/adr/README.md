@@ -31,4 +31,6 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 | [0024](0024-group-applications-and-library-modules.md) | Group applications and library modules | Accepted |
 | [0025](0025-acknowledge-inbox-delivery-only-after-durable-checkpoint.md) | Acknowledge inbox delivery only after a durable checkpoint | Proposed; implementation and review open |
 
+| [0026](0026-share-event-task-ownership-and-fence-checkpoints.md) | Share event-task ownership and fence the actual checkpoint | Proposed |
+
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.

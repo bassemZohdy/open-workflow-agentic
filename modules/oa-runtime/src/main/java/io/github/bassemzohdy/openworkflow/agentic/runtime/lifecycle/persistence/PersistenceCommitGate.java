@@ -66,6 +66,9 @@ public class PersistenceCommitGate implements AutoCloseable {
                 new IllegalStateException("restore from durable state after checkpoint storage is healthy"));
     }
 
+    /** A failed repair of an already committed task is also recovery-required; restart after storage/audit repair. */
+    public void recoveryFailed(Throwable failure) { fail(Operation.TASK_COMPLETED,Objects.requireNonNull(failure)); }
+
     /** Success observer is run only after actual writer success, never merely after another lifecycle listener. */
     public CompletableFuture<Void> commit(Operation operation, Supplier<CompletableFuture<Void>> write, Runnable committed) {
         return commit(operation, write, committed, () -> true);

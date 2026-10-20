@@ -87,3 +87,52 @@ proxy still must restart on its same port and exchange bytes/SQL successfully.
 All seven plain unit cases pass locally; local DB execution unavailable. New full
 CI and exact-head Claude review are required;36a057c review request is superseded
 by the published current head. Main is unchanged. No required check was waived.
+
+### Plan integrated after exact current review
+
+GPT merged #35 exact747ce7edea1cf03bf892773b84c1259912109d7a to main as
+c01cef4066648ab7313d0b6bd97337b1fc38e56c. Claude6282864843 explicitly APPROVED
+that SHA after tools/generated checks, TCP/JDBC tests and full delta review,
+with no findings; required full CI39360512505 SUCCESS. Commands: gh pr view35
+head/base/checks/mergeability; git ls-remote origin refs/heads/main (e738218);
+gh pr merge35 --merge --match-head-commit747ce7e; gh pr view35 state/mergeCommit.
+Post-merge main build39366191268 is live. No branch deletion or starting-checkout
+update. ADR0025 stays Proposed and product acceptance remains partial.
+
+New task-ownership branch normally merged origin/main after its d9b11c2
+implementation. Four JSON array conflicts combined both sides' progress/evidence
+and remaining gates; execution_plan exactly matched merged main before its
+subsequent status update. CHANGELOG kept both histories. Generated TODO/plan
+projections were regenerated from the combined source, not selected from a
+conflict side. All68 tool cases and generated/diff checks pass. Mergee0b4076 is
+pushed; no unfinished merge state remains. Published #40/#43 review heads are
+kept steady rather than silently replacing Claude's review targets.
+
+Current #40 6a0081d full39364933849/matrix39364933841 SUCCESS (old profile,
+standard3/native7, actual cancellation2 each lane); #43 2cb33c1 full39364985191
+SUCCESS (actual checkpoint3/selection6/protocol9/cancellation2). Exact Claude
+reviews still gate integration. New #39 a1b1c0b SOURCE-PASS addresses both
+material prior findings; full39365958905/matrix39365958968 still live. Detailed
+review in PR-39-review.md and comment6282871542. No current identity/provider
+acceptance or merge is inferred from old-profile passes.
+
+### Identity and task ownership integrated after current review
+
+GPT merged #45 exactbe71f0a into #39 as712c059 after Claude6283416018 APPROVE
+and full39368834100 SUCCESS. GPT formal review5580828818 APPROVE at exact712c059
+records detached source checks and full39369999072/matrix39369999157 SUCCESS:
+native8/standard3/binding7 each lane non-skipped, acceptance12 passing/0 missing,
+index consistent. Claude6283500105 confirms current head/local equivalent code.
+GPT merged #39 to main as0aec745; starting checkout remains untouched.
+
+GPT merged #44 exacta6bcccf into #40 as2d8761f after Claude6283480485 scoped
+APPROVE and full39367327487 SUCCESS. No blocking finding; effect/consumer/T13
+gates retained. P2 audit-loss liveness is bounded by the original30s expiry;
+P3 receipt epoch is validated at write time, not an epoch-history FK. The
+successor ADR/handoff documents those clarifications; approved #44 was frozen.
+
+Parent #40 normally merges main0aec745 at0f9ba10. No product conflicts; four
+source conflicts preserve all incoming array items and existing gates before
+regenerating TODO/plan.68 tools/generated/diff checks pass. Renew exact combined
+head full/native CI and Claude review before parent integration. No blanket
+WP-102/WP-107/WP-108 completion or ADR0025/0026 acceptance follows.

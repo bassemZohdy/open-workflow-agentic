@@ -256,3 +256,24 @@ combined commit remain mandatory before GPT integrates anything.
   "recommendation":"A"
 }
 ```
+
+### Adoption record: tested pinned compatibility profile (2026-10-20)
+
+The provisional gate statements above record the decision-time state. Profile A
+is now adopted for the pinned Keycloak26.8.1 native delegation compatibility
+profile: exact #39 712c059 passed GPT5580828818 and full39369999072/matrix39369999157;
+combined #40 dbe3bd8 passed Claude6283757505/6283759173 and
+full39370961537/matrix39370996254, then GPT merged it as7c36d17. Native8,
+standard3 and exact issuing-binding7 per lane passed with zero skips. Both
+pre-send fresh actor/subject and exact signed output iat/lifetime P1s are resolved.
+No input/output metadata shortening or actorless fallback. The numeric design
+comparison and sensitivity remain unchanged; evidence, not a score, closes the
+listed H3/H4 adoption gates. B remains the refusal fallback if those controls fail.
+
+This accepts a tested compatibility profile, not general stable-provider support:
+26.8.1 delegation is preview; stable26.2.5 actorless output is deliberately
+refused. Revisit on issuer/version or authority/freshness/H4 containment changes.
+WP-102/M11 remains partial for its original asynchronous live-Flow dispatch and
+identity/correlation propagation consumer deliverable; the presence of the
+exchanger bean and context wrappers alone does not prove that end-to-end path.
+Mounted secrets remain selected; conditional Vault integration is not claimed.
