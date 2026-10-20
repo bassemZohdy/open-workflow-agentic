@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-107 storage hardening: additive V72 closes late membership INSERTs after selection and binds members to the original match set; readback also fails closed on changed membership. Thirty local plain cases pass; eleven SQL cases compile and await fresh CI. V71 remains unchanged.
+
 - WP-107 preparation: centrally sequenced V71 and task-fenced group selection retain configuration/deadline, ordered receipt memberships and stream/stop roles. Twenty-eight plain cases/app compile pass; ten PostgreSQL cases await CI. Selection grants no callback, checkpoint or ACK; full consumer/recovery/T13 stays open.
 
 - WP-107 preparation: framework-free listen-group identities preserve duplicate filter ordinals, data/until roles, wildcard ANY and pinned configuration. Receipt-match classification excludes stopping events from data; it grants no execution permission. All172 contract tests pass, including8 new cases; durable storage/coordinator and full acceptance remain open.

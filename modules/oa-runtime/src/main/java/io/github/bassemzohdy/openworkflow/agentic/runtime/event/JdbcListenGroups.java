@@ -153,7 +153,7 @@ public class JdbcListenGroups {
         });
     }
     private Recorded read(Connection c,InboxListenGroup group,long sequence) throws SQLException {
-        try(var s=statement(c,"select role,source,event_id,receipt_fingerprint,selecting_owner,selecting_epoch from inbox.listen_item where tenant=? and instance_id=? and task_digest=? and sequence=?")) {
+        try(var s=statement(c,"select role,source,event_id,receipt_fingerprint,selecting_owner,selecting_epoch,matched_slots from inbox.listen_item where tenant=? and instance_id=? and task_digest=? and sequence=?")) {
             key(s,group,1);s.setLong(4,sequence);try(var r=s.executeQuery()) {
                 if(!r.next()) throw new IllegalStateException("retained selection disappeared");
                 var receipt=message(c,group,r.getString(2),r.getString(3),false);
@@ -163,7 +163,10 @@ public class JdbcListenGroups {
                     key(members,group,1);members.setLong(4,sequence);try(var m=members.executeQuery()) {while(m.next())
                         slots.add(new Slot(group.digest(),Role.valueOf(m.getString(1)),m.getInt(2),m.getString(3)));}
                 }
+                var selectedMatches=readSlots(r.getString(7));var selection=group.classify(Set.copyOf(selectedMatches));
                 var match=group.classify(Set.copyOf(slots));
+                if(!selection.slots().equals(selectedMatches) || !selectedMatches.containsAll(slots) || selection.disposition()!=match.disposition())
+                    throw new IllegalStateException("membership was not part of the original receipt match set");
                 if(!match.slots().equals(slots) || !match.disposition().name().equals(r.getString(1))) throw new IllegalStateException("retained membership changed");
                 return new Recorded(sequence,match.disposition(),slots,receipt,r.getString(5),r.getLong(6));
             }

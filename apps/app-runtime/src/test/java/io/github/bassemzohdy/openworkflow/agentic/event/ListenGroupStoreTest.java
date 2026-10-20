@@ -154,6 +154,20 @@ class ListenGroupStoreTest {
         }
         assertEquals(1,groups.selected(f.claim,f.group,0,128).size());
     }
+    @Test void aLateInsertCannotAddAPinnedButUnmatchedSlotToAnAlreadyCommittedReceipt() throws Exception {
+        var f=fixture(Strategy.ALL,List.of(A,B),Stop.NONE,List.of());
+        groups.offer(f.claim,f.group,receipt(f,"only-a"),Set.of(f.group.slots(Role.DATA).getFirst()));
+        try(var c=data.getConnection()) {
+            c.setAutoCommit(false);
+            try(var s=c.prepareStatement("insert into inbox.listen_member(tenant,instance_id,task_digest,sequence,role,ordinal,filter_fingerprint,exclusive_slot) "
+                    +"values(?,?,?,1,'DATA',1,?,false)")) {
+                key(s,f);s.setString(4,B);
+                assertEquals("42501",assertThrows(SQLException.class,s::executeUpdate).getSQLState());
+            } finally {c.rollback();}
+        }
+        var selected=groups.selected(f.claim,f.group,0,128).getFirst();assertEquals(List.of(f.group.slots(Role.DATA).getFirst()),selected.memberships());
+        assertFalse(groups.register(f.claim,f.group,SNAPSHOT,Duration.ofMinutes(5)).captureComplete());
+    }
     private void noLocks(Fixture f) {
         assertDoesNotThrow(()->{try(var c=data.getConnection()) {c.setAutoCommit(false);
             try(var s=c.prepareStatement("select 1 from inbox.listen_group where tenant=? and instance_id=? and task_digest=? for update nowait")) {

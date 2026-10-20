@@ -3,7 +3,7 @@
 Owner: GPT. Reviewer: Claude. Preparation on gpt/WP-107-listen-groups;
 #48 remains the only active GPT implementation PR, frozen at e2e9b89.
 Normal foundation merge0c14528 retains prepared V70 before centrally allocated
-V71; V64..V70 are unchanged. Effect foundation must integrate before V71.
+V71/V72; V64..V71 are unchanged by V72. Effect foundation must integrate before V71.
 The dependency is migration ordering only: group storage uses already merged
 V68/V69 task ownership, not an unmerged identity/provider interface.
 
@@ -70,12 +70,37 @@ under a current claim; that does not authorize late execution.
 
 ## Verification and remaining full scope
 
+Implementation audit found an additional V71 gap: its member INSERT guard
+validated a pinned slot but did not close membership additions after a
+selection committed. A later valid-but-unmatched slot could therefore extend
+that historical receipt. V72 replaces only that guard function, leaving the
+pushed/possibly-applied V71 untouched. It requires the item's live selecting
+owner, an open group/current not-yet-advanced sequence, and membership in both
+the pinned registration AND the original item's complete match set. Java
+readback independently rejects members outside the retained match set and
+malformed/changed original match carriers. This is an implementation audit,
+not the mandatory independent Claude approval.
+
+The new eleventh PostgreSQL case attempts a pinned but previously unmatched
+late insertion in a transaction that always rolls back; it must receive42501
+and leave the original selection/capture state unchanged. The initial ten
+cases atbaadd56/39378344724 do not cover this missing late-insert path. All11
+compile with the final application reactor. Current V72 execution remains
+pending its own Linux run; no baseline success is transferred to the fix.
+
+Two additional plain runtime cases require ZERO database/audit access for
+duplicate/trailing/non-object snapshot JSON, changed snapshot fingerprint and
+unsupported timeout precision. Together with group9/task2, actual SDK group4,
+telemetry5/decoder6/SPI2,30 selected plain cases pass, zero skips. There is no
+local PostgreSQL listener or usable Docker daemon; SQL runtime evidence comes
+from the isolated Linux jobs, not these in-process validation cases.
+
 Final local application reactor test-compile passes. An initial pair of invalid
 compound var declarations in the new test was corrected; assertions stay.
 28 selected plain cases pass (group9/task2, actual SDK group4, telemetry5,
 decoder6, registration SPI2), zero skips. These do not execute PostgreSQL.
 
-Ten actual PostgreSQL cases compile and await Linux CI: overlapping ALL without
+The baseline ten actual PostgreSQL cases: overlapping ALL without
 legacy signal/proof; ordered fresh-store pages; concurrent ANY selection;
 stream ordinal reuse and stop precedence; expression capture never falsely
 complete; owner handover with historical configuration/attribution; changed
