@@ -26,5 +26,9 @@
   "T37": {
     "status": "planned",
     "where": "poc item 4"
+  },
+  "T03": {
+    "status": "automated",
+    "where": "apps/app-runtime:EffectCrashRecoveryIT#processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
   }
 }

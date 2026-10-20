@@ -763,13 +763,24 @@
       "reuse": [],
       "notes": "The workflow HTTP client retries below OWS retry policy by default, and restart can re-run the first unfinished task. Disable unintended client retries and require the effect ledger/idempotency contract for every external effect; do not promise exactly-once delivery to arbitrary targets.",
       "progress": {
-        "status": "not-started",
-        "implemented": [],
-        "completed_deliverables": [],
-        "remaining_tasks": [
-          "Provide a durable implementation of EffectLedger; in-memory contract doubles are not production persistence."
+        "status": "partial",
+        "implemented": [
+          "JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.",
+          "Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue."
         ],
-        "evidence": []
+        "completed_deliverables": [
+          "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
+        ],
+        "remaining_tasks": [
+          "Obtain passing CI and Claude review of the current head; T03 passed in CI run 39259523945 on the initial component head.",
+          "Integrate governed adapters and effect-aware Flow re-execution through the new execution boundary with WP-105/WP-113.",
+          "Integrate policy-verified manual decisions and central audit projection through Claude-owned handoffs; add distributed trace spans. Low-cardinality metrics and CDI ambient-rollback tests are included."
+        ],
+        "evidence": [
+          "docs/handoffs/gpt/WP-108.md",
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java"
+        ]
       }
     },
     {
