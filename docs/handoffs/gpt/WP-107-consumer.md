@@ -102,3 +102,53 @@ reordering outputs by filter ordinal. The specification does not itself settle
 every overlap/delivery detail above; the two SPI tests are the concrete pinned
 observations used for this integration design. Foreach, until and parallel/loop
 restore still need their full actual-engine failure/ordering cases.
+
+## Asynchronous ACK before checkpoint advancement
+
+CheckpointFinalizer snapshots immutable work BEFORE the mutable SDK context is
+submitted to the actual JPA writer. Only actual writer success starts the
+prepared asynchronous stage; the existing watchdog covers both. Success
+observers and the protected SDK future wait for finalization. Snapshot/write/ACK
+failure, rejection or timeout cannot release progress, including late success.
+Trusted cancellation still holds obsolete work without poisoning independent
+ABORTED cleanup. The original reader/writer strategy and exclusions remain.
+
+The production handlers compose InboxCheckpointFinalizer: unmarked operations
+complete immediately; trusted marked TASK_COMPLETED operations use two workers
+and at most16 queued jobs. No caller/event-loop thread blocks on ACK. Saturation
+fails closed through the same readiness gate. Each worker performs the actual
+proof/audit/ACK on short transactions, then a fresh registry/task-owner check
+AFTER that blocking work. No connection spans independent audit or idle waiting.
+The worker needs one connection at a time; reserve headroom for two active
+finalizations plus lifecycle/audit and other components. The watchdog may hold
+a queued/late finalization even if its later historical ACK succeeds.
+
+The three-argument writer constructor retains compatibility for isolated callers;
+the actual CDI producer explicitly installs the finalizer. Its prepare captures
+trusted marker values rather than reading later-mutated task/metadata objects.
+No public event field installs markers. This wires the checkpoint hook, NOT a
+production event consumer/router or a pre-restore repair coordinator.
+
+Local checks:24 selected plain cases pass (writer5/gate8/actual SDK lifecycle1,
+decoder6/parser2/registration SPI2), zero skips. Application reactor test-compile
+passes. Three additional real-SDK/JPA cases compile: block the actual ACK audit
+after task/proof commit and prove next-task wait; fail ACK and repair later
+without resurrecting the failed continuation; change owner AFTER checkpoint
+during ACK and prove historical ACK grants no old continuation. Existing eight
+SDK cases are unchanged in their assertions. These11 database cases passed
+both lanes at50ce5af in39373064706, independently of #46's eight-case pass.
+
+Pre-restore ACK repair, full group/membership/fan-out/winner/FIFO/foreach/until,
+new-owner reconstruction, every later continuation/effect fence, process and
+partition proof, loop/parallel reader handling and complete T13 remain open.
+The after-ACK owner check is a local boundary check, not a lease spanning every
+later observer/effect. No marker-free task is treated as consumed event evidence.
+
+Exact50ce5af executed in39373064706 SUCCESS BOTH lanes: actual SDK/JPA11,
+owned10, writer5, native8/standard3, all zero skips. Logs independently inspected;
+the three ACK/after-checkpoint-owner cases are now executed, not compile-only.
+The next repair increment and its separate scoped evidence/remaining gates are
+in [WP-107-recovery.md](WP-107-recovery.md). Do not transfer this11-case pass
+to unexecuted work. The later original-reader/pre-start-repair and lifecycle
+cases now also passed both lanes ataf5df6e in39374605698: recovery5/lifecycle5,
+zero failures/errors/skips. See the repair handoff for exact evidence and limits.

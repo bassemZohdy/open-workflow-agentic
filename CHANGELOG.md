@@ -23,6 +23,10 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 - WP-108 partial: publish an explicit effect scope/registry-owner contract that preserves existing recovery keys, plus the current authority/manual-policy/central-audit handoff. Four scope and two existing key cases pass; no effect/operator consumer or package gate is activated by the value type.
 
+- WP-107 partial: repair actual committed receipt ACKs in bounded batches before the reconciler starts restored work, preserving identity/cancellation gates and failed-repair readiness. Ten new database/reader/lifecycle cases compile; execution/review and complete distributed consumer/T13 gates remain open.
+
+- WP-107 partial: compose asynchronous receipt ACK and a fresh ownership check after actual JPA commit and before protected SDK advancement. Bounded workers leave unmarked tasks immediate;24 plain cases pass and three new real-SDK ACK/owner-loss cases compile. Current database execution, pre-restore/group recovery and full T13 remain open.
+
 - WP-107 partial: decode complete stored CloudEvents for the future SDK consumer, validate receipt metadata and preserve precise JSON/binary/null data. Six decoder and two parser unit cases pass; production coordinator/recovery and full T13 remain open.
 
 - WP-107 partial: add task-fenced matching, one audited dispatch permission per epoch and historical proof-based ACK using short transactions and one connection at a time. Unknown replies retain reservations without returning permission. Production coordinator/restore and complete T13 remain open; V69/database evidence and reciprocal review are required.

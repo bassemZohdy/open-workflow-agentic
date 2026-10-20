@@ -11,6 +11,22 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 class CheckpointingWriterTest {
+    private record Contexts(WorkflowContextData workflow,TaskContextData task) { }
+    private static Contexts contexts(AtomicInteger iteration,java.util.function.Supplier<WorkflowStatus> status) {
+        var definition=fixture(WorkflowDefinitionData.class,Map.of("id",new WorkflowDefinitionId("agentic","orders","1")));
+        var instance=fixture(WorkflowInstanceData.class,Map.of("id","engine-1","status",status));
+        var workflow=fixture(WorkflowContextData.class,Map.of("definition",definition,"instanceData",instance));
+        var position=fixture(WorkflowPosition.class,Map.of("jsonPointer","do/0/listen"));
+        var task=fixture(TaskContextData.class,Map.of("position",position,"iteration",(java.util.function.Supplier<Integer>)iteration::get));
+        return new Contexts(workflow,task);
+    }
+    private static PersistenceInstanceWriter writing(CompletableFuture<Void> actual,AtomicInteger calls) {
+        return (PersistenceInstanceWriter)Proxy.newProxyInstance(PersistenceInstanceWriter.class.getClassLoader(),
+                new Class<?>[]{PersistenceInstanceWriter.class},(p,m,args)-> {
+                    if(m.getName().equals("close")) return null;
+                    calls.incrementAndGet();return actual;
+                });
+    }
     @SuppressWarnings("unchecked")
     static <T> T fixture(Class<T> type, Map<String, Object> fields) {
         return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, args) -> {
@@ -65,6 +81,78 @@ class CheckpointingWriterTest {
             assertEquals(EnumSet.allOf(PersistenceCommitGate.Operation.class), EnumSet.copyOf(operations));
             assertEquals(9, operations.size());
             writer.close(); assertEquals("close", called.getLast());
+        }
+    }
+
+    @Test void capturesBeforeWriterSubmissionThenWaitsForActualCommitAndAsynchronousAckBeforeReleasingProgress() {
+        var iteration=new AtomicInteger(7);var c=contexts(iteration,()->WorkflowStatus.RUNNING);
+        var actual=new CompletableFuture<Void>();var ack=new CompletableFuture<Void>();
+        var writes=new AtomicInteger();var finished=new AtomicInteger();var observed=new AtomicInteger();
+        try(var gate=new PersistenceCommitGate(Duration.ofSeconds(2),Clock.systemUTC())) {
+            var writer=new CheckpointingWriter(writing(actual,writes),gate,(op,id)-> {
+                assertEquals(7,id.iteration());observed.incrementAndGet();
+            },(op,w,t)-> {
+                assertEquals(0,writes.get(),"snapshot must precede handing the mutable task to the writer");
+                int captured=t.iteration();
+                return ()->{ assertEquals(7,captured);finished.incrementAndGet();return ack; };
+            });
+            var stage=writer.taskCompleted(c.workflow,c.task);iteration.set(8);
+            assertEquals(1,writes.get());assertEquals(0,finished.get());assertFalse(stage.isDone());
+            actual.complete(null);
+            assertEquals(1,finished.get());assertEquals(0,observed.get());assertFalse(stage.isDone());
+            assertTrue(gate.status().healthy());
+            ack.complete(null);
+            assertTrue(stage.isDone());assertEquals(1,observed.get());assertTrue(gate.status().healthy());
+        }
+    }
+
+    @Test void failedOrTimedOutAckNeverReleasesTheAlreadyCommittedCheckpointEvenOnLateSuccess() throws Exception {
+        for(boolean timeout:new boolean[]{false,true}) {
+            var c=contexts(new AtomicInteger(1),()->WorkflowStatus.RUNNING);
+            var ack=new CompletableFuture<Void>();var observed=new AtomicInteger();var writes=new AtomicInteger();
+            try(var gate=new PersistenceCommitGate(Duration.ofMillis(80),Clock.systemUTC())) {
+                var writer=new CheckpointingWriter(writing(CompletableFuture.completedFuture(null),writes),gate,
+                        (op,id)->observed.incrementAndGet(),(op,w,t)->()->ack);
+                var stage=writer.taskCompleted(c.workflow,c.task);
+                assertEquals(1,writes.get());assertFalse(stage.isDone());
+                if(!timeout) ack.completeExceptionally(new IllegalStateException("ACK unavailable"));
+                assertTimeoutPreemptively(Duration.ofSeconds(2),()-> { while(gate.status().healthy()) Thread.sleep(5); });
+                if(timeout) assertTrue(ack.complete(null));
+                assertFalse(stage.isDone());assertEquals(0,observed.get());assertFalse(gate.status().healthy());
+            }
+        }
+    }
+
+    @Test void snapshotOrActualWriteFailureNeverRunsPostCommitAckOrObserver() {
+        for(boolean snapshotFailure:new boolean[]{false,true}) {
+            var c=contexts(new AtomicInteger(1),()->WorkflowStatus.RUNNING);
+            var writes=new AtomicInteger();var after=new AtomicInteger();var observed=new AtomicInteger();
+            try(var gate=new PersistenceCommitGate(Duration.ofSeconds(2),Clock.systemUTC())) {
+                var writer=new CheckpointingWriter(writing(CompletableFuture.failedFuture(new IllegalStateException("write failed")),writes),
+                        gate,(op,id)->observed.incrementAndGet(),(op,w,t)-> {
+                            if(snapshotFailure) throw new IllegalStateException("bad marker snapshot");
+                            return ()->{after.incrementAndGet();return CompletableFuture.completedFuture(null);};
+                        });
+                assertFalse(writer.taskCompleted(c.workflow,c.task).isDone());
+                assertFalse(gate.status().healthy());assertEquals(snapshotFailure?0:1,writes.get());
+                assertEquals(0,after.get());assertEquals(0,observed.get());
+            }
+        }
+    }
+
+    @Test void cancellationDuringAckHoldsTheStageWithoutPoisoningIndependentCleanup() {
+        var status=new java.util.concurrent.atomic.AtomicReference<>(WorkflowStatus.RUNNING);
+        var c=contexts(new AtomicInteger(1),status::get);var ack=new CompletableFuture<Void>();
+        var observed=new ArrayList<PersistenceCommitGate.Operation>();
+        try(var gate=new PersistenceCommitGate(Duration.ofSeconds(2),Clock.systemUTC())) {
+            var writer=new CheckpointingWriter(writing(CompletableFuture.completedFuture(null),new AtomicInteger()),gate,
+                    (op,id)->observed.add(op),(op,w,t)->()->op==PersistenceCommitGate.Operation.TASK_COMPLETED
+                            ?ack:CompletableFuture.completedFuture(null));
+            var stage=writer.taskCompleted(c.workflow,c.task);status.set(WorkflowStatus.CANCELLED);
+            ack.completeExceptionally(new IllegalStateException("cancelled while ACK unavailable"));
+            assertFalse(stage.isDone());assertTrue(gate.status().healthy());assertTrue(observed.isEmpty());
+            assertTrue(writer.aborted(c.workflow).isDone());
+            assertEquals(List.of(PersistenceCommitGate.Operation.ABORTED),observed);assertTrue(gate.status().healthy());
         }
     }
 }
