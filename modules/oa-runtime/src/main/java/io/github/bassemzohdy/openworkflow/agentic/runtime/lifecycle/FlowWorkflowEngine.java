@@ -25,6 +25,10 @@ public class FlowWorkflowEngine implements WorkflowEngine {
     @Inject
     WorkflowApplication application;
 
+    public FlowWorkflowEngine() { }
+    /** Explicit application binding for isolated runtimes; CDI keeps the existing injected application. */
+    public FlowWorkflowEngine(WorkflowApplication application) { this.application=java.util.Objects.requireNonNull(application); }
+
     @Override
     public boolean hasDefinition(DefinitionRef definition) {
         return definition(definition).isPresent();

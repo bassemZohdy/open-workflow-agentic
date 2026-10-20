@@ -7,6 +7,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.event.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.event.*;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.*;
 import io.quarkiverse.flow.persistence.jpa.*;
@@ -44,6 +45,7 @@ class AtomicInboxCheckpointTest {
     @Inject DataSource dataSource;
     @Inject JdbcInboxTaskLease taskLeases;
     @Inject JdbcOwnedInbox owned;
+    @Inject AuditTrail audit;
 
     record Listening(WorkflowContext workflow, TaskContext task) { }
     static class Broker extends InMemoryEvents {
@@ -93,16 +95,33 @@ class AtomicInboxCheckpointTest {
     @Test void cancellationContendingWithAnActualCheckpointHoldingItsSdkAndRegistryLocksCompletesWithoutDeadlock() throws Exception {
         execute(Mode.CHECKPOINT_WINS_CANCELLATION);
     }
-    enum Mode { COMMIT, HANDOVER, CANCEL, TASK_HANDOVER, TASK_EXPIRED, TASK_DELAYED_EXPIRED, RESERVATION_WON_DEADLINE, CHECKPOINT_WINS_CANCELLATION }
+    @Test void committedSdkTaskCannotAdvanceWhileItsRealReceiptAckAuditIsBlocked() throws Exception { execute(Mode.ACK_DELAY); }
+    @Test void failedReceiptAckHoldsProgressButPreservesTheActualCommittedTaskAndProofForRepair() throws Exception { execute(Mode.ACK_FAILURE); }
+    @Test void taskOwnerLostAfterCheckpointDuringAckCannotReleaseTheOldContinuation() throws Exception { execute(Mode.ACK_OWNER_LOSS); }
+    enum Mode { COMMIT, HANDOVER, CANCEL, TASK_HANDOVER, TASK_EXPIRED, TASK_DELAYED_EXPIRED, RESERVATION_WON_DEADLINE, CHECKPOINT_WINS_CANCELLATION,
+        ACK_DELAY, ACK_FAILURE, ACK_OWNER_LOSS }
 
     private void execute(Mode mode) throws Exception {
         assertInstanceOf(InboxCheckpointJpaOperations.class,operations);
-        try(var gate = new PersistenceCommitGate(Duration.ofSeconds(15),Clock.systemUTC()); var broker = new Broker()) {
+        boolean finalizing=Set.of(Mode.ACK_DELAY,Mode.ACK_FAILURE,Mode.ACK_OWNER_LOSS).contains(mode);
+        var ackEntered=new CompletableFuture<Void>();var releaseAck=new CompletableFuture<Void>();
+        var ackService=new JdbcOwnedInbox(dataSource,taskLeases,inbox,proof,e->{
+            if(e.action().equals("event.checkpoint.observed")) {
+                ackEntered.complete(null);
+                try { releaseAck.get(10,TimeUnit.SECONDS); }
+                catch(InterruptedException error) { Thread.currentThread().interrupt();throw new IllegalStateException("ACK audit interrupted",error); }
+                catch(ExecutionException | TimeoutException error) { throw new IllegalStateException("ACK audit not released",error); }
+                if(mode==Mode.ACK_FAILURE) throw new IllegalStateException("injected ACK audit failure");
+            }
+            audit.record(e);
+        },Clock.systemUTC());
+        try(var gate = new PersistenceCommitGate(Duration.ofSeconds(15),Clock.systemUTC()); var broker = new Broker();
+            var finalizer=new InboxCheckpointFinalizer(ackService,taskLeases)) {
             var next = new CompletableFuture<Void>(); var releaseNext = new CompletableFuture<Void>();
             var cleaned = new CompletableFuture<Void>();
             var guarded = new CheckpointingWriter(borrowedWriter(),gate,(op,id)-> {
                 if (op == PersistenceCommitGate.Operation.COMPLETED) cleaned.complete(null);
-            });
+            },finalizing?finalizer:CheckpointFinalizer.none());
             try(var app = WorkflowApplication.builder().withId("atomic-"+UUID.randomUUID()).withEventConsumer(broker)
                     .disableLifeCycleCEPublishing().disableStatusChangePublishing()
                     .withListener(new WorkflowPersistenceListener(guarded))
@@ -184,6 +203,33 @@ class AtomicInboxCheckpointTest {
                     broker.publish(CloudEventBuilder.v1().withId(message.eventId()).withSource(URI.create(message.source()))
                             .withType(message.type()).withData("application/json",message.dataJson().getBytes(StandardCharsets.UTF_8))
                             .build()).get(10,TimeUnit.SECONDS);
+                    if(finalizing) {
+                        ackEntered.get(10,TimeUnit.SECONDS);
+                        assertTrue(proof.consumed(wait,message),"ACK starts only after the actual JPA task/proof commit");
+                        assertTrue(QuarkusTransaction.requiringNew().call(()->em.find(CompletedTaskEntity.class,key)!=null));
+                        assertFalse(next.isDone(),"the committed SDK task cannot release its next task before ACK");
+                        assertFalse(completed.isDone());assertTrue(gate.status().healthy());
+                        assertEquals("DISPATCHED",deliveryState(wait));
+                        if(mode==Mode.ACK_OWNER_LOSS) {
+                            assertTrue(taskLeases.release(lease.claim()));
+                            var replacement=taskLeases.acquire(wait.task(),"post-commit-owner",Duration.ofSeconds(30)).orElseThrow();
+                            cleanup.add(replacement.claim());
+                        }
+                        releaseAck.complete(null);
+                        if(mode!=Mode.ACK_DELAY) {
+                            assertTimeoutPreemptively(Duration.ofSeconds(10),()-> { while(gate.status().healthy()) Thread.sleep(10); });
+                            assertTrue(proof.consumed(wait,message));
+                            assertTrue(QuarkusTransaction.requiringNew().call(()->em.find(CompletedTaskEntity.class,key)!=null),
+                                    "post-commit ACK/authority failure cannot pretend the real checkpoint rolled back");
+                            assertEquals(mode==Mode.ACK_FAILURE?"DISPATCHED":"ACKNOWLEDGED",deliveryState(wait));
+                            assertThrows(TimeoutException.class,()->next.get(150,TimeUnit.MILLISECONDS));
+                            assertFalse(completed.isDone());
+                            var repair=new JdbcOwnedInbox(dataSource,taskLeases,inbox,proof,audit,Clock.systemUTC());
+                            assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,repair.acknowledge(wait));
+                            assertFalse(next.isDone(),"later repair cannot resurrect a failed protected continuation");
+                            return;
+                        }
+                    }
                     if(mode==Mode.CHECKPOINT_WINS_CANCELLATION) {
                         awaitDeliveryBlock(blockerPid);
                         int checkpointPid=blockedCheckpointHoldingSdkLock(blockerPid);
@@ -218,7 +264,7 @@ class AtomicInboxCheckpointTest {
                         assertTimeoutPreemptively(Duration.ofSeconds(10),()-> { while(!databaseExpired(lease)) Thread.sleep(10); });
                         blocker.commit(); blocker.close(); blocker=null;
                     }
-                    if (mode == Mode.COMMIT || mode==Mode.RESERVATION_WON_DEADLINE) {
+                    if (mode == Mode.COMMIT || mode==Mode.RESERVATION_WON_DEADLINE || mode==Mode.ACK_DELAY) {
                         next.get(15,TimeUnit.SECONDS);
                         assertFalse(completed.isDone(),"observe the committed wait before SDK workflow-completion cleanup");
                         assertTrue(QuarkusTransaction.requiringNew().call(()->em.find(CompletedTaskEntity.class,key)!=null));
@@ -253,11 +299,18 @@ class AtomicInboxCheckpointTest {
                         assertFalse(completed.isDone());
                     }
                 } finally {
+                    releaseAck.complete(null);
                     if(blocker!=null) { blocker.rollback(); blocker.close(); }
                     releaseNext.complete(null);
                     for(var claim:cleanup) taskLeases.release(claim);
                 }
             }
+        }
+    }
+    private String deliveryState(InboxWait wait) throws SQLException {
+        try(var c=dataSource.getConnection();var s=c.prepareStatement("select state from inbox.delivery where tenant=? and instance_id=? and wait_key=?")) {
+            s.setString(1,wait.tenant());s.setString(2,wait.instanceId().value());s.setString(3,wait.key());
+            try(var r=s.executeQuery()) { assertTrue(r.next());return r.getString(1); }
         }
     }
     private boolean deliveryExpired(InboxWait wait) throws SQLException {

@@ -112,6 +112,12 @@ public class JdbcInboxTaskLease {
             throw new IllegalStateException("event task lost current ownership or wait authority");
     }
 
+    /** Fresh short-transaction fence after independently committed receipt ACK, before releasing advancement. */
+    public void requireLive(InboxTaskClaim claim) {
+        Objects.requireNonNull(claim);
+        Transactions.inTransaction(dataSource,c->{ requireCurrent(c,claim,false); return null; });
+    }
+
     private static boolean matches(Row row,InboxTaskClaim claim) {
         return row!=null && row.state.equals("ACTIVE") && row.epoch==claim.epoch() && row.owner.equals(claim.owner());
     }
