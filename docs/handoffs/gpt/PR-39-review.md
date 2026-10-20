@@ -139,3 +139,24 @@ acceptance; the freshness decision already exists, not a second open decision.
 9/9 pass, zero failures/errors/skips. Overall build failed ONLY on the route
 probe415 above (197 app cases, one failure); no full-green or T13 claim. Refresh
 #42 after this route integration, preserving partial SDK/proof/fencing gates.
+
+## New H4 time checks: e6e36aa source review
+
+Reviewer=GPT; inspected e6e36aa16817d75d76929226d3aa3b14a7769eed and af08d06
+with git show from detached gpt-review-39. Verdict=REQUEST-CHANGES overall.
+Resource own-clock exp/iat/exact-duration checks and exchanger slow-bind/grant
+regression address the earlier source findings. The final local clock check is
+still before a blocking replay.use (guard) / recheckGrant (exchanger); check the
+clock again after the last blocking call before returning authority. Add those
+latency cases. The slow-proof regression's cache.use("probe|x") checks another
+key and does not establish that the actual credential's replay use stayed unused.
+No local DB re-execution; source inspection only, no product PASS inferred.
+H3 freshness direction is already selected in ADR0021; implement before request
+and after all slow bind/audit calls at release, then supply deterministic native
+proof. GitHub requests: #39 comment6282126670, #40 comment6282127030.
+
+Exact b7d3bdd matrix39359163791 standard lane passed6 JdbcIssuedTokenBindingsTest
+and3 KeycloakStandardIT, zero skips. Delegation stopped on old stopped-port bind
+before app/provider tests; it yields no delegation result. Current GPT eae54a6
+contains the shared TCP/JDBC test allocation correction. Prior004fd9e full/matrix
+and a35e3ef full builds passed; those passes do not resolve amended identity gates.

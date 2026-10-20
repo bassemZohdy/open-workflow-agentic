@@ -420,6 +420,7 @@ Implementation status: **partial**.
 - Implemented: PR #41 checkpoint/ingress increment merged as e738218 after Claude exact-head APPROVE-partial at cd3f57b and CI39355182128; postmerge main CI39357918414 passed. WP-107/T13 stay partial.
 - Implemented: Dispatch protocol successor adds immutable occurrence identity, retained deadlines/dispositions, same-session reservations and explicit checkpoint-proof ACK port. Local application test-compile and two identity cases pass; nine PostgreSQL protocol cases await CI. No SDK consumer/proof implementation is activated.
 - Implemented: Dispatch protocol754507a passed9/9 real PostgreSQL cases, zero skips, in CI39358587955. Overall build failed only the route media probe; Claude0cf85d6 correction integrated via GPT004fd9e and current full CI/review renewed. No actual SDK consumption/T13 proof.
+- Implemented: Atomic SDK receipt proof successor on gpt/WP-107-sdk-delivery adds V67 and a JPA operations adapter that commits proof with actual task completion, fencing cancellation and stale attempts. Application test-compile and OWS fixture validation pass; three real SDK/JPA tests await CI. No production event consumer/coordinator or complete T13 proof.
 
 Remaining gates:
 
