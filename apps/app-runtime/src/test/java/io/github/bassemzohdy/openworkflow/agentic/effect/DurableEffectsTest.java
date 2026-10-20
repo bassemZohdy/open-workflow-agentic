@@ -217,4 +217,77 @@ class DurableEffectsTest {
         effects.compensate(original.key(), undo, target);
         assertThrows(IllegalStateException.class, () -> effects.execute(undo, target));
     }
+
+    @Test
+    void interruptionAfterRealIntentCommitLeavesUnattemptedIntentAndReleasesClaim() {
+        EffectCommand command=JdbcEffectLedgerTest.command("cancel-after-intent");Target target=new Target();
+        var interrupting=new JdbcEffectLedger(dataSource) {
+            public Prepared prepare(EffectCommand c,Duration window,Instant now) {
+                Prepared stored=super.prepare(c,window,now);Thread.currentThread().interrupt();return stored;
+            }
+        };
+        try {
+            assertThrows(CancellationException.class,()->new DurableEffects(interrupting).execute(command,target));
+            assertTrue(Thread.currentThread().isInterrupted());assertEquals(0,target.calls.get());
+        } finally {Thread.interrupted();}
+        assertFalse(ledger.prepare(command,target.replayWindow(),Instant.now()).attempted());
+        // A fresh physical connection cannot reenter a leaked advisory claim from Agroal's existing session.
+        assertEquals(EffectState.CONFIRMED,new DurableEffects(new JdbcEffectLedger(EffectCrashWorker.dataSource())).execute(command,target).state());
+        assertEquals(Set.of(command.key().idempotencyKey()),target.applied);assertEquals(1,target.calls.get());
+    }
+
+    @Test
+    void interruptionAfterRealAttemptCommitNeverDispatchesAndFreshConnectionReconcilesSameKey() {
+        EffectCommand command=JdbcEffectLedgerTest.command("cancel-after-attempt");Target target=new Target();
+        var interrupting=new JdbcEffectLedger(dataSource) {
+            public void markAttempted(EffectKey key){super.markAttempted(key);Thread.currentThread().interrupt();}
+        };
+        try {
+            assertThrows(CancellationException.class,()->new DurableEffects(interrupting).execute(command,target));
+            assertTrue(Thread.currentThread().isInterrupted());assertEquals(0,target.calls.get());
+        } finally {Thread.interrupted();}
+        assertTrue(ledger.prepare(command,target.replayWindow(),Instant.now()).attempted());
+        assertEquals(EffectState.INTENDED,ledger.find(command.key()).orElseThrow().state());
+        assertEquals(EffectState.CONFIRMED,new DurableEffects(new JdbcEffectLedger(EffectCrashWorker.dataSource())).execute(command,target).state());
+        assertEquals(Set.of(command.key().idempotencyKey()),target.applied);assertEquals(1,target.calls.get());
+    }
+
+    @Test
+    void interruptionDuringLookupCannotResendAndLaterFreshOwnerUsesTheRetainedReceipt() {
+        EffectCommand command=JdbcEffectLedgerTest.command("cancel-lookup");
+        var interruptLookup=new java.util.concurrent.atomic.AtomicBoolean(true);
+        Target target=new Target() {
+            public Reply lookup(String key) {
+                if(interruptLookup.getAndSet(false)){Thread.currentThread().interrupt();return new Reply(Outcome.UNKNOWN,null);}
+                return new Reply(applied.contains(key)?Outcome.CONFIRMED:Outcome.UNKNOWN,"lookup");
+            }
+        };
+        target.loseAck=true;
+        assertEquals(EffectState.INTENDED,effects.execute(command,target).state());
+        try {
+            assertThrows(CancellationException.class,()->effects.execute(command,target));
+            assertTrue(Thread.currentThread().isInterrupted());assertEquals(1,target.calls.get());
+        } finally {Thread.interrupted();}
+        assertEquals(EffectState.CONFIRMED,new DurableEffects(new JdbcEffectLedger(EffectCrashWorker.dataSource())).execute(command,target).state());
+        assertEquals(1,target.calls.get());assertTrue(ledger.manualQueue(command.key().threadId(),10).isEmpty());
+    }
+
+    @Test
+    void interruptionAfterCompensationIntentRetainsLinkAndFreshOwnerRefundsOnce() {
+        EffectCommand original=JdbcEffectLedgerTest.command("cancel-refund");Target charge=new Target();effects.execute(original,charge);
+        Target refund=new Target();EffectCommand undo=EffectCommand.of(original.key().threadId(),"refund","1",refund.target(),"refund=10");
+        var interrupting=new JdbcEffectLedger(dataSource) {
+            public Prepared prepareCompensation(EffectKey key,EffectCommand command,Duration window,Instant now) {
+                Prepared stored=super.prepareCompensation(key,command,window,now);Thread.currentThread().interrupt();return stored;
+            }
+        };
+        try {
+            assertThrows(CancellationException.class,()->new DurableEffects(interrupting).compensate(original.key(),undo,refund));
+            assertTrue(Thread.currentThread().isInterrupted());assertEquals(0,refund.calls.get());
+        } finally {Thread.interrupted();}
+        assertEquals(EffectState.CONFIRMED,ledger.find(original.key()).orElseThrow().state());
+        assertEquals(EffectState.INTENDED,ledger.find(undo.key()).orElseThrow().state());
+        assertEquals(EffectState.COMPENSATED,new DurableEffects(new JdbcEffectLedger(EffectCrashWorker.dataSource())).compensate(original.key(),undo,refund).state());
+        assertEquals(Set.of(undo.key().idempotencyKey()),refund.applied);assertEquals(1,refund.calls.get());
+    }
 }

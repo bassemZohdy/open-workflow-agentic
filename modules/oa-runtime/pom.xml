@@ -63,9 +63,12 @@
 
     <!-- Metrics: outbox lag gauges (WP-105b); the registry is chosen in app-runtime -->
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-micrometer</artifactId></dependency>
+    <!-- Effect spans (WP-108/WP-112), managed by the existing Quarkus BOM. -->
+    <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-opentelemetry</artifactId></dependency>
 
     <!-- Tests (plain JUnit and ArchUnit; Quarkus boot tests live in app-runtime) -->
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>io.opentelemetry</groupId><artifactId>opentelemetry-sdk-testing</artifactId><scope>test</scope></dependency>
     <dependency><groupId>com.tngtech.archunit</groupId><artifactId>archunit-junit5</artifactId><scope>test</scope></dependency>
   </dependencies>
 
