@@ -106,7 +106,7 @@ class AtomicInboxCheckpointTest {
                 var message = new InboxMessage(row.tenant(),"urn:test:atomic",UUID.randomUUID().toString(),wait.eventType(),
                         row.id(),wait.route(),"{\"ok\":true}");
                 dispatch.register(wait); inbox.receive(message,now().plusSeconds(600));
-                assertEquals(Optional.of(message),inbox.match(row.tenant(),row.id(),wait.route(),wait.eventType()));
+                assertEquals(Optional.of(message),inbox.matchCandidate(wait,message));
                 var claim = dispatch.claim(wait).orElseThrow();
                 JdbcInboxDispatch.Claim newer = null;
                 try {

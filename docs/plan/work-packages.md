@@ -423,6 +423,7 @@ Implementation status: **partial**.
 - Implemented: Atomic SDK receipt proof successor on gpt/WP-107-sdk-delivery adds V67 and a JPA operations adapter that commits proof with actual task completion, fencing cancellation and stale attempts. Application test-compile and OWS fixture validation pass; three real SDK/JPA tests await CI. No production event consumer/coordinator or complete T13 proof.
 - Implemented: SDK0c483d2 CI39360729877 exposed native position-format mismatch before the three atomic proof cases ran. Contract now preserves the actual SDK position spelling verbatim; three identity cases and local reactor test-compile pass. Atomic proof remains unverified pending renewed CI.
 - Implemented: SDK selector separates approved public correlation from internal occurrence identity, reads bounded predicate candidates without consuming them, and atomically commits a selected receipt after scope/content/retention/cancellation/deadline rechecks. Six real JDBC selection cases compile; CI pending. No event consumer/coordinator activation or T13 closure.
+- Implemented: At SDK8243760, six SdkInboxSelectionTest cases passed non-skipped in39361635541. Atomic/protocol fixtures still used legacy public-key matching, causing1 failure/5 errors before checkpoint; both helpers corrected to matchCandidate. Atomic proof remains pending, all assertions retained and no T13/provider pass inferred.
 
 Remaining gates:
 
