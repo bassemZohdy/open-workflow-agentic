@@ -1,5 +1,9 @@
 # WP-605 URI template compatibility adapter
 
+Historical checkpoint at078d4c5. Its non-activation boundary is superseded in the
+current candidate by [default JVM runtime integration](WP-605-uri-runtime-integration.md).
+The exact historical verification below remains unchanged.
+
 Reviewer=GPT (author verification, not peer approval).
 Reviewed SHA: **078d4c51512c464943c2281ec42ac1c123d50ba1**.
 Verdict: local and exact Linux/BOTH compatibility proof PASS; integration HOLD for exact peer,

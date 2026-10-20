@@ -10,7 +10,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Compatibility adapter for SDK 7.35.3.Final's full-URI-as-path interpolation.
- * No service descriptor is installed: activation requires an explicit integration decision.
+ * Registered by this module's URITemplateResolver service descriptor, ahead of the
+ * pinned SDK resolver (priority 1000). Changes ship only after normal integration review.
  * This retains the pinned JAX-RS template subset; it is not a target authorization policy
  * or a general RFC 6570 implementation. */
 public final class ComponentUriTemplateResolver implements URITemplateResolver {

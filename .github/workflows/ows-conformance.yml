@@ -10,6 +10,7 @@ on:
       - 'modules/oa-runtime/src/main/**/adapter/source/**'
       - 'modules/oa-runtime/src/test/**/adapter/source/**'
       - 'modules/oa-runtime/src/main/resources/conformance/**'
+      - 'modules/oa-runtime/src/main/resources/META-INF/services/io.serverlessworkflow.impl.resources.URITemplateResolver'
       - 'apps/app-runtime/src/main/resources/flow/**'
       - 'docs/conformance/**'
   push:
@@ -22,6 +23,7 @@ on:
       - 'modules/oa-runtime/src/main/**/adapter/source/**'
       - 'modules/oa-runtime/src/test/**/adapter/source/**'
       - 'modules/oa-runtime/src/main/resources/conformance/**'
+      - 'modules/oa-runtime/src/main/resources/META-INF/services/io.serverlessworkflow.impl.resources.URITemplateResolver'
       - 'apps/app-runtime/src/main/resources/flow/**'
       - 'docs/conformance/**'
 permissions:

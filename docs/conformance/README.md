@@ -180,9 +180,20 @@ gRPC host and shell argument forms in this corpus. The controlled CTK protocol m
 model-shape samples; no general public-provider execution claim follows. The report includes the actual host metadata serializer class so
 stack-specific behavior is not misattributed to a bare upstream SDK.
 
-A separate opt-in `ComponentUriTemplateResolver` compatibility preparation uses
-JAX-RS `fromUri` for URI component parsing. Its isolated service-provider test
-executes the unchanged official HTTP query case through the actual SDK and
-owned transport successfully. No service descriptor activates it in production;
-the native report above remains unchanged. See
-[URI adapter evidence and registration gates](../handoffs/gpt/WP-605-uri-template-adapter.md).
+The candidate runtime packages `ComponentUriTemplateResolver` as its default
+URI template service. It preserves URI components through JAX-RS `fromUri`.
+The native SDK measurement above is isolated through a test-only descriptor
+filter; its original report is unchanged. The default platform has its own
+[CTK report](platform-ctk-report.json) and actual observation artifacts.
+
+| Measurement | Same original scenarios/assertions | MATCH | DIVERGED |
+| --- | --- | --- | --- |
+| Pinned upstream SDK |21/45|14|7|
+| Default platform service |21/45|15|6|
+
+Only the HTTP query case changes; all other scenario records and definition
+hashes are equal, enforced by a test. A separate real injected Quarkus Flow
+boot test verifies normal and escaped URI inputs on actual owned loopback HTTP.
+This candidate has not merged or deployed. JVM packaging/discovery does not
+establish native-image discovery, target authority, public TLS or full semantic
+portability. See [runtime integration and exact verification](../handoffs/gpt/WP-605-uri-runtime-integration.md).

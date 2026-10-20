@@ -115,6 +115,30 @@ class OfficialCtkTest {
         throw new IllegalArgumentException("Not an assertion: "+text);
     }
     @Test void allPinnedOfficialScenariosRunUnchangedWithPureOrControlledProvidersAndEveryAssertionIsMeasured() throws Exception {
+        try (var nativeSdk = new NativeSdkUriResolverScope()) {
+            measure(false);
+        }
+    }
+    @Test void registeredPlatformRuntimeExecutesEveryUnchangedPinnedScenarioSeparatelyFromNativeSdkMeasurement() throws Exception {
+        try (var app = WorkflowApplication.builder().build()) {
+            assertInstanceOf(io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.source.ComponentUriTemplateResolver.class,
+                    app.templateResolver().orElseThrow());
+        }
+        measure(true);
+        var nativeReport=OwsConformance.JSON.readTree(Files.readString(OwsConformance.repository().resolve("docs/conformance/official-ctk-report.json")));
+        var platformReport=OwsConformance.JSON.readTree(Files.readString(Path.of("target/conformance/platform-ctk/report.json")));
+        int differences=0;
+        for(int index=0;index<21;index++) {
+            var upstream=nativeReport.path("scenarios").get(index);var adapted=platformReport.path("scenarios").get(index);
+            assertEquals(upstream.path("definitionSha256"),adapted.path("definitionSha256"));
+            if(!upstream.equals(adapted)) {
+                differences++;assertEquals("Call HTTP With Content Output",adapted.path("scenario").asText());
+                assertEquals("DIVERGED",upstream.path("status").asText());assertEquals("MATCH",adapted.path("status").asText());
+            }
+        }
+        assertEquals(1,differences,"Do not hide another semantic change in the URI adapter assessment");
+    }
+    private void measure(boolean platform) throws Exception {
         var manifest=OwsConformance.JSON.readTree(OwsConformance.resource(PREFIX+"manifest.json"));
         var scenarios=new ArrayList<Scenario>();int features=0;
         for(var file:manifest.path("files")) {
@@ -129,8 +153,9 @@ class OfficialCtkTest {
                 .put("sdkVersion","7.35.3.Final").put("fullSemanticConformance","NOT_ESTABLISHED")
                 .put("scope","All pinned development CTK scenarios attempted unchanged with pure or controlled HTTP/OpenAPI/event providers")
                 .put("publicProviderInteroperability","NOT_ESTABLISHED: loopback transport substitution, pinned document and in-memory event delivery");
+        if(platform)report.put("runtimeAdapter","ComponentUriTemplateResolver: packaged service provider; upstream SDK measurement remains separate");
         var results=report.putArray("scenarios");int executed=0,unmeasured=0,matched=0,diverged=0,assertions=0;
-        Path artifacts=Path.of("target/conformance/official-ctk");Files.createDirectories(artifacts);
+        Path artifacts=Path.of("target/conformance/"+(platform?"platform-ctk":"official-ctk"));Files.createDirectories(artifacts);
         for(int index=0;index<scenarios.size();index++) {
             var scenario=scenarios.get(index);String source=null;JsonNode input=OwsConformance.JSON.createObjectNode();int acts=0;
             for(var step:scenario.steps()) {
@@ -165,9 +190,10 @@ class OfficialCtkTest {
         report.putObject("summary").put("features",features).put("scenarios",scenarios.size()).put("executed",executed)
                 .put("unmeasured",unmeasured).put("matched",matched).put("diverged",diverged).put("measuredAssertions",assertions);
         assertEquals(21,executed);assertEquals(0,unmeasured);assertEquals(45,assertions);
+        assertEquals(platform?15:14,matched);assertEquals(platform?6:7,diverged);
         String text=OwsConformance.JSON.writerWithDefaultPrettyPrinter().writeValueAsString(report)+"\n";
         Files.writeString(artifacts.resolve("report.json"),text);
-        Path baseline=OwsConformance.repository().resolve("docs/conformance/official-ctk-report.json");
+        Path baseline=OwsConformance.repository().resolve("docs/conformance/"+(platform?"platform-ctk-report.json":"official-ctk-report.json"));
         if(Boolean.getBoolean("ows.updateReport"))Files.writeString(baseline,text);
         assertEquals(OwsConformance.JSON.readTree(Files.readString(baseline)),report,"Inspect actual CTK observations; never silently bless changed semantics");
     }
