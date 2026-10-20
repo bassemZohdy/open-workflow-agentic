@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-107 preparation: framework-free listen-group identities preserve duplicate filter ordinals, data/until roles, wildcard ANY and pinned configuration. Receipt-match classification excludes stopping events from data; it grants no execution permission. All172 contract tests pass, including8 new cases; durable storage/coordinator and full acceptance remain open.
+
 - WP-107 preparation: four actual SDK full-workflow listen-group cases establish ALL order/overlap and negative controls for ANY post-completion mutation and concurrent foreach/until completion. All four fixtures validate; these observations do not close durable delivery, FIFO or T13 gates.
 
 This log records implemented capabilities and their requirement coverage. Entries describe unreleased development work.

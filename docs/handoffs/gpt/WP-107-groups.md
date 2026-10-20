@@ -70,6 +70,47 @@ and stream restoration evidence before any production stream activation.
 
 ## Next implementation and verification
 
+### Framework-free group and membership contract
+
+InboxListenGroup now describes ONE/ANY/ALL, event or expression until, ordered
+filter fingerprints (duplicates retained), and one current InboxTask occurrence.
+configurationFingerprint must cover the complete pinned listen/read/foreach
+definition PLUS approved producer/predicate/correlation configuration. The
+runtime producer still has to compute/validate that snapshot; a supplied hash
+is data, never authorization. Group/registration digests use new ig1/ir1
+canonical domains, with full task identity, roles and ordinal. They contain no
+owner/attempt/resume epoch, and do not rewrite existing single-wait keys.
+
+ANY [] and event-until ANY [] each normalize to one logical wildcard slot,
+independent of physical transport registrations. DATA and UNTIL roles remain
+distinct even with identical filter fingerprints. Total logical slots are
+bounded at128; oversized definitions must be refused before callback/persistence
+activation rather than silently losing filters. ONE/ALL cardinality and legal
+until shapes are validated. Expression until has no stopping-event slot and
+must be evaluated after ordered actual item output by the future coordinator.
+
+classify accepts the trusted selector's complete match set of ONE receipt.
+It rejects foreign group/role/ordinal/filter matches; returns all matched ALL
+memberships in their within-receipt AST order, or the first matching ANY slot;
+and gives UNTIL matches precedence so stopping events never become data output.
+It does NOT sort different receipts or assign arrival sequence, evaluate a
+predicate, persist a winner, know which ALL slots were already satisfied, or
+grant callback/ACK/resume permission. Match records validate ordered distinct
+slots of one group/role. Receipt dedup, ordinal progress, ownership, mandatory
+audit, ordering and actual checkpoint/effect proof remain store/coordinator work.
+
+Validation: `mvn -B -pl modules/oa-contracts test` BUILD SUCCESS,172 tests,
+zero failures/errors/skips, including8 new group cases and existing purity/
+schema/key/port tests. They cover duplicate memberships, ANY choice and
+stopping-event precedence, wildcard roles, full snapshot/task replay isolation,
+foreign/forged matches, bounds and contradictory match carriers. The initial
+null-expression test expected the wrong exception class; it now follows the
+existing Checks contract (required null -> NullPointerException) while still
+requiring refusal. No predicate/DB/engine/authority pass is inferred from these
+value tests. The four actual SDK negative controls above remain separate.
+
+### Store and runtime work still required
+
 Implement the durable group/membership/winner/ordered-item contract, a bounded
 serialized coordinator, whole-group reconstruction and per-item/parent proof
 binding. Only then use the reviewed finalizer/pre-start repair from #48 and
