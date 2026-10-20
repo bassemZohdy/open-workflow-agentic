@@ -8,8 +8,8 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 ## [Unreleased]
 
 - **WP-107 (partial):** persist normalized events before matching and record durable
-  wait signals with duplicate, expiry and cancellation checks. HTTP ingress and
-  durable engine delivery/replay remain open; T13 is not promoted.
+  wait signals with duplicate, expiry and cancellation checks. Durable engine
+  delivery/replay remains open; T13 is not promoted.
 - **WP-107 ingress (partial):** receive bounded structured CloudEvents through
   verified caller, scoped policy and deployment-bound routes; preserve complete
   canonical envelopes with audit and receipt metrics. Engine consumption remains

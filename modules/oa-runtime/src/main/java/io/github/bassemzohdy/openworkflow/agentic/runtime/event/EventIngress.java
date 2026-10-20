@@ -21,8 +21,6 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavail
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import io.quarkus.runtime.StartupEvent;
-import jakarta.enterprise.event.Observes;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -34,7 +32,6 @@ import java.util.Set;
 /** Authorize a deployment-bound producer, audit intent, then commit receipt. Never wakes an in-memory listener. */
 @ApplicationScoped
 public class EventIngress {
-    void onStart(@Observes StartupEvent event) { } // Validate immutable deployment bindings before serving ingress.
     private final JdbcEventInbox inbox;
     private final InstanceStore instances;
     private final Pep pep;
@@ -54,12 +51,21 @@ public class EventIngress {
                          EventIngressSettings settings, Clock clock) {
         this.inbox = Objects.requireNonNull(inbox); this.instances = Objects.requireNonNull(instances);
         this.pep = Objects.requireNonNull(pep); this.audit = Objects.requireNonNull(audit);
-        this.clock = Objects.requireNonNull(clock); this.retention = settings.retention();
+        this.clock = Objects.requireNonNull(clock);
+        var config = validated(settings);
+        this.retention = config.retention(); this.producers = config.producers(); this.bindingsHash = config.hash();
+    }
+
+    /** Startup validation deliberately does not initialize a native policy engine. */
+    static void validateSettings(EventIngressSettings settings) { validated(settings); }
+    private record Config(Duration retention, List<Binding> producers, String hash) { }
+    private static Config validated(EventIngressSettings settings) {
+        Duration retention = settings.retention();
         if (retention.isZero() || retention.isNegative() || retention.compareTo(Duration.ofDays(30)) > 0) {
             throw new IllegalArgumentException("event retention must be positive and at most 30 days");
         }
         if (settings.producers().size() > 256) throw new IllegalArgumentException("too many event producer bindings");
-        this.producers = settings.producers().values().stream().map(Binding::new).toList();
+        var producers = settings.producers().values().stream().map(Binding::new).toList();
         for (var p : producers) {
             Checks.requireText("producer tenant", p.tenant(), 256); Objects.requireNonNull(p.kind());
             Checks.requireText("producer subject", p.subject(), 256); Checks.requireText("producer source", p.source(), 1024);
@@ -71,7 +77,7 @@ public class EventIngress {
         }
         var bindingSnapshot = new CanonicalEncoder("oa.event.producers.v1").number(producers.size());
         producers.stream().map(Binding::fingerprint).sorted().forEach(bindingSnapshot::text);
-        this.bindingsHash = CanonicalEncoder.sha256Hex(bindingSnapshot.toBytes());
+        return new Config(retention, producers, CanonicalEncoder.sha256Hex(bindingSnapshot.toBytes()));
     }
 
     private record Binding(String tenant, io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind kind,

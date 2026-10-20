@@ -57,6 +57,20 @@ class EventIngressTest {
     }
 
     @Test
+    void validatesDeploymentSettingsWithoutInitializingNativePolicyForUnusedIngress() {
+        for (Duration retention : List.of(Duration.ofHours(1), Duration.ZERO)) {
+            EventIngressSettings empty = new EventIngressSettings() {
+                public Duration retention() { return retention; }
+                public Map<String, Producer> producers() { return Map.of(); }
+                public String policyFolder() { throw new AssertionError("startup binding validation must not load policy"); }
+            };
+            if (retention.isZero()) assertThrows(IllegalArgumentException.class,
+                    () -> new EventPolicyProducer().validateBindings(null, empty));
+            else new EventPolicyProducer().validateBindings(null, empty);
+        }
+    }
+
+    @Test
     void authorizesVerifiedIdentityAndAuditsBeforeReceipt() {
         Inbox inbox = new Inbox();
         var ingress = ingress(inbox, DecisionOutcome.ALLOW, e -> {
