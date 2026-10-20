@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-107 pinned group/snapshot/V71-V72 ordered-membership increment is refreshed onto reviewed main54 for exact-head peer/full/strict review.192 contracts/25 selected cases/app test compilation/tools76/four OWS fixtures pass locally; full selector/coordinator/FIFO/restore/T13 and package gates remain open. Main54 postmerge full and both strict provider/process lanes passed; finished logs inspected.
+
 - Combined preparation on reviewed #48 and effect/process-CI foundation passed BOTH39381927960 atc1fd835: snapshots6/group SQL11/actual SDK-JPA11/receipt recovery5/restore gate5/CDI tracing3/core effect process recovery1/standard3/native8, zero skips and strict checkers. Production group selector/coordinator/execution/recovery/T13 remains open.
 
 - WP-107 preparation: derive pinned group snapshots from actual SDK listen tasks, scoped approved producer routes and explicit correlation parameters. Preserve duplicate ordinals and empty ANY arrays. Forty selected plain cases pass; full consumer/coordinator/recovery remains open. Exact V72 product4d75161 independently passed both39379015967 lanes (11 SQL cases, zero skips).
