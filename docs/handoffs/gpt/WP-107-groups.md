@@ -46,7 +46,8 @@ one-event-only consumer or by sorting results after effects have already run.
 The source is the official
 [Listen contract](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#listen)
 and [consumption strategies](https://github.com/open-workflow-specification/specification/blob/v1.0.3/dsl-reference.md#event-consumption-strategy),
-plus the actual pinned SDK1.2.0 source/execution above.
+plus the actual pinned SDK source/execution above (implementation core7.35.3.Final
+from the existing Flow dependency set).
 
 The additive durable model must represent a task group, immutable pinned filter
 ordinals/roles (including duplicate filters and until), receipt membership and
