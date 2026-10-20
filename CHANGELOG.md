@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
+
 - WP-108 preparation: refuse interrupted callers before effect/refund dispatch and after blocking ledger/cleanup work, preserving committed facts and original recovery keys. Six local interruption cases pass; four new PostgreSQL cases compile and need fresh Linux execution. This is cooperative thread handling, not complete Flow/owner/authority cancellation.
 
 - WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. All76 tooling tests pass. Exact4325993 passed BOTH39381656269 with process recovery1/SQL guards5/effects12/CDI tracing3/standard3/native8, zero skips and strict checks. Full governed Flow/owner/partition/peer gates remain; no acceptance promotion.
