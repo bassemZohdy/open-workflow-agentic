@@ -9,6 +9,9 @@ on:
       - 'modules/oa-runtime/src/**/identity/**'
       - 'apps/app-runtime/src/test/**/identity/**'
       - 'docs/adr/0021-*'
+      - 'pom.xml'
+      - 'apps/app-runtime/pom.xml'
+      - 'modules/oa-runtime/pom.xml'
   push:
     branches: [main]
     paths:
@@ -16,11 +19,16 @@ on:
       - 'tools/require_keycloak_evidence.py'
       - 'modules/oa-runtime/src/**/identity/**'
       - 'apps/app-runtime/src/test/**/identity/**'
+      - 'tools/test_keycloak_evidence.py'
+      - 'docs/adr/0021-*'
+      - 'pom.xml'
+      - 'apps/app-runtime/pom.xml'
+      - 'modules/oa-runtime/pom.xml'
 permissions:
   contents: read
 jobs:
   java-interop:
-    name: keycloak-${{ matrix.profile }}
+    name: keycloak-${{ matrix.profile }}-${{ matrix.evidence }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -30,9 +38,27 @@ jobs:
           - profile: standard
             image: quay.io/keycloak/keycloak:26.2.5
             test: KeycloakStandardIT
+            evidence: contract
+            evidence_args: ''
+            delegation: 'false'
           - profile: delegation
             image: quay.io/keycloak/keycloak:26.8.1
             test: KeycloakDelegationIT
+            evidence: contract
+            evidence_args: ''
+            delegation: 'true'
+          - profile: standard
+            image: quay.io/keycloak/keycloak:26.2.5
+            test: KeycloakInteropIT
+            evidence: characterization
+            evidence_args: '--characterization'
+            delegation: 'false'
+          - profile: delegation
+            image: quay.io/keycloak/keycloak:26.8.1
+            test: KeycloakInteropIT
+            evidence: characterization
+            evidence_args: '--characterization'
+            delegation: 'true'
     services:
       postgres:
         image: postgres:16
@@ -43,13 +69,16 @@ jobs:
     env:
       KEYCLOAK_URL: http://127.0.0.1:18080
       KEYCLOAK_PROFILE: ${{ matrix.profile }}
+      KEYCLOAK_DELEGATION: ${{ matrix.delegation }}
+      EVIDENCE_ARGS: ${{ matrix.evidence_args }}
       # Disposable CI-only credentials, never used against a deployment.
       KEYCLOAK_ADMIN_USER: admin
+      KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: ci-keycloak-only
     steps:
       - uses: actions/checkout@v4
       - name: Require the real Java test before starting a server
-        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" --preflight
+        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS --preflight
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Start an isolated pinned Keycloak server
@@ -82,12 +111,12 @@ jobs:
           -Dkeycloak.required=true -Dkeycloak.profile="$KEYCLOAK_PROFILE"
           -Dkeycloak.url="$KEYCLOAK_URL"
       - name: Require passing non-skipped Java evidence
-        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE"
+        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS
       - name: Save test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: keycloak-${{ matrix.profile }}-java-results
+          name: keycloak-${{ matrix.profile }}-${{ matrix.evidence }}-java-results
           path: apps/app-runtime/target/failsafe-reports/
           if-no-files-found: ignore
       - name: Stop the disposable server

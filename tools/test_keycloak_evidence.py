@@ -2,12 +2,12 @@ import tempfile
 from pathlib import Path
 import unittest
 import xml.etree.ElementTree as ET
-from require_keycloak_evidence import PROFILES, REPORTS, verify
+from require_keycloak_evidence import CHARACTERIZATION, PROFILES, REPORTS, verify
 
 
 class KeycloakEvidenceTest(unittest.TestCase):
-    def report(self, root, profile, missing=None, bad=None, recorded_profile=None):
-        test_class, required = PROFILES[profile]
+    def report(self, root, profile, missing=None, bad=None, recorded_profile=None, characterization=False):
+        test_class, required = CHARACTERIZATION if characterization else PROFILES[profile]
         suite = ET.Element('testsuite')
         props = ET.SubElement(suite, 'properties')
         ET.SubElement(props, 'property', name='keycloak.profile', value=recorded_profile or profile)
@@ -44,6 +44,25 @@ class KeycloakEvidenceTest(unittest.TestCase):
             self.assertTrue(verify(root, 'delegation'))
             self.report(root, 'delegation', recorded_profile='standard')
             self.assertTrue(verify(root, 'delegation'))
+
+    def test_characterization_never_substitutes_for_strict_contract(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for profile in PROFILES:
+                self.report(root, profile, characterization=True)
+                self.assertEqual([], verify(root, profile, characterization=True))
+                self.assertTrue(verify(root, profile))
+
+    def test_characterization_requires_all_cases_non_skipped_and_correct_profile(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for bad in ('skipped', 'failure', 'error'):
+                self.report(root, 'delegation', bad=bad, characterization=True)
+                self.assertTrue(verify(root, 'delegation', characterization=True))
+            self.report(root, 'delegation', missing=next(iter(CHARACTERIZATION[1])), characterization=True)
+            self.assertTrue(verify(root, 'delegation', characterization=True))
+            self.report(root, 'delegation', recorded_profile='standard', characterization=True)
+            self.assertTrue(verify(root, 'delegation', characterization=True))
 
 
 if __name__ == '__main__':

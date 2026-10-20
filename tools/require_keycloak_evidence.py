@@ -15,10 +15,22 @@ PROFILES = {
 }
 SOURCE = 'apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/identity'
 REPORTS = 'apps/app-runtime/target/failsafe-reports'
+CHARACTERIZATION = ('KeycloakInteropIT', {
+    'theVerifierAcceptsAUserTokenFromKeycloakAndReadsItsTenantAndScopes',
+    'theWorkloadTokenOfTheAgentClientIsAnAgentOfItsOwnTenant',
+    'aTokenForAnotherAudienceIsRefusedByTheVerifier',
+    'theClientGetsADelegatedTokenOnlyWhereKeycloakRecordsTheActor',
+    'aScopeTheUserNeverHeldIsRefusedByKeycloakAsInvalidScope',
+    'anUnregisteredAudienceIsInvalidClientNotInvalidTarget',
+    'anExpiredSubjectTokenIsRefusedAsInvalidRequestNotInvalidGrant',
+    'aSubjectTokenOfALoggedOutSessionIsRefused',
+    'theActorTokenIsIgnoredByStandardExchangeAndCheckedByDelegation',
+    'theExchangedTokenHasTheScopesAskedForAndALifetimeOf300SecondsEvenForAShortSubjectToken',
+})
 
 
-def verify(root, profile, preflight=False):
-    test_class, required = PROFILES[profile]
+def verify(root, profile, preflight=False, characterization=False):
+    test_class, required = CHARACTERIZATION if characterization else PROFILES[profile]
     if preflight:
         source = root / SOURCE / f'{test_class}.java'
         if not source.is_file():
@@ -61,12 +73,15 @@ def main():
     parser.add_argument('--profile', choices=PROFILES, required=True)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument('--preflight', action='store_true')
+    parser.add_argument('--characterization', action='store_true',
+                        help='Check known-behavior evidence only; never establishes the strict WP-102 contract')
     args = parser.parse_args()
-    errors = verify(args.root, args.profile, args.preflight)
+    errors = verify(args.root, args.profile, args.preflight, args.characterization)
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         return 1
-    print(f'Keycloak {args.profile}: ' + ('Java test source present' if args.preflight else 'required Java cases passed'))
+    kind = 'characterization (WP-102 still partial)' if args.characterization else 'strict contract'
+    print(f'Keycloak {args.profile} {kind}: ' + ('Java test source present' if args.preflight else 'required Java cases passed'))
     return 0
 
 

@@ -498,7 +498,8 @@
         "status": "partial",
         "implemented": [
           "JWT verification, scoped grants, replay protection, RFC 8693 client, mounted-secret rotation and wait reauthorization are implemented.",
-          "T07 is automated using in-process stand-ins; issuer interoperability is not proven."
+          "T07 is automated using in-process stand-ins; issuer interoperability is not proven.",
+          "102a audit endpoints bind verified caller subject/kind/scopes before querying; GPT reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858 with green audit CI."
         ],
         "completed_deliverables": [
           "OIDC for users and service identity for agents",
@@ -510,7 +511,6 @@
         "remaining_tasks": [
           "Run the real Keycloak test in docs/identity.md section 9; prove actor_token/act mapping, tenant/scope claims, audience narrowing and expiry bounds.",
           "Resolve any issuer mismatch, record the real-IdP evidence, and add the repeatable integration test to an appropriate CI profile.",
-          "Bind verified caller identity to audit API access instead of its anonymous subject.",
           "If the Vault path is selected, implement and run the quarkus-vault 4.9.0 integration/renewal/rotation test required by ADR 0021; mounted static secrets remain the implemented path.",
           "Implement ADR 0021 H1 strict native Keycloak delegation compatibility without an actorless fallback; retain all user/actor/tenant/scope/audience/expiry/replay checks.",
           "Supply KeycloakStandardIT and KeycloakDelegationIT under the Claude-owned identity test package and pass the H2 real-Java evidence matrix; missing or skipped tests do not close WP-102."
@@ -520,7 +520,7 @@
           "docs/audit.md",
           "docs/handoffs/gpt/WP-102.md"
         ],
-        "scope_note": "102a audit-caller increment in PR #39 was reviewed by GPT at 79f94ce56b794515cf3f66c3a832bfc84693dc00 with green CI run 39260386461; it is not merged by this change. 102b real product Java/Keycloak evidence remains open. WP-102 stays partial."
+        "scope_note": "PR #40 integrates reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858. KeycloakInteropIT is characterization only; all ten cases were skipped in build run 39262137012. Separate non-skipped characterization CI is wired; strict H1/H2 consumer cases and WP-102 closure remain open. No merge to main or real-provider pass is claimed."
       }
     },
     {

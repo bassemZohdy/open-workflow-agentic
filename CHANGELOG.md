@@ -9,6 +9,10 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ### Tracking
 
+- Integrate the reviewed PR #39 audit-caller increment into PR #40; run its real
+  Keycloak characterization on both pinned issuers separately from strict authority
+  contract gates. Skips and characterization never close WP-102.
+
 - **WP-102 H1/H2 (partial):** retain strict signed actor proof, reject actorless standard exchange,
   and add an isolated real-Keycloak Java CI matrix with missing/skipped-evidence rejection. The Java
   identity tests remain Claude-owned; harness availability does not complete provider interoperability.
