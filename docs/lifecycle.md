@@ -599,7 +599,7 @@ accepted only through the existing explicit development/test caller seam.
 The complete envelope is persisted before any listener wake. A new receipt is
 202, an identical source/id retry is 200, and changed content or routing is 409.
 Tenant/target metadata in the event is untrusted. Missing authentication is 401,
-denial is 403, an absent/other-tenant instance is 404, invalid input is 400/413/415,
+denial is 403, an absent/other-tenant/definition-denied target is 404, invalid input is 400/413/415,
 and unavailable policy, database or audit is 503. Retry the same event id after
 an uncertain response. Retention defaults to 24 hours and is bounded to 30 days;
 a duplicate never extends its original retention. Audit and fixed-label receipt

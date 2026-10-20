@@ -26,13 +26,15 @@ class EventIngressApiTest {
     static final String TENANT = "event-api";
     public static class Profile implements QuarkusTestProfile {
         public Map<String, String> getConfigOverrides() {
-            return Map.of("agentic.events.producers.orders.tenant", TENANT,
-                    "agentic.events.producers.orders.kind", "USER",
-                    "agentic.events.producers.orders.subject", "alice",
-                    "agentic.events.producers.orders.source", "urn:test:orders",
-                    "agentic.events.producers.orders.types", "order.ready",
-                    "agentic.events.producers.orders.definitions", "agentic/orders",
-                    "agentic.events.producers.orders.correlations", "wait-1");
+            Map<String, String> result = new HashMap<>();
+            Map.of("orders", TENANT, "other", "other-tenant").forEach((name, tenant) -> {
+                String prefix = "agentic.events.producers." + name + ".";
+                result.put(prefix + "tenant", tenant); result.put(prefix + "kind", "USER");
+                result.put(prefix + "subject", "alice"); result.put(prefix + "source", "urn:test:orders");
+                result.put(prefix + "types", "order.ready"); result.put(prefix + "definitions", "agentic/orders");
+                result.put(prefix + "correlations", "wait-1");
+            });
+            return Map.copyOf(result);
         }
     }
     @Inject InstanceStore store;
@@ -94,11 +96,14 @@ class EventIngressApiTest {
         given().auth().oauth2(jwt).contentType(StructuredEvent.CONTENT_TYPE)
                 .body(event(UUID.randomUUID().toString(), "urn:test:spoofed", "{}"))
                 .post(path(instance, "wait-1")).then().statusCode(403);
+        given().auth().oauth2(jwt).contentType(StructuredEvent.CONTENT_TYPE)
+                .body(event(UUID.randomUUID().toString(), "urn:test:spoofed", "{}"))
+                .post(path(UlidGenerator.shared().next().value(), "wait-1")).then().statusCode(403);
         given().auth().oauth2(jwt).contentType(StructuredEvent.CONTENT_TYPE).body(body)
                 .post(path(instance, "wrong-wait")).then().statusCode(403);
         String wrongDefinition = instance("agentic/other");
         given().auth().oauth2(jwt).contentType(StructuredEvent.CONTENT_TYPE).body(body)
-                .post(path(wrongDefinition, "wait-1")).then().statusCode(403);
+                .post(path(wrongDefinition, "wait-1")).then().statusCode(404);
         assertEquals(0, count("inbox.message", instance)); assertEquals(0, count("inbox.message", wrongDefinition));
     }
 

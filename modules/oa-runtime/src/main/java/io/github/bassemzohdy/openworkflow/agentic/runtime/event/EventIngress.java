@@ -111,17 +111,22 @@ public class EventIngress {
             count(decision.outcome() == DecisionOutcome.ERROR ? "unavailable" : "denied");
             throw new ProblemException(decision.outcome() == DecisionOutcome.ERROR ? 503 : 403, "event ingress is not authorized");
         }
-        InstanceRecord target;
-        try { target = instances.find(caller.tenant(), instance).orElseThrow(() -> new ProblemException(404, "no such instance")); }
-        catch (StoreUnavailableException unavailable) { throw new ProblemException(503, "event target lookup is unavailable"); }
-        boolean bound = producers.stream().anyMatch(p -> p.tenant().equals(caller.tenant())
+        var routes = producers.stream().filter(p -> p.tenant().equals(caller.tenant())
                 && p.kind() == caller.subject().kind() && p.subject().equals(caller.subject().id())
                 && p.source().equals(event.source()) && p.types().contains(event.type())
-                && p.definitions().contains(target.definition().definitionId()) && p.correlations().contains(correlation));
-        if (!bound) {
+                && p.correlations().contains(correlation)).toList();
+        if (routes.isEmpty()) {
             record(caller, message, "event.receive.denied", route);
             count("denied");
             throw new ProblemException(403, "event producer is not bound to this source and target route");
+        }
+        // Unbound producers learn nothing about instance existence. Definition-denied targets look absent too.
+        InstanceRecord target;
+        try { target = instances.find(caller.tenant(), instance).orElseThrow(() -> new ProblemException(404, "no such instance")); }
+        catch (StoreUnavailableException unavailable) { throw new ProblemException(503, "event target lookup is unavailable"); }
+        if (routes.stream().noneMatch(p -> p.definitions().contains(target.definition().definitionId()))) {
+            record(caller, message, "event.receive.denied", route); count("denied");
+            throw new ProblemException(404, "no such instance");
         }
         record(caller, message, "event.receive.attempt", route); // Audit failure refuses before persistence.
         JdbcEventInbox.Received received;

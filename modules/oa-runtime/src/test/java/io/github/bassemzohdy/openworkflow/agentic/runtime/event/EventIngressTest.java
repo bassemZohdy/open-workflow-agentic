@@ -21,11 +21,15 @@ class EventIngressTest {
     static final Subject ALICE = new Subject(SubjectKind.USER, "alice");
     final List<AuditEvent> audit = new ArrayList<>();
     final List<AuthorizationRequest> decisions = new ArrayList<>();
+    final java.util.concurrent.atomic.AtomicInteger targetReads = new java.util.concurrent.atomic.AtomicInteger();
     final InstanceRecord row = InstanceRecord.starting(UlidGenerator.shared().next(), new StartRequest("tenant", ALICE,
             new DefinitionRef("agentic/orders", "1"), Map.of(), "one"), Instant.now());
     final InstanceStore store = (InstanceStore) Proxy.newProxyInstance(InstanceStore.class.getClassLoader(),
             new Class<?>[]{InstanceStore.class}, (proxy, method, args) -> {
-                if (method.getName().equals("find")) return args[0].equals("tenant") && args[1].equals(row.id()) ? Optional.of(row) : Optional.empty();
+                if (method.getName().equals("find")) {
+                    targetReads.incrementAndGet();
+                    return args[0].equals("tenant") && args[1].equals(row.id()) ? Optional.of(row) : Optional.empty();
+                }
                 throw new UnsupportedOperationException();
             });
     static class Inbox extends JdbcEventInbox {
@@ -95,6 +99,7 @@ class EventIngressTest {
                     assertThrows(ProblemException.class, () -> denied.receive(caller(), row.id(), "wait-1", event())).getResponse().getStatus());
         }
         assertEquals(0, inbox.calls);
+        assertEquals(0, targetReads.get(), "unverified, unbound or policy-denied callers must not probe targets");
     }
 
     @Test
