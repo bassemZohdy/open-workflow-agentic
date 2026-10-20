@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Require real, passing Java Keycloak tests; an absent or skipped test is never provider evidence."""
+"""Require passing real Java provider tests and optional process recovery; missing/skipped tests never count."""
 import argparse
 from pathlib import Path
 import sys
@@ -15,6 +15,9 @@ PROFILES = {
 }
 SOURCE = 'apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/identity'
 REPORTS = 'apps/app-runtime/target/failsafe-reports'
+EFFECT_SOURCE = 'apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java'
+EFFECT_RECOVERY = ('io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT', {
+    'processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation'})
 CHARACTERIZATION = ('KeycloakInteropIT', {
     'theVerifierAcceptsAUserTokenFromKeycloakAndReadsItsTenantAndScopes',
     'theWorkloadTokenOfTheAgentClientIsAnAgentOfItsOwnTenant',
@@ -36,10 +39,24 @@ def verify(root, profile, preflight=False, characterization=False):
         if not source.is_file():
             return [f'Missing {source}: Claude must supply the real Java integration test; WP-102 stays partial.']
         return []
+    return _reports(root, profile, test_class, required)
+
+
+def verify_effect_recovery(root, profile, preflight=False):
+    """Require the actual process-death charge/refund test alongside the selected real provider."""
+    if preflight:
+        source = root / EFFECT_SOURCE
+        return [] if source.is_file() else [f'Missing process recovery test source: {source}']
+    return _reports(root, profile, *EFFECT_RECOVERY, strict=True)
+
+
+def _reports(root, profile, test_class, required, strict=False):
     reports = list((root / REPORTS).glob(f'TEST-*{test_class}.xml'))
     if not reports:
-        return [f'No failsafe XML for {test_class}; missing/disabled tests do not establish interoperability.']
+        return [f'No failsafe XML for {test_class}; missing/disabled tests do not establish execution evidence.']
     seen, errors = set(), []
+    if strict and len(reports) != 1:
+        errors.append(f'{test_class}: expected one unambiguous report')
     for report in reports:
         try:
             if report.stat().st_size > 5_000_000:
@@ -53,8 +70,19 @@ def verify(root, profile, preflight=False, characterization=False):
             cases = suite.findall('testcase')
             if not cases:
                 errors.append(f'{report}: zero test cases')
+            if strict:
+                if suite.tag != 'testsuite' or suite.get('name') != test_class:
+                    errors.append(f'{report}: unexpected suite identity')
+                counters = {name: int(suite.attrib[name]) for name in ('tests', 'failures', 'errors', 'skipped')}
+                if counters['tests'] != len(cases) or any(value < 0 for value in counters.values()):
+                    errors.append(f'{report}: inconsistent suite counters')
+                identities = [(case.get('classname'), case.get('name')) for case in cases]
+                if len(identities) != len(set(identities)):
+                    errors.append(f'{report}: duplicate test case identity')
             for case in cases:
-                if not case.get('classname', '').endswith('.' + test_class):
+                classname = case.get('classname', '')
+                valid_class = classname == test_class if strict else classname.endswith('.' + test_class)
+                if not valid_class:
                     errors.append(f'{report}: unexpected test class')
                     continue
                 name = case.get('name', '').split('[', 1)[0]
@@ -62,7 +90,7 @@ def verify(root, profile, preflight=False, characterization=False):
                     errors.append(f'{test_class}#{name}: failed, errored or skipped')
                 else:
                     seen.add(name)
-        except (OSError, ET.ParseError, ValueError) as exc:
+        except (OSError, ET.ParseError, ValueError, KeyError) as exc:
             errors.append(f'{report}: cannot read evidence ({exc})')
     errors += [f'{test_class}: required passing case missing: {name}' for name in sorted(required - seen)]
     return errors
@@ -75,13 +103,19 @@ def main():
     parser.add_argument('--preflight', action='store_true')
     parser.add_argument('--characterization', action='store_true',
                         help='Check known-behavior evidence only; never establishes the strict WP-102 contract')
+    parser.add_argument('--effect-recovery', action='store_true',
+                        help='Also require non-skipped real process-death effect/compensation recovery evidence')
     args = parser.parse_args()
     errors = verify(args.root, args.profile, args.preflight, args.characterization)
+    if args.effect_recovery:
+        errors += verify_effect_recovery(args.root, args.profile, args.preflight)
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         return 1
     kind = 'characterization (WP-102 still partial)' if args.characterization else 'strict contract'
     print(f'Keycloak {args.profile} {kind}: ' + ('Java test source present' if args.preflight else 'required Java cases passed'))
+    if args.effect_recovery:
+        print('Effect process recovery: ' + ('Java test source present' if args.preflight else 'required Java case passed'))
     return 0
 
 

@@ -1,5 +1,23 @@
 # Changelog
 
+- Combined preparation on reviewed #48 and effect/process-CI foundation passed BOTH39381927960 atc1fd835: snapshots6/group SQL11/actual SDK-JPA11/receipt recovery5/restore gate5/CDI tracing3/core effect process recovery1/standard3/native8, zero skips and strict checkers. Production group selector/coordinator/execution/recovery/T13 remains open.
+
+- WP-107 preparation: derive pinned group snapshots from actual SDK listen tasks, scoped approved producer routes and explicit correlation parameters. Preserve duplicate ordinals and empty ANY arrays. Forty selected plain cases pass; full consumer/coordinator/recovery remains open. Exact V72 product4d75161 independently passed both39379015967 lanes (11 SQL cases, zero skips).
+
+- WP-107 storage hardening: additive V72 closes late membership INSERTs after selection and binds members to the original match set; readback also fails closed on changed membership. Thirty local plain cases pass; eleven SQL cases compile and await fresh CI. V71 remains unchanged.
+
+- WP-107 preparation: centrally sequenced V71 and task-fenced group selection retain configuration/deadline, ordered receipt memberships and stream/stop roles. Twenty-eight plain cases/app compile pass; ten PostgreSQL cases await CI. Selection grants no callback, checkpoint or ACK; full consumer/recovery/T13 stays open.
+
+- WP-107 preparation: framework-free listen-group identities preserve duplicate filter ordinals, data/until roles, wildcard ANY and pinned configuration. Receipt-match classification excludes stopping events from data; it grants no execution permission. All172 contract tests pass, including8 new cases; durable storage/coordinator and full acceptance remain open.
+
+- WP-107 preparation: four actual SDK full-workflow listen-group cases establish ALL order/overlap and negative controls for ANY post-completion mutation and concurrent foreach/until completion. All four fixtures validate; these observations do not close durable delivery, FIFO or T13 gates.
+
+- WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. Eight new verifier cases and all76 tooling tests pass; new product process execution still needs fresh Linux CI. No acceptance promotion.
+
+- WP-108/WP-112 preparation: bounded, content-free OTel effect/dispatch/lookup/compensation spans, disabled SDK by default with runtime collector opt-in. Five local SDK/fault cases pass; three real ledger/CDI cases compile and await Linux execution. Governed Flow/adapter tracing and complete acceptance stay open.
+
+- WP-108 preparation: additive V70 protects effect intent identity, replay contract, irreversible state/attempt evidence and retained journal/compensation links. Five direct-SQL cases compile; Linux execution/review and original governed adapter/manual/audit/recovery gates remain open.
+
 This log records implemented capabilities and their requirement coverage. Entries describe unreleased development work.
 A merged component or passing acceptance case does not close an entire platform requirement. The full
 remaining checklist is [TODO.md](TODO.md); implementation status is maintained in
@@ -10,6 +28,8 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 - WP-103 shared contract preparation: immutable registry/task resource-call attribution, stable invocation keys distinct from target/request fingerprints, governed thread derivation and verified issuer/jti binding port. All170 contracts pass; backend/admission/dispatch and actual workflow success remain open.
 
 - WP-107 integration: #48 merged after exact Claude approval, independent full verification and green full/strict provider CI. Group/coordinator/FIFO/foreach/until/loop, process/partition, effect and full T13 gates remain partial.
+
+- WP-108 partial: publish an explicit effect scope/registry-owner contract that preserves existing recovery keys, plus the current authority/manual-policy/central-audit handoff. Four scope and two existing key cases pass; no effect/operator consumer or package gate is activated by the value type.
 
 - WP-107 partial: repair actual committed receipt ACKs in bounded batches before the reconciler starts restored work, preserving identity/cancellation gates and failed-repair readiness. Ten new database/reader/lifecycle cases compile; execution/review and complete distributed consumer/T13 gates remain open.
 
