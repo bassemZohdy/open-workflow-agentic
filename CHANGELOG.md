@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-103 preparation: JDK-only full-scope execution entry, separate private fence signature and exact UUID checkpoint/outcome association with one bounded canonical stored-Base64 fingerprint.189 contracts including6 new and actual pinned serializer interoperability1/application test compilation pass. No durable gate, consumer/dispatch activation or package promotion; exact peer/full/strict review follows sole #55.
+
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 
 - WP-108 preparation: refuse interrupted callers before effect/refund dispatch and after blocking ledger/cleanup work, preserving committed facts and original recovery keys. Six local interruption cases pass; four new PostgreSQL cases compile and need fresh Linux execution. This is cooperative thread handling, not complete Flow/owner/authority cancellation.

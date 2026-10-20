@@ -35,4 +35,6 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 
 | [0027](0027-identify-retained-audit-projections-and-draft-content.md) | Identify retained audit projections and draft content | Proposed contract foundation |
 
+| [0028](0028-bind-resource-entry-and-retained-graph-outcomes.md) | Bind resource entry and retained graph outcomes | Proposed contract foundation |
+
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.
