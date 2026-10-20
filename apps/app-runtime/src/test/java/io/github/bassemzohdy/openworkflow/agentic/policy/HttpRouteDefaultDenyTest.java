@@ -65,11 +65,18 @@ class HttpRouteDefaultDenyTest {
                 continue;
             }
             route = parts[0] + " " + path; // the report names the route, not the probe media type
-            int status = given().redirects().follow(false).contentType(contentType).body("{}")
+            boolean gap = KNOWN_GAPS.contains(parts[0] + " " + path);
+            // A known gap is reachable, so a valid-looking body would RUN its logic (the research agent writes SDK
+            // checkpoints; a failing run poisons the shared persistence gate for unrelated tests). The probe is therefore
+            // malformed JSON: a route that is still open rejects it as a 400 before any logic runs, and a route that has
+            // been authenticated answers 401.
+            int status = given().redirects().follow(false).contentType(contentType).body(gap ? "{" : "{}")
                     .when().request(parts[0], path).statusCode();
-            if (KNOWN_GAPS.contains(parts[0] + " " + path)) {
+            if (gap) {
                 if (status == 401) {
                     failures.add(route + " is now authenticated: remove it from KNOWN_GAPS");
+                } else if (status != 400) {
+                    failures.add(route + " (known gap) answered " + status + " to a malformed body instead of 400");
                 }
                 continue;
             }
