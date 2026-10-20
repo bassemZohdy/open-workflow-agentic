@@ -1,0 +1,16 @@
+document:
+  dsl: '1.0.3'
+  namespace: agentic
+  name: cancel-checkpoint-successor
+  version: '1.0.0'
+  title: Independent workflow after cancellation
+  summary: Test fixture performs a local set with actual checkpoint persistence.
+input:
+  schema:
+    format: json
+    document:
+      type: object
+do:
+  - finish:
+      set:
+        ok: true

@@ -7,6 +7,8 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ## [Unreleased]
 
+- WP-107 partial: add retained wait identities, dispatch reservations and a checkpoint-proof acknowledgement port. SDK delivery, lost-claim fencing and full T13 remain open; the protocol is not activated.
+
 - WP-102 partial: add V65 immutable issuer/jti-to-grant schema with tenant binding and expiry retention. Product admission integration and native-provider lifetime compatibility remain open.
 - WP-107 partial: guard actual Flow checkpoint commits against swallowed lifecycle failures; hold failed/unknown writes, report readiness down and refuse new starts until restore. Durable inbox acknowledgement and full T13 remain open.
 

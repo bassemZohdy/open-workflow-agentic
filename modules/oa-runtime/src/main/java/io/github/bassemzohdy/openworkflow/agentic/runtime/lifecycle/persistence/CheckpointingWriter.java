@@ -22,7 +22,8 @@ public final class CheckpointingWriter implements PersistenceInstanceWriter {
         var definition = workflow.definition().id();
         var checkpoint = new CheckpointCommitObserver.Checkpoint(workflow.instanceData().id(), definition.namespace(),
                 definition.name(), definition.version(), task == null ? null : task.position().jsonPointer(), task == null ? 0 : task.iteration());
-        return gate.commit(op, action, () -> observer.committed(op, checkpoint));
+        return gate.commit(op, action, () -> observer.committed(op, checkpoint),
+                () -> op == ABORTED || workflow.instanceData().status() != io.serverlessworkflow.impl.WorkflowStatus.CANCELLED);
     }
     public CompletableFuture<Void> started(WorkflowContextData w) { return write(STARTED, w, null, () -> delegate.started(w)); }
     public CompletableFuture<Void> completed(WorkflowContextData w) { return write(COMPLETED, w, null, () -> delegate.completed(w)); }

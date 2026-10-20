@@ -222,6 +222,7 @@ Implemented scope:
 - Strict matrix39354646523 at665547e: standard3/3 and delegation6/6 real-provider cases pass non-skipped with matching evidence checkers; full CI39354646488 green. H3 actor expiry and H4 exact grant/chain binding still block acceptance; latest0aeb52f route inventory integrated and new combined CI required.
 - H3 actor-expiry bound at Claude b0e3b18: full CI39355478836/34 exchanger cases pass. V65 H4 schema provided in GPT f97f193; five direct SQL cases pass in full CI39356040766 atd05fc17. H4 product consumer is still open.
 - ADR0021 H3 freshness direction selected for implementation, explicitly superseding actor-output-exp acceptance only when replacement including H4 passes. Old strict baseline remains; current #39 1abcfbd is reviewed as incompatibility evidence only, not provider acceptance.
+- Shared checkpoint correction: diagnostic SDK1893c17/39364160057 reproduced late task completion after SDK cancellation deleting its parent (real JPA23503, one new failing case in both lanes). Gate now holds known-cancelled work without ACK/success or poisoning independent work; transaction-scoped SDK mutation/cleanup ordering prevents resurrection. Active failures and required ABORTED cleanup retain their gates. Ten local gate/writer/SDK unit cases pass; two real-JPA regressions and corrected current CI remain pending. Current #39 fc0376c still has two P1 acceptance findings and failed full build despite green matrix; H3/H4 unintegrated, package partial.
 
 PR #40 integrates reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858. KeycloakInteropIT is characterization only; all ten cases were skipped in build run 39262137012. Separate non-skipped characterization CI is wired; strict H1/H2 consumer cases and WP-102 closure remain open. No merge to main or real-provider pass is claimed.
 
@@ -337,12 +338,16 @@ Implemented scope:
 - Bounded canonical envelope, audit/metrics and scoped ingress passed full CI 39352802891 at 04b421f (6 unit, 4 HTTP, 1 native policy, 9 JDBC inbox cases).
 - Actual JPA writer success observer and bounded fail-closed checkpoint gate implemented; unhealthy readiness/new-start refusal and 14 local unit cases pass. Current-head application binding/full CI and durable inbox acknowledgement remain open.
 - Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open.
+- PR #41 checkpoint/ingress increment merged as e738218 after Claude exact-head APPROVE-partial at cd3f57b and CI39355182128; postmerge main CI39357918414 passed. WP-107/T13 stay partial.
+- Dispatch protocol successor adds immutable occurrence identity, retained deadlines/dispositions, same-session reservations and explicit checkpoint-proof ACK port. Local application test-compile and two identity cases pass; nine PostgreSQL protocol cases await CI. No SDK consumer/proof implementation is activated.
+- Dispatch protocol754507a passed9/9 real PostgreSQL cases, zero skips, in CI39358587955. Overall build failed only the route media probe; Claude0cf85d6 correction integrated via GPT004fd9e and current full CI/review renewed. No actual SDK consumption/T13 proof.
 
 Additional closure/integration tasks:
 
 - [ ] Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.
 - [ ] Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.
 - [ ] Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.
+- [ ] Integrate authoritative SDK task-completed receipt proof, bounded delivery coordinator and lost-claim fencing; prove loop/parallel restore and checkpoint-before-ACK crash recovery with actual engine persistence. Protocol-port doubles are not T13 proof.
 
 Acceptance gates:
 
