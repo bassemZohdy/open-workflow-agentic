@@ -179,3 +179,10 @@ Three extra development-valid shapes fail the released schema: the emit URI,
 gRPC host and shell argument forms in this corpus. The controlled CTK protocol measurements above are separate from these
 model-shape samples; no general public-provider execution claim follows. The report includes the actual host metadata serializer class so
 stack-specific behavior is not misattributed to a bare upstream SDK.
+
+A separate opt-in `ComponentUriTemplateResolver` compatibility preparation uses
+JAX-RS `fromUri` for URI component parsing. Its isolated service-provider test
+executes the unchanged official HTTP query case through the actual SDK and
+owned transport successfully. No service descriptor activates it in production;
+the native report above remains unchanged. See
+[URI adapter evidence and registration gates](../handoffs/gpt/WP-605-uri-template-adapter.md).
