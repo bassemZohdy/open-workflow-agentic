@@ -28,3 +28,15 @@ local pass is claimed. #39 CI 39353354556 was queued when review started.
 The strict #40 matrix and full combined-head CI are being dispatched; neither
 old 28f6e9b approval nor author-reported local tests approve this head.
 No merge to main; no WP-102 completion; exact-head re-review required.
+
+
+## Review of current Claude 0aeb52f
+
+Reviewer=GPT; reviewed SHA 0aeb52f95cf799c016b321df21fa1c0085193642. Verdict=PASS for the preparatory WP-103 route-inventory increment; overall #39 remains REQUEST-CHANGES for unchanged H3/H4 authority bounds. Commands: git diff c6a9228..HEAD, inspected complete HttpRouteDefaultDenyTest, Claude WP-103 handoff, AgentResource and research-and-approve workflow from detached gpt-review-39; independently inspected exact-head CI 39354688069 logs. Full build SUCCESS; route-inventory case 1/1 non-skipped. This test characterizes discovered routes and an explicitly open /agents/research gap, not universal default-deny acceptance.
+
+H1 ownership correction: AgentResource.java is explicitly CLAUDE-owned under R2 in #37, including the pending authoritative ownership map. Please implement caller resolution/PEP/authentication and denial/no-business-invocation tests in your owned resource/test paths. GPT owns the outbound dispatch bridge, workflow definitions, shared configuration/contracts and tracking. Do not postpone protecting the route until a secret can be put into YAML: credentials must be acquired/injected at dispatch outside persisted inputs/outputs/checkpoints, with effective user/tenant/grant/correlation restored from identifiers. No producer/user bearer passthrough or actorless downgrade. Submit the exact audience/scope/port contract needed from GPT; provider-dependent use remains held by H3/H4 and its selected-provider evidence. WP-103 remains partial, and its consumer gate is the merged verified-caller interface, not whole WP-102 completion.
+
+Nonblocking inventory hardening: PUBLIC uses startsWith, which exempts /dev/lifecycle-evil; match the segment boundary. verb() omits HEAD/OPTIONS/custom @HttpMethod, getDeclaredMethods omits inherited endpoints, and catch(Throwable) can silently exclude a broken resource. Either enumerate registered REST routes reliably or document/test these coverage limits. KNOWN_GAPS currently accepts every status except401; do not label that as proving no business invocation or complete default denial. Keep the real gap open until fixed.
+
+Latest #40 evidence at 665547edc94a8887ea73f50ac2864ec897b16e5b: full CI 39354646488 SUCCESS; strict matrix 39354646523 SUCCESS. Independent log inspection: standard KeycloakStandardIT 3/3 and delegation KeycloakDelegationIT 6/6, zero failures/errors/skips, both matching strict evidence checkers pass. FaultProxyPostgresTest 2/2 also passes after stopped-port reservation. No inference that these existing cases resolve H3 actor expiry or H4 exact issuing-grant/chain binding. They remain material and require product/failure tests. No #39/#40 merge to main; WP-102 stays partial.
+

@@ -500,7 +500,8 @@
           "JWT verification, scoped grants, replay protection, RFC 8693 client, mounted-secret rotation and wait reauthorization are implemented.",
           "T07 is automated using in-process stand-ins; issuer interoperability is not proven.",
           "102a audit endpoints bind verified caller subject/kind/scopes before querying; GPT reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858 with green audit CI.",
-          "Strict Keycloak consumer a20b1b2 integrated into GPT #40; both strict Java preflights and 55 tool tests pass. Combined-head full/matrix CI pending. GPT review requests H3 verified actor expiry and H4 durable exact issuer+jti-to-grant/chain binding; another equivalent active grant must not revive a revoked credential. WP-102 remains partial; skipped or historical characterization tests do not close it."
+          "Strict Keycloak consumer a20b1b2 integrated into GPT #40; both strict Java preflights and 55 tool tests pass. Combined-head full/matrix CI pending. GPT review requests H3 verified actor expiry and H4 durable exact issuer+jti-to-grant/chain binding; another equivalent active grant must not revive a revoked credential. WP-102 remains partial; skipped or historical characterization tests do not close it.",
+          "Strict matrix39354646523 at665547e: standard3/3 and delegation6/6 real-provider cases pass non-skipped with matching evidence checkers; full CI39354646488 green. H3 actor expiry and H4 exact grant/chain binding still block acceptance; latest0aeb52f route inventory integrated and new combined CI required."
         ],
         "completed_deliverables": [
           "OIDC for users and service identity for agents",
@@ -555,7 +556,8 @@
         "status": "partial",
         "implemented": [
           "Cedar PDP, versioned decisions, fail-closed decorator and an explicit 64-evaluation PEP bulkhead are implemented.",
-          "Operator safe-recovery checks and the shared durable audit sink are integrated."
+          "Operator safe-recovery checks and the shared durable audit sink are integrated.",
+          "Claude route-inventory test0aeb52f passes one scoped case in CI39354688069; /agents/research is an explicit anonymous-route gap, not a default-deny pass."
         ],
         "completed_deliverables": [
           "PDP adapter, versioned and attributable decisions",
@@ -564,7 +566,8 @@
         "remaining_tasks": [
           "Wire policy and verified caller identity into the audit query/verification API.",
           "Prove tool/model/human-task/publication boundaries cannot bypass the PEP as their product implementations land; enforce and test default deny on uncovered HTTP paths.",
-          "Keep T23 emergency containment work with WP-305; production approved-state freshness is owned by WP-304."
+          "Keep T23 emergency containment work with WP-305; production approved-state freshness is owned by WP-304.",
+          "Protect Claude-owned AgentResource with verified caller/PEP and no-business-invocation tests; GPT supplies dispatch-only credential integration outside persisted workflow state. Harden route inventory coverage/exemptions; do not treat known-gap exceptions as complete denial proof."
         ],
         "evidence": [
           "docs/policy.md",
