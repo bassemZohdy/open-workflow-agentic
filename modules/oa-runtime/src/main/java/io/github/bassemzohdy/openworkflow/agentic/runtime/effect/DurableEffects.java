@@ -28,6 +28,14 @@ import org.jboss.logging.Logger;
 @ApplicationScoped
 @Transactional(Transactional.TxType.NOT_SUPPORTED)
 public class DurableEffects {
+    /** Internal opt-in hooks. Legacy CDI calls keep their existing protocol; AuditedEffects supplies every hook. */
+    interface Boundary {
+        JdbcEffectLedger.Prepared prepare(EffectCommand command, Duration window, Instant now);
+        void beforeTarget(EffectCommand command, boolean lookup);
+        void afterPrepared(EffectCommand command);
+        void beforeCompensation(EffectKey original);
+        void beforeReturn();
+    }
     private static final Logger LOG = Logger.getLogger(DurableEffects.class);
     private final JdbcEffectLedger ledger;
     private final Clock clock;
@@ -47,28 +55,36 @@ public class DurableEffects {
     }
 
     public Effect execute(EffectCommand command, EffectTarget target) {
-        Effect result=telemetry.effect(EffectTelemetry.Operation.EXECUTE,()->executeCommand(command,target));
+        return execute(command,target,null);
+    }
+
+    Effect execute(EffectCommand command, EffectTarget target, Boundary boundary) {
+        Effect result=telemetry.effect(EffectTelemetry.Operation.EXECUTE,()->executeCommand(command,target,boundary));
         requireNotInterrupted(); // Claim release and optional tracing cleanup can block after the inner outcome check.
+        if(boundary!=null)boundary.beforeReturn();
+        requireNotInterrupted();
         return result;
     }
 
-    private Effect executeCommand(EffectCommand command,EffectTarget target) {
+    private Effect executeCommand(EffectCommand command,EffectTarget target,Boundary boundary) {
         requireNotInterrupted();
         requireTarget(command, target);
         requireNotInterrupted();
         if (!slots.tryAcquire()) throw new JdbcEffectLedger.EffectBusyException();
-        try { return ledger.exclusively(command.key(), () -> {requireNotInterrupted();return executeLocked(command, target);}); }
+        try { return ledger.exclusively(command.key(), () -> {requireNotInterrupted();return executeLocked(command, target,boundary);}); }
         finally { slots.release(); }
     }
 
-    private Effect executeLocked(EffectCommand command, EffectTarget target) {
+    private Effect executeLocked(EffectCommand command, EffectTarget target, Boundary boundary) {
         Duration window = Objects.requireNonNull(target.replayWindow(), "replayWindow");
         requireNotInterrupted();
-        JdbcEffectLedger.Prepared prepared = ledger.prepare(command, window, clock.instant());
-        return executePrepared(command, target, prepared);
+        JdbcEffectLedger.Prepared prepared = boundary==null?ledger.prepare(command, window, clock.instant()):boundary.prepare(command,window,clock.instant());
+        Effect result=executePrepared(command, target, prepared,boundary);
+        if(boundary!=null)boundary.afterPrepared(command);
+        return result;
     }
 
-    private Effect executePrepared(EffectCommand command, EffectTarget target, JdbcEffectLedger.Prepared prepared) {
+    private Effect executePrepared(EffectCommand command, EffectTarget target, JdbcEffectLedger.Prepared prepared, Boundary boundary) {
         requireNotInterrupted();
         Duration window = Objects.requireNonNull(target.replayWindow(), "replayWindow");
         requireNotInterrupted();
@@ -77,15 +93,16 @@ public class DurableEffects {
         Reply result;
         if (!prepared.attempted()) {
             ledger.markAttempted(command.key()); // This commit MUST succeed before dispatch.
-            result = dispatch(target, command.key());
+            result = dispatch(target, command,boundary,null,null);
         } else {
-            result = lookup(target, command.key());
+            result = lookup(target, command,boundary);
             Instant now = clock.instant();
             if (result.outcome() == EffectTarget.Outcome.UNKNOWN) requireNotInterrupted();
             if (result.outcome() == EffectTarget.Outcome.UNKNOWN && prepared.replayUntil() != null
                     && now.isBefore(prepared.replayUntil()) && !window.isZero()
                     && now.isBefore(prepared.createdAt().plus(window))) {
-                result = dispatch(target, command.key());
+                if(boundary!=null)ledger.markReplayAttempt(command.key());
+                result = dispatch(target, command,boundary,prepared,window);
             }
         }
         if (result.outcome() == EffectTarget.Outcome.UNKNOWN) {
@@ -108,12 +125,18 @@ public class DurableEffects {
 
     /** Compensation has its own durable intent/key; loss of its acknowledgment is recovered like any other effect. */
     public Effect compensate(EffectKey original, EffectCommand compensation, EffectTarget target) {
-        Effect result=telemetry.effect(EffectTelemetry.Operation.COMPENSATE,()->compensateCommand(original,compensation,target));
+        return compensate(original,compensation,target,null);
+    }
+
+    Effect compensate(EffectKey original, EffectCommand compensation, EffectTarget target, Boundary boundary) {
+        Effect result=telemetry.effect(EffectTelemetry.Operation.COMPENSATE,()->compensateCommand(original,compensation,target,boundary));
+        requireNotInterrupted();
+        if(boundary!=null)boundary.beforeReturn();
         requireNotInterrupted();
         return result;
     }
 
-    private Effect compensateCommand(EffectKey original,EffectCommand compensation,EffectTarget target) {
+    private Effect compensateCommand(EffectKey original,EffectCommand compensation,EffectTarget target,Boundary boundary) {
         requireNotInterrupted();
         requireTarget(compensation, target);
         requireNotInterrupted();
@@ -127,6 +150,7 @@ public class DurableEffects {
                 Effect before = ledger.find(original).orElseThrow();
                 requireNotInterrupted();
                 if (before.state() == EffectState.INTENDED) throw new IllegalStateException("resolve original first");
+                if(boundary!=null)boundary.beforeCompensation(original);
                 Effect undo = ledger.exclusively(compensation.key(), () -> {
                     requireNotInterrupted();
                     Duration window=Objects.requireNonNull(target.replayWindow(),"replayWindow");
@@ -135,7 +159,9 @@ public class DurableEffects {
                             window, clock.instant());
                     requireNotInterrupted();
                     if (before.state() == EffectState.COMPENSATED) return prepared.effect();
-                    return executePrepared(compensation, target, prepared);
+                    Effect result=executePrepared(compensation, target, prepared,boundary);
+                    if(boundary!=null)boundary.afterPrepared(compensation);
+                    return result;
                 });
                 if (before.state() == EffectState.COMPENSATED) {requireNotInterrupted();return before;}
                 if (undo.state() == EffectState.CONFIRMED) {
@@ -168,20 +194,33 @@ public class DurableEffects {
         if(Thread.currentThread().isInterrupted()) throw new CancellationException("effect caller interrupted");
     }
 
-    private Reply dispatch(EffectTarget target, EffectKey key) {
+    private Reply dispatch(EffectTarget target, EffectCommand command, Boundary boundary,
+                           JdbcEffectLedger.Prepared replayOf,Duration replayWindow) {
         return telemetry.target(EffectTelemetry.Operation.DISPATCH,()->{
             requireNotInterrupted(); // After blocking intent/attempt writes and telemetry setup, immediately before target I/O.
-            try { return Objects.requireNonNull(target.execute(key.idempotencyKey()), "target reply"); }
+            if(boundary!=null)boundary.beforeTarget(command,false); // Outside target-exception-to-UNKNOWN conversion.
+            requireNotInterrupted();
+            // Telemetry, audit or the current authority fence may block beyond the replay decision above.
+            // Never send after either original or current guaranteed key-retention window has ended.
+            if(replayOf!=null) {
+                Instant now=clock.instant();
+                if(replayOf.replayUntil()==null || replayWindow.isZero() || !now.isBefore(replayOf.replayUntil())
+                        || !now.isBefore(replayOf.createdAt().plus(replayWindow)))
+                    throw new IllegalStateException("effect replay retention ended before dispatch");
+            }
+            try { return Objects.requireNonNull(target.execute(command.key().idempotencyKey()), "target reply"); }
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
             } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }
         });
     }
 
-    private Reply lookup(EffectTarget target, EffectKey key) {
+    private Reply lookup(EffectTarget target, EffectCommand command, Boundary boundary) {
         return telemetry.target(EffectTelemetry.Operation.LOOKUP,()->{
             requireNotInterrupted();
-            try { return Objects.requireNonNull(target.lookup(key.idempotencyKey()), "lookup reply"); }
+            if(boundary!=null)boundary.beforeTarget(command,true);
+            requireNotInterrupted();
+            try { return Objects.requireNonNull(target.lookup(command.key().idempotencyKey()), "lookup reply"); }
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
             } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }

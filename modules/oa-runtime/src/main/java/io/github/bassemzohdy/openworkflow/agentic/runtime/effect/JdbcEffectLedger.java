@@ -237,6 +237,17 @@ public class JdbcEffectLedger implements EffectLedger {
         });
     }
 
+    /** Audited replay gets a distinct retained dispatch fact; it never creates another business key or resets time. */
+    void markReplayAttempt(EffectKey key) {
+        transaction(c -> {
+            var current=locked(c,key);
+            if(!current.attempted() || current.effect().state()!=EffectState.INTENDED)
+                throw new IllegalStateException("replay requires an unresolved prior attempt");
+            journal(c,key,EffectState.INTENDED,EffectState.INTENDED,"effect.dispatch");
+            return null;
+        });
+    }
+
     public void requireManualResolution(EffectKey key, String reason) {
         Checks.requireText("reason", reason, 64);
         transaction(c -> {

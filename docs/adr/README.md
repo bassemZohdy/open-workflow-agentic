@@ -41,4 +41,6 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 
 | [0030](0030-reserve-model-node-allowances-before-callbacks.md) | Reserve model-node allowances before callbacks | Proposed; consumer/usage/restore gates remain |
 
+| [0031](0031-require-complete-effect-audit-before-io.md) | Require complete effect audit before target I/O and private results | Proposed; consumer/authority/Flow gates remain |
+
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.

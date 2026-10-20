@@ -127,4 +127,22 @@ class DurableEffectsCancellationTest {
             assertEquals(EffectState.CONFIRMED,effects.execute(COMMAND,target).state());assertEquals(1,target.dispatch);
         }
     }
+    @Test void replayWindowIsCheckedAgainAfterBlockingDispatchTelemetry() {
+        var instant=new java.util.concurrent.atomic.AtomicReference<>(NOW);
+        var clock=new Clock(){
+            @Override public ZoneId getZone(){return ZoneOffset.UTC;}
+            @Override public Clock withZone(ZoneId zone){return this;}
+            @Override public Instant instant(){return instant.get();}
+        };
+        var ledger=new Ledger();ledger.attempted=true;var target=new Target();
+        var telemetry=new EffectTelemetry(io.opentelemetry.api.OpenTelemetry.noop()){
+            @Override public EffectTarget.Reply target(Operation operation,Supplier<EffectTarget.Reply> work){
+                if(operation==Operation.DISPATCH)instant.set(NOW.plus(Duration.ofHours(2)));
+                return super.target(operation,work);
+            }
+        };
+        assertThrows(IllegalStateException.class,()->new DurableEffects(ledger,clock,telemetry).execute(COMMAND,target));
+        assertEquals(1,target.lookup);assertEquals(0,target.dispatch);assertEquals(0,ledger.outcomes);
+        assertEquals(EffectState.INTENDED,ledger.effect.state());
+    }
 }

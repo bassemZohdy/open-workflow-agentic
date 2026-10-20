@@ -1,6 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.effect;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.IdempotentAuditSink;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import jakarta.transaction.Transaction;
@@ -86,6 +87,64 @@ public final class EffectAuditDelivery {
     /** One bounded pass, no internal retry loop. Failure preserves unacknowledged work and stops the pass. */
     public List<AuditReceipt> drain(int limit) {
         var receipts=new ArrayList<AuditReceipt>();for(long id:ready(limit))receipts.add(deliver(id));return List.copyOf(receipts);
+    }
+
+    /**
+     * One complete bounded key history, not a page that can hide an unacknowledged tail. Every retained source,
+     * including an already ACKed source, goes through trusted consumer readback again. Missing source/queue,
+     * wrong full scope, more than 128 facts, concurrent history growth or changed central binding refuses.
+     * This internal barrier remains DATA/protocol verification, not chain authenticity or caller authority.
+     */
+    void synchronize(EffectScope scope,EffectKey key) {
+        isolated(()->{
+            var before=snapshot(scope,key,null);
+            var receipts=new ArrayList<AuditReceipt>();
+            for(var fact:before)receipts.add(deliver(fact.source().sequence()));
+            if(!before.equals(snapshot(scope,key,receipts)))
+                throw new IllegalStateException("effect history changed during mandatory audit");
+            return null;
+        });
+    }
+    private List<EffectAuditProducer.Retained> snapshot(EffectScope scope,EffectKey key,List<AuditReceipt> receipts) {
+        scope.requireKey(key);
+        return Transactions.inTransaction(dataSource,c->{
+            c.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+            try(var limits=c.createStatement()){limits.execute("set local lock_timeout='2s'; set local statement_timeout='5s'");}
+            if(!producer.bound(c,key).orElseThrow().scope().equals(scope))
+                throw new IllegalStateException("effect audit full scope differs");
+            var facts=new ArrayList<EffectAuditProducer.Retained>();
+            try(var q=c.prepareStatement("""
+                select e.id,a.source_event_id as source_id,w.source_event_id as queue_id,
+                  w.thread_name,w.node_id,w.idempotency_key,w.ack_source_key,w.acked_at,
+                  b.event_id,b.chain_id,b.chain_sequence,b.hash,b.content_fingerprint
+                from effect.event e left join effect.audit_source a on a.source_event_id=e.id
+                left join effect.audit_delivery w on w.source_event_id=e.id
+                left join audit.source_binding b on b.source_key=w.ack_source_key
+                where e.thread_name=? and e.node_id=? and e.idempotency_key=? order by e.id limit 129
+                """)) {
+                q.setString(1,key.threadId().value());q.setString(2,key.nodeId());q.setString(3,key.idempotencyKey());
+                try(var r=q.executeQuery()) {while(r.next()) {
+                    if(facts.size()==128 || r.getObject("source_id")==null || r.getObject("queue_id")==null
+                            || !key.threadId().value().equals(r.getString("thread_name"))
+                            || !key.nodeId().equals(r.getString("node_id")) || !key.idempotencyKey().equals(r.getString("idempotency_key")))
+                        throw new IllegalStateException("effect audit history is missing, changed or exceeds the bounded barrier");
+                    var fact=producer.find(c,r.getLong("id")).orElseThrow();
+                    if(receipts!=null) {
+                        if(facts.size()>=receipts.size() || !fact.source().key().equals(r.getString("ack_source_key"))
+                                || r.getTimestamp("acked_at")==null || r.getString("event_id")==null)
+                            throw new IllegalStateException("effect audit acknowledgment missing or changed");
+                        var stored=new AuditReceipt(fact.source(),Ulid.parse(r.getString("event_id")),r.getString("chain_id"),
+                                r.getLong("chain_sequence"),r.getString("hash"),r.getString("content_fingerprint"));
+                        stored.requireMatches(fact.source(),fact.draft());
+                        if(!stored.equals(receipts.get(facts.size())))throw new IllegalStateException("effect audit receipt changed");
+                    }
+                    facts.add(fact);
+                }}
+            }
+            if(facts.isEmpty() || (receipts!=null && receipts.size()!=facts.size()))
+                throw new IllegalStateException("effect audit history is empty or changed");
+            return List.copyOf(facts);
+        });
     }
     private <T> T isolated(Supplier<T> action) {
         Transaction caller;
