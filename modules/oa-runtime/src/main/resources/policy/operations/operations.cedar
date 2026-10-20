@@ -39,3 +39,10 @@ when { context.scopes.contains("oa.audit.read") };
 @id("audit.verify-chains")
 permit (principal is User, action == Action::"data_access", resource == Resource::"audit.chains.verify")
 when { context.scopes.contains("oa.audit.verify") };
+
+// WP-108: a manual decision on an unknown governed effect (resolve it as applied, or release it for another attempt).
+// It needs oa.recover and nothing else: oa.operate (retry, recover) does not cover it, and it is not a safe-recovery
+// operation, so when the policy engine is unavailable it is refused and nothing changes.
+@id("operations.resolve-effect")
+permit (principal is User, action == Action::"operation", resource == Resource::"operation:resolve-effect")
+when { context.scopes.contains("oa.recover") };

@@ -140,7 +140,9 @@ public final class Pep {
     public enum InstanceOperation {
         INSPECT("operation:inspect"),
         RETRY("operation:retry"),
-        RECOVER("operation:recover");
+        RECOVER("operation:recover"),
+        /** A manual decision on an unknown governed effect (WP-108); needs the verified oa.recover scope. */
+        RESOLVE_EFFECT("operation:resolve-effect");
 
         private final String resource;
 

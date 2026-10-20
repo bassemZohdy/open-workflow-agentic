@@ -49,7 +49,7 @@ class PepInstanceOperationTest {
                     pep.instanceOperation(op, OPERATOR, INSPECT, INSTANCE).outcome(), op.name());
         }
         List<AuthorizationRequest> received = engine.received();
-        assertEquals(List.of("operation:inspect", "operation:retry", "operation:recover"),
+        assertEquals(List.of("operation:inspect", "operation:retry", "operation:recover", "operation:resolve-effect"),
                 received.stream().map(AuthorizationRequest::resource).toList());
         assertTrue(received.stream().allMatch(r -> INSTANCE.equals(r.taskId())),
                 "the request names the instance as its task id");
@@ -71,7 +71,7 @@ class PepInstanceOperationTest {
                 .filter(r -> "true".equals(r.attributes().get("policy.recoveryPath"))
                         && "DENY".equals(r.attributes().get("policy.outcome")))
                 .count();
-        assertEquals(3, recoveryRefusals);
+        assertEquals(InstanceOperation.values().length, recoveryRefusals);
     }
 
     @Test
