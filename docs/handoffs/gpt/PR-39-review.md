@@ -139,3 +139,118 @@ acceptance; the freshness decision already exists, not a second open decision.
 9/9 pass, zero failures/errors/skips. Overall build failed ONLY on the route
 probe415 above (197 app cases, one failure); no full-green or T13 claim. Refresh
 #42 after this route integration, preserving partial SDK/proof/fencing gates.
+
+## New H4 time checks: e6e36aa source review
+
+Reviewer=GPT; inspected e6e36aa16817d75d76929226d3aa3b14a7769eed and af08d06
+with git show from detached gpt-review-39. Verdict=REQUEST-CHANGES overall.
+Resource own-clock exp/iat/exact-duration checks and exchanger slow-bind/grant
+regression address the earlier source findings. The final local clock check is
+still before a blocking replay.use (guard) / recheckGrant (exchanger); check the
+clock again after the last blocking call before returning authority. Add those
+latency cases. The slow-proof regression's cache.use("probe|x") checks another
+key and does not establish that the actual credential's replay use stayed unused.
+No local DB re-execution; source inspection only, no product PASS inferred.
+H3 freshness direction is already selected in ADR0021; implement before request
+and after all slow bind/audit calls at release, then supply deterministic native
+proof. GitHub requests: #39 comment6282126670, #40 comment6282127030.
+
+Exact b7d3bdd matrix39359163791 standard lane passed6 JdbcIssuedTokenBindingsTest
+and3 KeycloakStandardIT, zero skips. Delegation stopped on old stopped-port bind
+before app/provider tests; it yields no delegation result. Current GPT eae54a6
+contains the shared TCP/JDBC test allocation correction. Prior004fd9e full/matrix
+and a35e3ef full builds passed; those passes do not resolve amended identity gates.
+
+## Current #39 freshness/binding review: fc0376c
+
+Reviewer=GPT; reviewed fc0376c475e70a55d880c93c99b6d5924d5b6a52 from detached
+gpt-review-39. Commands: git diff e6e36aa..fc0376c, git showfc0376c and full
+verifyInputs/requestToken/accept/releaseCheck/guard/new test inspection. No local
+DB repetition. Verdict=REQUEST-CHANGES for two remaining ADR acceptance gaps.
+H4 metadata/mandatory dependencies/independent commit and final resource/release
+checks are addressed on inspection. Exact build39362289998/matrix39362290043
+are live; no pass inferred yet.
+
+P1: verifyInputs samples now BEFORE blocking subject/actor verification, and
+requestToken subsequently resolves a secret before http.send. Resample and enforce
+actor freshness/subject expiry immediately before http.send after verification,
+secret lookup and any final grant read. Add slow verifier and SecretProvider
+cases asserting INPUT_REJECTED and unchanged actual issuer request count; final
+release rejection alone does not satisfy pre-request freshness.
+
+P1: accept checks residual exp<=now+300s but not positive exact exp-iat<=300s or
+signed iat<=now+5s. A signed iat=now-301/exp=now+299, or future iat=now+6 with
+exp=now+120, can be returned and bound despite the ADR (guard correctly refuses
+it later). Enforce before binding/audit/release, with signed-response regressions,
+not metadata shortening or reliance on a later resource.
+
+The transport test meaningfully covers a real stalled PostgreSQL connection and
+recovery. cutConnections runs after failed calls returned, so it is not separate
+active-SQL-cut evidence. A lost commit ACK can legitimately leave an orphan
+binding while discarding the token; do not require rollback on an unknown commit.
+Published findings: #39 comment6282376227 / #40 comment6282376516. Current #35
+747ce7e remains unchanged/green and still needs Claude's exact review. Claude
+reviewed #42 2f21aaf in comment6282145103: APPROVE-WITH-COMMENTS for the partial
+protocol store, N1 required before consumer wiring (fixed on the SDK successor).
+
+Exact fc0376c matrix39362290043 SUCCESS; full build39362289998 FAILED with
+downstream lifecycle failures after the checkpoint barrier became unhealthy.
+Reviewer=GPT; `gh run view 39362289998 --log-failed` inspected, no first underlying
+writer error recorded. Verdict remains REQUEST-CHANGES; provider success cannot
+waive full-build failures. GPT is adding bounded structural first-failure logging
+and a deterministic late-cancellation/checkpoint regression on its SDK branch.
+The cancellation race is unproven pending execution; no behavior weakened.
+
+## Current a1b1c0b source review
+
+Reviewer=GPT; reviewed a1b1c0b215d2f00cdd034be123058404de57f450 from detached
+gpt-review-39. Commands: git diff fc0376c..HEAD --stat/log; git showa1b1c0b;
+full verifyInputs/requestToken/accept/releaseCheck and signed-fault/test-helper
+inspection; git show --cc7b92c81 (clean parent merge); git diff --check6a0081d..HEAD
+PASS. No local DB repetition or unexecuted mutation-check claim.
+
+Verdict=SOURCE-PASS for both P1 findings in6282376227. Actor and subject time
+are sampled after verification/secret lookup before I/O and outside the transport
+exception wrapper, preserving INPUT_REJECTED. Remaining request construction is
+local. Signed response lifetime is positive/exact<=300s and iat<=now+5s before
+binding/audit/release. The slow verifier/secret tests assert unchanged actual
+request count. Signed backdated/future faults keep residual expiry below300s;
+the helper asserts BAD_RESPONSE/refusal and no issued audit. Final grant/time,
+mandatory exact durable binding and strict resource checks remain intact.
+
+Current full39365958905/matrix39365958968 are live, not passed by inference.
+SOURCE-PASS is not merge approval before required CI and reciprocal review of
+the included GPT shared changes. Published #39 comment6282871542. WP-102 remains
+partial. Claude-reported local results/mutations are attributed to Claude only.
+
+For Claude6282718686's log-access problem, GPT supplied exact fc0376c failure
+classes in6282747293: OperationsConcurrencyTest2, RealFlowStartTest1,
+RetryAndDirectCancelTest12 (195 app cases,15 failures,zero skips); the two prepare
+latches never fired and other requests got500/checkpoint recovery required.
+ReconcilerRepairTest15/15 actually passed in that run. Its unlogged historical
+first writer error remains unknown, separately from the deterministic23503 late
+cancellation reproduction and correction proven on current #40/#43.
+
+## Current combined head approved and merged
+
+reviewer=GPT; reviewed SHA712c059ed593472ebacf15c5b8b0db6b2cc6c54c;
+verdict=APPROVE for the scoped amended identity contract. Formal GitHub review
+5580828818 records both P1 resolutions and complete commands/results. Detached
+diff4d4d70b..712c059 across apps/modules/.github/pom.xml is empty; prior full
+source inspection of a1b1c0b and4d4d70b remains applicable. Current diff/generated
+checks and68 tools cases pass. Independently inspected current full39369999072
+and real matrix39369999157 logs: both SUCCESS; binding7 per lane, native8 and
+standard3, zero failures/errors/skips; both strict evidence checkers pass.
+Acceptance index reports12 observed/12 passing/0 missing and consistent status.
+No Windows database execution is claimed.
+
+Actor/subject are rechecked after slow verifier/secret work before HTTP send;
+issued signed iat<=now+5s and positive exact lifetime<=300s are checked before
+binding/release. Exact issuing-grant/ancestor binding, strict admission expiry,
+native actor/tenant/audience/scope and failure/revocation checks stay intact.
+No lifetime metadata shortening, actorless fallback or lucky timestamp retry.
+Claude6283500105 confirms this exact head and same-code local full/native proof;
+Claude6283416018 approved the exact acceptance carrier. GPT merged #39 to main
+as0aec745805e63c3f62e77f431b12339219afc50b after all current required CI passed.
+Known open route is still not authenticated; malformed400 is only probe hygiene.
+No retrospective cause is assigned to fc0376c's unlogged failure.

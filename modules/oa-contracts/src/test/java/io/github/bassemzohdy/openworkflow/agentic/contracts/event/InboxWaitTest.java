@@ -6,6 +6,15 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 class InboxWaitTest {
+    @Test void nativeSdkPositionSpellingsArePreservedWithoutPrefixAliases() {
+        var id=UlidGenerator.shared().next();
+        var relative=new InboxWait("tenant",id,"app","engine","ns","flow","1","do/0/wait",1,
+                "approval","approval.ready","a".repeat(64),Duration.ofMinutes(5));
+        var absolute=new InboxWait("tenant",id,"app","engine","ns","flow","1","/do/0/wait",1,
+                "approval","approval.ready","a".repeat(64),Duration.ofMinutes(5));
+        assertEquals("do/0/wait",relative.taskPosition());
+        assertNotEquals(relative.key(),absolute.key(),"SDK persistence keys must not be silently normalized");
+    }
     @Test void restoredOccurrenceKeepsItsKeyWhileAnotherIterationAndPinnedDefinitionDoNot() {
         var id = UlidGenerator.shared().next();
         var first = new InboxWait("tenant",id,"app","engine","ns","flow","1","/do/0/wait",1,
