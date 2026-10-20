@@ -476,6 +476,7 @@ Implementation status: **partial**.
 - Implemented: Additive V70 storage guards preserve effect key/target/request/purpose/creation/replay binding, irreversible attempts and existing state transitions, immutable repeated outcome evidence and retained journal/compensation links. Five new direct-SQL cases compile with app reactor; execution/review pending. No public authority/manual/adapter activation or acceptance closure.
 - Implemented: Effect tracing preparation adds schema1 fixed logical/dispatch/lookup/compensation spans with current parent context, finite outcome attributes and no payload/key/subject/target/credential/exception events. SDK defaults disabled with runtime collector opt-in, bounded batch queue/export and content capture disabled. Five local real-SDK/fault cases pass; app reactor test-compile and dependency/license checks pass; three actual ledger/CDI trace cases compile pending Linux. V70 standard lane39374918657 passed guard5/existing service12/ledger4/standard3; delegation lane pending. No governed Flow/adapter/manual/audit or whole tracing/acceptance closure.
 - Implemented: Exact199cf5b workflow39374918657 SUCCESS BOTH lanes: storage guard5, existing DurableEffects12/ledger4 and standard3/native8 all zero failures/errors/skips with strict evidence checks. Matrix does not rerun process-kill T03; final implementation PR full CI retains that gate. Separate tracese2dc636 workflow39376019493 pending; no pass transfers to new tracing code.
+- Implemented: Exact trace producte2dc636 workflow39376019493 SUCCESS BOTH lanes, logs independently inspected: actual ledger/CDI EffectTracingTest3, real-SDK/fault telemetry5, V70 guard5, original effect service12, standard3/native8, zero failures/errors/skips and strict provider evidence checks pass. No external production collector/whole Flow/distributed trace or process-T03 rerun is claimed; final implementation PR full CI/current Claude review still gates merge.
 
 Remaining gates:
 
@@ -563,6 +564,7 @@ Deliverables:
 Implementation status: **partial**.
 - Implemented: Correlation IDs, health endpoints, Prometheus metrics and outbox-lag metrics exist.
 - Implemented: WP-108 preparation supplies bounded OTel effect/dispatch/lookup/compensation spans using pinned existing Quarkus3.39.5 BOM/API1.62.0, custom schema1 and disabled SDK by default. Five in-process SDK/fault cases pass; actual ledger/CDI trace execution and end-to-end Flow/agent/tool/model, async/restart propagation, collector/runbook/dashboard/alert/SLO evidence remain open. No full observability deliverable or acceptance promotion.
+- Implemented: Effect trace producte2dc636 executed in39376019493 SUCCESS both Linux lanes: ledger/CDI3 and SDK/fault5 zero skips, plus existing service/guard/provider regressions. This proves only component emission/privacy/failure semantics; production collector/deployment, complete Flow/agent/tool/model and async/restart/outbound correlation, runbook/dashboard/alert/SLO gates remain open.
 
 Remaining gates:
 

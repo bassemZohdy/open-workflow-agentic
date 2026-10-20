@@ -62,16 +62,23 @@ attribute/end failure with context restored; null return preserved. Local
 `mvn -B -pl modules/oa-runtime -am test -Dtest=EffectTelemetryTest
 -Dsurefire.failIfNoSpecifiedTests=false` passes5/5, zero skips.
 
-Three new PostgreSQL/Quarkus cases compile: real ledger execute/refund trace
+Three new PostgreSQL/Quarkus cases: real ledger execute/refund trace
 shape, attempted-intent lookup without redispatch, and the actual CDI service
 using the extension plus an isolated test-only SpanExporter alternative. They
 use explicit external-target doubles; no external service or whole Flow trace
-is claimed. Their runtime evidence remains pending current Linux CI.
+is claimed. Exact producte2dc636 workflow39376019493 SUCCESS BOTH lanes;
+complete logs independently inspected: EffectTracingTest3 (including actual
+CDI extension/exporter wiring), EffectTelemetryTest5, V70 guard5, original
+DurableEffectsTest12 and standard3/native8, zero failures/errors/skips and
+strict provider evidence checks pass. These three SQL/CDI cases are now
+executed, not compile-only. No external production collector, whole Flow/
+distributed trace or hard-kill span flush follows from that component result.
 Local application reactor test-compile passes. Full reactor package with
 tests skipped passes (build/CDI augmentation only, never test evidence);
-dependency/license policy passes. New traced runtime/config must execute in
-Linux CI before review/merge. V70's independent pre-tracing run is not
-transferred to new tracing code.
+dependency/license policy passes. Final implementation PR full CI and exact
+Claude review remain required, including process-kill T03 (not selected by
+this provider matrix). V70's prior independent run was not transferred to
+the new code; the new trace cases executed in their own current-product run.
 
 ## Review, operations and remaining gates
 
