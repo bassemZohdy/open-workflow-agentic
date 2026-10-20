@@ -75,3 +75,15 @@ WP-107, WP-108 package gates remain partial as recorded by their source progress
 Do not promote older #35/#37 reviews to the resulting #35 head. Claude must review
 that published exact head; GPT alone merges to main after that review, resolved
 material findings and required full CI. Any new review finding remains a gate.
+
+### TCP outage fixture correction on combined plan branch
+
+CI39359557480 at #35 36a057c failed in FaultProxyTest: a released ephemeral port
+accepted a connection after proxy.stop. This is the same test resource ownership
+problem observed in the PG test, not a plan assertion failure. GPT994b937 adds
+one shared exclusive non-listening reservation for TCP/JDBC cases, with at most32
+fresh resource allocations and no retries of the behavioral assertion. The chosen
+proxy still must restart on its same port and exchange bytes/SQL successfully.
+All seven plain unit cases pass locally; local DB execution unavailable. New full
+CI and exact-head Claude review are required;36a057c review request is superseded
+by the published current head. Main is unchanged. No required check was waived.
