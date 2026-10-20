@@ -1,6 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence;
 
 import io.quarkiverse.flow.persistence.jpa.JpaInstanceReader;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.event.InboxCheckpointFinalizer;
 import io.quarkiverse.flow.persistence.jpa.JpaInstanceWriter;
 import io.serverlessworkflow.impl.persistence.PersistenceInstanceHandlers;
 import jakarta.annotation.Priority;
@@ -17,8 +18,8 @@ import jakarta.enterprise.inject.Produces;
 public class CheckpointingHandlersProducer {
     @Produces @ApplicationScoped @Alternative @Priority(1)
     public PersistenceInstanceHandlers guardedHandlers(JpaInstanceWriter writer, JpaInstanceReader reader,
-            PersistenceCommitGate gate, Instance<CheckpointCommitObserver> observers) {
+            PersistenceCommitGate gate, Instance<CheckpointCommitObserver> observers, InboxCheckpointFinalizer finalizer) {
         CheckpointCommitObserver observer = (op, checkpoint) -> observers.forEach(o -> o.committed(op, checkpoint));
-        return new PersistenceInstanceHandlers(new CheckpointingWriter(writer, gate, observer), reader);
+        return new PersistenceInstanceHandlers(new CheckpointingWriter(writer, gate, observer,finalizer), reader);
     }
 }

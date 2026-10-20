@@ -24,6 +24,7 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -105,14 +106,20 @@ public class Reconciler {
     private final Clock clock;
     private final Predicate<String> tenantScope;
     private final ResumeGate gate;
+    private final RestoreCheckpointGate checkpoints;
     private final ScheduledExecutorService executor;
     private final AtomicBoolean warmedUp = new AtomicBoolean();
     private volatile State state;
 
     @Inject
     public Reconciler(InstanceStore store, WorkflowEngine engine, EngineStatusSync sync, RegistryScan scan,
-                      RepairStore repairs, LifecycleSettings settings, DataSource dataSource, ResumeGate gate) {
-        this(store, engine, sync, scan, repairs, settings, dataSource, Clock.systemUTC(), tenant -> true, gate);
+                      RepairStore repairs, LifecycleSettings settings, DataSource dataSource, ResumeGate gate,RestoreCheckpointGate checkpoints) {
+        this(store, engine, sync, scan, repairs, settings, dataSource, Clock.systemUTC(), tenant -> true, gate,checkpoints);
+    }
+
+    public Reconciler(InstanceStore store,WorkflowEngine engine,EngineStatusSync sync,RegistryScan scan,
+                      RepairStore repairs,LifecycleSettings settings,DataSource dataSource,ResumeGate gate) {
+        this(store,engine,sync,scan,repairs,settings,dataSource,Clock.systemUTC(),tenant->true,gate,RestoreCheckpointGate.ALLOW);
     }
 
     /**
@@ -129,7 +136,14 @@ public class Reconciler {
     public Reconciler(InstanceStore store, WorkflowEngine engine, EngineStatusSync sync, RegistryScan scan,
                       RepairStore repairs, LifecycleSettings settings, DataSource dataSource, Clock clock,
                       Predicate<String> tenantScope, ResumeGate gate) {
+        this(store,engine,sync,scan,repairs,settings,dataSource,clock,tenantScope,gate,RestoreCheckpointGate.ALLOW);
+    }
+
+    public Reconciler(InstanceStore store,WorkflowEngine engine,EngineStatusSync sync,RegistryScan scan,
+                      RepairStore repairs,LifecycleSettings settings,DataSource dataSource,Clock clock,
+                      Predicate<String> tenantScope,ResumeGate gate,RestoreCheckpointGate checkpoints) {
         this.gate = Objects.requireNonNull(gate, "gate");
+        this.checkpoints=Objects.requireNonNull(checkpoints,"checkpoints");
         this.store = Objects.requireNonNull(store, "store");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.sync = Objects.requireNonNull(sync, "sync");
@@ -309,6 +323,7 @@ public class Reconciler {
     private void adopt(InstanceRecord row, WorkflowEngine.ActiveInstance view) {
         if (view.status() == EngineStatus.PENDING) {
             // Prepared in memory and not started: the start never reached the engine. Start it now.
+            if(!prepareResume(row,clock.instant())) return;
             if (engine.startRestored(row.definition(), row.engineInstanceId())) {
                 repairs.record("start", row.id().value(), "started", "adopted pending instance");
                 sync.observe(row.engineInstanceId(), EngineStatus.RUNNING, "started");
@@ -451,11 +466,7 @@ public class Reconciler {
             // Restored from Flow's tables and registered as active, but not started (WP-003, fact 1).
             // First ask whether the authority of the instance still holds (WP-102): a restored instance that runs under
             // a delegation grant continues only while the grant is usable. Anything but PROCEED keeps it from running.
-            ResumeGate.Decision decision = gateDecision(row);
-            if (!decision.proceeds()) {
-                holdForAuthority(row, decision, now);
-                return;
-            }
+            if(!prepareResume(row,now)) return;
             boolean wasHeld = isHeldForAuthority(row);
             // The epoch is written first, so the task that runs again sees the new value.
             long epoch = repairs.incrementResumeEpoch(row.id().value());
@@ -467,6 +478,41 @@ public class Reconciler {
             return;
         }
         sync.observe(engineId, view.get().status(), "polled");
+    }
+
+    /** Identity is checked before and after receipt I/O, and neither a partial batch nor an error releases work. */
+    private boolean prepareResume(InstanceRecord row,Instant now) {
+        var decision=gateDecision(row);
+        if(!decision.proceeds()) { holdResume(row,decision,now);return false; }
+        try {
+            if(!checkpoints.prepare(row)) {
+                holdForAuthority(row,new ResumeGate.Decision(ResumeGate.Outcome.UNAVAILABLE,"checkpoint.receipt.pending"),now);
+                return false;
+            }
+            var current=store.find(row.tenant(),row.id()).orElseThrow();
+            if(!resumable(row,current)) return false;
+            decision=gateDecision(current); // The receipt audit/storage work may have outlasted the prior grant check.
+            if(!decision.proceeds()) { holdResume(current,decision,clock.instant());return false; }
+            return resumable(row,store.find(row.tenant(),row.id()).orElseThrow()); // Cancellation may race the authority read too.
+        } catch(RuntimeException failed) {
+            LOG.warnf("receipt restore gate failed for instance %s (%s); the instance is not resumed",row.id(),simpleName(failed));
+            holdForAuthority(row,new ResumeGate.Decision(ResumeGate.Outcome.UNAVAILABLE,"checkpoint.receipt.unavailable"),now);
+            return false;
+        }
+    }
+
+    private static boolean resumable(InstanceRecord expected,InstanceRecord current) {
+        return Set.of(InstanceStatus.STARTING,InstanceStatus.RUNNING,InstanceStatus.WAITING).contains(current.status())
+                && Objects.equals(expected.engineInstanceId(),current.engineInstanceId()) && expected.definition().equals(current.definition())
+                && expected.owner().equals(current.owner());
+    }
+
+    private void holdResume(InstanceRecord row,ResumeGate.Decision decision,Instant now) {
+        if(row.status()==InstanceStatus.STARTING && decision.outcome()==ResumeGate.Outcome.REAUTHORIZATION_REQUIRED) {
+            // A prepared but never-started instance cannot transition STARTING -> WAITING. Its identity authority
+            // is already held by the identity gate; keep the registry phase and refuse the first execution.
+            auditOnce("start",row.id().value(),"held","authority unavailable before first execution: "+decision.reason(),now);
+        } else holdForAuthority(row,decision,now);
     }
 
     /** The gate's answer; a gate that throws is UNAVAILABLE, so the instance does not run. */

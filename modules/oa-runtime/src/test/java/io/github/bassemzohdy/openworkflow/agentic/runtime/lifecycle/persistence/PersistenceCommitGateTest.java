@@ -129,4 +129,16 @@ class PersistenceCommitGateTest {
             assertThrows(IllegalArgumentException.class, () -> new PersistenceCommitGate(timeout, Clock.systemUTC()));
         }
     }
+
+    @Test void failedRestoreRepairKeepsReadinessDownAndRejectsNewWorkUntilProcessRestart() {
+        try(var gate=gate()) {
+            gate.recoveryFailed(new IllegalStateException("receipt audit unavailable"));
+            assertFalse(gate.status().healthy());
+            assertEquals(TASK_COMPLETED,gate.status().failure().orElseThrow().operation());
+            assertThrows(io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException.class,gate::requireAvailable);
+            assertFalse(gate.commit(STARTED,()-> {fail("new work during failed repair");return null;},()->{}).isDone());
+            assertTrue(gate.commit(ABORTED,()->CompletableFuture.completedFuture(null),()->{}).isDone());
+            assertFalse(gate.status().healthy(),"cleanup never clears a required recovery failure");
+        }
+    }
 }
