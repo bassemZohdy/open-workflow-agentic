@@ -7,6 +7,14 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ## [Unreleased]
 
+### Added
+
+- **Effect ledger (WP-108, partial):** JDBC write-ahead intent and stable operation keys, request conflict
+  rejection, cross-process execution claims, bounded unknown-outcome replay, compensation intents and an
+  internal durable manual-resolution queue. Added database and process-death T03 tests. Governed adapter,
+  manual-decision, central-audit and lifecycle integration remain open; CI and Claude review are required
+  before merge. [Scope and handoff](docs/handoffs/gpt/WP-108.md).
+
 ### Tracking
 
 - Integrate the reviewed PR #39 audit-caller increment into PR #40; run its real

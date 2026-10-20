@@ -293,7 +293,7 @@ Each returns counts. The operator's identity is not recorded by these methods; 1
 
 ### 9.7 The resume epoch seam (WP-108)
 
-`task.instance.resume_epoch` counts the restarts the reconciler performed. It is incremented before `startRestored`, so the task that runs again sees the new value. A task reads it from its engine instance id through `RegistryScan.resumeEpochOfEngineInstance`. In YAML, the probe sends the engine id in `X-Flow-Instance-Id` and the endpoint looks the epoch up. Whether a YAML expression can read the epoch directly was not tested; the call above is the verified path. WP-108 keys its effect ledger on (engine instance id, epoch, node id).
+`task.instance.resume_epoch` counts the restarts the reconciler performed. It is incremented before `startRestored`, so the task that runs again sees the new value. A task reads it from its engine instance id through `RegistryScan.resumeEpochOfEngineInstance`. In YAML, the probe sends the engine id in `X-Flow-Instance-Id` and the endpoint looks the epoch up. Whether a YAML expression can read the epoch directly was not tested; the call above is the verified path. The epoch is diagnostic only: WP-108 derives an effect key from the scoped thread, node and persisted logical operation occurrence. Retrying or restarting that occurrence MUST reuse its key; including the changing epoch would permit a duplicate business effect. See [WP-108](handoffs/gpt/WP-108.md).
 
 ### 9.8 HTTP retry rule
 
@@ -332,7 +332,7 @@ These are for the owner. The ADRs were not edited.
 - ADR 0019, Cancel: "a reconciler moves rows stuck in `CANCEL_REQUESTED`". This is incomplete. When the engine holds no instance and sends no report, CANCELLED and COMPLETED cannot be told apart, and the ADR needs a rule for that outcome. Amendment 4 (2026-10-19) gives the rule for a row with no engine id (`CANCELLED` directly, issue #24). The rule for a `CANCEL_REQUESTED` row whose engine holds nothing is still open.
 - ADR 0019, Deadlines: says the reconciler enforces the deadline without saying how. Implemented: record the request, then cancel the engine instance; `FAILED` when the engine holds nothing.
 - ADR 0019, Start: records RUNNING after `start()` returns. The engine's report can arrive first, so the registry follows the engine's report when both happen. The ADR should say so.
-- ADR 0019, Resume: the epoch must be incremented before the restart for WP-108 to key on it. The ADR does not say this.
+- The resume epoch remains diagnostic. WP-108 keys use a persisted logical operation occurrence and remain unchanged across restart (section 9.7).
 - ADR 0019, Retries: states the rule for the OWS retry. It does not say that the Flow default also repeats a 500 response (9.8).
 - ADR 0023, decision 7: requires the reconciler to restart agent runs "recorded as RUNNING or RESUMING", but does not define when such a run is no longer alive. 105c adds the lease columns for that (V36); the agent path that writes them does not exist yet.
 - ADR 0019, Query: "scoped by definition id and version" is still open (section 7, item 3).
