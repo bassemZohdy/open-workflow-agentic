@@ -6,11 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.quarkus.test.junit.QuarkusTest;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.PATCH;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import java.io.File;
 import java.lang.reflect.Method;
@@ -42,26 +37,42 @@ class HttpRouteDefaultDenyTest {
             "/dev/lifecycle", "process-test probe, 404 unless agentic.dev.lifecycle-probes=true (%test only)");
 
     /**
-     * KNOWN GAP (WP-103, open): routes that are reachable without a verified caller today. Each entry asserts the
-     * current behaviour so that the gap is visible and so that fixing it fails this test until the entry is removed.
-     * {@code POST /agents/research} runs the research agent for an anonymous caller. Authenticating it needs a credential
-     * for the workflow's {@code call: http} step, which is a design change in shared API code
-     * (docs/handoffs/claude/WP-103.md, request H1).
+     * KNOWN GAPS (WP-103): routes that are reachable without a verified caller. Empty since {@code POST /agents/research}
+     * was authenticated. An entry is probed with a malformed body, may answer anything except 401 and 2xx, and fails
+     * the test the day it answers 401 (remove it then).
      */
-    private static final Set<String> KNOWN_GAPS = Set.of("POST /agents/research");
+    private static final Set<String> KNOWN_GAPS = Set.of();
+
+    /** Product classes that could not be loaded for inspection; the test fails if there is any. */
+    private static final List<String> UNLOADABLE = new ArrayList<>();
 
     private static final String ROOT = "io/github/bassemzohdy/openworkflow/agentic";
+
+    /** A public exemption covers its own path and the segments below it, never a longer name that merely starts with it. */
+    private static boolean isPublic(String path) {
+        return PUBLIC.keySet().stream().anyMatch(prefix -> path.equals(prefix) || path.startsWith(prefix + "/"));
+    }
+
+    @Test
+    void publicExemptionsAreBoundToWholePathSegments() {
+        assertTrue(isPublic("/dev/lifecycle"));
+        assertTrue(isPublic("/dev/lifecycle/effect"));
+        assertFalse(isPublic("/dev/lifecycle-evil"));
+        assertFalse(isPublic("/dev/lifecycles"));
+        assertFalse(isPublic("/dev"));
+    }
 
     @Test
     void everyDiscoveredRouteRefusesAnAnonymousCallerWith401() throws Exception {
         List<String> routes = routes();
+        assertEquals(List.of(), UNLOADABLE, "classes that could not be inspected for routes");
         assertTrue(routes.size() >= 10, () -> "route discovery found too few routes: " + routes);
         List<String> failures = new ArrayList<>();
         for (String route : routes) {
             String[] parts = route.split(" ", 3);
             String path = parts[1];
             String contentType = parts[2];
-            if (PUBLIC.keySet().stream().anyMatch(path::startsWith)) {
+            if (isPublic(path)) {
                 continue;
             }
             route = parts[0] + " " + path; // the report names the route, not the probe media type
@@ -75,8 +86,8 @@ class HttpRouteDefaultDenyTest {
             if (gap) {
                 if (status == 401) {
                     failures.add(route + " is now authenticated: remove it from KNOWN_GAPS");
-                } else if (status != 400) {
-                    failures.add(route + " (known gap) answered " + status + " to a malformed body instead of 400");
+                } else if (status / 100 == 2) {
+                    failures.add(route + " (known gap) answered " + status + " to a malformed body");
                 }
                 continue;
             }
@@ -96,7 +107,7 @@ class HttpRouteDefaultDenyTest {
             if (base == null) {
                 continue;
             }
-            for (Method m : type.getDeclaredMethods()) {
+            for (Method m : type.getMethods()) { // public, including inherited
                 String verb = verb(m);
                 if (verb == null) {
                     continue;
@@ -126,12 +137,14 @@ class HttpRouteDefaultDenyTest {
         return s.replaceAll("^/+|/+$", "");
     }
 
+    /** The HTTP method of a resource method: any annotation meta-annotated with {@code @HttpMethod} (custom ones too). */
     private static String verb(Method m) {
-        if (m.isAnnotationPresent(GET.class)) return "GET";
-        if (m.isAnnotationPresent(POST.class)) return "POST";
-        if (m.isAnnotationPresent(PUT.class)) return "PUT";
-        if (m.isAnnotationPresent(DELETE.class)) return "DELETE";
-        if (m.isAnnotationPresent(PATCH.class)) return "PATCH";
+        for (java.lang.annotation.Annotation a : m.getAnnotations()) {
+            jakarta.ws.rs.HttpMethod http = a.annotationType().getAnnotation(jakarta.ws.rs.HttpMethod.class);
+            if (http != null) {
+                return http.value();
+            }
+        }
         return null;
     }
 
@@ -164,12 +177,14 @@ class HttpRouteDefaultDenyTest {
             try {
                 Class<?> c = Class.forName(cn, false, loader);
                 java.security.CodeSource source = c.getProtectionDomain().getCodeSource();
-                boolean testOnly = source != null && source.getLocation().getPath().contains("test-classes");
+                boolean testOnly = source != null && source.getLocation() != null
+                        && source.getLocation().getPath().contains("test-classes");
                 if (!testOnly && c.isAnnotationPresent(Path.class)) {
                     out.add(c);
                 }
-            } catch (Throwable ignored) {
-                // optional dependency not on the classpath: not a route of this build
+            } catch (Throwable unloadable) {
+                // a class that cannot be inspected may hide a route: it must be visible, never silently skipped
+                UNLOADABLE.add(cn + " (" + unloadable.getClass().getSimpleName() + ")");
             }
         }
         return out;

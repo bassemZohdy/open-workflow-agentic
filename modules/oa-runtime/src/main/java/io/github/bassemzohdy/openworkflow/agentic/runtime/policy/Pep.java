@@ -166,6 +166,19 @@ public final class Pep {
                 new PolicyContext(operatorScopes, null, null, null, null, null));
     }
 
+    /** Resource of a direct invocation of the research agent over HTTP (WP-103). */
+    public static final String AGENT_RESEARCH_RUN = "agent:research:run";
+
+    /**
+     * A verified caller runs the research agent directly ({@code POST /agents/research}). The request is an
+     * {@code OPERATION} on {@link #AGENT_RESEARCH_RUN}; {@link SafeRecovery} does not name it, so when the policy
+     * engine is unavailable the call is refused (ERROR) and the agent does not run.
+     */
+    public Decision agentInvocation(Subject caller, Set<String> callerScopes) {
+        return decide(caller, ActionKind.OPERATION, AGENT_RESEARCH_RUN, null,
+                new PolicyContext(callerScopes, null, null, null, null, null));
+    }
+
     /** Decides any request through the full path: engine, audit, and the recovery rule when the engine is unavailable. */
     public Decision decide(AuthorizationRequest request) {
         Objects.requireNonNull(request, "request");

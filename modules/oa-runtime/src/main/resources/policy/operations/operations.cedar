@@ -24,3 +24,8 @@ when { context.scopes.contains("oa.operate") || context.scopes.contains("oa.reco
 @id("operations.pause-instance")
 permit (principal is User, action == Action::"operation", resource == Resource::"operation:pause")
 when { context.scopes.contains("oa.operate") || context.scopes.contains("oa.recover") };
+
+// WP-103: a verified caller runs the research agent directly (POST /agents/research). Needs oa.agent.run.
+@id("operations.run-research-agent")
+permit (principal is User, action == Action::"operation", resource == Resource::"agent:research:run")
+when { context.scopes.contains("oa.agent.run") };

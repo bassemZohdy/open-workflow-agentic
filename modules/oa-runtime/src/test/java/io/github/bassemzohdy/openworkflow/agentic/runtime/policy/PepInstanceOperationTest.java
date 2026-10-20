@@ -93,4 +93,21 @@ class PepInstanceOperationTest {
         assertEquals(DecisionOutcome.DENY, retry.outcome());
         assertEquals("test-engine", retry.decidedBy());
     }
+
+    @Test
+    void agentInvocationIsAnOperationOnTheAgentResourceAndIsRefusedWhenThePolicyEngineIsDown() {
+        ScriptedEngine allow = new ScriptedEngine(PepTest::allow);
+        assertEquals(DecisionOutcome.ALLOW,
+                pep(allow, new InMemoryAuditSink()).agentInvocation(OPERATOR, Set.of("oa.agent.run")).outcome());
+        AuthorizationRequest received = allow.received().get(0);
+        assertEquals("agent:research:run", received.resource());
+        assertEquals(io.github.bassemzohdy.openworkflow.agentic.contracts.governance.ActionKind.OPERATION,
+                received.action());
+        assertEquals(Set.of("oa.agent.run"), received.context().scopes());
+
+        InMemoryAuditSink audit = new InMemoryAuditSink();
+        Decision down = pep(new ScriptedEngine(PepTest::error), audit)
+                .agentInvocation(OPERATOR, Set.of("oa.agent.run", "oa.recover"));
+        assertEquals(DecisionOutcome.ERROR, down.outcome(), "the safe-recovery rule does not name the agent run");
+    }
 }

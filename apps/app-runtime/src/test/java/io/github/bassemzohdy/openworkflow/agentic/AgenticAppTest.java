@@ -18,6 +18,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 @QuarkusTest
+@io.quarkus.test.junit.TestProfile(io.github.bassemzohdy.openworkflow.agentic.lifecycle.TrustedCallerProfile.class)
 class AgenticAppTest {
 
     @Inject
@@ -57,7 +58,8 @@ class AgenticAppTest {
 
     @Test
     void agentGraphRunsAndCheckpoints() {
-        given().contentType("application/json").body("{\"topic\":\"agentic workflows\"}")
+        given().header("X-Tenant", "t-agent").header("X-Subject", "alice").header("X-Scopes", "oa.agent.run")
+                .contentType("application/json").body("{\"topic\":\"agentic workflows\"}")
                 .when().post("/agents/research")
                 .then().statusCode(200)
                 .body("threadId", notNullValue())
