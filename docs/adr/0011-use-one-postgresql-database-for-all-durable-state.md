@@ -46,3 +46,20 @@ Productc63130e subsequently passed BOTH Linux39387463567 lanes: all twelve new
 actual PostgreSQL cases plus existing issuing-migration5/group11, zero failures/
 errors/skips. GPT inspected both finished-job logs. This proves that component
 scope, not final-head peer approval, whole governed execution or package closure.
+
+## Canonical resource occurrence preparation (2026-10-20)
+
+Actual SDK retries can change leaf AND parent entry counters for the same loop
+index (three complete in-memory workflow observations). Add V74 to retain a
+separate ro1 business-occurrence-to-original-call association; never rewrite
+V73/rc1 or treat a retry counter as new business work. The trusted producer still
+derives the complete durable leaf/enclosing loop/goto coordinate. Historical
+lookup returns original attribution, not authority/execution/result permission.
+
+The additive backfill refuses conflicting history; new call/anchor inserts are
+atomic and guarded against direct SQL rebinding or premature deletion. Canonical
+strict UTF-8 byte lengths and SHA256 are shared between Java and PostgreSQL16;
+see PostgreSQL's [binary functions](https://www.postgresql.org/docs/16/functions-binarystring.html).
+No new database extension or dependency. Actual upgrade/Unicode/conflict cases
+must pass Linux CI and exact peer review before integration. Dispatch/whole
+workflow/execution fencing and archival/quotas remain open.

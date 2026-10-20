@@ -24,6 +24,7 @@ class ResourceCallBindingPreflightTest {
         assertThrows(IllegalArgumentException.class,()->store.bind(binding("valid",Instant.parse("2026-10-20T00:00:00.000000001Z"))));
         assertThrows(IllegalArgumentException.class,()->store.bind(binding("valid",Instant.parse("+10000-01-01T00:00:00Z"))));
         assertThrows(IllegalArgumentException.class,()->store.bind(binding("invalid/namespace",Instant.parse("2026-10-20T00:00:00Z"))));
+        assertThrows(IllegalArgumentException.class,()->store.findInvocation(binding("invalid/namespace",Instant.parse("2026-10-20T00:00:00Z")).scope()));
         assertEquals(0,calls.get());
     }
     @Test void malformedVerifiedIdentityCannotReachStorage() {

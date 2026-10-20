@@ -4,7 +4,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEnco
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.Checks;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
-import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceCallBindings;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceInvocations;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transaction;
@@ -26,7 +26,7 @@ import javax.sql.DataSource;
  * microseconds: unsupported precision/range is rejected before I/O rather than silently rounded.
  */
 @ApplicationScoped
-public class JdbcResourceCallBindings implements ResourceCallBindings {
+public class JdbcResourceCallBindings implements ResourceInvocations {
     private static final String COLUMNS = """
             call_key,fingerprint,tenant,instance_id,owner_kind,owner_id,application_id,engine_instance_id,
             namespace,definition_name,definition_version,task_position,iteration,logical_occurrence,
@@ -59,11 +59,16 @@ public class JdbcResourceCallBindings implements ResourceCallBindings {
             existing = read(c, binding.issuer(), binding.tokenId());
             if (existing.isPresent()) return same(existing.get(), binding);
             requireRegistry(c, scope);
+            var retained=findInvocation(c,scope);
+            if(retained.isPresent() && !retained.get().equals(scope)) throw conflict();
             try (var s = c.prepareStatement("insert into task.resource_call ("+COLUMNS+") values ("+
                     "?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) on conflict(call_key) do nothing")) {
                 writeScope(s, scope); s.executeUpdate();
             }
-            try (var s = c.prepareStatement("select "+COLUMNS+" from task.resource_call where call_key=?")) {
+            try (var s = c.prepareStatement("""
+                    select c.*,o.occurrence_key from task.resource_call c
+                    left join task.resource_occurrence o on o.call_key=c.call_key where c.call_key=?
+                    """)) {
                 s.setString(1, scope.key());
                 try (var r=s.executeQuery()) {
                     if (!r.next() || !scope.equals(scope(r))) throw conflict();
@@ -85,6 +90,31 @@ public class JdbcResourceCallBindings implements ResourceCallBindings {
     @Override public Optional<ResourceCallBinding> find(String issuer, String tokenId) {
         identity(issuer); identity(tokenId);
         return isolated(c -> read(c,issuer,tokenId));
+    }
+
+    @Override public Optional<ResourceCallScope> findInvocation(ResourceCallScope candidate) {
+        Objects.requireNonNull(candidate,"candidate");
+        new DefinitionRef(candidate.namespace()+"/"+candidate.definition(),candidate.version());
+        return isolated(c -> findInvocation(c,candidate));
+    }
+
+    private static Optional<ResourceCallScope> findInvocation(Connection c,ResourceCallScope candidate) throws SQLException {
+        try(var s=c.prepareStatement("""
+                select c.*,o.occurrence_key from task.resource_occurrence o
+                join task.resource_call c on c.call_key=o.call_key where o.occurrence_key=?
+                """)) {
+            s.setString(1,candidate.occurrenceKey());
+            try(var r=s.executeQuery()) {
+                if(!r.next()) return Optional.empty();
+                var stored=scope(r);
+                var originalCounter=new ResourceCallScope(candidate.tenant(),candidate.instanceId(),candidate.owner(),
+                        candidate.applicationId(),candidate.engineInstanceId(),candidate.namespace(),candidate.definition(),
+                        candidate.version(),candidate.taskPosition(),stored.iteration(),candidate.logicalOccurrence(),
+                        candidate.audience(),candidate.operation(),candidate.targetFingerprint(),candidate.requestFingerprint());
+                if(!stored.equals(originalCounter)) throw conflict();
+                return Optional.of(stored);
+            }
+        }
     }
 
     private static void identity(String value) {
@@ -138,13 +168,15 @@ public class JdbcResourceCallBindings implements ResourceCallBindings {
                 r.getString("definition_name"),r.getString("definition_version"),r.getString("task_position"),
                 r.getInt("iteration"),r.getString("logical_occurrence"),r.getString("audience"),r.getString("operation"),
                 r.getString("target_fingerprint"),r.getString("request_fingerprint"));
-        if(!value.key().equals(r.getString("call_key")) || !value.fingerprint().equals(r.getString("fingerprint"))) throw conflict();
+        if(!value.key().equals(r.getString("call_key")) || !value.fingerprint().equals(r.getString("fingerprint"))
+                || !value.occurrenceKey().equals(r.getString("occurrence_key"))) throw conflict();
         return value;
     }
     private static Optional<ResourceCallBinding> read(Connection c, String issuer, String tokenId) throws SQLException {
         try(var s=c.prepareStatement("""
-                select c.*,b.binding_key,b.issuer,b.token_id,b.grant_id,b.issued_at,b.expires_at
+                select c.*,o.occurrence_key,b.binding_key,b.issuer,b.token_id,b.grant_id,b.issued_at,b.expires_at
                 from task.resource_call_binding b join task.resource_call c on c.call_key=b.call_key
+                left join task.resource_occurrence o on o.call_key=c.call_key
                 where b.issuer=? and b.token_id=?
                 """)) {
             s.setString(1,issuer); s.setString(2,tokenId);

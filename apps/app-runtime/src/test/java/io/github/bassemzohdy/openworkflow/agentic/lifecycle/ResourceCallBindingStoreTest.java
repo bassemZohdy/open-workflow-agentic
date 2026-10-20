@@ -59,7 +59,7 @@ class ResourceCallBindingStoreTest {
                 field.equals("owner")?new Subject(s.owner().kind(),value):s.owner(),s.applicationId(),
                 field.equals("engine")?value:s.engineInstanceId(),s.namespace(),
                 field.equals("definition")?value:s.definition(),field.equals("version")?value:s.version(),
-                s.taskPosition(),s.iteration(),field.equals("occurrence")?value:s.logicalOccurrence(),
+                s.taskPosition(),field.equals("iteration")?Integer.parseInt(value):s.iteration(),field.equals("occurrence")?value:s.logicalOccurrence(),
                 field.equals("audience")?value:s.audience(),field.equals("operation")?value:s.operation(),
                 field.equals("target")?value:s.targetFingerprint(),field.equals("request")?value:s.requestFingerprint());
     }
@@ -227,5 +227,112 @@ class ResourceCallBindingStoreTest {
             assertEquals("23503",assertThrows(SQLException.class,s::executeUpdate).getSQLState(),"V73 FK retains metadata beyond V65 one-minute rule");
         }
         assertEquals(b,bindings.find(b.issuer(),b.tokenId()).orElseThrow());
+    }
+
+    @Test void canonicalScopeSurvivesChangedEntryCounterAndRefreshButDistinctBusinessWorkIsSeparate() throws Exception {
+        var f=fixture();var b=f.binding;
+        assertTrue(bindings.findInvocation(b.scope()).isEmpty());bindings.bind(b);
+        var observed=change(b.scope(),"iteration","2");assertNotEquals(b.scope().key(),observed.key());
+        var canonical=new JdbcResourceCallBindings(data).findInvocation(observed).orElseThrow();assertEquals(b.scope(),canonical);
+        var credential=fresh(b,observed);
+        assertThrows(IllegalStateException.class,()->bindings.bind(credential));
+        var recovered=sameToken(credential,canonical);assertEquals(recovered,bindings.bind(recovered));
+        assertEquals(b.scope().threadId(),recovered.scope().threadId());
+        var nextScope=change(observed,"occurrence","root/foreach/2");
+        assertTrue(bindings.findInvocation(nextScope).isEmpty());bindings.bind(fresh(b,nextScope));
+        assertEquals(2,count(f,"task.resource_call"));assertEquals(3,count(f,"task.resource_call_binding"));
+        var row=registry.find(f.row.tenant(),f.row.id()).orElseThrow();
+        registry.replace(row.successor(now(),InstanceStatus.COMPLETED,row.engineInstanceId(),row.startAttempts(),null,null),row.version(),"test.complete",ALICE);
+        assertEquals(b.scope(),bindings.findInvocation(observed).orElseThrow(),"historical lookup does not refresh authority");
+    }
+    @Test void occurrenceLookupRefusesChangedTargetRequestAudienceAndOperation() {
+        var f=fixture();var b=f.binding;bindings.bind(b);
+        for(String field:List.of("target","request","audience","operation")) {
+            var candidate=change(change(b.scope(),"iteration","9"),field,field.equals("target")||field.equals("request")?"c".repeat(64):"other");
+            assertThrows(IllegalStateException.class,()->bindings.findInvocation(candidate),field);
+        }
+    }
+    void copyCallWithNewCounter(Connection c,String schema,ResourceCallScope first,ResourceCallScope second) throws SQLException {
+        // schema names are generated test-owned lowercase/hex, never input or a public API.
+        if(!schema.matches("(?:task|gpt_occ_[a-f0-9]{32})")) throw new IllegalArgumentException("test schema");
+        try(var s=c.prepareStatement("insert into "+schema+".resource_call "+"""
+                select ?,?,tenant,instance_id,owner_kind,owner_id,application_id,engine_instance_id,namespace,
+                definition_name,definition_version,task_position,?,logical_occurrence,audience,operation,
+                target_fingerprint,request_fingerprint,created_at
+                from
+                """+schema+".resource_call where call_key=?")) {
+            s.setString(1,second.key());s.setString(2,second.fingerprint());s.setInt(3,second.iteration());s.setString(4,first.key());s.executeUpdate();
+        }
+    }
+    @Test void directSqlCannotCreateAnotherCallForTheSameOccurrenceOrRewriteItsAnchor() throws Exception {
+        var f=fixture();var b=f.binding;bindings.bind(b);
+        try(var c=data.getConnection()) {
+            assertEquals("23505",assertThrows(SQLException.class,()->copyCallWithNewCounter(c,"task",b.scope(),change(b.scope(),"iteration","2"))).getSQLState());
+        }
+        try(var c=data.getConnection();var s=c.prepareStatement("insert into task.resource_occurrence(occurrence_key,call_key) values(?,?)")) {
+            s.setString(1,"ro1-"+"f".repeat(64));s.setString(2,b.scope().key());
+            assertEquals("23514",assertThrows(SQLException.class,s::executeUpdate).getSQLState(),"derive the occurrence from full retained fields before uniqueness checks");
+        }
+        for(String sql:List.of("update task.resource_occurrence set call_key=call_key where occurrence_key=?",
+                "delete from task.resource_occurrence where occurrence_key=?")) {
+            try(var c=data.getConnection();var s=c.prepareStatement(sql)) {
+                s.setString(1,b.scope().occurrenceKey());assertEquals("42501",assertThrows(SQLException.class,s::executeUpdate).getSQLState());
+            }
+        }
+        try(var c=data.getConnection()) {
+            c.setAutoCommit(false);
+            try(var s=c.createStatement()){assertEquals("42501",assertThrows(SQLException.class,()->s.execute("truncate task.resource_occurrence")).getSQLState());}
+            finally {c.rollback();}
+        }
+        assertEquals(1,count(f,"task.resource_call"));assertEquals(b.scope(),bindings.findInvocation(b.scope()).orElseThrow());
+    }
+    String occurrenceMigration(String schema) throws Exception {
+        if(!schema.matches("gpt_occ_[a-f0-9]{32}")) throw new IllegalArgumentException("test schema");
+        try(var input=getClass().getClassLoader().getResourceAsStream("db/migration/V74__canonical_resource_occurrence.sql")) {
+            assertNotNull(input);return new String(input.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8).replace("task.",schema+".");
+        }
+    }
+    void clonePreOccurrenceCall(Connection c,String schema,ResourceCallScope original) throws SQLException {
+        if(!schema.matches("gpt_occ_[a-f0-9]{32}")) throw new IllegalArgumentException("test schema");
+        try(var s=c.createStatement()) {
+            s.execute("create schema "+schema);
+            s.execute("create table "+schema+".resource_call (like task.resource_call including all)");
+        }
+        try(var s=c.prepareStatement("insert into "+schema+".resource_call select * from task.resource_call where call_key=?")) {
+            s.setString(1,original.key());assertEquals(1,s.executeUpdate());
+        }
+    }
+    @Test void actualAdditiveMigrationBackfillsExactUnicodeCanonicalLookupWithoutChangingOldKey() throws Exception {
+        var f=fixture();var scope=change(f.binding.scope(),"occurrence","root/é|二/0");bindings.bind(fresh(f.binding,scope));
+        String schema="gpt_occ_"+UUID.randomUUID().toString().replace("-","");
+        try(var c=data.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                clonePreOccurrenceCall(c,schema,scope);
+                try(var s=c.createStatement()){s.execute(occurrenceMigration(schema));}
+                try(var s=c.createStatement();var r=s.executeQuery("select occurrence_key,call_key from "+schema+".resource_occurrence")) {
+                    assertTrue(r.next());assertEquals(scope.occurrenceKey(),r.getString(1));assertEquals(scope.key(),r.getString(2));assertFalse(r.next());
+                }
+            } finally {c.rollback();} // Includes all temporary DDL: never drop/alter another fixture's schema.
+        }
+        assertEquals(scope,bindings.findInvocation(scope).orElseThrow());
+    }
+    @Test void actualAdditiveMigrationRefusesConflictingHistoricalOccurrencesAndRetainsBothOriginalRows() throws Exception {
+        var f=fixture();var scope=f.binding.scope();bindings.bind(f.binding);
+        String schema="gpt_occ_"+UUID.randomUUID().toString().replace("-","");
+        try(var c=data.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                clonePreOccurrenceCall(c,schema,scope);copyCallWithNewCounter(c,schema,scope,change(scope,"iteration","2"));
+                var beforeMigration=c.setSavepoint();
+                try(var s=c.createStatement()) {assertEquals("23505",assertThrows(SQLException.class,()->s.execute(occurrenceMigration(schema))).getSQLState());}
+                c.rollback(beforeMigration);
+                try(var s=c.createStatement();var r=s.executeQuery("select count(*) from "+schema+".resource_call")) {assertTrue(r.next());assertEquals(2,r.getLong(1));}
+                try(var s=c.prepareStatement("select to_regclass(?)")) {
+                    s.setString(1,schema+".resource_occurrence");try(var r=s.executeQuery()){assertTrue(r.next());assertNull(r.getString(1));}
+                }
+            } finally {c.rollback();}
+        }
+        assertEquals(1,count(f,"task.resource_call"));assertEquals(scope,bindings.findInvocation(scope).orElseThrow());
     }
 }

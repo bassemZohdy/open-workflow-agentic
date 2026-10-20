@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-103 preparation: additive V74 retains one canonical call per complete business occurrence while preserving existing rc1 keys. New producer lookup recovers original attribution across changing SDK retry counters and rejects changed contracts.12 local plain cases/app compile/tools76 pass;17 actual PostgreSQL cases including upgrade/backfill/conflict await new-head Linux evidence. No dispatch or acceptance promotion.
+
 - Combined6fbb9fb passed BOTH39388831952: actual effects16/group11/binding12/interruption6/core process1/standard3/native8, zero skips/strict checks. Three later full-SDK workflow observations prove retry counters can change for the same loop index; naive scope derivation is unsafe and the durable producer remains open. All three fixtures validate against OWS1.0.3.
 
 - GPT preparation normally combines frozen #51 current interruption code with group V71/V72 and binding V73, preserving source histories.62 local plain tests/app compilation/tools76 pass; fresh combined-head SQL/provider/full/peer evidence is required. This does not merge #51 to main or activate dispatch/acceptance.

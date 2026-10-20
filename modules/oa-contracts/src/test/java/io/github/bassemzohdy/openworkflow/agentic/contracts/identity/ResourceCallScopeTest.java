@@ -30,7 +30,7 @@ class ResourceCallScopeTest {
                 first.audience(),first.operation(),"d".repeat(64),first.requestFingerprint());
         assertEquals(first.key(),changedTarget.key());assertEquals(first.threadId(),changedTarget.threadId());assertNotEquals(first.fingerprint(),changedTarget.fingerprint());
     }
-    @Test void fullOwnerTenantInstanceTaskIterationAndLogicalParentOccurrenceSeparateInvocations() {
+    @Test void fullOwnerTenantInstanceTaskAndRetainedEntryAttributionSeparateStoredKeys() {
         var different=List.of(scope(),scope("other",INSTANCE,OWNER,"do/0/research",1,"root/1","agent-resource","agent:research:run",REQUEST),
                 scope("tenant",Ulid.parse("01K7VJN9GZVV8M2GXCSX0W9WJ9"),OWNER,"do/0/research",1,"root/1","agent-resource","agent:research:run",REQUEST),
                 scope("tenant",INSTANCE,new Subject(SubjectKind.SERVICE,"alice"),"do/0/research",1,"root/1","agent-resource","agent:research:run",REQUEST),
@@ -40,6 +40,8 @@ class ResourceCallScopeTest {
                 scope("tenant",INSTANCE,OWNER,"do/0/research",1,"root/2","agent-resource","agent:research:run",REQUEST));
         assertEquals(different.size(),new HashSet<>(different.stream().map(ResourceCallScope::key).toList()).size());
         assertEquals(different.size(),new HashSet<>(different.stream().map(ResourceCallScope::threadId).toList()).size());
+        assertEquals(different.size()-1,new HashSet<>(different.stream().map(ResourceCallScope::occurrenceKey).toList()).size(),
+                "only a new observed counter for the SAME complete business occurrence has the same lookup identity");
     }
     @Test void completeSdkDefinitionIdentitySeparatesCalls() {
         var base=scope();var values=new ArrayList<ResourceCallScope>();values.add(base);
@@ -47,6 +49,17 @@ class ResourceCallScopeTest {
                 i==1?"other":base.engineInstanceId(),i==2?"other":base.namespace(),i==3?"other":base.definition(),i==4?"2":base.version(),
                 base.taskPosition(),base.iteration(),base.logicalOccurrence(),base.audience(),base.operation(),base.targetFingerprint(),base.requestFingerprint()));
         assertEquals(6,new HashSet<>(values.stream().map(ResourceCallScope::key).toList()).size());
+        assertEquals(6,new HashSet<>(values.stream().map(ResourceCallScope::occurrenceKey).toList()).size());
+    }
+    @Test void occurrenceRecoversOriginalAttributionAcrossEntryCountersButNeverCollapsesBusinessCoordinates() {
+        var first=scope();
+        var retry=scope("tenant",INSTANCE,OWNER,"do/0/research",2,"root/1","agent-resource","agent:research:run",REQUEST);
+        assertNotEquals(first.key(),retry.key());assertEquals(first.occurrenceKey(),retry.occurrenceKey());
+        assertTrue(first.occurrenceKey().matches("ro1-[0-9a-f]{64}"));assertNotEquals(first.occurrenceKey(),first.key());
+        var next=scope("tenant",INSTANCE,OWNER,"do/0/research",2,"root/2","agent-resource","agent:research:run",REQUEST);
+        assertNotEquals(first.occurrenceKey(),next.occurrenceKey());
+        var changedRequest=scope("tenant",INSTANCE,OWNER,"do/0/research",2,"root/1","other","other","f".repeat(64));
+        assertEquals(first.occurrenceKey(),changedRequest.occurrenceKey(),"changed contracts must conflict at this SAME lookup");
     }
     @Test void maximumSubjectAndDelimiterUnicodePartsAreBoundedAndNeverTruncatedOrNormalized() {
         var longest=scope("tenant",INSTANCE,new Subject(SubjectKind.USER,"u".repeat(256)),"do/0/x",1,"root/1","aud","op",REQUEST);
