@@ -150,3 +150,18 @@ old-owner/partition recovery, manual resolution/retention/restore/observability 
 T03/full WP-108 closure remain open. No acceptance annotation/status promotion,
 Flyway placement, CDI wiring, provider permissions, second GPT PR or merge.
 Tracking remains 11 completed / 13 partial / 29 not started; acceptance 3/39.
+
+
+## Subsequent readiness race and correction
+
+Intermediate manual preparation c8197e7/BOTH39454950406 exposed a real existing
+HTTP fixture startup race in standard: the parent saw port existence while the
+newly created file was still empty (NumberFormatException). Both full logs and
+all161 actual XML per lane checked: manual25 passes each; only that HTTP case
+errors in standard, native succeeds. Those sources are not a new passing BOTH.
+The worker now closes the complete pending port and publishes with ATOMIC_MOVE
+in its SAME unique owned directory, after flushing ready output. Parent existence
+cannot observe a partially written published file. No sleeps/retry/guard removal
+substitute for the publication fix. Local native filesystem/concurrent-reader
+probe100 succeeds; fresh exact Linux HTTP7 execution remains required. See the
+current manual-decision handoff for final source/evidence, not older proof transfer.

@@ -49,8 +49,15 @@ public final class EffectHttpProcessWorker {
             finally{exchange.close();}
         });
         Runtime.getRuntime().addShutdownHook(new Thread(()->{server.stop(0);executor.shutdownNow();}));
-        server.start();Files.writeString(Path.of("port"),Integer.toString(server.getAddress().getPort()),StandardOpenOption.CREATE_NEW);
-        System.out.println("owned HTTP server ready "+mode);System.out.flush();new CountDownLatch(1).await();
+        server.start();System.out.println("owned HTTP server ready "+mode);System.out.flush();
+        publishReadyPort(Path.of("."),server.getAddress().getPort());new CountDownLatch(1).await();
+    }
+    /** File existence is readiness ONLY after all bytes are closed and atomically published in the owned directory. */
+    static void publishReadyPort(Path directory,int port) throws Exception {
+        if(port<1 || port>65535)throw new IllegalArgumentException("invalid owned HTTP port");
+        var pending=directory.resolve("port.pending");var ready=directory.resolve("port");
+        Files.writeString(pending,Integer.toString(port),StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW);
+        Files.move(pending,ready,StandardCopyOption.ATOMIC_MOVE);
     }
     private static void handle(PGSimpleDataSource ds,String mode,HttpExchange x) throws Exception {
         String key=x.getRequestHeaders().getFirst("X-Effect-Key"),fp=x.getRequestHeaders().getFirst("X-Request-Fingerprint"),op=x.getRequestHeaders().getFirst("X-Operation");

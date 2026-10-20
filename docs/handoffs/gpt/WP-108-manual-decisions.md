@@ -121,6 +121,29 @@ disabled to make a fixture pass. Central receipts in the final boundary cases
 are explicit TWO-COMMIT DATA fixtures, not the actual atomic appendOnce consumer;
 private authority and targets there are protocol spies, not actual operator proof.
 
+## Retained intermediate execution and HTTP fixture repair
+
+Intermediate correctedc8197e7/BOTH39454950406: native SUCCESS, standard FAILED
+ONE existing HTTP refund-recovery startup error, not manual storage. Both finished
+full logs (standard118739268420/native118739269280) and actual archives12280486916/
+12280866461 inspected; bytes/digests/CRC/paths verified. All161 XML each parsed.
+Manual25 matches EXACT old source and passes EACH, including all UPDATE/DELETE/
+TRUNCATE guard assertions. Standard's only error is NumberFormatException for an
+EMPTY port file before constructing the refund target; native is clean. No green
+BOTH claim or new26/readback proof is transferred from this older source.
+
+Actual file publication caused the race: Files.writeString CREATE_NEW makes the
+port path visible before bytes finish. Correct the test worker to close the full
+port.pending contents, then ATOMIC_MOVE within the SAME exclusive owned child
+directory; flush its ready diagnostic before publishing. Parent existence now
+observes a completed port. Unsupported atomic publication refuses rather than
+falling back to the raced protocol. No assertion removed/weakened and no unchanged
+retry. A local actual native filesystem/concurrent-reader probe completes100
+publications with zero partial/invalid reads; that probe is not DB/provider proof.
+Current26/eight-contract/HTTP7/core1/audit-process4/provider gates need fresh exact
+Linux execution after BOTH the scoped read API and atomic fixture fix. The live
+5a8241a/BOTH39455577089 is an intermediate source, not this final fixture code.
+
 ## Explicit Claude handoff and remaining gates
 
 Current unmerged #53 d38776c already contains CallerAuthority/resolveAuthority,
