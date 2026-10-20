@@ -51,6 +51,12 @@ late-cleanup case was added afterward. No mutation/probe file is committed.
 
 Final selected application-reactor build passes39 plain cases (contracts6/runtime33,
 including interruption6), zero failures/errors/skips; all application tests compile.
+
+After normal mergef311fa9 of reviewed main49/30e81c3, the selected application
+reactor build also includes ResourceCallScopeTest:45 total plain cases
+(contracts12/runtime33), zero failures/errors/skips. Tools76/generated/diff
+checks pass; source histories are preserved. New combined-head SQL/full/
+provider/process CI and exact peer review remain required.
 The four new ACTUAL PostgreSQL cases compile but still require new-head Linux
 execution: interrupt after real intent commit, after real attempt commit, during
 lookup and after compensation intent/link commit. Each later uses a new physical
