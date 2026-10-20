@@ -25,6 +25,10 @@ public record InboxMessage(String tenant, String source, String eventId, String 
         type = Checks.requireText("type", type, 256);
         Objects.requireNonNull(instanceId, "instanceId");
         correlationKey = Checks.requireText("correlationKey", correlationKey, 256);
+        if (CanonicalEncoder.strictUtf8(tenant).length + CanonicalEncoder.strictUtf8(correlationKey).length
+                + CanonicalEncoder.strictUtf8(type).length > 2000) {
+            throw new IllegalArgumentException("event route exceeds the storage key byte limit");
+        }
         Objects.requireNonNull(dataJson, "dataJson");
         if (CanonicalEncoder.strictUtf8(dataJson).length > 64 * 1024) {
             throw new IllegalArgumentException("event data exceeds 64 KiB");

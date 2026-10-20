@@ -150,9 +150,33 @@ class JdbcEventInboxTest {
                     + "where tenant=? and id=?")) {
                 s.setString(1, row.tenant()); s.setString(2, row.id().value()); assertEquals(1, s.executeUpdate());
             }
-            var result = worker.submit(() -> inbox.match(row.tenant(), row.id(), "wait:1", event.type()));
-            c.commit();
-            assertTrue(result.get(10, TimeUnit.SECONDS).isEmpty());
+            String marker = "inbox-race-" + UUID.randomUUID();
+            DataSource tagged = (DataSource) java.lang.reflect.Proxy.newProxyInstance(DataSource.class.getClassLoader(),
+                    new Class<?>[]{DataSource.class}, (proxy, method, args) -> {
+                        try {
+                            Object value = method.invoke(dataSource, args);
+                            if (value instanceof Connection connection) connection.setClientInfo("ApplicationName", marker);
+                            return value;
+                        } catch (java.lang.reflect.InvocationTargetException e) { throw e.getCause(); }
+                    });
+            var result = worker.submit(() -> new JdbcEventInbox(tagged).match(row.tenant(), row.id(), "wait:1", event.type()));
+            try {
+                // Observe actual PostgreSQL lock contention, not just executor scheduling.
+                boolean blocked = false;
+                long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+                try (var observer = dataSource.getConnection(); var s = observer.prepareStatement(
+                        "select exists (select 1 from pg_stat_activity where application_name=? and wait_event_type='Lock')")) {
+                    observer.setAutoCommit(true); s.setString(1, marker);
+                    while (System.nanoTime() < until && !result.isDone()) {
+                        try (var r = s.executeQuery()) { r.next(); blocked = r.getBoolean(1); }
+                        if (blocked) break;
+                        Thread.sleep(20);
+                    }
+                }
+                assertTrue(blocked, "matcher must wait on the cancellation transaction's instance lock");
+                c.commit();
+                assertTrue(result.get(10, TimeUnit.SECONDS).isEmpty());
+            } finally { c.rollback(); }
         }
     }
 
