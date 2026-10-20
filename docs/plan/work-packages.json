@@ -559,6 +559,7 @@
           "Cedar PDP, versioned decisions, fail-closed decorator and an explicit 64-evaluation PEP bulkhead are implemented.",
           "Operator safe-recovery checks and the shared durable audit sink are integrated.",
           "Claude route-inventory test0aeb52f passes one scoped case in CI39354688069; /agents/research is an explicit anonymous-route gap, not a default-deny pass.",
+          "GPT integrated #49 as main30e81c3 after exact411dc36 Claude APPROVE6285298422 and full39380912923/BOTH39380912505 SUCCESS; shared resource-call scope/binding port available, production storage/admission/dispatch and actual workflow401 gate remain. GPT reviewed stacked audit #50 exact427dc7267ba823e429b4d287688ed03a7bc60ef1/base60c1c7f REQUEST_CHANGES6285396372 for expiry during mandatory audit before read and lazy PEP DI failure500 instead503.34 independent cases pass, ignored actual-class probes reproduce both; full39383362196 SUCCESS does not resolve findings. Parent47 must resolve shared gate/merge before final retarget/review; WP-103 remains partial.",
           "GPT shared contract preparation: ResourceCallScope pins registry/full-owner/actual SDK task and stable enclosing occurrence; stable rc1 invocation excludes mutable target/request so changes conflict, while separate immutable contract fingerprint pins approved target configuration/audience/operation/request. Governed thread is bounded and stable across credentials. ResourceCallBinding pins verified issuer+jti/exact grant/signed lifetime; ResourceCallBindings documents atomic two-identity retention and fail-closed unknown replies.170 contracts pass including6 new semantic cases; no SQL/backend/admission/dispatch activated, actual workflow still401, no acceptance promotion. Claude exact60c1c7f review6284804165 acknowledges owned fixes; shared integration gate remains, full39379651134/both39379651142 SUCCESS."
         ],
         "completed_deliverables": [
@@ -570,11 +571,13 @@
           "Prove tool/model/human-task/publication boundaries cannot bypass the PEP as their product implementations land; enforce and test default deny on uncovered HTTP paths.",
           "Keep T23 emergency containment work with WP-305; production approved-state freshness is owned by WP-304.",
           "Protect Claude-owned AgentResource with verified caller/PEP and no-business-invocation tests; GPT supplies dispatch-only credential integration outside persisted workflow state. Harden route inventory coverage/exemptions; do not treat known-gap exceptions as complete denial proof.",
+          "Resolve GPT revised #47 exact8d63727 review: retain/revalidate signed expiry and exact current grant after blocking policy/audit, bind governed invocation to trusted registry instance/task/occurrence separate from direct threads, preserve valid maximum subject lengths, and integrate the actual GPT-owned workflow credential adapter with denial/no-effect evidence. See WP-103-admission-review.md; no whole WP-102 start gate.",
           "Resolve GPT #47 exact bb58420 material review: bind direct agent checkpoint access to verified user/instance/tenant ownership and reconcile workflow dispatch-only exchanged credentials with resource admission, proving the actual HTTP step and denial/no-effect cases; full39374220592 alone does not close these boundaries. See docs/handoffs/gpt/WP-103-review.md."
         ],
         "evidence": [
           "docs/policy.md",
           "docs/audit.md",
+          "docs/handoffs/gpt/WP-103-admission-review.md",
           "docs/handoffs/gpt/WP-103-review.md"
         ]
       }
@@ -829,7 +832,16 @@
         "implemented": [
           "JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.",
           "Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.",
-          "Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial."
+          "Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial.",
+          "Governed-boundary preparation publishes framework-free EffectScope (tenant, registry instance, full owner Subject) and exact authority/manual-policy/central-audit handoff. Reuses existing ws1/ef1 derivation without key/schema changes; requires verified registry/full-owner checks because historical thread hashing omits subject kind. Four new scope and two existing key unit cases pass zero skips. This is attribution data, not an authority grant or consumer activation. Specific current-authority-after-blocking-I/O, resolve-effect OPERATION policy, audit producer/consumer and real Flow/effect/manual execution gates remain open; no whole-WP-102 start dependency.",
+          "Additive V70 storage guards preserve effect key/target/request/purpose/creation/replay binding, irreversible attempts and existing state transitions, immutable repeated outcome evidence and retained journal/compensation links. Five new direct-SQL cases compile with app reactor; execution/review pending. No public authority/manual/adapter activation or acceptance closure.",
+          "Effect tracing preparation adds schema1 fixed logical/dispatch/lookup/compensation spans with current parent context, finite outcome attributes and no payload/key/subject/target/credential/exception events. SDK defaults disabled with runtime collector opt-in, bounded batch queue/export and content capture disabled. Five local real-SDK/fault cases pass; app reactor test-compile and dependency/license checks pass; three actual ledger/CDI trace cases compile pending Linux. V70 standard lane39374918657 passed guard5/existing service12/ledger4/standard3; delegation lane pending. No governed Flow/adapter/manual/audit or whole tracing/acceptance closure.",
+          "Exact199cf5b workflow39374918657 SUCCESS BOTH lanes: storage guard5, existing DurableEffects12/ledger4 and standard3/native8 all zero failures/errors/skips with strict evidence checks. Matrix does not rerun process-kill T03; final implementation PR full CI retains that gate. Separate tracese2dc636 workflow39376019493 pending; no pass transfers to new tracing code.",
+          "Exact trace producte2dc636 workflow39376019493 SUCCESS BOTH lanes, logs independently inspected: actual ledger/CDI EffectTracingTest3, real-SDK/fault telemetry5, V70 guard5, original effect service12, standard3/native8, zero failures/errors/skips and strict provider evidence checks pass. No external production collector/whole Flow/distributed trace or process-T03 rerun is claimed; final implementation PR full CI/current Claude review still gates merge.",
+          "Normal preparation mergec18f08ba314016da1efad539a2205ed83f46c99b takes reviewed #48/maindbec8e0 without history rewrite, preserves both source progress histories and regenerated projections.33 selected local scope/command/tracing/decoder/SPI/checkpoint tests pass plus app reactor compile/tools68/checks. Fresh Linux39381057653 running; old V70/CDI evidence is not transferred. No additional implementation PR; #49 shared resource-call contract remains the sole GPT PR. Final full T03/peer/actual governed Flow/authority/manual/central-audit/distributed trace gates remain open.",
+          "Manual real-provider matrix now also selects existing EffectCrashRecoveryIT in both lanes, with mandatory source preflight and strict exact suite/class/method/lane/counter/no-skip XML verification plus retained child logs.76 tooling tests (8 new evidence-refusal cases) and preflights/checks pass. Java process test/assertions unchanged: separate workers halt after independent charge/refund target commits, then repeated recovery. Actual new-head Linux execution pending; no local SQL/native/core-result transfer/whole governed Flow or broader T03 completion claim. No second GPT implementation PR or new migration.",
+          "Exact CI product4325993605ed50418f321ecdcaff73178d550029 passed BOTH39381656269 with actual original separate-worker charge/refund EffectCrashRecoveryIT1 on V70/tracing/merged main48, guards5/effects12/actual CDI tracing3/standard3/native8, zero failures/errors/skips. Both full logs and strict provider/process checks inspected; tooling76 pass. This re-executes original core T03, not whole governed Flow/current authority/manual/owner/partition or complete distributed tracing. Clarified transient caller()/requireCurrent(scopes) producer proposal for ordinary-user/manual signed expiry after blocking work as well as exact delegated grant freshness; no bearer persistence, DEV/UNVERIFIED production refusal. Claude producer/policy/central audit and final peer/full-CI gates remain open; no package/acceptance promotion.",
+          "Cooperative interruption checks now refuse before target execute/lookup after claim/intent/attempt I/O, around compensation and after complete claim/tracing cleanup; flag preserved and committed facts retained, no false FAILED/COMPENSATED or fresh-key retry. Six deterministic cases pass with39 selected local plain total/app reactor compile; four new actual SQL cases compile (intent/attempt/lookup/compensation plus fresh physical-connection recovery). Original service fails all five initial regressions; final source restored. New-head SQL/provider/process/full CI and exact peer review pending. This is not registry/lease/authority/SDK future cancellation or whole governed Flow proof."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -841,7 +853,10 @@
         "evidence": [
           "docs/handoffs/gpt/WP-108.md",
           "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/JdbcEffectLedger.java",
-          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java"
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/EffectCrashRecoveryIT.java",
+          "docs/handoffs/gpt/WP-108-authority.md",
+          "docs/handoffs/gpt/WP-108-storage-guards.md",
+          "docs/handoffs/gpt/WP-108-tracing.md"
         ]
       }
     },
@@ -1000,7 +1015,9 @@
       "progress": {
         "status": "partial",
         "implemented": [
-          "Correlation IDs, health endpoints, Prometheus metrics and outbox-lag metrics exist."
+          "Correlation IDs, health endpoints, Prometheus metrics and outbox-lag metrics exist.",
+          "WP-108 preparation supplies bounded OTel effect/dispatch/lookup/compensation spans using pinned existing Quarkus3.39.5 BOM/API1.62.0, custom schema1 and disabled SDK by default. Five in-process SDK/fault cases pass; actual ledger/CDI trace execution and end-to-end Flow/agent/tool/model, async/restart propagation, collector/runbook/dashboard/alert/SLO evidence remain open. No full observability deliverable or acceptance promotion.",
+          "Effect trace producte2dc636 executed in39376019493 SUCCESS both Linux lanes: ledger/CDI3 and SDK/fault5 zero skips, plus existing service/guard/provider regressions. This proves only component emission/privacy/failure semantics; production collector/deployment, complete Flow/agent/tool/model and async/restart/outbound correlation, runbook/dashboard/alert/SLO gates remain open."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -1009,7 +1026,8 @@
         ],
         "evidence": [
           "README.md",
-          "docs/lifecycle.md"
+          "docs/lifecycle.md",
+          "docs/handoffs/gpt/WP-108-tracing.md"
         ]
       }
     },
@@ -2633,7 +2651,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-19",
-    "status": "2026-10-20: GPT merged #48 exacte2e9b89 as maindbec8e0 after Claude APPROVE6284855752, independent full verify, full39375306470 and BOTH real-provider39375306597 SUCCESS. Nonblocking operator-label/cosmetic notes retained; all full group/recovery/T13 gates remain. Main postmerge39380658087/39380658010 running. Claude #47 exact60c1c7f reviewed GPT6284804165: prior Claude-owned findings addressed, shared trusted resource-call binding/actual workflow adapter still a merge gate (workflow401); full39379651134/BOTH39379651142 SUCCESS. New GPT shared resource-call contract preparation adds stable invocation vs immutable target/request fingerprints, bounded governed threads and issuer+jti-to-scope port;170 contracts pass (6 new), no backend/SQL/consumer activation or completion. Effect V70/tracing and group V71/V72/snapshot preparations stay on their GPT branches; exact V724d75161 passed BOTH39379015967 (SQL11 zero skips), snapshotf1842c0 fresh39380401962 running. No new binding migration allocated; preserve V70->V71->V72 order. Complete selector/FIFO/coordinator/per-item proof/Flow/loop/process/partition/old-owner/effect/manual/starts/retention/audit/tracing/full T13 and live async identity/exchange stay open",
+    "status": "Current sole GPT implementation PR #51 follows merged #49/main30e81c3; V70/scope/tracing/process-CI/interruption changes require current-head full/provider/process CI and exact Claude review.45 selected plain tests (contracts12/runtime33, interruption6), app test compile/tools76/generated checks pass; four new PostgreSQL interruption cases compile and need fresh execution. Earlier4325993/BOTH39381656269 proves pre-interruption core process/SQL/CDI scope only, not this fix. #49 exact411dc36 merged after Claude APPROVE6285298422/full39380912923/BOTH39380912505; main postmerge39383731640 SUCCESS. #47 exact60c1c7f still needs shared trusted binding/backend/actual workflow dispatch (401). GPT reviewed stacked #50 exact427dc72/base60c1c7f REQUEST_CHANGES6285396372: expiry crossed during mandatory audit still reaches query, lazy PEP DI failure maps500;34 independent tests pass and probes reproduce both, full39383362196 SUCCESS does not resolve findings. Group c1fd835/BOTH39381927960 passed component SQL/JPA/recovery/tracing/core-process scope, not whole production selector/coordinator/Flow/loop/group recovery/T13. Preserve V70->V71->V72, no new binding migration allocated. Current ordinary-user/operator authority, explicit manual policy, central audit, actual governed Flow/adapters, registry/lease cancellation, old-owner/partition, starts/retention/distributed trace and live async identity/exchange remain open; packages stay partial",
     "agents": [
       {
         "id": "GPT",
