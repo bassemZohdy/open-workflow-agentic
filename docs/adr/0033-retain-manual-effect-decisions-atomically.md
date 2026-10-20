@@ -28,6 +28,12 @@ changed full scope/request, unattempted/nonqueued/resolved intent, stale latest
 journal and conflicting id/tuple. An exact historical retry returns the original
 fact, including after later compensation, without another transition/source.
 
+A bounded coherent find(full scope, full command, original id) returns historical
+DATA with the original source checked. A trusted producer can recover its first
+server-derived policy/evidence metadata without accepting replacement client
+fields. It must compare original client intent and reauthorize the current caller
+before exposing a result; find is neither mutation permission nor an allow cache.
+
 Atomically commit decision, manual journal event, MANUAL source/original draft,
 pending audit delivery, ledger outcome and queue closure. Proposed additive V80
 extends V77 without rewriting it or any applied migration. Validate canonical

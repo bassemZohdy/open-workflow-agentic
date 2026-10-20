@@ -34,6 +34,28 @@ public final class JdbcEffectManualDecisions {
         this.data=Objects.requireNonNull(data);this.manager=Objects.requireNonNull(manager);
         this.ledger=new JdbcEffectLedger(data,manager,producer);
     }
+    /**
+     * Historical DATA by original id/full command, no mutation or permission. A trusted operator producer can
+     * recover its first server-derived policy/evidence attribution without accepting replacement client fields.
+     * Public access still needs current authorization/audit/result gates; absence proves no permission or outcome.
+     */
+    public Optional<Stored> find(EffectScope scope,EffectCommand command,Ulid id) {
+        Objects.requireNonNull(scope);Objects.requireNonNull(command);Objects.requireNonNull(id);scope.requireKey(command.key());
+        interrupted();Transaction prior;
+        try{prior=manager.suspend();}catch(Exception failed){throw new StoreUnavailableException("manual read transaction cannot be suspended",failed);}
+        try {
+            var found=EffectStoreTransactions.snapshot(data,c->{
+                try(var q=c.prepareStatement("select * from effect.manual_decision where decision_id=?")) {
+                    q.setString(1,id.value());try(var r=q.executeQuery()) {
+                        if(!r.next())return Optional.<Stored>empty();var stored=read(r);
+                        if(!stored.decision().scope().equals(scope) || !stored.decision().command().equals(command))throw inconsistent();
+                        producer.find(c,stored.journalId()).orElseThrow(JdbcEffectManualDecisions::inconsistent);return Optional.of(stored);
+                    }
+                }
+            });
+            interrupted();return found;
+        }finally{if(prior!=null)try{manager.resume(prior);}catch(Exception failed){throw new StoreUnavailableException("manual read transaction cannot be resumed",failed);}}
+    }
     public Stored record(EffectManualDecision decision) {
         Objects.requireNonNull(decision);interrupted();Transaction prior;
         try{prior=manager.suspend();}catch(Exception failed){throw new StoreUnavailableException("manual caller transaction cannot be suspended",failed);}

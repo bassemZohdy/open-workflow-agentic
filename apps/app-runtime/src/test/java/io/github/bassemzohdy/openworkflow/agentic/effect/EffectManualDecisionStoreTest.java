@@ -92,6 +92,16 @@ class EffectManualDecisionStoreTest {
         var f=fixture();var d=decision(f);var stored=decisions.record(d);var history=history(f);
         assertEquals(stored,new JdbcEffectManualDecisions(db.dataSource,manager).record(d));assertEquals(stored,decisions.record(d));assertEquals(history,history(f));committed(f,d,stored);
     }
+    @Test void stableIdReadbackRetainsServerAttributionAndRefusesAnotherFullScopeOrCommand() throws Exception {
+        var f=fixture();var d=decision(f);assertTrue(decisions.find(f.scope(),f.command(),d.id()).isEmpty());
+        var stored=decisions.record(d);var history=history(f);var fresh=new JdbcEffectManualDecisions(db.dataSource,manager);
+        assertEquals(stored,fresh.find(f.scope(),f.command(),d.id()).orElseThrow());
+        var wrong=new EffectScope(f.scope().tenant(),f.scope().instanceId(),new Subject(SubjectKind.SERVICE,OWNER.id()));
+        assertThrows(IllegalStateException.class,()->fresh.find(wrong,f.command(),d.id()));
+        for(var command:List.of(new EffectCommand(d.command().key(),"other",d.command().requestFingerprint()),new EffectCommand(d.command().key(),d.command().target(),"c".repeat(64))))
+            assertThrows(IllegalStateException.class,()->fresh.find(f.scope(),command,d.id()));
+        assertEquals(stored,decisions.record(fresh.find(f.scope(),f.command(),d.id()).orElseThrow().decision()));assertEquals(history,history(f));
+    }
     @Test void changedOperatorPolicyEvidenceAuthorizationOutcomeOrExpectedHistoryConflicts() throws Exception {
         var f=fixture();var d=decision(f);decisions.record(d);var saved=history(f);
         for(var changed:List.of(
@@ -205,7 +215,10 @@ class EffectManualDecisionStoreTest {
     }
     @Test void ambientCallerRollbackCannotEraseTheOwnedCommittedManualDecision() throws Exception {
         var f=fixture();var d=decision(f);JdbcEffectManualDecisions.Stored stored;
-        caller.begin();try{stored=decisions.record(d);assertEquals(Status.STATUS_ACTIVE,manager.getStatus());}finally{caller.rollback();}
+        caller.begin();try {
+            stored=decisions.record(d);assertEquals(Status.STATUS_ACTIVE,manager.getStatus());
+            assertEquals(stored,decisions.find(f.scope(),f.command(),d.id()).orElseThrow());assertEquals(Status.STATUS_ACTIVE,manager.getStatus());
+        }finally{caller.rollback();}
         assertEquals(stored,decisions.record(d));committed(f,d,stored);
     }
     @Test void existingInterruptionRefusesMutationAndPreservesTheInterruptFlag() throws Exception {

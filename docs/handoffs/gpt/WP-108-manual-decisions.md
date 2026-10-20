@@ -52,6 +52,19 @@ new current history, outcome or second id refuses. Exact id+tuple retry reopens
 the original decision/draft/time even after subsequent compensation. A different
 effect cannot reuse the id. No target is called by this persistence operation.
 
+The added find(full scope, complete command, original decision id) returns checked
+historical DATA in a bounded owned REPEATABLE_READ snapshot. It validates the
+original stored tuple and source, suspends/resumes caller JTA, and refuses another
+full owner/target/request. It never mutates or authorizes. A genuine producer can
+recover its original server-derived policy/evidence attribution by stable id,
+compare the retry's original client intent/outcome/evidence/history coordinates,
+and perform independent CURRENT authorization/audit/result checks. Never blindly
+ignore changed client intent, trust client-supplied policy fields, replace first
+attribution or treat a historical read as permission. One additional SQL case
+brings the CURRENT suite to26; caller-JTA test also checks the read path. The
+intermediate25-case corrected run cannot prove this later API or its extra case.
+
+
 ONE transaction inserts journal+manual decision+original MANUAL draft/pending
 delivery and updates ledger outcome/queue closure to that same journal time.
 Deferred DB checks/FKs require all of them together, even if application code
