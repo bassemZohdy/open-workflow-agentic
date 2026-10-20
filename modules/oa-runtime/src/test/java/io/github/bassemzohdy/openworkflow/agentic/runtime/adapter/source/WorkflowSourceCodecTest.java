@@ -69,17 +69,20 @@ class WorkflowSourceCodecTest {
         rejected(codec.importSource(bytes("{} {}"),Format.JSON,Profile.RELEASED_1_0_1),Code.MALFORMED_SOURCE);
         rejected(read(BASIC+"---\n{}\n"),Code.MALFORMED_SOURCE);
     }
-    @Test void aliasesAreExplicitlyUnsupportedAndOriginalSourceStillExportsExactly() throws Exception {
+    @Test void aliasesExpandTheirReferencedDataAndOriginalSourceStillExportsExactly() throws Exception {
         byte[] source=resource("cases/comments-and-aliases.yaml");var imported=codec.importSource(source,Format.YAML,Profile.DEVELOPMENT_1_0_3);
-        rejected(imported,Code.YAML_ALIAS_UNSUPPORTED);assertArrayEquals(source,codec.exportOriginal(imported).bytes());
-        assertFalse(codec.export(imported,Format.JSON,ConversionPolicy.ALLOW_FORMATTING_CHANGES).succeeded());
+        assertTrue(imported.schemaAccepted(),imported.diagnostics().toString());assertArrayEquals(source,codec.exportOriginal(imported).bytes());
+        for(var format:Format.values()) {
+            var converted=codec.export(imported,format,ConversionPolicy.ALLOW_FORMATTING_CHANGES);assertTrue(converted.succeeded(),converted.diagnostics().toString());
+            var set=tree(converted.bytes(),format).path("do").get(0).path("copy").path("set");
+            assertEquals(new ObjectMapper().readTree("{\"label\":\"example\"}"),set.path("first"));assertEquals(set.path("first"),set.path("second"));
+        }
     }
     @Test void yamlTypeTagsBinaryAndNonFiniteNumbersCannotBecomeRuntimeObjectsOrChangedJsonValues() {
         rejected(read(BASIC+"tagged: !java.lang.Runtime value\n"),Code.YAML_TAG_UNSUPPORTED);
         assertFalse(read(BASIC+"tagged: !!binary SGVsbG8=\n").schemaAccepted());
-        // This pinned YAML parser refuses these spellings before producing a numeric token.
-        rejected(read(BASIC+"number: .nan\n"),Code.MALFORMED_SOURCE);
-        rejected(read(BASIC+"number: .inf\n"),Code.MALFORMED_SOURCE);
+        rejected(read(BASIC+"number: .nan\n"),Code.NON_JSON_VALUE);
+        rejected(read(BASIC+"number: .inf\n"),Code.NON_JSON_VALUE);
     }
     @Test void escapedUnpairedSurrogatesAreRejectedButValidUnicodeSurvives() {
         rejected(codec.importSource(bytes("{\"value\":\"\\uD800\"}"),Format.JSON,Profile.RELEASED_1_0_1),Code.INVALID_UNICODE);
@@ -116,6 +119,8 @@ class WorkflowSourceCodecTest {
         assertThrows(IllegalArgumentException.class,()->codec.importSource(new byte[0],Format.JSON,Profile.RELEASED_1_0_1));
         rejected(read("[".repeat(70)+"0"+"]".repeat(70)),Code.MALFORMED_SOURCE);
         rejected(read("["+"0,".repeat(100_001)+"0]"),Code.TOKEN_LIMIT);
+        rejected(read(BASIC+"number: "+"7".repeat(1100)+"\n"),Code.NON_JSON_VALUE);
+        assertTrue(read(BASIC+"text: '"+"7".repeat(1100)+"'\n").schemaAccepted());
     }
     @Test void noExternalWorkflowSchemaUriIsResolvedOrWorkflowExecutedByImportOrExport() throws Exception {
         var server=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress(java.net.InetAddress.getLoopbackAddress(),0),0);
@@ -141,23 +146,32 @@ class WorkflowSourceCodecTest {
         int accepted=0,converted=0;
         for(var entry:manifest.path("cases")) {
             byte[] source=entry.has("repositoryPath")?Files.readAllBytes(repository.resolve(entry.path("repositoryPath").asText())):resource(entry.path("source").asText());
-            var imported=codec.importSource(source,Format.YAML,Profile.DEVELOPMENT_1_0_3);assertArrayEquals(source,codec.exportOriginal(imported).bytes());
-            boolean alias=entry.path("id").asText().equals("comments-and-aliases");assertEquals(entry.path("schemaExpected").asText().equals("VALID")&&!alias,imported.schemaAccepted(),entry.path("id").asText()+imported.diagnostics());
+            var profile=entry.path("id").asText().startsWith("released-")?Profile.RELEASED_1_0_1:Profile.DEVELOPMENT_1_0_3;
+            var imported=codec.importSource(source,Format.YAML,profile);assertArrayEquals(source,codec.exportOriginal(imported).bytes());
+            boolean alias=entry.path("id").asText().equals("comments-and-aliases");assertEquals(entry.path("schemaExpected").asText().equals("VALID"),imported.schemaAccepted(),entry.path("id").asText()+imported.diagnostics());
             if(imported.schemaAccepted())accepted++;
             var item=cases.addObject().put("id",entry.path("id").asText()).put("originalSha256",imported.originalSha256()).put("schemaAccepted",imported.schemaAccepted());
+            item.put("profile",profile.name());
             String id=entry.path("id").asText();assertTrue(id.matches("[a-z0-9-]+"));
             Files.write(retained.resolve("originals/"+id+".yaml"),codec.exportOriginal(imported).bytes());
             item.set("diagnostics",new ObjectMapper().valueToTree(imported.diagnostics()));
             for(var format:Format.values()) {
                 var out=codec.export(imported,format,ConversionPolicy.ALLOW_FORMATTING_CHANGES);assertEquals(imported.schemaAccepted(),out.succeeded(),entry.path("id").asText()+out.diagnostics());
                 if(out.succeeded()) {
-                    converted++;assertEquals(tree(source,Format.YAML),tree(out.bytes(),format));
+                    converted++;var expected=tree(source,Format.YAML);
+                    // Independent oracle for the one pinned alias fixture; Jackson itself reads the alias name.
+                    if(alias) {
+                        var set=(com.fasterxml.jackson.databind.node.ObjectNode)expected.path("do").get(0).path("copy").path("set");
+                        assertEquals("fixture",set.path("second").asText());assertEquals("example",set.path("first").path("label").asText());
+                        set.set("second",set.path("first").deepCopy());
+                    }
+                    assertEquals(expected,tree(out.bytes(),format));
                     Files.write(retained.resolve("exports/"+id+"."+format.name().toLowerCase(Locale.ROOT)),out.bytes());
                 }
                 item.put(format.name()+"Converted",out.succeeded());
             }
         }
-        assertEquals(42,cases.size());assertEquals(38,accepted);assertEquals(76,converted);
+        assertEquals(42,cases.size());assertEquals(39,accepted);assertEquals(78,converted);
         report.putObject("summary").put("sources",cases.size()).put("originalsRetained",cases.size()).put("schemaAccepted",accepted).put("converted",converted)
                 .put("scope","Offline source data conversion only; no SDK compatibility, execution, activation or full conformance proof");
         Path output=Path.of("target/conformance/source-codec-report.json");Files.createDirectories(output.getParent());Files.writeString(output,report.toPrettyString()+"\n");
@@ -167,6 +181,71 @@ class WorkflowSourceCodecTest {
         for(String name:List.of("workflow-1.0.1.yaml","workflow-1.0.3.yaml","LICENSE")) {
             byte[] main=Files.readAllBytes(root.resolve("modules/oa-runtime/src/main/resources/conformance/schema/"+name));
             assertArrayEquals(resource("schema/"+name),main,name);
+        }
+    }
+    @Test void coreScalarsFollowYaml12RatherThanLegacyOctalDatesSexagesimalOrBooleanWords() throws Exception {
+        for(String value:List.of("0123","+0123","-0123","0o17","0xF","0xFF","0b10","0X0F","1_000","'1:20'","2026-10-20","on","yes"))
+            assertTrue(read(BASIC+"values: ["+value+"]\n").schemaAccepted(),"Public core scalar control: "+value);
+        var imported=read(BASIC+"values: [0123, +0123, -0123, 0o17, 0xF, 0xFF, 0b10, 0X0F, 1_000, '1:20', 2026-10-20, on, yes]\n");
+        assertTrue(imported.schemaAccepted(),imported.diagnostics().toString());
+        var converted=codec.export(imported,Format.JSON,ConversionPolicy.ALLOW_FORMATTING_CHANGES);assertTrue(converted.succeeded(),converted.diagnostics().toString());
+        assertEquals(tree(bytes("[123,123,-123,15,15,255,\"0b10\",\"0X0F\",\"1_000\",\"1:20\",\"2026-10-20\",\"on\",\"yes\"]"),Format.JSON),tree(converted.bytes(),Format.JSON).path("values"));
+    }
+    @Test void explicitCoreTagsRetainTheirJsonDataWithoutConstructingJavaObjects() throws Exception {
+        var imported=read(BASIC+"values: [!!str null, !!str 0o7, !!int '0123', !!int 0o17, !!int 0xF, !!float '.5', !!float 1, !!null NULL, !!bool FALSE, !!seq [1, 2], !!map {word: on}]\n");
+        assertTrue(imported.schemaAccepted(),imported.diagnostics().toString());
+        for(var format:Format.values()) {
+            var out=codec.export(imported,format,ConversionPolicy.ALLOW_FORMATTING_CHANGES);assertTrue(out.succeeded(),out.diagnostics().toString());
+            assertEquals(tree(bytes("[\"null\",\"0o7\",123,15,15,0.5,1,null,false,[1,2],{\"word\":\"on\"}]"),Format.JSON),tree(out.bytes(),format).path("values"));
+        }
+    }
+    @Test void malformedExplicitCoreTagsAndNonJsonMappingKeysAreRefused() {
+        rejected(read(BASIC+"extra: !!int abc\n"),Code.MALFORMED_SOURCE);
+        rejected(read(BASIC+"extra: !!bool yes\n"),Code.MALFORMED_SOURCE);
+        rejected(read(BASIC+"extra: {true: value}\n"),Code.NON_JSON_VALUE);
+        rejected(read(BASIC+"extra: {[a, b]: value}\n"),Code.NON_JSON_VALUE);
+    }
+    @Test void cyclicUndefinedAndDuplicateAliasKeysNeverProduceChangedSourceData() {
+        var cyclic=read(BASIC+"extra: &cycle {again: *cycle}\n");rejected(cyclic,Code.YAML_CYCLE);
+        assertArrayEquals(bytes(BASIC+"extra: &cycle {again: *cycle}\n"),codec.exportOriginal(cyclic).bytes());
+        rejected(read(BASIC+"extra: *missing\n"),Code.MALFORMED_SOURCE);
+        rejected(read(BASIC+"extra: {&key same: 1, *key : 2}\n"),Code.MALFORMED_SOURCE);
+    }
+    @Test void aliasExpansionBoundsCountExpandedNodesAndCharactersRatherThanOnlyCompactSource() {
+        var graph=new StringBuilder(BASIC).append("a0: &a0 [x, x]\n");
+        for(int i=1;i<=20;i++)graph.append("a").append(i).append(": &a").append(i).append(" [*a").append(i-1).append(", *a").append(i-1).append("]\n");
+        rejected(read(graph.toString()),Code.EXPANSION_LIMIT);
+        String repeated=BASIC+"large: &large '"+"x".repeat(20_000)+"'\nextra: ["+String.join(",",Collections.nCopies(100,"*large"))+"]\n";
+        rejected(read(repeated),Code.EXPANSION_LIMIT);
+    }
+    @Test void yaml12DirectivesAreRecognizedWithoutMatchingTextInsideQuotedScalars() {
+        assertTrue(read("%YAML 1.2\n---\n"+BASIC).schemaAccepted());
+        rejected(read("%YAML 1.1\n---\n"+BASIC),Code.YAML_VERSION_UNSUPPORTED);
+        assertTrue(read(BASIC+"text: '%YAML 1.1'\n").schemaAccepted());
+    }
+    @Test void outputSizeLimitInterruptsSerializationAndReturnsNoPartialBytes() {
+        String source=BASIC+"wide: ["+String.join(",",Collections.nCopies(24_000,"x".repeat(40)))+"]\n";
+        var imported=read(source);assertTrue(imported.schemaAccepted(),imported.diagnostics().toString());
+        var exported=codec.export(imported,Format.JSON,ConversionPolicy.ALLOW_FORMATTING_CHANGES);
+        assertFalse(exported.succeeded());assertEquals(List.of(new Diagnostic(Code.OUTPUT_LIMIT,"","")),exported.diagnostics());assertEquals(0,exported.bytes().length);
+        assertArrayEquals(bytes(source),codec.exportOriginal(imported).bytes());
+    }
+    @Test void sourceMaterializationPreservesAliasMeaningWhereThePinnedSdkYamlReaderDoesNot() throws Exception {
+        byte[] source=resource("cases/comments-and-aliases.yaml");var candidate=codec.importSource(source,Format.YAML,Profile.DEVELOPMENT_1_0_3);
+        var exported=codec.export(candidate,Format.JSON,ConversionPolicy.ALLOW_FORMATTING_CHANGES);assertTrue(exported.succeeded());
+        JsonNode original=executeKnownPureAliasFixture(source,WorkflowFormat.YAML),materialized=executeKnownPureAliasFixture(exported.bytes(),WorkflowFormat.JSON);
+        var expected=new ObjectMapper().readTree("{\"first\":{\"label\":\"example\"},\"second\":{\"label\":\"example\"}}");
+        assertEquals(new ObjectMapper().readTree("{\"first\":{\"label\":\"example\"},\"second\":\"fixture\"}"),original);
+        assertEquals(expected,materialized);assertNotEquals(expected,original);
+        var observation=new ObjectMapper().createObjectNode();observation.set("originalSdkOutput",original);observation.set("materializedSdkOutput",materialized);observation.set("expected",expected);
+        observation.put("scope","Known pure fixture only; source alias correctness does not grant activation or full SDK semantic conformance");
+        Path output=Path.of("target/conformance/source-codec/alias-sdk-observation.json");Files.createDirectories(output.getParent());Files.writeString(output,observation.toPrettyString()+"\n");
+    }
+    private static JsonNode executeKnownPureAliasFixture(byte[] source,WorkflowFormat format) throws Exception {
+        // The only caller is the fixed, byte-retained set-only fixture above; no caller-supplied workflow execution.
+        try(var app=io.serverlessworkflow.impl.WorkflowApplication.builder().disableLifeCycleCEPublishing().disableStatusChangePublishing().build()) {
+            var instance=app.workflowDefinition(WorkflowReader.readWorkflow(source,format)).instance(Map.of());
+            return new ObjectMapper().valueToTree(instance.start().get(3,java.util.concurrent.TimeUnit.SECONDS).asJavaObject());
         }
     }
 }

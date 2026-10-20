@@ -68,6 +68,8 @@
 
     <!-- Offline source import/export validates against locally pinned OWS schemas. Existing BOM-managed version. -->
     <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><scope>compile</scope></dependency>
+    <!-- Already transitively present at the managed version; compose YAML nodes without Java object construction. -->
+    <dependency><groupId>org.yaml</groupId><artifactId>snakeyaml</artifactId></dependency>
 
     <!-- Tests (plain JUnit and ArchUnit; Quarkus boot tests live in app-runtime) -->
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>

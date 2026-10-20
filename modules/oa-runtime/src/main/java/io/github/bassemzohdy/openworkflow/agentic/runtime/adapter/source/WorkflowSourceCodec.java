@@ -24,7 +24,8 @@ public final class WorkflowSourceCodec {
         Profile(String version,String sha){this.version=version;this.sha=sha;}
     }
     public enum Code {INVALID_UTF8,MALFORMED_SOURCE,YAML_ALIAS_UNSUPPORTED,YAML_TAG_UNSUPPORTED,
-        NON_JSON_VALUE,INVALID_UNICODE,TOKEN_LIMIT,SCHEMA_INVALID,OUTPUT_LIMIT,CONVERSION_CHANGED_DATA}
+        NON_JSON_VALUE,INVALID_UNICODE,TOKEN_LIMIT,SCHEMA_INVALID,OUTPUT_LIMIT,CONVERSION_CHANGED_DATA,
+        YAML_CYCLE,YAML_VERSION_UNSUPPORTED,EXPANSION_LIMIT}
     public record Diagnostic(Code code,String path,String keyword) {
         public Diagnostic {Objects.requireNonNull(code);Objects.requireNonNull(path);Objects.requireNonNull(keyword);}
     }
@@ -64,7 +65,7 @@ public final class WorkflowSourceCodec {
         public boolean succeeded(){return diagnostics.isEmpty();}
         public List<Diagnostic> diagnostics(){return diagnostics;}
         public String presentationNotice(){return exactSource?"EXACT_ORIGINAL_BYTES":
-                "FORMATTING_AND_COMMENTS_NOT_PRESERVED; ORIGINAL_SOURCE_RETAINED; NO_ENGINE_COMPATIBILITY_OR_ACTIVATION_PROOF";}
+                "FORMATTING_AND_COMMENTS_NOT_PRESERVED; ALIAS_NAMES_NOT_PRESERVED; ORIGINAL_SOURCE_RETAINED; NO_ENGINE_COMPATIBILITY_OR_ACTIVATION_PROOF";}
     }
     private final ObjectMapper json,yaml;
     private final Map<Profile,Schema> schemas;
@@ -124,17 +125,16 @@ public final class WorkflowSourceCodec {
         return new Imported(source,format,profile,data,diagnostics);
     }
     private JsonNode parse(byte[] bytes,Format format) throws IOException {
+        if(format==Format.YAML) {
+            try{return YamlSourceData.read(bytes,MAX_TOKENS,MAX_BYTES);}
+            catch(YamlSourceData.Failure refused){throw new Rejected(refused.code);}
+        }
         var mapper=mapper(format);
-        // Inspect the complete token stream before constructing a tree. YAML aliases are otherwise silently
-        // read as their anchor NAME by this pinned Jackson parser; refusing them preserves authored meaning.
+        // Inspect JSON before constructing a tree. YAML takes the separate bounded representation-graph path.
         try(var parser=mapper.createParser(bytes)) {
             int tokens=0;
             while(parser.nextToken()!=null) {
                 if(++tokens>MAX_TOKENS)throw new Rejected(Code.TOKEN_LIMIT);
-                if(parser instanceof YAMLParser yp) {
-                    if(yp.isCurrentAlias())throw new Rejected(Code.YAML_ALIAS_UNSUPPORTED);
-                    if(yp.getTypeId()!=null)throw new Rejected(Code.YAML_TAG_UNSUPPORTED);
-                }
                 if(parser.currentToken()==JsonToken.VALUE_EMBEDDED_OBJECT)throw new Rejected(Code.NON_JSON_VALUE);
                 if(parser.currentToken()==JsonToken.VALUE_NUMBER_FLOAT&&parser.isNaN())
                     throw new Rejected(Code.NON_JSON_VALUE);
@@ -168,13 +168,37 @@ public final class WorkflowSourceCodec {
         }
         if(!document.schemaAccepted())return new Exported(new byte[0],target,document,false,document.diagnostics);
         try {
-            byte[] converted=mapper(target).writerWithDefaultPrettyPrinter().writeValueAsBytes(document.data);
-            if(converted.length>MAX_BYTES)return new Exported(new byte[0],target,document,false,List.of(issue(Code.OUTPUT_LIMIT)));
+            var buffer=new ByteArrayOutputStream();
+            try(var bounded=new OutputStream() {
+                int count;
+                public void write(int b) throws IOException {if(count==MAX_BYTES)throw new Rejected(Code.OUTPUT_LIMIT);buffer.write(b);count++;}
+                public void write(byte[] b,int offset,int length) throws IOException {
+                    if(length>MAX_BYTES-count)throw new Rejected(Code.OUTPUT_LIMIT);buffer.write(b,offset,length);count+=length;
+                }
+            }) {mapper(target).writerWithDefaultPrettyPrinter().writeValue(bounded,document.data);}
+            byte[] converted=buffer.toByteArray();
             Imported reimport=importSource(converted,target,document.profile);
             if(!reimport.schemaAccepted())return new Exported(new byte[0],target,document,false,reimport.diagnostics);
-            if(!document.data.equals(reimport.data))return new Exported(new byte[0],target,document,false,List.of(issue(Code.CONVERSION_CHANGED_DATA)));
+            if(!sameData(document.data,reimport.data))return new Exported(new byte[0],target,document,false,List.of(issue(Code.CONVERSION_CHANGED_DATA)));
             return new Exported(converted,target,document,Arrays.equals(document.source,converted),List.of());
-        }catch(IOException failure){return new Exported(new byte[0],target,document,false,List.of(issue(Code.MALFORMED_SOURCE)));}
+        }catch(IOException failure) {
+            for(Throwable cause=failure;cause!=null;cause=cause.getCause())
+                if(cause instanceof Rejected rejected)return new Exported(new byte[0],target,document,false,List.of(issue(rejected.code)));
+            return new Exported(new byte[0],target,document,false,List.of(issue(Code.MALFORMED_SOURCE)));
+        }
+    }
+    /** JSON data compares numbers by their exact mathematical value, never through a floating point coercion. */
+    private static boolean sameData(JsonNode a,JsonNode b) {
+        if(a.isNumber()&&b.isNumber())return a.decimalValue().compareTo(b.decimalValue())==0;
+        if(a.isArray()&&b.isArray()) {
+            if(a.size()!=b.size())return false;for(int i=0;i<a.size();i++)if(!sameData(a.get(i),b.get(i)))return false;return true;
+        }
+        if(a.isObject()&&b.isObject()) {
+            if(a.size()!=b.size())return false;
+            for(var fields=a.fields();fields.hasNext();) {var field=fields.next();var value=b.get(field.getKey());if(value==null||!sameData(field.getValue(),value))return false;}
+            return true;
+        }
+        return a.equals(b);
     }
     private ObjectMapper mapper(Format format){return format==Format.JSON?json:yaml;}
     private static Diagnostic issue(Code code){return new Diagnostic(code,"","");}
