@@ -206,7 +206,10 @@ available to steps (`InstanceAuthorities.recheck`) and is wired at resume. Verif
 - **Audience binding.** The exchanger asks for one audience and verifies that the issued token names exactly that audience;
   the resource guard requires the audience set to equal its own name.
 - **Lifetime.** A delegated token lives at most 300 seconds: the exchanger and the guard both refuse longer ones. The guard
-  also refuses a token with no `jti` or `iat`.
+  also refuses a token with no `jti` or `iat`, compares the lifetime exactly (not truncated to seconds), and enforces time with
+  its own clock regardless of the verifier's expiry skew: a delegated token is refused at `exp` (no grace), an `iat` more than
+  5 s ahead is refused, and the time is checked again after the grant and binding lookups, immediately before the use is
+  consumed, so release time is the enforced time.
 - **Replay.** Each token id is accepted `max-uses` times (default once). The in-memory cache is bounded and refuses new tokens
   when full; the JDBC cache is shared by all processes and survives a restart. A failing cache refuses the token. The replay
   count is taken last, so a token refused for another reason does not use up its single use.

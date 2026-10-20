@@ -27,6 +27,9 @@ import java.util.Set;
  */
 public final class ResourceTokenGuard {
 
+    /** How far in the future an {@code iat} may be (clock skew between issuer and resource). */
+    static final Duration ISSUED_AT_SKEW = Duration.ofSeconds(5);
+
     private final TokenVerifier verifier;
     private final String audience;
     private final ReplayCache replay;
@@ -74,15 +77,21 @@ public final class ResourceTokenGuard {
         if (token.tokenId() == null || token.tokenId().isBlank() || token.issuedAt() == null) {
             throw new TokenRejectedException(TokenRejectedException.Reason.MISSING_CLAIM);
         }
+        // exact comparison, not getSeconds() truncation: 300.5 s is over the bound
         Duration lifetime = Duration.between(token.issuedAt(), token.expiresAt());
-        if (lifetime.isNegative() || lifetime.getSeconds() > TokenExchanger.MAX_LIFETIME_SECONDS) {
+        if (lifetime.isNegative() || lifetime.isZero()
+                || lifetime.compareTo(Duration.ofSeconds(TokenExchanger.MAX_LIFETIME_SECONDS)) > 0) {
             throw new TokenRejectedException(TokenRejectedException.Reason.EXPIRED);
         }
+        // admission time is this guard's own clock, independent of the verifier's skew tolerance (delegated tokens
+        // get no grace at expiry), and a token from the future is refused
+        checkTime(token);
         if (!token.scopes().containsAll(requiredScopes)) {
             throw new TokenRejectedException(TokenRejectedException.Reason.SCOPE);
         }
-        Instant now = clock.instant();
         checkGrant(token, requiredScopes);
+        // grant and binding lookups can be slow: release time is the enforced time, checked right before the use is consumed
+        Instant now = checkTime(token);
         boolean allowed;
         try {
             allowed = replay.use(token.issuer() + "|" + token.tokenId(), token.expiresAt(), maxUses, now);
@@ -93,6 +102,18 @@ public final class ResourceTokenGuard {
             throw new TokenRejectedException(TokenRejectedException.Reason.REPLAYED);
         }
         return token;
+    }
+
+    /** Fail closed at {@code exp} (exp must be strictly after now) and refuse an issue time beyond a small clock skew. */
+    private Instant checkTime(VerifiedToken token) {
+        Instant now = clock.instant();
+        if (!token.expiresAt().isAfter(now)) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.EXPIRED);
+        }
+        if (token.issuedAt().isAfter(now.plus(ISSUED_AT_SKEW))) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.NOT_YET_VALID);
+        }
+        return now;
     }
 
     private void checkGrant(VerifiedToken token, Set<String> requiredScopes) {

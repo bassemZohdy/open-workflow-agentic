@@ -155,6 +155,53 @@ class ResourceTokenGuardTest {
         assertEquals(Reason.EXPIRED, refusedWith(fx.idp.signClaims(claims), Set.of("cases:read")));
     }
 
+    @Test
+    void aFirstUseJustBeforeExpiryIsAdmittedButExactlyAtExpiryAndInsideTheVerifierSkewIsNot() {
+        // the verifier would accept these (skew 30 s); the resource never grants delegated authority past exp
+        IssuedToken justBefore = issue(RESOURCE, Set.of("cases:read"));
+        IssuedToken atExpiry = issue(RESOURCE, Set.of("cases:read"));
+        IssuedToken inSkew = issue(RESOURCE, Set.of("cases:read"));
+        fx.clock.advance(Duration.ofSeconds(299));
+        assertEquals(Set.of("cases:read"), guard.admit(justBefore.accessToken().reveal(), Set.of("cases:read")).scopes());
+        fx.clock.advance(Duration.ofSeconds(1));
+        assertEquals(Reason.EXPIRED, refusedWith(atExpiry.accessToken().reveal(), Set.of("cases:read")));
+        fx.clock.advance(Duration.ofSeconds(10));
+        assertEquals(Reason.EXPIRED, refusedWith(inSkew.accessToken().reveal(), Set.of("cases:read")));
+    }
+
+    @Test
+    void aTokenIssuedInTheFutureBeyondFiveSecondsIsRefusedEvenInsideTheVerifierSkew() throws Exception {
+        Map<String, Object> claims = forged(RESOURCE);
+        claims.put("iat", fx.clock.instant().plusSeconds(6).getEpochSecond());
+        claims.put("exp", fx.clock.instant().plusSeconds(120).getEpochSecond());
+        assertEquals(Reason.NOT_YET_VALID, refusedWith(fx.idp.signClaims(claims), Set.of("cases:read")));
+    }
+
+    @Test
+    void aTokenThatExpiresWhileTheGrantAndBindingAreBeingCheckedIsRefusedBeforeItsUseIsConsumed() {
+        IssuedToken token = issue(RESOURCE, Set.of("cases:read"));
+        fx.clock.advance(Duration.ofSeconds(299));
+        IssuedTokenBindings slow = new IssuedTokenBindings() {
+            @Override
+            public void bind(String issuer, String tokenId, Binding binding) {
+                fx.bindings.bind(issuer, tokenId, binding);
+            }
+
+            @Override
+            public java.util.Optional<Binding> find(String issuer, String tokenId) {
+                java.util.Optional<Binding> found = fx.bindings.find(issuer, tokenId);
+                fx.clock.advance(Duration.ofSeconds(2)); // a slow lookup: now it is past exp
+                return found;
+            }
+        };
+        ReplayCache cache = new InMemoryReplayCache(100);
+        ResourceTokenGuard slowGuard = new ResourceTokenGuard(fx.verifier, RESOURCE, cache, fx.grants, slow, fx.clock, 1);
+
+        assertEquals(Reason.EXPIRED, assertThrows(TokenRejectedException.class,
+                () -> slowGuard.admit(token.accessToken().reveal(), Set.of("cases:read"))).reason());
+        assertTrue(cache.use("probe|x", fx.clock.instant().plusSeconds(60), 1, fx.clock.instant()), "cache still usable");
+    }
+
     // ---- replay -----------------------------------------------------------------------------------------------
 
     @Test
