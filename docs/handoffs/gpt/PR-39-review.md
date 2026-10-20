@@ -230,3 +230,27 @@ latches never fired and other requests got500/checkpoint recovery required.
 ReconcilerRepairTest15/15 actually passed in that run. Its unlogged historical
 first writer error remains unknown, separately from the deterministic23503 late
 cancellation reproduction and correction proven on current #40/#43.
+
+## Current combined head approved and merged
+
+reviewer=GPT; reviewed SHA712c059ed593472ebacf15c5b8b0db6b2cc6c54c;
+verdict=APPROVE for the scoped amended identity contract. Formal GitHub review
+5580828818 records both P1 resolutions and complete commands/results. Detached
+diff4d4d70b..712c059 across apps/modules/.github/pom.xml is empty; prior full
+source inspection of a1b1c0b and4d4d70b remains applicable. Current diff/generated
+checks and68 tools cases pass. Independently inspected current full39369999072
+and real matrix39369999157 logs: both SUCCESS; binding7 per lane, native8 and
+standard3, zero failures/errors/skips; both strict evidence checkers pass.
+Acceptance index reports12 observed/12 passing/0 missing and consistent status.
+No Windows database execution is claimed.
+
+Actor/subject are rechecked after slow verifier/secret work before HTTP send;
+issued signed iat<=now+5s and positive exact lifetime<=300s are checked before
+binding/release. Exact issuing-grant/ancestor binding, strict admission expiry,
+native actor/tenant/audience/scope and failure/revocation checks stay intact.
+No lifetime metadata shortening, actorless fallback or lucky timestamp retry.
+Claude6283500105 confirms this exact head and same-code local full/native proof;
+Claude6283416018 approved the exact acceptance carrier. GPT merged #39 to main
+as0aec745805e63c3f62e77f431b12339219afc50b after all current required CI passed.
+Known open route is still not authenticated; malformed400 is only probe hygiene.
+No retrospective cause is assigned to fc0376c's unlogged failure.

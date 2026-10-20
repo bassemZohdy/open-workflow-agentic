@@ -3,9 +3,13 @@
     "status": "automated",
     "where": "apps/app-runtime:AgenticAppTest#structuredAgentOutputRejectsMalformedActionsAndUnauthorizedEscalation"
   },
+  "T03": {
+    "status": "automated",
+    "where": "apps/app-runtime:EffectCrashRecoveryIT#processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+  },
   "T07": {
     "status": "automated",
-    "where": "modules/oa-testkit:DelegatedAuthorityAcceptanceTest#revokingTheParentStopsTheChildAndTheTokensItAlreadyHolds; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#theAgentTaskContractCannotBeWidenedByAChildTask; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#anExpiredTokenIsRefusedAndNoNewOneIsIssuedUnderAnExpiredOrRevokedGrant; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#thePolicyBoundaryDeniesADelegatedCallOutsideItsScopeRecordsWhyAndFailsClosedWhenItCannotDecide; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#aTokenIsAcceptedOnceAndEveryLaterUseIsAReplayEvenAfterARestart; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#aTokenIsBoundToItsResourceAndTheUsersOwnTokenIsNotADelegatedOne; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#theDatabaseRefusesAWiderOrLongerChildEvenWhenTheServiceIsBypassed; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#anAgentCannotPassOnMoreThanItHoldsInScopeLifeOrIdentity; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#theExchangeNeverIssuesMoreThanTheGrantAndTheResourceRefusesAForgedWiderToken"
+    "where": "modules/oa-testkit:DelegatedAuthorityAcceptanceTest#revokingTheParentStopsTheChildAndTheTokensItAlreadyHolds; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#theAgentTaskContractCannotBeWidenedByAChildTask; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#anExpiredTokenIsRefusedAndNoNewOneIsIssuedUnderAnExpiredOrRevokedGrant; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#thePolicyBoundaryDeniesADelegatedCallOutsideItsScopeRecordsWhyAndFailsClosedWhenItCannotDecide; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#aTokenIsAcceptedOnceAndEveryLaterUseIsAReplayEvenAfterARestart; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#aTokenIsBoundToItsResourceAndTheUsersOwnTokenIsNotADelegatedOne; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#theDatabaseRefusesAWiderOrLongerChildEvenWhenTheServiceIsBypassed; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#anAgentCannotPassOnMoreThanItHoldsInScopeLifeOrIdentity; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#theExchangeNeverIssuesMoreThanTheGrantAndTheResourceRefusesAForgedWiderToken; modules/oa-testkit:DelegatedAuthorityAcceptanceTest#revokingTheIssuingChainStopsTheTokenWhileAnEquivalentChainStaysActive"
   },
   "T12": {
     "status": "planned",
@@ -26,9 +30,5 @@
   "T37": {
     "status": "planned",
     "where": "poc item 4"
-  },
-  "T03": {
-    "status": "automated",
-    "where": "apps/app-runtime:EffectCrashRecoveryIT#processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
   }
 }

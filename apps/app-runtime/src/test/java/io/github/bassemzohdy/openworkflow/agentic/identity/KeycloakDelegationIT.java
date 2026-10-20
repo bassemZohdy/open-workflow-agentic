@@ -196,18 +196,16 @@ class KeycloakDelegationIT {
         ExchangeException before = refused(h.exchanger, h.request(subject, TOOL, READ, revoked));
         assertEquals(Code.GRANT_INACTIVE, before.code());
 
-        // revoked after the token was issued: the resource stops an unexpired token. The token carries no grant id, so
-        // the guard asks whether ANY active grant of this user to this agent covers the scopes; the other grants of
-        // this pair are therefore ended first (docs/identity.md 9.3: revoking one of several equivalent grants does
-        // not stop a token, ending all of them does)
-        for (DelegationGrant open : h.grants.activeFor(KeycloakRealm.USER_TENANT, h.alice.id(), h.agent.id())) {
-            h.grants.revoke(open.id(), h.alice, "test isolation", null);
-        }
+        // revoked after the token was issued: the resource stops an unexpired token. The token is bound to the exact grant
+        // that issued it (identity.issued_token_binding), so an EQUIVALENT grant that stays active must not revive it
         DelegationGrant later = h.grant(READ, Duration.ofHours(1));
+        DelegationGrant equivalent = h.grant(READ, Duration.ofHours(1));
         IssuedToken live = h.exchanger.exchange(h.request(subject, TOOL, READ, later));
+        assertEquals(later.id(), h.bindings.find(live.issuer(), live.tokenId()).orElseThrow().grantId());
         h.grants.revoke(later.id(), h.alice, "alice withdrew later", null);
+        assertTrue(h.grants.check(equivalent.id()).active(), "an equivalent grant is still active");
         assertEquals(Reason.GRANT_INACTIVE, rejected(h.guard(TOOL), live.accessToken().reveal(), READ),
-                "provider-side validity is not a substitute for the grant check");
+                "provider-side validity and an equivalent grant are not a substitute for the issuing grant");
 
         // revoked while the request is in flight: the token the server answered with is discarded
         DelegationGrant racing = h.grant(READ, Duration.ofHours(1));
@@ -228,25 +226,43 @@ class KeycloakDelegationIT {
     }
 
     /**
-     * KNOWN INCOMPATIBILITY (open ADR decision, docs/handoffs/claude/WP-102.md section 8). Keycloak accepts the actor token
-     * only from the exchanging client itself (it refuses "Requesting client does not match the client_id in the may_act
-     * claim"), and it gives a token the lifespan of its client at the moment of issue. The actor token and the token issued
-     * by the exchange therefore have the same lifespan, and the exchanged one is issued later: with the strict H3 bound
-     * (nothing may outlive the verified actor token) a stock Keycloak exchange succeeds only when it happens within the
-     * second the actor token was issued. This test asserts the product's refusal deterministically; it does not make the
-     * positive case pass.
+     * ADR 0021 H3 freshness amendment, native positive proof. Keycloak accepts the actor token only from the exchanging
+     * client and gives a token the lifespan of that client at issue, so the exchanged token is issued later and ends later
+     * than the actor token. The actor must be fresh at exchange (signed iat within 60 s); the signed credential is bounded
+     * by the subject and the grant, not by the workload proof. The test deliberately crosses an issuance-second boundary and
+     * checks the real signed JWT outlives the actor token.
      */
     @Test
-    void anActorTokenOfTheExchangingClientExpiresBeforeWhatIsIssuedLaterSoTheStrictBoundRefuses() throws Exception {
+    void aFreshActorYieldsACredentialThatOutlivesTheActorTokenWithinTheStatedContract() throws Exception {
         String subject = h.delegatedSubject(KeycloakRealm.CONSOLE);
         DelegationGrant grant = h.grant(READ, Duration.ofHours(1));
         ExchangeRequest request = h.request(subject, TOOL, READ, grant); // the actor token is issued here
-        Thread.sleep(Duration.ofSeconds(2));
+        JsonNode actor = KeycloakRealm.payload(request.actorToken().reveal());
+        Thread.sleep(Duration.ofSeconds(2)); // cross the second boundary of issuance
 
-        ExchangeException e = refused(h.exchanger, request);
+        IssuedToken issued = h.exchanger.exchange(request);
 
-        assertEquals(Code.BAD_RESPONSE, e.code());
-        assertTrue(e.getMessage().contains("actor"), e.getMessage());
+        VerifiedToken verified = h.verifier.verify(issued.accessToken().reveal(), TOOL);
+        assertEquals(List.of(h.agent.id()), verified.actors());
+        assertTrue(issued.expiresAt().getEpochSecond() > actor.path("exp").asLong(),
+                "the signed credential ends after the workload proof it was exchanged with");
+        assertFalse(issued.expiresAt().isAfter(grant.expiresAt()));
+        assertTrue(Duration.between(Instant.now(), issued.expiresAt()).compareTo(Duration.ofSeconds(301)) < 0);
+        assertEquals(h.agent.id(), h.guard(TOOL).admit(issued.accessToken().reveal(), READ).actor());
+    }
+
+    @Test
+    void anActorTokenOlderThanSixtySecondsIsRefusedBeforeAnythingIsSent() {
+        String subject = h.delegatedSubject(KeycloakRealm.CONSOLE);
+        DelegationGrant grant = h.grant(READ, Duration.ofHours(1));
+        ExchangeRequest request = h.request(subject, TOOL, READ, grant);
+        Rfc8693TokenExchanger later = h.exchanger(Clock.offset(Clock.systemUTC(), Duration.ofSeconds(61)),
+                UnaryOperator.identity());
+
+        ExchangeException e = refused(later, request);
+
+        assertEquals(Code.INPUT_REJECTED, e.code());
+        assertTrue(e.getMessage().contains("stale"), e.getMessage());
     }
 
     @Test

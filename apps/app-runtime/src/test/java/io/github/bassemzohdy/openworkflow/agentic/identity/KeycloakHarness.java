@@ -42,6 +42,9 @@ final class KeycloakHarness implements AutoCloseable {
     final Subject agent;
     final Subject otherAgent;
     final DelegationGrants grants;
+    /** The durable binding of issued tokens to their grants (PostgreSQL), as production wires it. */
+    final io.github.bassemzohdy.openworkflow.agentic.runtime.identity.JdbcIssuedTokenBindings bindings =
+            new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.JdbcIssuedTokenBindings(KeycloakSupport.dataSource());
     final IdentityAudit audit;
     final Rfc8693TokenExchanger exchanger;
     final JwtTokenVerifier verifier;
@@ -75,12 +78,12 @@ final class KeycloakHarness implements AutoCloseable {
     Rfc8693TokenExchanger exchanger(Clock clock, UnaryOperator<TokenVerifier> wrap) {
         SecretProvider secrets = name -> Credential.of(KeycloakRealm.AGENT_SECRET);
         return new Rfc8693TokenExchanger(realm.tokenEndpoint(), KeycloakRealm.AGENT, "exchange-client-secret", secrets,
-                grants, wrap.apply(verifier(clock)), audit, clock, Duration.ofSeconds(10));
+                grants, bindings, wrap.apply(verifier(clock)), audit, clock, Duration.ofSeconds(10));
     }
 
     /** A resource server for {@code audience}: one use per token, grants checked. */
     ResourceTokenGuard guard(String audience) {
-        return new ResourceTokenGuard(verifier, audience, new InMemoryReplayCache(100), grants, Clock.systemUTC(), 1);
+        return new ResourceTokenGuard(verifier, audience, new InMemoryReplayCache(100), grants, bindings, Clock.systemUTC(), 1);
     }
 
     DelegationGrant grant(Set<String> scopes, Duration lifetime) {

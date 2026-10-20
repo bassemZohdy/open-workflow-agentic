@@ -50,6 +50,8 @@ final class IdentityFixture implements AutoCloseable {
     final JwtTokenVerifier verifier;
     final RecordingSink sink = new RecordingSink();
     final DelegationGrants grants;
+    final io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InMemoryIssuedTokenBindings bindings =
+            new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InMemoryIssuedTokenBindings();
     final FakeSecrets secrets = new FakeSecrets();
     final String clientSecret = "s3cret-" + UUID.randomUUID();
 

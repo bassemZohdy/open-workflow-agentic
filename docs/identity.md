@@ -65,15 +65,17 @@ lists the checks; they are all in force:
 | Rule | Where it is checked |
 |---|---|
 | The grant, and every grant above it, is active now | before the request; nothing is sent otherwise |
+| The token is bound to its issuing grant (`IssuedTokenBindings`) before it is returned; a failed binding discards it | before return |
 | The scopes asked are all held by the grant **and** by the verified subject token | before the request |
-| Both input tokens verify (signature, issuer, time) with the exchanging client as audience; the subject token is the grant's user in the grant's tenant and carries exactly the delegation chain of the grant's parent (none for a root grant); the actor token is the grant's own, undelegated workload token; neither is expired | before the request |
+| Both input tokens verify (signature, issuer, time) with the exchanging client as audience; the subject token is the grant's user in the grant's tenant and carries exactly the delegation chain of the grant's parent (none for a root grant); the actor token is the grant's own, undelegated workload token, **fresh**: signed `iat` with `now-60s <= iat <= now+5s` and `exp > now` (missing, stale, future or expired fails closed; fixed bounds, not settings); the subject is not expired | before the request (re-judged at the moment of sending, after verification and the secret lookup), and the actor window again before the token is returned |
 | No `refresh_token` in the answer; token type Bearer | on the answer |
 | The token verifies (signature, issuer, time), for exactly the audience asked and no other, with a `jti` and an issue time | on the answer |
 | Subject is the grant's user, tenant is the grant's tenant, the actors are exactly the grant's chain, nearest first (a missing or different chain is refused, never flattened) | on the answer |
 | Token scopes are a non-empty subset of the scopes asked | on the answer |
-| The signed `exp` is at most 300 s away and not beyond the grant's expiry **or the verified subject token's expiry**. An overlong bearer is refused; only the signed `exp` counts, never a shortened Java-side expiry | on the answer |
+| The signed `exp` is at most 300 s away and not beyond the grant's expiry **or the verified subject token's expiry**. The signed token need not end with the workload proof (ADR 0021 H3 freshness amendment). An overlong bearer is refused; only the signed `exp` counts, never a shortened Java-side expiry | on the answer |
+| The signed claims themselves: `iat` at most 5 s ahead and a positive signed lifetime `exp-iat` of at most 300 s (exact comparison, independent of the verifier's skew) | on the answer, before binding, audit and release |
 | The token is not the subject or actor token handed back | on the answer |
-| The grant is active and still covers the scopes **after** the answer | after the answer, before the token is returned |
+| The grant is active and still covers the scopes **after** the answer; then, as the last step after the binding and audit writes, the signed `exp` is still in the future and the actor is still fresh | after the answer, immediately before the token is returned |
 
 Any failure discards the token. The audit event `identity.token.exchanged` is written before the token is returned, and
 if it cannot be written the token is discarded. The token itself is held in memory only (`IssuedToken`, a `Credential`).
@@ -205,7 +207,10 @@ available to steps (`InstanceAuthorities.recheck`) and is wired at resume. Verif
 - **Audience binding.** The exchanger asks for one audience and verifies that the issued token names exactly that audience;
   the resource guard requires the audience set to equal its own name.
 - **Lifetime.** A delegated token lives at most 300 seconds: the exchanger and the guard both refuse longer ones. The guard
-  also refuses a token with no `jti` or `iat`.
+  also refuses a token with no `jti` or `iat`, compares the lifetime exactly (not truncated to seconds), and enforces time with
+  its own clock regardless of the verifier's expiry skew: a delegated token is refused at `exp` (no grace), an `iat` more than
+  5 s ahead is refused, and the time is checked again after the grant and binding lookups, immediately before the use is
+  consumed, so release time is the enforced time.
 - **Replay.** Each token id is accepted `max-uses` times (default once). The in-memory cache is bounded and refuses new tokens
   when full; the JDBC cache is shared by all processes and survives a restart. A failing cache refuses the token. The replay
   count is taken last, so a token refused for another reason does not use up its single use.
@@ -281,10 +286,14 @@ the product requires: native, issuer-signed actor proof; no actorless downgrade;
      subject expiry. The consequence is deliberate: a near-expiry subject token needs re-authorization.
   3. *Grant expiry and revocation.* The server does not know our grants. Expiry is bounded as above; revocation is checked before
      the request, after the answer, and at every resource.
-* **Revocation granularity (residual limitation).** An exchanged token does not name the grant it was issued under, so a
-  resource asks whether *any* active grant of this user to this actor covers the scopes. Revoking one of several equivalent
-  grants does not stop a token issued under it; ending every grant of the pair does. Carrying a grant reference in the token
-  would need an issuer claim that Keycloak cannot compute.
+* **Revocation granularity (resolved by the grant binding, H4).** An exchanged token does not name its grant, and the issuer
+  cannot compute one. The exchanger therefore records `(issuer, jti) -> grant id` durably (`identity.issued_token_binding`)
+  **before** returning the token, and a resource admits a delegated token only through that binding: the bound grant and every
+  ancestor must be active, the binding's tenant and signed expiry must equal the token's, and the token's user, tenant, exact actor chain and scopes must match the grant. A binding is immutable: binding the same issuer and jti again is accepted only when grant, tenant and signed expiry are all identical, so an old proof cannot be re-bound or extended. The write commits on its own connection, outside any caller transaction (the caller's rollback cannot erase it and its unrelated work is not committed by it). A guard cannot be built without grants and bindings. Revoking the issuing grant
+  stops the token even while an equivalent grant (or an equivalent chain) stays active; a token with no binding (never
+  exchanged, forged with the issuer's key, or a lost row) is refused; a binding-store outage refuses at the resource and
+  discards the token at the exchange.
+* **Actor freshness (H3 amendment).** The workload proof must be fresh (signed `iat` within 60 s, 5 s future allowance, not expired) before the request and again right before release; the issued token may not outlive the verified subject token or the grant. It may outlive the workload proof (maximum 300 s); emergency containment is the live grant checks and policy at the resource.
 * Refusal is decided on the HTTP status, not on OAuth error names (`invalid_client` and `invalid_request` stand where this file
   once said `invalid_target` and `invalid_grant`).
 
@@ -331,7 +340,7 @@ grant check, the actor identity check or the subject scope bound each makes the 
 
 Keycloak 26.8 in a stable (non-preview) configuration; any other identity provider; multi-hop chains through a real provider
 (a chain the provider cannot preserve is refused, never flattened, and the in-process tests cover the exact-chain rule);
-an exchanged token that names its grant.
+(none from H4: the grant binding is covered by the integration tests).
 
 ### 9.6 Reproduction recipe
 
@@ -410,7 +419,7 @@ the wait deadline (`agentic.reconciler.wait-deadline`) cancels it.
 | Token exchange and resource guard (in-process unit and acceptance tests) | **[fake]**: the testkit's in-process authorization server and issuer (`DelegationAuthorizationServer`, `FakeIdentityProvider`). It follows the behaviour documented for Keycloak 26.2+, but is not Keycloak |
 | Kill/restart: identity restored, a held instance, no credential stored | **[verified]** with real child JVMs and the real engine (`IdentityRecoveryIT`), tokens from the fake issuer |
 | T07 | `DelegatedAuthorityAcceptanceTest`: widening, expiry and replay with two scripted agents against the fake issuer; policy boundary with the embedded Cedar engine. Real multi-agent flows are WP-207 |
-| A real Keycloak 26.2.5 and 26.8.1: exchange, `actor_token`, `act`/`may_act` with real permission and consent, scope/lifetime bounds, expiry, revocation, key rotation | **[verified locally]** 2026-10-20 by `KeycloakStandardIT` (3/3) and `KeycloakDelegationIT` (6/6) with the product exchanger, verifier, grants and guard (section 9.4); **CI evidence pending** (PR #40 matrix) until the exact head is green |
+| A real Keycloak 26.2.5 and 26.8.1: exchange, `actor_token`, `act`/`may_act` with real permission and consent, scope/lifetime bounds, expiry, revocation, key rotation | **[verified locally]** 2026-10-20 by `KeycloakStandardIT` (3/3) and `KeycloakDelegationIT` (8/8 with actor freshness) with the product exchanger, verifier, grants and guard (section 9.4); **CI evidence pending** (PR #40 matrix) until the exact head is green |
 | A live step gated by the grant check | **not built**: only resume is wired; `InstanceAuthorities.recheck` exists for the agent bridge (WP-2xx) |
 | `TokenExchanger` used by a running flow | **not built**: the bean exists, nothing in the runtime injects it yet |
 | Identity carried through asynchronous tasks | the `AuthorityScope` wrappers exist and are unit tested; no runtime component uses them yet except resume |
