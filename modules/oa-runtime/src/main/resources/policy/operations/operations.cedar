@@ -29,3 +29,13 @@ when { context.scopes.contains("oa.operate") || context.scopes.contains("oa.reco
 @id("operations.run-research-agent")
 permit (principal is User, action == Action::"operation", resource == Resource::"agent:research:run")
 when { context.scopes.contains("oa.agent.run") };
+
+// WP-103: the audit query and verification API (docs/audit.md, section 7). Audit reads are not tenant-filtered yet
+// (WP-404), so these scopes are operator-wide.
+@id("audit.read-events")
+permit (principal is User, action == Action::"data_access", resource == Resource::"audit.events.read")
+when { context.scopes.contains("oa.audit.read") };
+
+@id("audit.verify-chains")
+permit (principal is User, action == Action::"data_access", resource == Resource::"audit.chains.verify")
+when { context.scopes.contains("oa.audit.verify") };

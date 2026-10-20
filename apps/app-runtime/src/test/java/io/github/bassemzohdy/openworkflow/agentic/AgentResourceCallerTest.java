@@ -3,6 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
@@ -40,6 +41,17 @@ class AgentResourceCallerTest {
 
     private static String newThread() {
         return "wp103-" + UlidGenerator.shared().next().value();
+    }
+
+    @Test
+    void agentGraphRunsAndCheckpoints() {
+        given().header("X-Tenant", "t-agent").header("X-Subject", "alice").header("X-Scopes", "oa.agent.run")
+                .contentType("application/json").body("{\"topic\":\"agentic workflows\"}")
+                .when().post("/agents/research")
+                .then().statusCode(200)
+                .body("threadId", notNullValue())
+                .body("plan", containsString("[stub]"))
+                .body("review", containsString("[stub]"));
     }
 
     @Test

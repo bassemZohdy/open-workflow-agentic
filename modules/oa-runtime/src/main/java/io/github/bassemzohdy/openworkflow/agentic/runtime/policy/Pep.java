@@ -179,6 +179,17 @@ public final class Pep {
                 new PolicyContext(callerScopes, null, null, null, null, null));
     }
 
+    /**
+     * A verified caller reads or verifies the audit trail (WP-103). A {@code DATA_ACCESS} decision on the action name
+     * ({@code audit.events.read} or {@code audit.chains.verify}); the decision is audited and bounded like every PEP
+     * decision, and an unavailable engine is ERROR (safe recovery covers {@code OPERATION} only).
+     */
+    public Decision auditAccess(Subject caller, Set<String> callerScopes, String action) {
+        Objects.requireNonNull(action, "action");
+        return decide(caller, ActionKind.DATA_ACCESS, action, null,
+                new PolicyContext(callerScopes, null, null, null, null, null));
+    }
+
     /** Decides any request through the full path: engine, audit, and the recovery rule when the engine is unavailable. */
     public Decision decide(AuthorizationRequest request) {
         Objects.requireNonNull(request, "request");

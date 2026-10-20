@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.IntStream;
 import java.util.stream.Collectors;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import org.junit.jupiter.api.Test;
 
 /** The access rule of the audit API with a caller (WP-102). There is no anonymous caller any more. */
@@ -162,5 +163,64 @@ class AuditAccessTest {
 
     private static Decision decision(DecisionOutcome outcome) {
         return new Decision("test-pdp", outcome, "test decision", PolicyRef.FAIL_CLOSED, Instant.now());
+    }
+
+    // ---- the shared enforcement point (WP-103) ---------------------------------------------------------------------------
+
+    private static Pep pep(DecisionOutcome outcome, java.util.List<AuthorizationRequest> asked,
+                           io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink sink) {
+        return new Pep(request -> {
+            asked.add(request);
+            return new Decision("test", outcome, "t", io.github.bassemzohdy.openworkflow.agentic.contracts.governance
+                    .PolicyRef.FAIL_CLOSED, java.time.Instant.now());
+        }, sink);
+    }
+
+    @Test
+    void theEnforcementPointDecidesAuditedAndOnlyAllowPasses() {
+        var asked = new java.util.ArrayList<AuthorizationRequest>();
+        var recorded = new java.util.ArrayList<io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent>();
+        var sink = (io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink) recorded::add;
+
+        assertDoesNotThrow(() -> AuditAccess.of(null, pep(DecisionOutcome.ALLOW, asked, sink), false)
+                .require(AuditAccess.READ, verified()));
+        assertThrows(ForbiddenException.class, () -> AuditAccess.of(null, pep(DecisionOutcome.DENY, asked, sink), false)
+                .require(AuditAccess.VERIFY, verified()));
+        var down = assertThrows(jakarta.ws.rs.WebApplicationException.class,
+                () -> AuditAccess.of(null, pep(DecisionOutcome.ERROR, asked, sink), false)
+                        .require(AuditAccess.READ, verified()));
+        assertEquals(503, down.getResponse().getStatus());
+
+        assertEquals(java.util.List.of(AuditAccess.READ, AuditAccess.VERIFY, AuditAccess.READ),
+                asked.stream().map(AuthorizationRequest::resource).toList());
+        assertTrue(asked.stream().allMatch(r -> r.action() == ActionKind.DATA_ACCESS && r.subject().equals(ALICE)
+                && r.context().scopes().equals(Set.of("audit.read", "profile"))), "the caller's own subject and scopes");
+        assertEquals(3, recorded.size(), "every decision, including the refusals, is an audit event");
+    }
+
+    @Test
+    void anAuditSinkThatFailsRefusesAndDoesNotReadAndUnhandledScopesAreDenied() {
+        var asked = new java.util.ArrayList<AuthorizationRequest>();
+        var failing = (io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink) event -> {
+            throw new IllegalStateException("audit down");
+        };
+        var down = assertThrows(jakarta.ws.rs.WebApplicationException.class,
+                () -> AuditAccess.of(null, pep(DecisionOutcome.ALLOW, asked, failing), false)
+                        .require(AuditAccess.READ, verified()));
+        assertEquals(503, down.getResponse().getStatus(), "an unrecorded decision is a refusal");
+
+        CallerContext badScopes = new CallerContext("tenant-1", ALICE, Set.of("has space"), Provenance.VERIFIED_TOKEN);
+        assertThrows(ForbiddenException.class, () -> AuditAccess.of(null,
+                pep(DecisionOutcome.ALLOW, asked, event -> { }), false).require(AuditAccess.READ, badScopes));
+    }
+
+    @Test
+    void aBoundTestPolicyOrDevOpenComesBeforeTheEnforcementPoint() {
+        var asked = new java.util.ArrayList<AuthorizationRequest>();
+        var pep = pep(DecisionOutcome.DENY, asked, event -> { });
+        assertDoesNotThrow(() -> AuditAccess.of(null, pep, true).require(AuditAccess.READ, verified()));
+        assertDoesNotThrow(() -> AuditAccess.of(policy(DecisionOutcome.ALLOW), pep, false)
+                .require(AuditAccess.READ, verified()));
+        assertEquals(0, asked.size());
     }
 }

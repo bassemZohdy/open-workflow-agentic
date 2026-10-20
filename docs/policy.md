@@ -17,6 +17,7 @@ Every boundary where the runtime lets something happen asks the PEP first. The P
 | Operator recovery | `Pep.operation(op, operator, scopes, taskId)` | `operation:cancel`, `operation:pause`, `operation:drain` | `OPERATION` |
 | Operator operation on a registry instance (WP-105d) | `Pep.instanceOperation(op, operator, scopes, instanceId)` | `operation:inspect`, `operation:retry`, `operation:recover` | `OPERATION` |
 | Direct run of the research agent, `POST /agents/research` (WP-103) | `Pep.agentInvocation(subject, scopes)` | `agent:research:run` | `OPERATION` (scope `oa.agent.run`; not named by safe recovery, so an unavailable engine refuses) |
+| Audit query and verification (WP-103) | `Pep.auditAccess(subject, scopes, action)` | `audit.events.read`, `audit.chains.verify` | `DATA_ACCESS` (scopes `oa.audit.read`, `oa.audit.verify`; ERROR is 503) |
 | Structured event receipt (WP-107, `EventIngress`) | `Pep.decide(AuthorizationRequest(producer, DATA_ACCESS, resource, instance, context))` through the dedicated `@EventPolicy` Pep | `event:receive:<sha256 of tenant, source, type, correlation>` | `DATA_ACCESS` |
 
 For the operations API (`docs/lifecycle.md`, section 11), the request's task id carries the registry instance id, since the request shape has no instance field. Cancel and pause use `Pep.operation` with that id; inspect, retry and recover use `Pep.instanceOperation`. Only the first two are named by the safe-recovery rule, so the other three are refused when the main policy is unavailable.
