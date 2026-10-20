@@ -78,4 +78,20 @@ public class AgentResourceAdmission {
         }
         guard.revalidate(principal.token(), Set.of(SCOPE));
     }
+
+    /**
+     * The admitted principal as a transient authority handle: its {@code requireCurrent} re-checks the signed expiry and
+     * the exact grant chain with this resource's settings and the guard's clock, without a second replay admission.
+     */
+    public io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority authority(Principal principal,
+            Clock clock) {
+        Objects.requireNonNull(principal, "principal");
+        return io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority.ofDelegatedToken(
+                principal.token(), clock, (token, scopes) -> {
+                    if (guard == null) {
+                        throw new TokenRejectedException(TokenRejectedException.Reason.AUDIENCE);
+                    }
+                    guard.revalidate(token, scopes);
+                });
+    }
 }
