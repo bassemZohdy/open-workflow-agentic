@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-103 backend preparation: propose V76 immutable one-entry-per-call and one-outcome association with canonical full-source checks, registry/binding-time guard and target-scoped physical UUID references. Six rollback-only cloned-schema cases compile; Linux evidence and runtime one-callback/current authority/audit/recovery gates remain open. SQL stays outside Flyway, with no dispatch or package promotion.
+
 - Exact4a45515 proposed audit-source schema passed both provider/process lanes with6 real cloned-schema SQL cases; frozen #55 passed full and both strict lanes with group SQL11/snapshot6/SDK4. All finished logs inspected, zero skips. Exact peer/activation/consumer gates remain. Pinned saver source refines UUID/serialized-text/released-error/mutable-checkpoint recovery requirements.
 
 - WP-108: #54 merged after exact Claude approval and full/strict CI. Prepare executable retained-source V75 DDL outside Flyway with complete immutable attribution/event-head FKs and six rollback-only schema cases; Linux execution and cross-owner test/consumer review precede activation. Clarify canonical attribute ordering as UTF-16 code units. WP-103 graph-inspection proposal reviewed with explicit entry/fence/UNKNOWN gates. No package/acceptance promotion.
