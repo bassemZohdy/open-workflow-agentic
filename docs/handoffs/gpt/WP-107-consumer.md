@@ -135,8 +135,8 @@ passes. Three additional real-SDK/JPA cases compile: block the actual ACK audit
 after task/proof commit and prove next-task wait; fail ACK and repair later
 without resurrecting the failed continuation; change owner AFTER checkpoint
 during ACK and prove historical ACK grants no old continuation. Existing eight
-SDK cases are unchanged in their assertions. These11 database cases await
-current Linux execution, not inferred from #46's eight-case pass.
+SDK cases are unchanged in their assertions. These11 database cases passed
+both lanes at50ce5af in39373064706, independently of #46's eight-case pass.
 
 Pre-restore ACK repair, full group/membership/fan-out/winner/FIFO/foreach/until,
 new-owner reconstruction, every later continuation/effect fence, process and
@@ -149,4 +149,6 @@ owned10, writer5, native8/standard3, all zero skips. Logs independently inspecte
 the three ACK/after-checkpoint-owner cases are now executed, not compile-only.
 The next repair increment and its separate scoped evidence/remaining gates are
 in [WP-107-recovery.md](WP-107-recovery.md). Do not transfer this11-case pass
-to the new original-reader/pre-start-repair or lifecycle failure cases.
+to unexecuted work. The later original-reader/pre-start-repair and lifecycle
+cases now also passed both lanes ataf5df6e in39374605698: recovery5/lifecycle5,
+zero failures/errors/skips. See the repair handoff for exact evidence and limits.

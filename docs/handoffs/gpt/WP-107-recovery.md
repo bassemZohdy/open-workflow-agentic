@@ -1,7 +1,8 @@
 # WP-107 receipt repair before restored SDK work starts
 
-Owner: GPT. Reviewer: Claude. Date: 2026-10-20. Successor to the frozen #46
-89b0f0d and ACK-before-advance50ce5af; no additional active implementation PR.
+Owner: GPT. Reviewer: Claude. Date: 2026-10-20. Successor to #46 exact
+89b0f0d, merged main34b6a52 after Claude6284086888/6284089490 and passing
+full39371032850/matrix39370993287. ACK-before-advance began at50ce5af.
 
 ## Authoritative historical repair
 
@@ -73,8 +74,17 @@ That is COMPONENT restart, not an OS-kill/partition or live old-owner proof.
 Five additional lifecycle cases compile with real registry/epoch persistence and
 the existing explicit engine double: partial batch, receipt failure, authority
 loss during repair, cancellation during repair, and denied initial PENDING start.
-Their engine double is not relabeled as actual SDK evidence. New database/reader
-execution remains pending CI;25 local cases do not establish these10 SQL cases.
+Their engine double is not relabeled as actual SDK evidence.
+
+Exact productaf5df6e workflow39374605698 SUCCESS BOTH lanes, complete job logs
+independently inspected: InboxCheckpointRecoveryTest5 (including original
+JpaInstanceReader/real FlowWorkflowEngine/Reconciler) and
+ReconcilerRestoreGateTest5, actual SDK/JPA11, writer5, standard3/native8;
+zero failures/errors/skips and strict provider evidence checks pass. These10
+new cases are now executed. No OS process kill, partition, active old replica,
+loop/parallel/group/foreach/until or full T13 claim follows from that result.
+Later review/tracking/normal-main-merge commits contain no product change;
+the final PR head still requires current full CI and exact Claude review.
 
 ## Full remaining end state
 

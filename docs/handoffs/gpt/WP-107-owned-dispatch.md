@@ -2,6 +2,13 @@
 
 Owner/producer: GPT. Reviewer/consumer handoff: Claude. Date: 2026-10-20.
 
+Integration update: #46 exact89b0f0d merged main34b6a52 after
+reviewer=Claude6284086888/6284089490 APPROVE (independent full Maven verify,
+no blocking findings), required full39371032850 and real matrix39370993287
+SUCCESS. #44 previously merged into #40 after its own exact peer/CI gates.
+Earlier pending-review statements below describe their historical stage.
+Whole consumer/effect/partition/full T13 scope remains partial.
+
 Branch `gpt/WP-107-owned-dispatch` follows exact #44
 `a6bcccf53f408fb9adcad1b7c948bd73840d3e9b`. #44's required full CI39367327487
 passed, including its seventh real SDK reservation-wins-deadline case. Its exact
