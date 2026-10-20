@@ -93,3 +93,14 @@ source and declared profile must travel with any candidate artifact; a converted
 view is not a replacement for the original. The 42-source corpus is exercised
 through this production API, retaining original/converted fixture bytes and the
 actual result report in CI. WP-605/H01/H02 remain partial.
+
+The checked runtime boundary is `WorkflowSourceMaterializer`. `prepare` applies
+a separate capability overlay to the whole schema-validated source, accepts only
+omitted/default or exact `json`, and returns immutable executable JSON bytes and
+original/executable fingerprints without SDK binding or schema access. Unknown
+formats and explicit versions refuse, including late nested/reusable schemas;
+opaque payload keys remain data. After separate source/view/resource approval,
+`materialize` creates the SDK definition, which can fetch supported schemas but
+does not start an instance. This producer preparation does not activate an
+authoring/publication route or confer execution authority. See
+[schema-format capability evidence and consumer gates](../handoffs/gpt/WP-605-schema-format-capability.md).

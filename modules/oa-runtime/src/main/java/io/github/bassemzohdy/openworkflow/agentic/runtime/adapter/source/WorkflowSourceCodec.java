@@ -25,7 +25,7 @@ public final class WorkflowSourceCodec {
     }
     public enum Code {INVALID_UTF8,MALFORMED_SOURCE,YAML_ALIAS_UNSUPPORTED,YAML_TAG_UNSUPPORTED,
         NON_JSON_VALUE,INVALID_UNICODE,TOKEN_LIMIT,SCHEMA_INVALID,OUTPUT_LIMIT,CONVERSION_CHANGED_DATA,
-        YAML_CYCLE,YAML_VERSION_UNSUPPORTED,EXPANSION_LIMIT}
+        YAML_CYCLE,YAML_VERSION_UNSUPPORTED,EXPANSION_LIMIT,UNSUPPORTED_SCHEMA_FORMAT,SDK_BINDING_UNSUPPORTED}
     public record Diagnostic(Code code,String path,String keyword) {
         public Diagnostic {Objects.requireNonNull(code);Objects.requireNonNull(path);Objects.requireNonNull(keyword);}
     }
@@ -69,12 +69,14 @@ public final class WorkflowSourceCodec {
     }
     private final ObjectMapper json,yaml;
     private final Map<Profile,Schema> schemas;
+    private final Map<Profile,Schema> capabilitySchemas;
 
     public WorkflowSourceCodec() throws IOException {
         // No service-loader modules, class binding, global SDK mapper or checkpoint serializer.
         json=configure(new ObjectMapper());yaml=configure(new ObjectMapper(YAMLFactory.builder()
                 .enable(YAMLParser.Feature.PARSE_BOOLEAN_LIKE_WORDS_AS_STRINGS).build()));
         var pinned=new EnumMap<Profile,Schema>(Profile.class);
+        var capabilities=new EnumMap<Profile,Schema>(Profile.class);
         for(var profile:Profile.values()) {
             byte[] bytes;
             try(var in=getClass().getResourceAsStream("/conformance/schema/workflow-"+profile.version+".yaml")) {
@@ -85,8 +87,19 @@ public final class WorkflowSourceCodec {
             JsonNode schema=yaml.readTree(bytes);requireInternalReferences(schema);
             pinned.put(profile,SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12,b->b.schemaRegistryConfig(
                     SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build())).getSchema(json.writeValueAsString(schema)));
+            // A separate capability overlay, never a modification of the pinned normative bytes.
+            // Let the actual schema identify declarations, including nested/reusable tasks;
+            // arbitrary payload keys named schema/format are not interpreted as declarations.
+            JsonNode capability=schema.deepCopy();
+            JsonNode format=capability.at("/$defs/schema/properties/format");
+            if(!(format instanceof com.fasterxml.jackson.databind.node.ObjectNode object))
+                throw new IOException("Pinned schema format declaration unavailable");
+            object.putArray("enum").add("json");
+            capabilities.put(profile,SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12,b->b.schemaRegistryConfig(
+                    SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build())).getSchema(json.writeValueAsString(capability)));
         }
         schemas=Map.copyOf(pinned);
+        capabilitySchemas=Map.copyOf(capabilities);
     }
     private static ObjectMapper configure(ObjectMapper mapper) {
         mapper.getFactory().setStreamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64)
@@ -123,6 +136,18 @@ public final class WorkflowSourceCodec {
                     .limit(32).forEach(diagnostics::add);
         }
         return new Imported(source,format,profile,data,diagnostics);
+    }
+    /** Offline declaration check, before SDK binding or any schema resource access.
+     * Only omitted/default or exact json is supported. Explicit format versions are
+     * refused until the runtime binds that declaration to an evidenced implementation.
+     * This is not execution, source/target approval or complete engine compatibility. */
+    public List<Diagnostic> runtimeCapabilityDiagnostics(Imported document) {
+        Objects.requireNonNull(document);
+        if(!document.schemaAccepted())return document.diagnostics;
+        return capabilitySchemas.get(document.profile).validate(document.data).stream()
+                .map(e->new Diagnostic(Code.UNSUPPORTED_SCHEMA_FORMAT,bounded(e.getInstanceLocation().toString(),512),
+                        bounded(e.getKeyword(),64))).distinct()
+                .sorted(Comparator.comparing(Diagnostic::path).thenComparing(Diagnostic::keyword)).limit(32).toList();
     }
     private JsonNode parse(byte[] bytes,Format format) throws IOException {
         if(format==Format.YAML) {

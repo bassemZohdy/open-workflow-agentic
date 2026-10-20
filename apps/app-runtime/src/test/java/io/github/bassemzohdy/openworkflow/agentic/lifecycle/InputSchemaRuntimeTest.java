@@ -117,7 +117,7 @@ class InputSchemaRuntimeTest {
         }
     }
 
-    private static final class Fixture implements AutoCloseable {
+    static final class Fixture implements AutoCloseable {
         final AtomicInteger schemaReads = new AtomicInteger();
         final AtomicInteger effects = new AtomicInteger();
         final List<String> requests = new CopyOnWriteArrayList<>();
