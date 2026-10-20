@@ -11,6 +11,23 @@ writes a checkpoint after each node into `lg4jthread`/checkpoint tables, keyed b
 `graph.invoke(...)`; it is an execution, not a read. Observed in the app tests: running the same thread twice produces a
 second run (two thread rows, two sets of model calls). So **calling `run` again is new model work, never a read**.
 
+### Measured on the real Postgres saver (this changes the shape of `inspect`)
+
+- A completed run is **released**: its `lg4jthread` row has `is_released = true`. The unique index covers only
+  unreleased rows, so a second `run` on the same thread name creates a **second** thread row with its own four
+  checkpoints (`__START__->plan`, `plan->draft`, `draft->review`, `review->__END__`). Every completed run in the test
+  database has exactly this shape.
+- The saver's `get(config)`/`list(config)` look up the thread by name among unreleased rows, so they **cannot read a
+  completed run**. `inspect` therefore has to read `lg4jthread`/`lg4jcheckpoint` directly (read-only SQL in the agent's
+  own store), by thread name and exact checkpoint id.
+- More than one thread row for one invocation thread is itself **evidence of a repeated graph entry**, which the
+  protocol forbids; `inspect` reports it as a distinct `REPEATED` state instead of choosing one.
+- Checkpoint state is Java-serialized bytes (`application/octet-stream`). `inspect` digests the raw `state_data` bytes of
+  the final checkpoint (immutable row) and never deserializes stored bytes; only the output-release step deserializes,
+  through the graph's own serializer.
+- Not yet measured: what a node that throws leaves behind (released or open, and which checkpoints). That needs a real
+  test and is the first thing the `inspect` increment will establish before PARTIAL is specified.
+
 ## Proposed boundary
 
 Two operations, in `runtime/agent`, framework-free signatures that GPT can mirror in the shared API:
@@ -19,8 +36,8 @@ Two operations, in `runtime/agent`, framework-free signatures that GPT can mirro
    - `NONE`: no checkpoint exists for the thread.
    - `PARTIAL(lastNode, checkpointId)`: some but not all of plan/draft/review are present.
    - `COMPLETE(checkpointId, outputDigest)`: the final checkpoint holds PLAN, DRAFT and REVIEW. `outputDigest` is
-     `sha256` over a domain-separated canonical encoding of the three texts (`CanonicalEncoder`, domain
-     `oa.agent.research.output.v1`). The private text itself is not part of any shared record.
+     `sha256` over the final checkpoint's raw `state_data` bytes with a domain tag (`oa.agent.research.output.v1`). The
+     private text itself is not part of any shared record.
    - Reads by the **exact checkpoint id**, not "the latest checkpoint of an owner-supplied thread".
 2. `execute(ExecutionEntry entry, String topic) -> Executed` runs the graph only when handed an `ExecutionEntry`
    that GPT's storage minted by the durable claim `NO_ENTRY -> ENTERED(entryToken)`. The adapter itself refuses to start
