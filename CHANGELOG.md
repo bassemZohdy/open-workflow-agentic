@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-103 preparation: exercise actual SDK/JPA task-start versus task-completion metadata storage, with a negative control against treating task-start success as a durable occurrence reservation. New two PostgreSQL cases compile and both full workflow fixtures validate; Linux execution and production occurrence/restore gates remain open.
+
 - Exact canonical-occurrence productb051776 passed BOTH39393353409:17 actual PostgreSQL cases including Unicode backfill and conflicting-history refusal, scope7/SDK observations3/core process1/standard3/native8, zero skips/strict checkers. Both finished logs inspected. Full producer/restore/execution and final-head peer/integration gates remain open.
 
 - WP-103 preparation: additive V74 retains one canonical call per complete business occurrence while preserving existing rc1 keys. New producer lookup recovers original attribution across changing SDK retry counters and rejects changed contracts.12 local plain cases/app compile/tools76 pass;17 actual PostgreSQL cases including upgrade/backfill/conflict await new-head Linux evidence. No dispatch or acceptance promotion.
