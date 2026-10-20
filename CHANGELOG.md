@@ -7,6 +7,10 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ## [Unreleased]
 
+- **WP-107 (partial):** persist normalized events before matching and record durable
+  wait signals with duplicate, expiry and cancellation checks. HTTP ingress and
+  durable engine delivery/replay remain open; T13 is not promoted.
+
 ### Added
 
 - **Effect ledger (WP-108, partial):** JDBC write-ahead intent and stable operation keys, request conflict

@@ -729,11 +729,20 @@
       ],
       "notes": "Kafka comes later in WP-406.",
       "progress": {
-        "status": "not-started",
-        "implemented": [],
+        "status": "partial",
+        "implemented": [
+          "JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.",
+          "Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied."
+        ],
         "completed_deliverables": [],
-        "remaining_tasks": [],
-        "evidence": []
+        "remaining_tasks": [
+          "Add authorized CloudEvents HTTP ingress, event-triggered starts and a durable idempotent engine wait adapter with restart replay.",
+          "Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, central audit, metrics and tracing.",
+          "Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient."
+        ],
+        "evidence": [
+          "docs/handoffs/gpt/WP-107.md"
+        ]
       }
     },
     {
