@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.Semaphore;
 import org.jboss.logging.Logger;
 
@@ -21,6 +22,8 @@ import org.jboss.logging.Logger;
  * Opt-in execution boundary for governed adapters. Does not intercept arbitrary Flow HTTP tasks. Unknown outcomes
  * stay INTENDED; callers must test the returned state before continuing. No credential/policy/target is inferred from
  * user input. Adapters own authorization, read-only lookup and finite network timeouts.
+ * Observed thread interruption throws CancellationException with the flag preserved. Committed intent/attempt/outcome
+ * facts stay retained; cancellation is never proof of non-application and must not cause a retry under a new key.
  */
 @ApplicationScoped
 @Transactional(Transactional.TxType.NOT_SUPPORTED)
@@ -44,24 +47,31 @@ public class DurableEffects {
     }
 
     public Effect execute(EffectCommand command, EffectTarget target) {
-        return telemetry.effect(EffectTelemetry.Operation.EXECUTE,()->executeCommand(command,target));
+        Effect result=telemetry.effect(EffectTelemetry.Operation.EXECUTE,()->executeCommand(command,target));
+        requireNotInterrupted(); // Claim release and optional tracing cleanup can block after the inner outcome check.
+        return result;
     }
 
     private Effect executeCommand(EffectCommand command,EffectTarget target) {
+        requireNotInterrupted();
         requireTarget(command, target);
+        requireNotInterrupted();
         if (!slots.tryAcquire()) throw new JdbcEffectLedger.EffectBusyException();
-        try { return ledger.exclusively(command.key(), () -> executeLocked(command, target)); }
+        try { return ledger.exclusively(command.key(), () -> {requireNotInterrupted();return executeLocked(command, target);}); }
         finally { slots.release(); }
     }
 
     private Effect executeLocked(EffectCommand command, EffectTarget target) {
         Duration window = Objects.requireNonNull(target.replayWindow(), "replayWindow");
+        requireNotInterrupted();
         JdbcEffectLedger.Prepared prepared = ledger.prepare(command, window, clock.instant());
         return executePrepared(command, target, prepared);
     }
 
     private Effect executePrepared(EffectCommand command, EffectTarget target, JdbcEffectLedger.Prepared prepared) {
+        requireNotInterrupted();
         Duration window = Objects.requireNonNull(target.replayWindow(), "replayWindow");
+        requireNotInterrupted();
         Effect intent = prepared.effect();
         if (intent.state().isResolved()) return intent;
         Reply result;
@@ -71,53 +81,75 @@ public class DurableEffects {
         } else {
             result = lookup(target, command.key());
             Instant now = clock.instant();
-            if (!Thread.currentThread().isInterrupted() && result.outcome() == EffectTarget.Outcome.UNKNOWN && prepared.replayUntil() != null
+            if (result.outcome() == EffectTarget.Outcome.UNKNOWN) requireNotInterrupted();
+            if (result.outcome() == EffectTarget.Outcome.UNKNOWN && prepared.replayUntil() != null
                     && now.isBefore(prepared.replayUntil()) && !window.isZero()
                     && now.isBefore(prepared.createdAt().plus(window))) {
                 result = dispatch(target, command.key());
             }
         }
         if (result.outcome() == EffectTarget.Outcome.UNKNOWN) {
+            requireNotInterrupted();
             ledger.requireManualResolution(command.key(), "effect.outcome.unknown");
             count("unknown");
             LOG.warnf("Effect awaits reconciliation: thread=%s node=%s", command.key().threadId(), command.key().nodeId());
-            return ledger.find(command.key()).orElseThrow();
+            requireNotInterrupted();
+            Effect pending=ledger.find(command.key()).orElseThrow();
+            requireNotInterrupted();
+            return pending;
         }
+        // Retain an observed target fact even if cancellation arrived during its I/O. This is history, not advancement.
         Effect resultEffect = ledger.recordOutcome(command.key(), result.outcome() == EffectTarget.Outcome.CONFIRMED
                 ? EffectState.CONFIRMED : EffectState.FAILED, result.detail());
         count(resultEffect.state() == EffectState.CONFIRMED ? "confirmed" : "failed");
+        requireNotInterrupted();
         return resultEffect;
     }
 
     /** Compensation has its own durable intent/key; loss of its acknowledgment is recovered like any other effect. */
     public Effect compensate(EffectKey original, EffectCommand compensation, EffectTarget target) {
-        return telemetry.effect(EffectTelemetry.Operation.COMPENSATE,()->compensateCommand(original,compensation,target));
+        Effect result=telemetry.effect(EffectTelemetry.Operation.COMPENSATE,()->compensateCommand(original,compensation,target));
+        requireNotInterrupted();
+        return result;
     }
 
     private Effect compensateCommand(EffectKey original,EffectCommand compensation,EffectTarget target) {
+        requireNotInterrupted();
         requireTarget(compensation, target);
+        requireNotInterrupted();
         if (!original.threadId().equals(compensation.key().threadId()) || original.equals(compensation.key())) {
             throw new IllegalArgumentException("compensation requires another key in the original scope");
         }
         if (!slots.tryAcquire()) throw new JdbcEffectLedger.EffectBusyException();
         try {
             return ledger.exclusively(original, () -> {
+                requireNotInterrupted();
                 Effect before = ledger.find(original).orElseThrow();
+                requireNotInterrupted();
                 if (before.state() == EffectState.INTENDED) throw new IllegalStateException("resolve original first");
                 Effect undo = ledger.exclusively(compensation.key(), () -> {
+                    requireNotInterrupted();
+                    Duration window=Objects.requireNonNull(target.replayWindow(),"replayWindow");
+                    requireNotInterrupted();
                     JdbcEffectLedger.Prepared prepared = ledger.prepareCompensation(original, compensation,
-                            target.replayWindow(), clock.instant());
+                            window, clock.instant());
+                    requireNotInterrupted();
                     if (before.state() == EffectState.COMPENSATED) return prepared.effect();
                     return executePrepared(compensation, target, prepared);
                 });
-                if (before.state() == EffectState.COMPENSATED) return before;
+                if (before.state() == EffectState.COMPENSATED) {requireNotInterrupted();return before;}
                 if (undo.state() == EffectState.CONFIRMED) {
                     Effect result = ledger.recordOutcome(original, EffectState.COMPENSATED, "compensation.confirmed");
                     count("compensated");
+                    requireNotInterrupted();
                     return result;
                 }
+                requireNotInterrupted();
                 ledger.requireManualResolution(original, "effect.compensation.unresolved");
-                return ledger.find(original).orElseThrow();
+                requireNotInterrupted();
+                Effect pending=ledger.find(original).orElseThrow();
+                requireNotInterrupted();
+                return pending;
             });
         } finally { slots.release(); }
     }
@@ -131,8 +163,14 @@ public class DurableEffects {
         if (!command.target().equals(target.target())) throw new IllegalArgumentException("adapter target mismatch");
     }
 
+    /** Cooperative thread cancellation only; it is not a substitute for registry, lease or current identity checks. */
+    private static void requireNotInterrupted() {
+        if(Thread.currentThread().isInterrupted()) throw new CancellationException("effect caller interrupted");
+    }
+
     private Reply dispatch(EffectTarget target, EffectKey key) {
         return telemetry.target(EffectTelemetry.Operation.DISPATCH,()->{
+            requireNotInterrupted(); // After blocking intent/attempt writes and telemetry setup, immediately before target I/O.
             try { return Objects.requireNonNull(target.execute(key.idempotencyKey()), "target reply"); }
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
@@ -142,6 +180,7 @@ public class DurableEffects {
 
     private Reply lookup(EffectTarget target, EffectKey key) {
         return telemetry.target(EffectTelemetry.Operation.LOOKUP,()->{
+            requireNotInterrupted();
             try { return Objects.requireNonNull(target.lookup(key.idempotencyKey()), "lookup reply"); }
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
