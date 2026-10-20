@@ -300,7 +300,8 @@ class ModelCallReservationStoreTest extends ResourceAllocationFixture {
             try{refused("42P01",()->g.find(m.call("plan")));refused("42P01",()->invoke(g,m.call("plan"),calls));}
             finally{m.arena().change("alter table "+m.arena().schema+".temporarily_missing_reservations rename to model_call_reservation");}
             m.arena().change("alter table "+m.arena().schema+".model_call_reservation disable trigger user");
-            m.arena().change("update "+m.arena().schema+".model_call_reservation set held_micros=1");
+            try{m.arena().change("update "+m.arena().schema+".model_call_reservation set held_micros=1");}
+            finally{m.arena().change("alter table "+m.arena().schema+".model_call_reservation enable trigger user");}
             assertThrows(RuntimeException.class,()->g.find(m.call("plan")));refused("23514",()->invoke(g,m.call("draft"),calls));assertEquals(1,calls.get());assertEquals(1,count(m,"model_call_reservation"));
         }
     }
@@ -308,7 +309,8 @@ class ModelCallReservationStoreTest extends ResourceAllocationFixture {
         try(var m=active(false)) {
             var calls=new AtomicInteger();refused("23514",()->gate(m).invokeOnce(m.call("plan"),current(),r->{
                 try{m.arena().change("alter table "+m.arena().schema+".resource_task_allocation disable trigger user");
-                    m.arena().change("update "+m.arena().schema+".resource_task_allocation set model_profile=model_profile||'{\"unapproved\":true}'::jsonb");}
+                    try{m.arena().change("update "+m.arena().schema+".resource_task_allocation set model_profile=model_profile||'{\"unapproved\":true}'::jsonb");}
+                    finally{m.arena().change("alter table "+m.arena().schema+".resource_task_allocation enable trigger user");}}
                 catch(SQLException e){throw new AssertionError(e);}return ()->{calls.incrementAndGet();return "private";};}));assertEquals(0,calls.get());assertEquals(1,count(m,"model_call_reservation"));
         }
     }

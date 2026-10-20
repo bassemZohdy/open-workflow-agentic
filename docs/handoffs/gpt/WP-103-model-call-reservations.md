@@ -124,3 +124,15 @@ lease/fence integration and ordered migration/build configuration. No full T06,
 precise usage/settlement, process/restore/partition or private-output/HTTP success
 is established by this preparation. #53 d38776c/#56 26def97 material findings and
 required one-PR consolidation remain. No package or acceptance status promotion.
+
+Initial product eef6c4f / BOTH39433117858 FAILED in both lanes: all24 new
+model reservation cases ran, with23 passing and one failing exact SQLSTATE
+assertion. The corruption fixture disabled its user triggers to alter retained
+held_micros, then failed to re-enable the INSERT validator before testing the
+next node. PostgreSQL correctly refused missing database-assigned fields23502,
+which was NOT proof of the intended retained-corruption guard23514. Restore
+USER triggers immediately after each owned corruption mutation (also the
+profile mutation) in finally; retain exact expected23514. No permissive expected
+SQLSTATE change or product bypass. All15 prior allocation regressions ran/pass
+in both failed runs, but no overall/provider/strict success is claimed there.
+Both complete failed job logs118663038740/118663039058 inspected and retained.
