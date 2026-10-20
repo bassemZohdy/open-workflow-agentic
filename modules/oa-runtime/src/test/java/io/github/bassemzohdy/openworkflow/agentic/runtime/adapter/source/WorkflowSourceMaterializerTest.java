@@ -188,4 +188,62 @@ class WorkflowSourceMaterializerTest {
             assertEquals(Map.of("payload", 1), result.asMap().orElseThrow());
         }
     }
+
+    @Test void cachedRawSdkDefinitionCannotSubstituteForTheSeparatelyPreparedView() throws Exception {
+        var raw = base(Profile.DEVELOPMENT_1_0_3);
+        raw.set("input", node("{\"schema\":{\"format\":\"unregistered\",\"document\":{\"type\":\"object\"}}}"));
+        ((ObjectNode)raw.path("do").get(0).path("leaf")).set("set", node("{\"unapproved\":true}"));
+        try (var app = WorkflowApplication.builder().disableLifeCycleCEPublishing().disableStatusChangePublishing().build()) {
+            var previous = app.workflowDefinition(io.serverlessworkflow.api.WorkflowReader.readWorkflow(
+                    json.writeValueAsBytes(raw), io.serverlessworkflow.api.WorkflowFormat.JSON));
+            var checked = materializer.prepare(read(base(Profile.DEVELOPMENT_1_0_3), Profile.DEVELOPMENT_1_0_3), ConversionPolicy.PRESERVE_ORIGINAL);
+            var refused = assertThrows(WorkflowSourceMaterializer.Refused.class, () -> materializer.materialize(checked, app));
+            assertEquals(Code.SDK_DEFINITION_CONFLICT, refused.diagnostics().getFirst().code());
+            assertSame(previous, app.workflowDefinitions().get(previous.id()));
+            assertEquals(1, app.workflowDefinitions().size());
+        }
+    }
+
+    @Test void racingPreparedViewsCannotShareOneDefinitionIdentityOrReturnTheOtherViewsExecutable() throws Exception {
+        record Attempt(int value, io.serverlessworkflow.impl.WorkflowDefinition definition, WorkflowSourceMaterializer.Refused refusal) { }
+        var evidence = json.createObjectNode().put("scope", "Actual SDK identity-cache race; checked views confer no authority");
+        var races = evidence.putArray("races");
+        try (var app = WorkflowApplication.builder().disableLifeCycleCEPublishing().disableStatusChangePublishing().build();
+             var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            for (int round = 0; round < 5; round++) {
+                var start = new java.util.concurrent.CountDownLatch(1);
+                var jobs = new java.util.ArrayList<java.util.concurrent.Future<Attempt>>();
+                for (int value : List.of(1, 2)) {
+                    var root = base(Profile.DEVELOPMENT_1_0_3);
+                    ((ObjectNode)root.path("document")).put("name", "race-" + round);
+                    ((ObjectNode)root.path("do").get(0).path("leaf").path("set")).put("payload", value);
+                    var prepared = materializer.prepare(read(root, Profile.DEVELOPMENT_1_0_3), ConversionPolicy.PRESERVE_ORIGINAL);
+                    jobs.add(pool.submit(() -> {
+                        start.await();
+                        try { return new Attempt(value, materializer.materialize(prepared, app), null); }
+                        catch (WorkflowSourceMaterializer.Refused refused) { return new Attempt(value, null, refused); }
+                    }));
+                }
+                start.countDown(); int winners = 0, refusals = 0;
+                var record = races.addObject().put("round", round);
+                for (var job : jobs) {
+                    var result = job.get(5, TimeUnit.SECONDS);
+                    if (result.definition() != null) {
+                        winners++;
+                        var output = result.definition().instance(Map.of()).start().get(5, TimeUnit.SECONDS).asMap().orElseThrow();
+                        assertEquals(Map.of("payload", result.value()), output);
+                        record.put("winner", result.value()); record.set("output", json.valueToTree(output));
+                    } else {
+                        refusals++;
+                        assertEquals(Code.SDK_DEFINITION_CONFLICT, result.refusal().diagnostics().getFirst().code());
+                    }
+                }
+                assertEquals(1, winners); assertEquals(1, refusals); assertEquals(round + 1, app.workflowDefinitions().size());
+                record.put("winners", winners).put("conflicts", refusals);
+            }
+        }
+        var path = java.nio.file.Path.of("target/conformance/materializer/cache-races.json");
+        java.nio.file.Files.createDirectories(path.getParent());
+        java.nio.file.Files.writeString(path, json.writerWithDefaultPrettyPrinter().writeValueAsString(evidence) + "\n");
+    }
 }

@@ -72,6 +72,18 @@ public final class WorkflowSourceMaterializer {
             throw new Refused(List.of(new WorkflowSourceCodec.Diagnostic(
                     WorkflowSourceCodec.Code.SDK_BINDING_UNSUPPORTED, "", "sdk-binding")));
         }
-        return application.workflowDefinition(workflow);
+        // The SDK caches by namespace/name/version, not executable fingerprint.
+        // Never silently return a cached definition for a separately checked view.
+        var id = io.serverlessworkflow.impl.WorkflowDefinitionId.of(workflow);
+        if (application.workflowDefinitions().containsKey(id)) throw definitionConflict();
+        var definition = application.workflowDefinition(workflow);
+        // Another caller can win computeIfAbsent after the precheck.
+        if (definition.workflow() != workflow) throw definitionConflict();
+        return definition;
+    }
+
+    private static Refused definitionConflict() {
+        return new Refused(List.of(new WorkflowSourceCodec.Diagnostic(
+                WorkflowSourceCodec.Code.SDK_DEFINITION_CONFLICT, "/document", "definition-identity")));
     }
 }
