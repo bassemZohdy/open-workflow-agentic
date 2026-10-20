@@ -335,12 +335,15 @@ Implemented scope:
 - Bounded canonical envelope, audit/metrics and scoped ingress passed full CI 39352802891 at 04b421f (6 unit, 4 HTTP, 1 native policy, 9 JDBC inbox cases).
 - Actual JPA writer success observer and bounded fail-closed checkpoint gate implemented; unhealthy readiness/new-start refusal and 14 local unit cases pass. Current-head application binding/full CI and durable inbox acknowledgement remain open.
 - Checkpoint guard passed full CI39354335254 at499550a; new real-SDK lifecycle regression proves failed wait checkpoint cannot release next task, with an unguarded negative control. Nine selected local checkpoint cases pass; actual durable inbox ACK/T13 remain open.
+- PR #41 checkpoint/ingress increment merged as e738218 after Claude exact-head APPROVE-partial at cd3f57b and CI39355182128; postmerge main CI39357918414 passed. WP-107/T13 stay partial.
+- Dispatch protocol successor adds immutable occurrence identity, retained deadlines/dispositions, same-session reservations and explicit checkpoint-proof ACK port. Local application test-compile and two identity cases pass; nine PostgreSQL protocol cases await CI. No SDK consumer/proof implementation is activated.
 
 Additional closure/integration tasks:
 
 - [ ] Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.
 - [ ] Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.
 - [ ] Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.
+- [ ] Integrate authoritative SDK task-completed receipt proof, bounded delivery coordinator and lost-claim fencing; prove loop/parallel restore and checkpoint-before-ACK crash recovery with actual engine persistence. Protocol-port doubles are not T13 proof.
 
 Acceptance gates:
 
