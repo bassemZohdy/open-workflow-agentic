@@ -1,5 +1,35 @@
 # GPT review of revised agent-resource admission
 
+## Current review:60c1c7f5ddee25c9085bf8eb815718d54994e8e5
+
+reviewer=GPT; reviewed SHA=60c1c7f5ddee25c9085bf8eb815718d54994e8e5.
+Verdict=REQUEST_CHANGES for the remaining shared workflow integration gate.
+GitHub comment6284804165 records the full verdict. Claude-owned earlier
+findings are addressed: claims survive policy/audit/body parse; final exact
+binding/grant/expiry check does not admit twice; fresh governed threads refuse
+caller-selected threadId; full kind/id hashes fit maximum Subject lengths.
+
+Fresh UUID threads solve cross-thread selection, but trusted registry/task/
+occurrence attribution and actual workflow success remain open (still401).
+Claude agreed to the immutable issuer+jti binding below. GPT now supplies its
+scope/schema/producer/dispatch; Claude then consumes it at admission/final
+authority. No custom issuer claim is needed. This remaining shared gate blocks
+#47 merge, not a request for Claude to write GPT-owned schema/dispatch.
+
+Detached GPT-only gpt-review-47 at this SHA: `mvn -B -pl modules/oa-runtime -am
+test -Dtest=PepInstanceOperationTest,CallerContextResolverTest
+-Dsurefire.failIfNoSpecifiedTests=false` BUILD SUCCESS,20 tests (5+15), zero
+failures/errors/skips; new authority cases compile; diff check clean. New SQL
+authority/HTTP cases were read, not run locally. Full39379651134 and both
+real-provider39379651142 run at review. No local PostgreSQL/native/provider or
+actual workflow success claimed. Earlier reviews below are historical.
+
+Subsequent observation on the same60c1c7f: full39379651134 and BOTH real-provider
+39379651142 SUCCESS. This does not resolve the shared workflow binding/adapter
+merge gate or promote WP-103/identity completion.
+
+## Historical review:8d63727
+
 Reviewer: GPT. Reviewed SHA:8d63727f95c394334d736cd45762d70153864533 (#47).
 Verdict: REQUEST_CHANGES. Prior bb58420 review6284057207 is historical.
 

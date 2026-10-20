@@ -58,6 +58,18 @@ public class EventIngress {
 
     /** Startup validation deliberately does not initialize a native policy engine. */
     static void validateSettings(EventIngressSettings settings) { validated(settings); }
+    /** Internal metadata only, never admission. Excludes routes belonging to other tenants/definitions. */
+    static Map<String,Object> producerSnapshot(EventIngressSettings settings, String tenant, String definition) {
+        Checks.requireText("snapshot tenant",tenant,256); Checks.requireText("snapshot definition",definition,257);
+        var config=validated(settings);
+        var scoped=config.producers().stream().filter(p -> p.tenant().equals(tenant) && p.definitions().contains(definition))
+                .sorted(java.util.Comparator.comparing(p -> p.fingerprint(Set.of(definition)))).toList();
+        var routes=scoped.stream().map(p -> Map.<String,Object>of("kind",p.kind().name(),"subject",p.subject(),
+                "source",p.source(),"types",p.types().stream().sorted().toList(),
+                "correlations",p.correlations().stream().sorted().toList())).toList();
+        // Project only the selected definition. Changes to another definition's allowlist are irrelevant here.
+        return Map.of("tenant",tenant,"definition",definition,"retention",config.retention().toString(),"routes",routes);
+    }
     private record Config(Duration retention, List<Binding> producers, String hash) { }
     private static Config validated(EventIngressSettings settings) {
         Duration retention = settings.retention();
@@ -86,8 +98,11 @@ public class EventIngress {
             this(p.tenant(), p.kind(), p.subject(), p.source(), Set.copyOf(p.types()), Set.copyOf(p.definitions()), Set.copyOf(p.correlations()));
         }
         String fingerprint() {
+            return fingerprint(definitions);
+        }
+        String fingerprint(Set<String> selectedDefinitions) {
             var e = new CanonicalEncoder("oa.event.producer.v1").text(tenant).text(kind.name()).text(subject).text(source);
-            for (var values : List.of(types, definitions, correlations)) { e.number(values.size()); values.stream().sorted().forEach(e::text); }
+            for (var values : List.of(types, selectedDefinitions, correlations)) { e.number(values.size()); values.stream().sorted().forEach(e::text); }
             return CanonicalEncoder.sha256Hex(e.toBytes());
         }
     }
