@@ -90,7 +90,10 @@ class AtomicInboxCheckpointTest {
     @Test void anInTimeReservationCanCheckpointAfterItsWaitDeadlineWithTheSameLiveOwner() throws Exception {
         execute(Mode.RESERVATION_WON_DEADLINE);
     }
-    enum Mode { COMMIT, HANDOVER, CANCEL, TASK_HANDOVER, TASK_EXPIRED, TASK_DELAYED_EXPIRED, RESERVATION_WON_DEADLINE }
+    @Test void cancellationContendingWithAnActualCheckpointHoldingItsSdkAndRegistryLocksCompletesWithoutDeadlock() throws Exception {
+        execute(Mode.CHECKPOINT_WINS_CANCELLATION);
+    }
+    enum Mode { COMMIT, HANDOVER, CANCEL, TASK_HANDOVER, TASK_EXPIRED, TASK_DELAYED_EXPIRED, RESERVATION_WON_DEADLINE, CHECKPOINT_WINS_CANCELLATION }
 
     private void execute(Mode mode) throws Exception {
         assertInstanceOf(InboxCheckpointJpaOperations.class,operations);
@@ -170,10 +173,45 @@ class AtomicInboxCheckpointTest {
                         assertTimeoutPreemptively(Duration.ofSeconds(10),()-> {
                             while(!deliveryExpired(wait)) Thread.sleep(10);
                         });
+                    } else if(mode==Mode.CHECKPOINT_WINS_CANCELLATION) {
+                        blocker=dataSource.getConnection(); blocker.setAutoCommit(false);
+                        try(var s=blocker.prepareStatement("select 1 from inbox.task_claim where tenant=? and instance_id=? and task_digest=? for update")) {
+                            s.setString(1,wait.tenant()); s.setString(2,wait.instanceId().value()); s.setString(3,wait.task().digest());
+                            try(var r=s.executeQuery()) { assertTrue(r.next()); }
+                        }
+                        try(var s=blocker.createStatement();var r=s.executeQuery("select pg_backend_pid()")) { r.next(); blockerPid=r.getInt(1); }
                     }
                     broker.publish(CloudEventBuilder.v1().withId(message.eventId()).withSource(URI.create(message.source()))
                             .withType(message.type()).withData("application/json",message.dataJson().getBytes(StandardCharsets.UTF_8))
                             .build()).get(10,TimeUnit.SECONDS);
+                    if(mode==Mode.CHECKPOINT_WINS_CANCELLATION) {
+                        awaitDeliveryBlock(blockerPid);
+                        int checkpointPid=blockedCheckpointHoldingSdkLock(blockerPid);
+                        var beforeCancel=row;
+                        var requested=CompletableFuture.supplyAsync(()->move(beforeCancel,InstanceStatus.CANCEL_REQUESTED,instance.id()));
+                        awaitDeliveryBlock(checkpointPid); // Real registry command waits behind the writer, not a callback double.
+                        assertFalse(requested.isDone());
+                        blocker.commit(); blocker.close(); blocker=null;
+                        next.get(15,TimeUnit.SECONDS); // The earlier real checkpoint wins, before cancellation commits.
+                        var cancelling=requested.get(10,TimeUnit.SECONDS);
+                        assertTrue(proof.consumed(wait,message));
+                        assertTrue(instance.cancelFuture().get(10,TimeUnit.SECONDS)); // Real cleanup takes the same SDK advisory lock.
+                        move(cancelling,InstanceStatus.CANCELLED,instance.id());
+                        assertTrue(gate.status().healthy(),()->"mixed lock ordering poisoned checkpoint readiness: "+gate.status());
+                        QuarkusTransaction.requiringNew().run(()-> {
+                            for(String table:List.of("WorkflowInstanceEntity","TaskInfoEntity")) {
+                                Number count=(Number)em.createNativeQuery("select count(*) from "+table+" where applicationid=?1")
+                                        .setParameter(1,app.id()).getSingleResult();
+                                assertEquals(0,count.longValue(),"cleanup must follow the earlier checkpoint: "+table);
+                            }
+                        });
+                        assertTrue(proof.consumed(wait,message),"cancellation after consumption does not erase immutable proof");
+                        assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,owned.acknowledge(wait));
+                        var successor=app.workflowDefinition(WorkflowReader.readWorkflowFromClasspath("lifecycle/cancel-successor.yaml"));
+                        successor.instance(Map.of()).start().get(10,TimeUnit.SECONDS);
+                        assertTrue(gate.status().healthy());
+                        return;
+                    }
                     if(mode==Mode.TASK_DELAYED_EXPIRED) {
                         awaitDeliveryBlock(blockerPid);
                         assertFalse(databaseExpired(lease),"reach the actual row-lock wait while the initial lease is still valid");
@@ -238,6 +276,19 @@ class AtomicInboxCheckpointTest {
                 Thread.sleep(10);
             }
         });
+    }
+    private int blockedCheckpointHoldingSdkLock(int blockerPid) throws SQLException {
+        try(var c=dataSource.getConnection();var s=c.prepareStatement("""
+                select a.pid from pg_stat_activity a where ?=any(pg_blocking_pids(a.pid))
+                  and exists(select 1 from pg_locks l where l.pid=a.pid and l.locktype='advisory'
+                    and l.classid=cast(? as oid) and l.objsubid=2 and l.granted)
+                """)) {
+            s.setInt(1,blockerPid); s.setInt(2,0x4f414350);
+            try(var r=s.executeQuery()) {
+                assertTrue(r.next(),"the blocked ACTUAL checkpoint must already hold its OACP advisory lock");
+                int pid=r.getInt(1);assertFalse(r.next());return pid;
+            }
+        }
     }
     private boolean databaseExpired(JdbcInboxTaskLease.Lease lease) throws SQLException {
         try(var c=dataSource.getConnection(); var s=c.prepareStatement("select expires_at<=clock_timestamp() from inbox.task_claim "

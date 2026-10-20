@@ -76,3 +76,25 @@ ordering remains an explicit gate, as does distributed cleanup/continuation
 authority. Complete T13 includes failed compensation, not just these primitives.
 
 WP-107 remains partial and ADR0025/0026 Proposed. No production consumer is wired.
+
+## Mixed checkpoint/cancellation ordering follow-up
+
+The next focused case for #40 L1 compiles against the actual SDK/JPA writer. A
+real PostgreSQL lease-row lock stalls its checkpoint AFTER it owns the OACP
+advisory lock and registry lock. pg_blocking_pids plus pg_locks proves those
+facts. A real registry cancellation command then waits behind that writer; a
+second blocking observation proves the command contends rather than bypassing
+it. Releasing the lease row lets the earlier checkpoint win; the command commits
+before calling real SDK cancellation/cleanup. Assertions require bounded
+completion, no deadlock/global checkpoint poison, no SDK rows after cleanup,
+retained immutable consumption and historical ACK, and successful independent
+work using the same writer/gate. The following workflow task is held by a test
+lifecycle future, not an external side effect.
+
+This adds an eighth actual SDK case without changing the first seven or product
+code. Local reactor test-compile passes. Its database execution remains pending;
+the seven-case V69 baseline at34a342a runs separately in39370100027 and cannot
+prove this new interleaving. The complementary cancellation-before-checkpoint
+and cleanup-before-late-write cases remain required and unchanged. This local
+ordering case does not prove cross-process cancellation/cleanup ownership or
+the committed-cancel-request/before-engine-call crash window; retain those gates.
