@@ -80,7 +80,21 @@ Author verification=GPT, not peer approval. All220 contracts pass locally,
 including eight new cases and the independent Unicode vector. All91 application
 test sources compile via Maven reactor test-compile -DskipTests. Twenty-five new
 owned actual PostgreSQL test cases compile but have no local execution claim.
-Fresh exact Linux BOTH execution/complete log/XML inspection is pending.
+Initial aeed0ffacf034336062eeb6c27c173c9d5d1435b/BOTH39453457278 FAILED:
+manual SQL25 had24 passes/one fixture expectation failure in EACH lane. V77's
+reused audit_no_change correctly rejects immutable changes with42501; the new
+retention test incorrectly expected23514. Corrected to exact42501 PLUS the actual
+retention-guard message, preserving refusal and strengthening attribution to the
+intended guard. No product SQL, permission, validator or mutation rule changed.
+The original assertion stopped at UPDATE; DELETE/TRUNCATE require the corrected
+fresh run too. No failed assertion was rerun unchanged. Fresh exact Linux BOTH
+execution/complete inspection is pending at the corrected source.
+
+Both finished failed logs inspected (standard118734067332/native118734068001).
+Both actual archives12280545199/12280425264 downloaded by id; raw bytes/digests/
+CRC/paths checked. All157 actual XML per lane parsed: EXACTLY that single failure,
+zero errors/skips, contracts220/runtime351/testkit196/app416. No actual Failsafe
+XML exists, so provider/HTTP/process success is NOT inferred from this run.
 
 The SQL tests create only a fresh gpt_eap_UUID database, verify ownership, run
 Flyway before writes, apply actual proposed V75/V77/V80 and drop only that owned
@@ -96,13 +110,23 @@ private authority and targets there are protocol spies, not actual operator proo
 
 ## Explicit Claude handoff and remaining gates
 
-Provide the actual current signed operator/tenant/full-owner or authorized
-delegation producer, with explicit OPERATION operation:resolve-effect and verified
-oa.recover. Do not reuse resolve-signal permission or DEV_HEADERS/UNVERIFIED.
-Propose the owned policy path through GPT's shared manifest/registration before
-adding it. Bind genuine authoritative evidence and original PolicyRef plus the
-authorization fingerprint; define the actual canonical authorization attribution
-and retained evidence custodian. Never mint a dummy allow decision/evidence/grant.
+Current unmerged #53 d38776c already contains CallerAuthority/resolveAuthority,
+Pep.InstanceOperation.RESOLVE_EFFECT and operations.resolve-effect in the existing
+registered operations.cedar/snapshot. GPT re-read those exact detached sources;
+reuse these interfaces after their reviewed integration, rather than introducing
+another policy file or equivalent token handle. Their scoped unit/provider proof
+does not establish an actual manual mutation/evidence/result path.
+
+Supply that actual current signed operator/tenant/full-owner or authorized
+delegation producer, consuming explicit OPERATION operation:resolve-effect and
+verified oa.recover. Do not reuse resolve-signal or DEV_HEADERS/UNVERIFIED. Request
+GPT manifest/registration changes only if a concrete additional owned policy path
+is needed. Bind genuine authoritative evidence and original Decision.policy plus
+the authorization fingerprint; define canonical authorization attribution and the
+retained evidence custodian. Never mint a dummy allow decision/evidence/grant.
+The existing Cedar comment describing manual resolution as release for another
+attempt needs clarification by its owner: FAILED is an authoritative final refusal,
+not permission for a fresh occurrence/key or an automatic resend.
 
 Review/propose the minimal ephemeral final mutation/current-result seam so
 revocation/expiry/owner/history changes after ALL blocking audit/storage/policy

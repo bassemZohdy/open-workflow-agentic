@@ -195,7 +195,11 @@ class EffectManualDecisionStoreTest {
     @Test void manualDecisionRowsCannotBeChangedDeletedOrTruncated() throws Exception {
         var f=fixture();var d=decision(f);var stored=decisions.record(d);
         for(String text:List.of("update effect.manual_decision set policy_version='forged' where decision_id=?","delete from effect.manual_decision where decision_id=?","truncate effect.manual_decision")) {
-            try(var c=db.dataSource.getConnection();var q=c.prepareStatement(text)) {if(text.contains("?"))q.setString(1,d.id().value());assertEquals("23514",assertThrows(SQLException.class,q::executeUpdate).getSQLState());}
+            try(var c=db.dataSource.getConnection();var q=c.prepareStatement(text)) {
+                if(text.contains("?"))q.setString(1,d.id().value());var refused=assertThrows(SQLException.class,q::executeUpdate);
+                // V77's reused retention guard deliberately reports insufficient_privilege, not check_violation.
+                assertEquals("42501",refused.getSQLState());assertTrue(refused.getMessage().contains("effect audit provenance and source are immutable and retained"));
+            }
         }
         assertEquals(stored,decisions.record(d));
     }
