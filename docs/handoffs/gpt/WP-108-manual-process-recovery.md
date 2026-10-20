@@ -1,6 +1,6 @@
 # WP-108 manual DATA process-death recovery preparation
 
-Owner: GPT. Reviewer/consumer: Claude. Preparation; actual operator/authority and
+Owner: GPT. Reviewer/consumer: Claude. Storage-process preparation verified; actual operator/authority and
 central/Flow activation remain gated. Sole GPT implementation PR #55 stays frozen
 ea56f3319d0e896d54703d9f4d857252906ed2a4 pending exact Claude review.
 
@@ -82,9 +82,70 @@ Author verification=GPT, not peer approval. Local all93 app test sources compile
 with Maven reactor test-compile -DskipTests. Standalone worker --self-check boots
 the actual Narayana manager; tools94, both strict source preflights and authored
 diff/generated checks pass. No local PostgreSQL/provider/process execution claim.
-Fresh exact Linux BOTH execution/complete reports/process-log inspection pending.
+Fresh exact Linux BOTH execution/complete inspection is verified below; it was
+pending at initial publication.
 Prior e1c2d84/BOTH39457012587 storage26/HTTP7 evidence is NOT new manual-process8
 proof and no approval/CI is transferred to this source.
+
+## Verified exact-source execution
+
+reviewer=GPT (AUTHOR verification only, not peer approval); reviewed/tested SHA
+**fd69ee157ed6edcde7f9fc9eea48b4912466d5af**. Verdict: manual STORAGE process
+preparation PASS; integration HOLD for exact peer/final PR and actual operator/
+central/current-authority/Flow adoption. Later handoff/tracking commit changes no
+code and is not mislabeled as the tested source.
+
+[BOTH39460706991](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39460706991)
+is terminal SUCCESS at that exact SHA, first attempt/no rerun. Both completed
+full raw logs downloaded/inspected: standard118759125008/native118759125559.
+EACH executes contracts220/runtime351/testkit196/application unit417 including
+manual storage26/contract8/boundary31/source17/model24/allocation15. Failsafe
+counts standard23/native28: NEW manual process8/HTTP7/source-ACK4/core1 EACH,
+real standard3/native8. All five strict evidence markers pass; failures/errors/
+skips0. No assertion was retried unchanged or weakened.
+
+Actual archives downloaded by exact id, raw bytes independently matched to
+GitHub SHA256, CRC and safe owned extraction paths verified:
+
+| Lane / artifact | Bytes | SHA256 |
+| --- | ---: | --- |
+| standard12283356951 | 2540735 | 641087e6868617d8b735e6abc96323c1e0afc1241b33b0c4722806682682574e |
+| native12282014878 | 2537536 | 87d0010f46f6a6bc324fe72415e3d3bebf150a4104393ffb70d109dd1d2f162d |
+
+ALL162 actual XML per lane parsed: positive consistent suite/case counters,
+unique identities and no failure/error/skip. Exact current process8/storage26/
+contract8/HTTP7/boundary31/model24/allocation15 method sets match source. Reran
+`python tools/require_keycloak_evidence.py --root <actual-lane> --profile
+<standard|delegation> --effect-recovery --effect-audit-recovery
+--effect-http-recovery --effect-manual-recovery` against EACH actual artifact,
+not preflight/synthetic XML.
+
+Inspected all32 manual-worker.log plus their actual argument files per lane:
+eight distinct ORIGINAL decision tuples, four fresh workers each, exact same
+scope/id/history/outcome/purpose across RECORD/FIND/RECORD;16 record/eight read
+markers. Exact halt matrix: ROOT CONFIRMED/FAILED at AFTER_SOURCE and BEFORE_COMMIT
+once each; ROOT CONFIRMED AFTER_COMMIT twice (ordinary+terminal), ROOT FAILED once,
+UNDO CONFIRMED once. AFTER_SOURCE2/BEFORE_COMMIT2/AFTER_COMMIT4 match planned exits.
+All56 real backend PID observations have valid positive distinct per-worker
+counts (two per record/halt, one per find). Executed parent assertions wait for
+those sessions' disappearance and independently check database state, sources,
+queue timestamps, full decision/draft/time/content and no extra mutation.
+
+Also inspected old14 worker logs and13 HTTP logs per lane, retaining all prior
+source/ACK/HTTP halt/reopen markers. Each lane has one owned WAIT_CHARGE cleanup
+InterruptedException with committed/release files; timeout/business assertions
+pass. Standalone fixture bootstrap diagnostics are retained, not hidden or called
+application/test failures. Actual bounded conformance reports/48 outputs/74
+exports/two known diagnostics checked per lane; only the two already bounded
+wrong fork-order fingerprints projected, still30 MATCH/18 DIVERGED. No complete
+semantic-conformance or operator/authority/central proof transfers.
+
+Local93-source compilation/real standalone Narayana self-check/tools94/preflights/
+dependency/generated/authored diff pass. Compared main runtime/contracts/schema
+and acceptance-status trees to prior97e5e54: unchanged. Storage8 process evidence
+closes only these raw DATA commit-death windows; full governed manual request/
+Flow/old-owner/partition/restore/correction/retention/T03/WP-108 remain open.
+Publication handoff: [comment6296240827](https://github.com/bassemZohdy/open-workflow-agentic/pull/54#issuecomment-6296240827).
 
 ## Explicit handoff and remaining gates
 
