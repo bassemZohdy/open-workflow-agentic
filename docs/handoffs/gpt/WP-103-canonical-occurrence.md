@@ -64,3 +64,13 @@ pass and all three logs inspected. Exact Claude review remains required. #53
 d38776c has scoped GPT APPROVE6286561388, its full39391218954/BOTH39391218984
 SUCCESS; current shared runtime/execution/workflow gate and final consolidated
 head review still block integration. These results do not approve V74.
+
+## Actual V74 execution
+
+Exact b05177653375be97dbe3d2036906cb17a5aa1974 passed BOTH39393353409. GPT inspected
+finished standard118529956946/native118529957356 logs: ResourceCallBindingStoreTest17
+(including both actual migration fixtures), scope7/SDK observations3, original
+process recovery1 in each lane, standard3/native8 and strict evidence checks pass,
+zero failures/errors/skips. This supersedes earlier execution-pending statements
+for that exact product. Final-head full/peer/ordered integration and actual
+producer/execution/restore proof remain required; no package/acceptance promotion.

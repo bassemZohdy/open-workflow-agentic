@@ -1,5 +1,7 @@
 # Changelog
 
+- Exact canonical-occurrence productb051776 passed BOTH39393353409:17 actual PostgreSQL cases including Unicode backfill and conflicting-history refusal, scope7/SDK observations3/core process1/standard3/native8, zero skips/strict checkers. Both finished logs inspected. Full producer/restore/execution and final-head peer/integration gates remain open.
+
 - WP-103 preparation: additive V74 retains one canonical call per complete business occurrence while preserving existing rc1 keys. New producer lookup recovers original attribution across changing SDK retry counters and rejects changed contracts.12 local plain cases/app compile/tools76 pass;17 actual PostgreSQL cases including upgrade/backfill/conflict await new-head Linux evidence. No dispatch or acceptance promotion.
 
 - Combined6fbb9fb passed BOTH39388831952: actual effects16/group11/binding12/interruption6/core process1/standard3/native8, zero skips/strict checks. Three later full-SDK workflow observations prove retry counters can change for the same loop index; naive scope derivation is unsafe and the durable producer remains open. All three fixtures validate against OWS1.0.3.
