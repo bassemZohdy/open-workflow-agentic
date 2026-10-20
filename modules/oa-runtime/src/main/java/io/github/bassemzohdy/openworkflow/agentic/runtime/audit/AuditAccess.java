@@ -92,7 +92,12 @@ public class AuditAccess {
         if (devOpen) {
             return;
         }
-        Pep enforcement = pep.get();
+        Pep enforcement;
+        try {
+            enforcement = pep.get();
+        } catch (RuntimeException initialization) {
+            throw unavailable(); // the engine could not be built: the same refusal as an unavailable decision
+        }
         if (enforcement != null) {
             Decision decision;
             try {
