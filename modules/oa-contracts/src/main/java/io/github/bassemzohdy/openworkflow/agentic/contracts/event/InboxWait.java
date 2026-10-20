@@ -22,7 +22,8 @@ public record InboxWait(String tenant, Ulid instanceId, String applicationId, St
         definition = Checks.requireText("definition", definition, 256);
         version = Checks.requireText("version", version, 128);
         taskPosition = Checks.requireText("taskPosition", taskPosition, 1024);
-        if (!taskPosition.startsWith("/")) throw new IllegalArgumentException("task position must be a JSON pointer");
+        // Preserve the SDK's position verbatim. Its default QueueWorkflowPosition emits "do/0/task";
+        // StringBufferWorkflowPosition emits "/do/0/task". Normalizing would alias distinct persistence keys.
         if (iteration < 1) throw new IllegalArgumentException("wait iteration must be positive");
         route = Checks.requireMatching("route", route, ROUTE);
         eventType = Checks.requireText("eventType", eventType, 256);
@@ -40,6 +41,6 @@ public record InboxWait(String tenant, Ulid instanceId, String applicationId, St
                 .text(route).text(eventType).text(filterDigest).text(maxWait.toString()).toBytes());
     }
 
-    /** A public occurrence key, separate from its deployment-approved route class. */
+    /** Internal logical occurrence key. Producers use the deployment-approved {@link #route()}, not SDK identity. */
     public String key() { return route + "~" + digest(); }
 }

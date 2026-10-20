@@ -104,9 +104,9 @@ class AtomicInboxCheckpointTest {
                         task.position().jsonPointer(),task.iteration(),"orders","org.openworkflow.agentic.atomic.test",
                         "a".repeat(64),Duration.ofMinutes(5));
                 var message = new InboxMessage(row.tenant(),"urn:test:atomic",UUID.randomUUID().toString(),wait.eventType(),
-                        row.id(),wait.key(),"{\"ok\":true}");
+                        row.id(),wait.route(),"{\"ok\":true}");
                 dispatch.register(wait); inbox.receive(message,now().plusSeconds(600));
-                assertEquals(Optional.of(message),inbox.match(row.tenant(),row.id(),wait.key(),wait.eventType()));
+                assertEquals(Optional.of(message),inbox.match(row.tenant(),row.id(),wait.route(),wait.eventType()));
                 var claim = dispatch.claim(wait).orElseThrow();
                 JdbcInboxDispatch.Claim newer = null;
                 try {

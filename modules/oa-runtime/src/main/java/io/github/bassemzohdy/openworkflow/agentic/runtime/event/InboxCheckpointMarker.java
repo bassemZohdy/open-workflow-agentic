@@ -22,7 +22,7 @@ public record InboxCheckpointMarker(InboxWait occurrence, String receiptFingerpr
     public static void install(WorkflowContext workflow, TaskContextData task, JdbcInboxDispatch.Reserved reserved) {
         InboxWait wait = reserved.occurrence();
         if (!reserved.receipt().tenant().equals(wait.tenant()) || !reserved.receipt().instanceId().equals(wait.instanceId())
-                || !reserved.receipt().correlationKey().equals(wait.key()) || !reserved.receipt().type().equals(wait.eventType())) {
+                || !reserved.receipt().correlationKey().equals(wait.route()) || !reserved.receipt().type().equals(wait.eventType())) {
             throw new IllegalArgumentException("reservation receipt does not identify this occurrence");
         }
         var marker = new InboxCheckpointMarker(wait, reserved.receipt().fingerprint(), reserved.attempt());

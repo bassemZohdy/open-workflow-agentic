@@ -341,6 +341,8 @@ Implemented scope:
 - Dispatch protocol successor adds immutable occurrence identity, retained deadlines/dispositions, same-session reservations and explicit checkpoint-proof ACK port. Local application test-compile and two identity cases pass; nine PostgreSQL protocol cases await CI. No SDK consumer/proof implementation is activated.
 - Dispatch protocol754507a passed9/9 real PostgreSQL cases, zero skips, in CI39358587955. Overall build failed only the route media probe; Claude0cf85d6 correction integrated via GPT004fd9e and current full CI/review renewed. No actual SDK consumption/T13 proof.
 - Atomic SDK receipt proof successor on gpt/WP-107-sdk-delivery adds V67 and a JPA operations adapter that commits proof with actual task completion, fencing cancellation and stale attempts. Application test-compile and OWS fixture validation pass; three real SDK/JPA tests await CI. No production event consumer/coordinator or complete T13 proof.
+- SDK0c483d2 CI39360729877 exposed native position-format mismatch before the three atomic proof cases ran. Contract now preserves the actual SDK position spelling verbatim; three identity cases and local reactor test-compile pass. Atomic proof remains unverified pending renewed CI.
+- SDK selector separates approved public correlation from internal occurrence identity, reads bounded predicate candidates without consuming them, and atomically commits a selected receipt after scope/content/retention/cancellation/deadline rechecks. Six real JDBC selection cases compile; CI pending. No event consumer/coordinator activation or T13 closure.
 
 Additional closure/integration tasks:
 

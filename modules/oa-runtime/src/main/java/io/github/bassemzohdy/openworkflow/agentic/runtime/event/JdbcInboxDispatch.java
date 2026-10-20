@@ -216,7 +216,7 @@ public class JdbcInboxDispatch {
                 if (!r.next()) return Optional.empty();
                 var m = new InboxMessage(r.getString("tenant"),r.getString("source"),r.getString("event_id"),
                         r.getString("type"),wait.instanceId(),r.getString("correlation_key"),r.getString("data_json"));
-                if (!m.type().equals(wait.eventType()) || !m.correlationKey().equals(wait.key())) {
+                if (!m.type().equals(wait.eventType()) || !m.correlationKey().equals(wait.route())) {
                     throw new IllegalStateException("signal does not match immutable wait contract");
                 }
                 return Optional.of(m);

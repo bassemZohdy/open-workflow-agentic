@@ -44,9 +44,9 @@ class InboxDispatchProtocolTest {
     }
     private InboxMessage match(InstanceRecord row, InboxWait wait) {
         var event = new InboxMessage(row.tenant(),"urn:test:dispatch",UUID.randomUUID().toString(),wait.eventType(),
-                row.id(),wait.key(),"{\"ok\":true}");
+                row.id(),wait.route(),"{\"ok\":true}");
         inbox.receive(event,now().plusSeconds(600));
-        assertEquals(Optional.of(event),inbox.match(row.tenant(),row.id(),wait.key(),wait.eventType()));
+        assertEquals(Optional.of(event),inbox.match(row.tenant(),row.id(),wait.route(),wait.eventType()));
         return event;
     }
     private String state(InboxWait wait) {

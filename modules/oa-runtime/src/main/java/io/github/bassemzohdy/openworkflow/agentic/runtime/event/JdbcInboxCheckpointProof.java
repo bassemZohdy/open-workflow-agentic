@@ -63,7 +63,7 @@ public class JdbcInboxCheckpointProof implements InboxCheckpointProof {
     @Override @Transactional(Transactional.TxType.NOT_SUPPORTED)
     public boolean consumed(InboxWait w, InboxMessage receipt) {
         if (!receipt.tenant().equals(w.tenant()) || !receipt.instanceId().equals(w.instanceId())
-                || !receipt.correlationKey().equals(w.key()) || !receipt.type().equals(w.eventType())) return false;
+                || !receipt.correlationKey().equals(w.route()) || !receipt.type().equals(w.eventType())) return false;
         try (var c = dataSource.getConnection(); var s = c.prepareStatement("""
                 select 1 from inbox.checkpoint_receipt where tenant=? and instance_id=? and wait_key=?
                 and identity_digest=? and receipt_fingerprint=? and application_id=? and engine_instance_id=?
