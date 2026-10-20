@@ -19,6 +19,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ExchangeExcep
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ExchangeRequest;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.GrantCheck;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedTokenBindings;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Rfc8693TokenExchanger;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenExchanger;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenVerifier;
@@ -379,6 +380,39 @@ class Rfc8693TokenExchangerTest {
 
         assertEquals(Code.BAD_RESPONSE, e.code());
         assertTrue(e.getMessage().contains("actor"), e.getMessage());
+    }
+
+    @Test
+    void aTokenThatExpiresOrLosesItsGrantWhileBeingBoundIsNeverReleased() {
+        for (boolean revoke : new boolean[] {false, true}) {
+            IssuedTokenBindings slow = new IssuedTokenBindings() {
+                @Override
+                public void bind(String issuer, String tokenId, Binding binding) {
+                    fx.bindings.bind(issuer, tokenId, binding);
+                    if (revoke) {
+                        fx.grants.revoke(grant.id(), ALICE, "revoked during binding", null);
+                    } else {
+                        fx.clock.advance(Duration.ofSeconds(301)); // a slow store: the token is now past exp
+                    }
+                }
+
+                @Override
+                public java.util.Optional<Binding> find(String issuer, String tokenId) {
+                    return fx.bindings.find(issuer, tokenId);
+                }
+            };
+            Rfc8693TokenExchanger slowExchanger = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID,
+                    CLIENT_SECRET_NAME, fx.secrets, fx.grants, slow, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
+
+            ExchangeException e = assertThrows(ExchangeException.class,
+                    () -> slowExchanger.exchange(request(Set.of("cases:read"))));
+
+            assertNotNull(e.getMessage());
+            assertFalse(e.getMessage().contains("eyJ"), "no token text in the refusal");
+            if (!revoke) {
+                assertEquals(Code.BAD_RESPONSE, e.code());
+            }
+        }
     }
 
     // ---- secrets ---------------------------------------------------------------------------------------------------

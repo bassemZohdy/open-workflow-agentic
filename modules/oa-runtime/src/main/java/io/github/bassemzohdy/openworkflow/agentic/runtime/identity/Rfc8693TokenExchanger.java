@@ -111,11 +111,25 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
                 throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
                         "the token was discarded because its audit event could not be written", e);
             }
+            releaseCheck(request, grant, token);
             return token;
         } catch (ExchangeException e) {
             auditRefusal(grant, request, e);
             throw e;
         }
+    }
+
+    /**
+     * The last look before the bearer leaves: binding and audit can be slow, so the token must still be inside its signed
+     * lifetime now (it was bounded by the grant and both input tokens when it was requested) and the grant must still
+     * cover the request. Release time is the enforced time; a token refused here is bound but never returned.
+     */
+    private void releaseCheck(ExchangeRequest request, DelegationGrant grant, IssuedToken token) {
+        if (!token.expiresAt().isAfter(clock.instant())) {
+            throw new ExchangeException(ExchangeException.Code.BAD_RESPONSE,
+                    "the issued token expired before it could be released; it was discarded");
+        }
+        recheckGrant(request, grant);
     }
 
     /**
