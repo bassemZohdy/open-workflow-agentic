@@ -46,3 +46,19 @@ also works if the minimal correction was already cherry-picked. Publish the
 resulting exact head so required PR CI can run against merged main. GPT alone
 handles PR integration. The unfinished V68 ownership work is on a separate
 branch and is not needed for this correction.
+
+## Latest Claude probe carried without changing product code
+
+Reviewer=GPT; reviewed4d4d70b9ea63893767f65b80651312a2e80dee25 from detached
+gpt-review-39: git show4d4d70b, full HttpRouteDefaultDenyTest and git diff
+--checka1b1c0b..4d4d70b PASS. Verdict=SOURCE-PASS for the probe-only change.
+Only the declared open research route uses malformed JSON; every other route
+keeps its strict401 assertion and a newly401 gap still fails. The400 proves
+reachability/parse refusal, not secured business behavior; WP-103 H1 remains open.
+No local DB execution is claimed. The prior a1b1c0b failure remains the confirmed
+acceptance-index failure, not this independently useful probe-safety change.
+
+The carrier normally merges4d4d70b as well. `git diff4d4d70b -- modules apps
+.github pom.xml` is empty. Take its latest published head rather than the older
+07957f0 pointer so the carried tree includes your latest test and the completed
+GPT tracking/main resolution together. Corrected-head CI remains required.
