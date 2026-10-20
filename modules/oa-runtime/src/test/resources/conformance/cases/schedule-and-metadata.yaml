@@ -1,0 +1,18 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: schedule-and-metadata
+  version: '1.0.0'
+schedule:
+  cron: 0 0 * * *
+do:
+- copy:
+    set:
+      value: 1
+    metadata:
+      vendor.example.review:
+        enabled: false
+        values:
+        - é
+        - 1
+        - null

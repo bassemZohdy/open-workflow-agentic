@@ -44,6 +44,8 @@
 
 - WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. Eight new verifier cases and all76 tooling tests pass; new product process execution still needs fresh Linux CI. No acceptance promotion.
 
+- WP-605 partial preparation: measure42 sources against released1.0.1/development1.0.3 schemas,76 export attempts (74 successes/two metadata failures) and48 pure execution observations with one pinned official development CTK case. Record export/context, fork-output and metadata-writer differences plus authoring/source and runtime-dependency limits; green reproduction is not semantic certification. Seven local assessment/control tests and all affected Linux/provider tests pass at f1dc63f (Linux39420975592/BOTH39420975752, actual XML/report inspected, zero skips); actual fork-order instability remains explicit. Full CTK, finding resolution, real authoring APIs, substitution and exact peer/final PR CI gates remain open.
+
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 
 - WP-108 preparation: refuse interrupted callers before effect/refund dispatch and after blocking ledger/cleanup work, preserving committed facts and original recovery keys. Six local interruption cases pass; four new PostgreSQL cases compile and need fresh Linux execution. This is cooperative thread handling, not complete Flow/owner/authority cancellation.

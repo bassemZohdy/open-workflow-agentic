@@ -1,0 +1,15 @@
+document:
+  dsl: 1.0.1
+  namespace: portability
+  name: parallel
+  version: 1.0.1
+do:
+- gather:
+    fork:
+      branches:
+      - left:
+          set:
+            side: left
+      - right:
+          set:
+            side: right

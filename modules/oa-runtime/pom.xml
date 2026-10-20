@@ -68,6 +68,8 @@
 
     <!-- Tests (plain JUnit and ArchUnit; Quarkus boot tests live in app-runtime) -->
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+    <!-- Independent pinned OWS schema checks for the portability assessment; existing managed test-only version. -->
+    <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><scope>test</scope></dependency>
     <dependency><groupId>io.opentelemetry</groupId><artifactId>opentelemetry-sdk-testing</artifactId><scope>test</scope></dependency>
     <dependency><groupId>com.tngtech.archunit</groupId><artifactId>archunit-junit5</artifactId><scope>test</scope></dependency>
   </dependencies>

@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: standard-extensions
+  version: '1.0.0'
+use:
+  extensions:
+  - markSets:
+      extend: set
+      before:
+      - mark:
+          set:
+            marker: true
+do:
+- copy:
+    set:
+      value: 1

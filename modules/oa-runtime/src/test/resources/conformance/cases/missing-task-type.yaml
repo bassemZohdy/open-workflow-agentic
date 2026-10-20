@@ -1,0 +1,9 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: missing-task-type
+  version: '1.0.0'
+do:
+- copy:
+    metadata:
+      vendor.example.fixture: true

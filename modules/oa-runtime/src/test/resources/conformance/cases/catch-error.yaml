@@ -1,0 +1,22 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: catch-error
+  version: '1.0.0'
+do:
+- recover:
+    try:
+    - reject:
+        raise:
+          error:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+            status: 400
+            title: Fixture rejection
+    catch:
+      errors:
+        with:
+          type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      do:
+      - handle:
+          set:
+            handled: true
