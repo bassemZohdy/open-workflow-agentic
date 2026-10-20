@@ -7,7 +7,10 @@ on:
       - 'tools/require_keycloak_evidence.py'
       - 'tools/test_keycloak_evidence.py'
       - 'modules/oa-runtime/src/**/identity/**'
+      - 'modules/oa-runtime/src/**/effect/**'
+      - 'modules/oa-runtime/src/main/resources/db/**'
       - 'apps/app-runtime/src/test/**/identity/**'
+      - 'apps/app-runtime/src/test/**/effect/**'
       - 'docs/adr/0021-*'
       - 'pom.xml'
       - 'apps/app-runtime/pom.xml'
@@ -18,7 +21,10 @@ on:
       - '.github/workflows/keycloak-interop.yml'
       - 'tools/require_keycloak_evidence.py'
       - 'modules/oa-runtime/src/**/identity/**'
+      - 'modules/oa-runtime/src/**/effect/**'
+      - 'modules/oa-runtime/src/main/resources/db/**'
       - 'apps/app-runtime/src/test/**/identity/**'
+      - 'apps/app-runtime/src/test/**/effect/**'
       - 'tools/test_keycloak_evidence.py'
       - 'docs/adr/0021-*'
       - 'pom.xml'
@@ -66,7 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Require the real Java test before starting a server
-        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS --effect-recovery --preflight
+        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS --effect-recovery --effect-audit-recovery --preflight
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Start an isolated pinned Keycloak server
@@ -95,11 +101,11 @@ jobs:
           JAVA_IT: ${{ matrix.test }}
         run: >-
           mvn -B -pl apps/app-runtime -am verify
-          -Dit.test="$JAVA_IT,EffectCrashRecoveryIT" -Dfailsafe.failIfNoSpecifiedTests=false
+          -Dit.test="$JAVA_IT,EffectCrashRecoveryIT,EffectAuditProcessRecoveryIT" -Dfailsafe.failIfNoSpecifiedTests=false
           -Dkeycloak.required=true -Dkeycloak.profile="$KEYCLOAK_PROFILE"
           -Dkeycloak.url="$KEYCLOAK_URL"
       - name: Require passing non-skipped Java evidence
-        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS --effect-recovery
+        run: python3 tools/require_keycloak_evidence.py --profile "$KEYCLOAK_PROFILE" $EVIDENCE_ARGS --effect-recovery --effect-audit-recovery
       - name: Save test results
         if: always()
         uses: actions/upload-artifact@v4

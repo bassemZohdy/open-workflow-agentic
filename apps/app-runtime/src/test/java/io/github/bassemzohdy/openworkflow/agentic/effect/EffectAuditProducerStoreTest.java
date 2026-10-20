@@ -12,7 +12,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.transaction.*;
 import java.lang.reflect.*;
-import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
@@ -20,7 +19,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import javax.sql.DataSource;
-import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.parallel.*;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -33,48 +31,20 @@ import org.postgresql.ds.PGSimpleDataSource;
 class EffectAuditProducerStoreTest {
     @Inject TransactionManager manager;
     @Inject UserTransaction caller;
-    PGSimpleDataSource admin,owned;
-    String database;
-    boolean created;
+    PGSimpleDataSource owned;
+    EffectAuditTestDatabase database;
     JdbcInstanceStore registry;
     EffectAuditProducer producer;
     JdbcEffectLedger ledger;
     static final Subject OWNER=new Subject(SubjectKind.USER,"alíce-𝄞");
     record Fixture(EffectScope scope,EffectCommand command) { }
     static Instant now(){return Instant.now().truncatedTo(ChronoUnit.MICROS);}
-    static PGSimpleDataSource dataSource(String name) {
-        var ds=new PGSimpleDataSource();ds.setUrl(System.getenv().getOrDefault("DB_URL","jdbc:postgresql://localhost:5432/agentic"));
-        if(name!=null)ds.setDatabaseName(name);
-        ds.setUser(System.getenv().getOrDefault("DB_USER","postgres"));ds.setPassword(System.getenv().getOrDefault("DB_PASSWORD","postgres"));
-        ds.setConnectTimeout(5);ds.setSocketTimeout(10);return ds;
-    }
     @BeforeAll void createOwnedDatabase() throws Exception {
-        admin=dataSource(null);database="gpt_eap_"+UUID.randomUUID().toString().replace("-","");
-        assertTrue(database.matches("gpt_eap_[0-9a-f]{32}"));
-        try(var c=admin.getConnection()){sql(c,"create database "+database);created=true;}
-        owned=dataSource(database);
-        try(var c=owned.getConnection();var q=c.createStatement();var r=q.executeQuery("select current_database()")){r.next();assertEquals(database,r.getString(1));}
-        // Initialize BEFORE ANY owned schema/table writes; never baseline or clean a pre-existing database.
-        Flyway.configure().dataSource(owned).locations("classpath:db/migration").load().migrate();
-        try(var c=owned.getConnection()) {
-            c.setAutoCommit(false);
-            try {sql(c,resource("V75__audit_source_binding.sql"));sql(c,resource("V77__retained_effect_audit_sources.sql"));c.commit();}
-            finally {c.rollback();}
-        }
+        database=EffectAuditTestDatabase.open();owned=database.dataSource;
         registry=new JdbcInstanceStore(owned);producer=new EffectAuditProducer();ledger=new JdbcEffectLedger(owned,manager,producer);
     }
-    @AfterAll void dropOnlyOwnedDatabase() throws Exception {
-        if(!created)return;
-        assertNotNull(admin);assertTrue(database.matches("gpt_eap_[0-9a-f]{32}"));
-        // created was set ONLY after CREATE succeeded. No IF EXISTS/force/termination of another session.
-        try(var c=admin.getConnection()){sql(c,"drop database "+database);created=false;}
-    }
-    static String resource(String name) throws Exception {
-        try(var in=EffectAuditProducerStoreTest.class.getClassLoader().getResourceAsStream("db/proposed/"+name)) {
-            assertNotNull(in,name);return new String(in.readAllBytes(),StandardCharsets.UTF_8);
-        }
-    }
-    static void sql(Connection c,String text) throws SQLException {try(var q=c.createStatement()){q.setQueryTimeout(15);q.execute(text);}}
+    @AfterAll void dropOnlyOwnedDatabase() throws Exception {if(database!=null)database.close();}
+    static void sql(Connection c,String text) throws SQLException {EffectAuditTestDatabase.sql(c,text);}
     Fixture fixture() {
         var req=new StartRequest("effect-source-"+UUID.randomUUID(),OWNER,new DefinitionRef("agentic/effect-source-test","1"),Map.of(),"start");
         var row=registry.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(),req,now()),"test.start").record();
