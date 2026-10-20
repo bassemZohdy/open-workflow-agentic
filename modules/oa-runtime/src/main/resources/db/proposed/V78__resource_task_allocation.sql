@@ -196,6 +196,7 @@ begin
         if not found or parent.instance_id is distinct from invocation.instance_id or parent.tenant is distinct from invocation.tenant
            or parent.owner_kind is distinct from invocation.owner_kind or parent.owner_id is distinct from invocation.owner_id
            or parent.status not in ('PENDING','RUNNING','WAITING_FOR_HUMAN','RESUMING')
+           or parent.created_at is null or parent.created_at>clock_timestamp()
            or parent.contract->>'id' is distinct from parent.id
            or parent.contract#>>'{requestingSubject,kind}' is distinct from parent.owner_kind
            or parent.contract#>>'{requestingSubject,id}' is distinct from parent.owner_id
@@ -204,8 +205,8 @@ begin
             raise exception 'allocation parent task differs or is closed' using errcode='check_violation';
         end if;
         perform task.ra_contract_hash_v1(parent.contract);
-        if not(new.contract->'permittedTools' <@ parent.contract->'permittedTools')
-           or not(new.contract->'permittedDataScopes' <@ parent.contract->'permittedDataScopes')
+        if not((new.contract->'permittedTools') <@ (parent.contract->'permittedTools'))
+           or not((new.contract->'permittedDataScopes') <@ (parent.contract->'permittedDataScopes'))
            or array_position(array['LOW','MEDIUM','HIGH'],new.contract->>'riskTier')<array_position(array['LOW','MEDIUM','HIGH'],parent.contract->>'riskTier')
            or (new.contract#>>'{limits,maxIterations}')::bigint>(parent.contract#>>'{limits,maxIterations}')::bigint
            or (new.contract#>>'{limits,maxWallClockSeconds}')::bigint>(parent.contract#>>'{limits,maxWallClockSeconds}')::bigint

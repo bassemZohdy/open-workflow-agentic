@@ -108,3 +108,16 @@ WP-108 stay partial; no new Acceptance annotation or acceptance-status promotion
 applies, including required consolidation to one Claude implementation PR.
 Separate WP-108 producer0a89ee5 and conformance2f31ba8 evidence is retained by normal
 merges/handoffs and does not become current allocation SQL/consumer proof.
+
+First CI c889a00 / BOTH39425642182 FAILED: both full logs show15 allocation
+cases, four parent-backed errors (operator does not exist: boolean -> unknown),
+11 other cases passing, contracts206/runtime344/testkit196 pass, app319 with4
+errors. No real-provider/process success is claimed for that run. Parent JSON
+operands of <@ now have explicit parentheses, per PostgreSQL16
+[operator precedence](https://www.postgresql.org/docs/16/sql-syntax-lexical.html#SQL-PRECEDENCE).
+Negative SQL cases now require exact SQLSTATE23514/23503/08006, so a parser/type
+error cannot masquerade as successful denial. Added real missing-table42P01 and
+future parent-created-time refusal inside the existing15 cases. Future parent
+time is refused rather than granting guessed remaining lifetime. Workflow retains
+all affected suite XML and actual conformance outputs for independent inspection.
+Fresh corrected-product CI remains required; first failed evidence is preserved.

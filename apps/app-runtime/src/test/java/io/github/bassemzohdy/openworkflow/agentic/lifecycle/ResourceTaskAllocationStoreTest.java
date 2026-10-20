@@ -152,6 +152,14 @@ class ResourceTaskAllocationStoreTest {
     static ResourceTaskAllocation withTask(ResourceTaskAllocation a,AgentTaskContract task) {
         return new ResourceTaskAllocation(a.scope(),a.parentTaskId(),task,a.modelProfile());
     }
+    static StoreUnavailableException refused(String state,Runnable work) {
+        var failure=assertThrows(StoreUnavailableException.class,work::run);
+        Throwable cause=failure;
+        while(cause!=null && !(cause instanceof SQLException))cause=cause.getCause();
+        assertNotNull(cause,"expected actual JDBC refusal, not a different failure");
+        assertEquals(state,((SQLException)cause).getSQLState());
+        return failure;
+    }
     @Test void exactRepeatReopenAndCredentialRefreshRetainOneOriginalAllocationAndLegacyParent() throws Exception {
         var f=fixture(true);
         try(var a=new Arena(f)) {
@@ -176,7 +184,7 @@ class ResourceTaskAllocationStoreTest {
                 s.definition(),s.version(),s.taskPosition(),2,s.logicalOccurrence(),s.audience(),s.operation(),s.targetFingerprint(),s.requestFingerprint());
         try(var a=new Arena(f)) {
             var first=a.store.allocate(f.allocation);
-            assertThrows(StoreUnavailableException.class,()->a.store.allocate(new ResourceTaskAllocation(retry,null,
+            refused("23503",()->a.store.allocate(new ResourceTaskAllocation(retry,null,
                     f.allocation.contract(),f.allocation.modelProfile())));
             var canonical=bindings.findInvocation(retry).orElseThrow();assertEquals(s,canonical);
             assertEquals(first,a.store.allocate(new ResourceTaskAllocation(canonical,null,f.allocation.contract(),f.allocation.modelProfile())));
@@ -214,7 +222,7 @@ class ResourceTaskAllocationStoreTest {
     @Test void unknownActualCommitReplyRetainsExactlyTheSameAllocationOnReopen() throws Exception {
         var f=fixture(false);
         try(var a=new Arena(f)) {
-            a.loseCommit.set(true);assertThrows(StoreUnavailableException.class,()->a.store.allocate(f.allocation));
+            a.loseCommit.set(true);refused("08006",()->a.store.allocate(f.allocation));
             var retained=new JdbcResourceTaskAllocations(a.redirected,transactions).find(f.binding.scope()).orElseThrow();
             assertEquals(retained,a.store.allocate(f.allocation));assertEquals(1,a.count());
         }
@@ -249,7 +257,9 @@ class ResourceTaskAllocationStoreTest {
         var f=fixture(true);var t=f.allocation.contract();
         try(var a=new Arena(f)) {
             var widened=withTask(f.allocation,task(t,t.goal(),Set.of("tool:unapproved"),t.limits(),t.delegationGrantId()));
-            assertThrows(StoreUnavailableException.class,()->a.store.allocate(widened));assertEquals(0,a.count());
+            refused("23514",()->a.store.allocate(widened));assertEquals(0,a.count());
+            a.change("update "+a.schema+".agent_task set created_at=clock_timestamp()+interval '60 seconds'");
+            refused("23514",()->a.store.allocate(f.allocation));assertEquals(0,a.count());
             a.change("update "+a.schema+".agent_task set created_at=clock_timestamp()-interval '590 seconds'");
             var first=a.store.allocate(f.allocation);
             try(var c=data.getConnection();var q=c.createStatement();var r=q.executeQuery("select created_at+interval '600 seconds' from "+a.schema+".agent_task")) {
@@ -261,12 +271,12 @@ class ResourceTaskAllocationStoreTest {
         var f=fixture(false);var t=f.allocation.contract();
         try(var a=new Arena(f)) {
             var unrelated=grants.grant(f.row.tenant(),ALICE,ALICE,AGENT,Set.of("oa.model.call"),now().plusSeconds(600),null);
-            assertThrows(StoreUnavailableException.class,()->a.store.allocate(withTask(f.allocation,
+            refused("23514",()->a.store.allocate(withTask(f.allocation,
                     task(t,t.goal(),t.permittedTools(),t.limits(),unrelated.id()))));
             var other=new ApprovedModelProfile("other","1","c".repeat(64),new Subject(SubjectKind.AGENT,"someone-else"),"model",3,1000,Duration.ofSeconds(10),2048);
-            assertThrows(StoreUnavailableException.class,()->a.store.allocate(new ResourceTaskAllocation(f.binding.scope(),null,t,other)));
+            refused("23514",()->a.store.allocate(new ResourceTaskAllocation(f.binding.scope(),null,t,other)));
             grants.revoke(f.root.id(),ALICE,"test",null);
-            assertThrows(StoreUnavailableException.class,()->a.store.allocate(f.allocation));assertEquals(0,a.count());
+            refused("23514",()->a.store.allocate(f.allocation));assertEquals(0,a.count());
         }
     }
     @Test void historicalReadAndExactRepeatAfterRevocationAndCompletionNeverRenewData() throws Exception {
@@ -287,7 +297,7 @@ class ResourceTaskAllocationStoreTest {
             try(var q=lock.createStatement();var r=q.executeQuery("select pg_backend_pid()")){assertTrue(r.next());blocker=r.getInt(1);}
             var begun=new CountDownLatch(1);var pool=Executors.newSingleThreadExecutor();
             try {
-                var result=pool.submit(()->{begun.countDown();return assertThrows(StoreUnavailableException.class,()->a.store.allocate(f.allocation));});
+                var result=pool.submit(()->{begun.countDown();return refused("23514",()->a.store.allocate(f.allocation));});
                 assertTrue(begun.await(5,TimeUnit.SECONDS));
                 boolean blocked=false;long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
                 try(var monitor=data.getConnection();var q=monitor.prepareStatement(
@@ -309,7 +319,10 @@ class ResourceTaskAllocationStoreTest {
         try(var a=new Arena(f)) {
             var unavailable=(DataSource)Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class<?>[]{DataSource.class},
                     (p,m,args)->{throw new SQLException("test outage","08006");});
-            assertThrows(StoreUnavailableException.class,()->new JdbcResourceTaskAllocations(unavailable).find(f.binding.scope()));
+            refused("08006",()->new JdbcResourceTaskAllocations(unavailable).find(f.binding.scope()));
+            a.change("alter table "+a.schema+".resource_task_allocation rename to temporarily_unavailable_allocation");
+            try {refused("42P01",()->a.store.find(f.binding.scope()));}
+            finally {a.change("alter table "+a.schema+".temporarily_unavailable_allocation rename to resource_task_allocation");}
             a.store.allocate(f.allocation);
             a.change("alter table "+a.schema+".resource_occurrence disable trigger user");
             a.change("delete from "+a.schema+".resource_occurrence");

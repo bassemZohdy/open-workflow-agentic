@@ -108,6 +108,9 @@ jobs:
           path: |
             apps/app-runtime/target/failsafe-reports/
             apps/app-runtime/target/process-logs/
+            apps/app-runtime/target/surefire-reports/
+            modules/*/target/surefire-reports/
+            modules/oa-runtime/target/conformance/
           if-no-files-found: ignore
       - name: Stop the disposable server
         if: always()
