@@ -7,6 +7,8 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 
 ## [Unreleased]
 
+- WP-107 partial: add task-scoped renewable event ownership and fence the actual SDK checkpoint with its owner/epoch. The producer/consumer coordinator, ACK-before-advance, restore/partition proof and full T13 remain open; no consumer is activated.
+
 - WP-107 partial: add retained wait identities, dispatch reservations and a checkpoint-proof acknowledgement port. SDK delivery, lost-claim fencing and full T13 remain open; the protocol is not activated.
 
 - WP-102 partial: add V65 immutable issuer/jti-to-grant schema with tenant binding and expiry retention. Product admission integration and native-provider lifetime compatibility remain open.

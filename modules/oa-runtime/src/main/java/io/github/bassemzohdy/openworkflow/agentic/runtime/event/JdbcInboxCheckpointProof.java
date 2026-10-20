@@ -13,6 +13,7 @@ import javax.sql.DataSource;
 public class JdbcInboxCheckpointProof implements InboxCheckpointProof {
     @Inject DataSource dataSource;
     @Inject TransactionManager transactions;
+    @Inject JdbcInboxTaskLease taskLeases;
 
     @Transactional(Transactional.TxType.MANDATORY)
     public void record(InboxCheckpointMarker marker) {
@@ -32,6 +33,7 @@ public class JdbcInboxCheckpointProof implements InboxCheckpointProof {
                         }
                     }
                 }
+                taskLeases.requireCurrent(marker.claim()); // Registry -> task lease -> delivery, all held until JTA completion.
                 try (var s = c.prepareStatement("select d.state,d.attempts,d.identity_digest,m.fingerprint "
                         + "from inbox.delivery d join inbox.signal s using(tenant,instance_id,wait_key) "
                         + "join inbox.message m on m.tenant=s.tenant and m.source=s.source and m.event_id=s.event_id "
@@ -44,14 +46,17 @@ public class JdbcInboxCheckpointProof implements InboxCheckpointProof {
                         }
                     }
                 }
+                // Delivery lock acquisition may have waited; sample lease expiry again after that last row lock.
+                taskLeases.requireCurrent(marker.claim());
                 try (var s = c.prepareStatement("""
                         insert into inbox.checkpoint_receipt(tenant,instance_id,wait_key,identity_digest,receipt_fingerprint,
-                          dispatch_attempt,application_id,engine_instance_id,task_position,iteration)
-                        values(?,?,?,?,?,?,?,?,?,?)
+                          dispatch_attempt,application_id,engine_instance_id,task_position,iteration,task_digest,claim_owner,claim_epoch)
+                        values(?,?,?,?,?,?,?,?,?,?,?,?,?)
                         """)) {
                     route(s,w); s.setString(4,w.digest()); s.setString(5,marker.receiptFingerprint()); s.setInt(6,marker.attempt());
                     s.setString(7,w.applicationId()); s.setString(8,w.engineInstanceId()); s.setString(9,w.taskPosition());
-                    s.setInt(10,w.iteration()); s.executeUpdate();
+                    s.setInt(10,w.iteration()); s.setString(11,w.task().digest()); s.setString(12,marker.claim().owner());
+                    s.setLong(13,marker.claim().epoch()); s.executeUpdate();
                 }
                 // No commit/setAutoCommit here: the Agroal connection participates in JpaInstanceWriter's REQUIRES_NEW JTA.
             }

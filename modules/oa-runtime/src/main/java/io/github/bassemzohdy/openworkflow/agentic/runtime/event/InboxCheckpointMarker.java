@@ -1,6 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.event;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.InboxWait;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.event.InboxTaskClaim;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.serverlessworkflow.impl.TaskContextData;
 import io.serverlessworkflow.impl.WorkflowContext;
@@ -9,23 +10,25 @@ import java.time.Duration;
 import java.util.*;
 
 /** Trusted runtime metadata, installed after audited reservation and before invoking the SDK callback. No payload/token. */
-public record InboxCheckpointMarker(InboxWait occurrence, String receiptFingerprint, int attempt) {
+public record InboxCheckpointMarker(InboxWait occurrence, String receiptFingerprint, int attempt, InboxTaskClaim claim) {
     static final String PREFIX = "oa.inbox.checkpoint.";
 
     public InboxCheckpointMarker {
         Objects.requireNonNull(occurrence);
+        Objects.requireNonNull(claim);
+        if(!occurrence.task().equals(claim.task())) throw new IllegalArgumentException("claim is for another task occurrence");
         if (receiptFingerprint == null || !receiptFingerprint.matches("[0-9a-f]{64}") || attempt < 1) {
             throw new IllegalArgumentException("invalid dispatch checkpoint marker");
         }
     }
 
-    public static void install(WorkflowContext workflow, TaskContextData task, JdbcInboxDispatch.Reserved reserved) {
+    public static void install(WorkflowContext workflow, TaskContextData task, JdbcInboxDispatch.Reserved reserved, InboxTaskClaim claim) {
         InboxWait wait = reserved.occurrence();
         if (!reserved.receipt().tenant().equals(wait.tenant()) || !reserved.receipt().instanceId().equals(wait.instanceId())
                 || !reserved.receipt().correlationKey().equals(wait.route()) || !reserved.receipt().type().equals(wait.eventType())) {
             throw new IllegalArgumentException("reservation receipt does not identify this occurrence");
         }
-        var marker = new InboxCheckpointMarker(wait, reserved.receipt().fingerprint(), reserved.attempt());
+        var marker = new InboxCheckpointMarker(wait, reserved.receipt().fingerprint(), reserved.attempt(),claim);
         marker.requireCheckpoint(workflow,task);
         String key = PREFIX + wait.digest();
         // A restart/replay may replace an older attempt of the SAME immutable receipt. The DB fence verifies the attempt.
@@ -48,6 +51,7 @@ public record InboxCheckpointMarker(InboxWait occurrence, String receiptFingerpr
     private Map<String,String> asMetadata() {
         InboxWait w = occurrence;
         Map<String,String> m = new LinkedHashMap<>();
+        m.put("format","2"); m.put("claimOwner",claim.owner()); m.put("claimEpoch",Long.toString(claim.epoch()));
         m.put("tenant",w.tenant()); m.put("instance",w.instanceId().value()); m.put("application",w.applicationId());
         m.put("engine",w.engineInstanceId()); m.put("namespace",w.namespace()); m.put("definition",w.definition());
         m.put("version",w.version()); m.put("position",w.taskPosition()); m.put("iteration",Integer.toString(w.iteration()));
@@ -69,7 +73,9 @@ public record InboxCheckpointMarker(InboxWait occurrence, String receiptFingerpr
                     Integer.parseInt(text(m,"iteration")),text(m,"route"),text(m,"type"),text(m,"filter"),
                     Duration.parse(text(m,"maxWait")));
             if (!entry.getKey().equals(PREFIX+wait.digest())) throw new IllegalStateException("checkpoint marker identity changed");
-            var marker = new InboxCheckpointMarker(wait,text(m,"receipt"),Integer.parseInt(text(m,"attempt")));
+            if(!text(m,"format").equals("2")) throw new IllegalStateException("unsupported checkpoint marker format");
+            var claim=new InboxTaskClaim(wait.task(),text(m,"claimOwner"),Long.parseLong(text(m,"claimEpoch")));
+            var marker = new InboxCheckpointMarker(wait,text(m,"receipt"),Integer.parseInt(text(m,"attempt")),claim);
             marker.requireCheckpoint(workflow,task); markers.add(marker);
         }
         return List.copyOf(markers);

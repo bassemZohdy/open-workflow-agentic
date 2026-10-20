@@ -42,6 +42,7 @@ class AtomicInboxCheckpointTest {
     @Inject InstanceStore registry;
     @Inject EntityManager em;
     @Inject DataSource dataSource;
+    @Inject JdbcInboxTaskLease taskLeases;
 
     record Listening(WorkflowContext workflow, TaskContext task) { }
     static class Broker extends InMemoryEvents {
@@ -76,7 +77,16 @@ class AtomicInboxCheckpointTest {
     @Test void cancellationBeforeCheckpointRollsBackBothReceiptProofAndActualTaskCompletion() throws Exception {
         execute(Mode.CANCEL);
     }
-    enum Mode { COMMIT, HANDOVER, CANCEL }
+    @Test void anotherTaskOwnerFencesTheOldSdkCheckpointEvenWhenItsDispatchAttemptIsUnchanged() throws Exception {
+        execute(Mode.TASK_HANDOVER);
+    }
+    @Test void anExpiredTaskLeaseCannotCommitItsSdkCheckpointOrReceiptProof() throws Exception {
+        execute(Mode.TASK_EXPIRED);
+    }
+    @Test void taskLeaseExpiryIsCheckedAgainAfterWaitingForTheDeliveryRowLock() throws Exception {
+        execute(Mode.TASK_DELAYED_EXPIRED);
+    }
+    enum Mode { COMMIT, HANDOVER, CANCEL, TASK_HANDOVER, TASK_EXPIRED, TASK_DELAYED_EXPIRED }
 
     private void execute(Mode mode) throws Exception {
         assertInstanceOf(InboxCheckpointJpaOperations.class,operations);
@@ -116,19 +126,45 @@ class AtomicInboxCheckpointTest {
                 assertEquals(Optional.of(message),inbox.matchCandidate(wait,message));
                 var claim = dispatch.claim(wait).orElseThrow();
                 JdbcInboxDispatch.Claim newer = null;
+                java.sql.Connection blocker=null;
+                int blockerPid=0;
                 try {
                     var reserved = dispatch.reserve(claim,proof).orElseThrow();
                     assertFalse(proof.consumed(wait,message));
-                    InboxCheckpointMarker.install(listening.workflow(),task,reserved);
+                    var lease=taskLeases.acquire(wait.task(),"owner-"+UUID.randomUUID(),
+                            mode==Mode.TASK_EXPIRED ? Duration.ofMillis(100) : mode==Mode.TASK_DELAYED_EXPIRED
+                                    ? Duration.ofSeconds(5) : Duration.ofSeconds(30)).orElseThrow();
+                    InboxCheckpointMarker.install(listening.workflow(),task,reserved,lease.claim());
                     if (mode == Mode.HANDOVER) {
                         claim.close(); newer = dispatch.claim(wait).orElseThrow();
                         assertEquals(2,dispatch.reserve(newer,proof).orElseThrow().attempt());
                     } else if (mode == Mode.CANCEL) {
                         move(row,InstanceStatus.CANCEL_REQUESTED,instance.id());
+                    } else if (mode == Mode.TASK_HANDOVER) {
+                        assertTrue(taskLeases.release(lease.claim()));
+                        assertEquals(lease.claim().epoch()+1,taskLeases.acquire(wait.task(),"replacement-"+UUID.randomUUID(),
+                                Duration.ofSeconds(30)).orElseThrow().claim().epoch());
+                    } else if (mode == Mode.TASK_EXPIRED) {
+                        assertTimeoutPreemptively(Duration.ofSeconds(5),()-> {
+                            while(!databaseExpired(lease)) Thread.sleep(10);
+                        });
+                    } else if(mode==Mode.TASK_DELAYED_EXPIRED) {
+                        blocker=dataSource.getConnection(); blocker.setAutoCommit(false);
+                        try(var s=blocker.prepareStatement("select 1 from inbox.delivery where tenant=? and instance_id=? and wait_key=? for update")) {
+                            s.setString(1,wait.tenant()); s.setString(2,wait.instanceId().value()); s.setString(3,wait.key());
+                            try(var r=s.executeQuery()) { assertTrue(r.next()); }
+                        }
+                        try(var s=blocker.prepareStatement("select pg_backend_pid()");var r=s.executeQuery()) { r.next(); blockerPid=r.getInt(1); }
                     }
                     broker.publish(CloudEventBuilder.v1().withId(message.eventId()).withSource(URI.create(message.source()))
                             .withType(message.type()).withData("application/json",message.dataJson().getBytes(StandardCharsets.UTF_8))
                             .build()).get(10,TimeUnit.SECONDS);
+                    if(mode==Mode.TASK_DELAYED_EXPIRED) {
+                        awaitDeliveryBlock(blockerPid);
+                        assertFalse(databaseExpired(lease),"reach the actual row-lock wait while the initial lease is still valid");
+                        assertTimeoutPreemptively(Duration.ofSeconds(10),()-> { while(!databaseExpired(lease)) Thread.sleep(10); });
+                        blocker.commit(); blocker.close(); blocker=null;
+                    }
                     if (mode == Mode.COMMIT) {
                         next.get(15,TimeUnit.SECONDS);
                         assertFalse(completed.isDone(),"observe the committed wait before SDK workflow-completion cleanup");
@@ -165,10 +201,28 @@ class AtomicInboxCheckpointTest {
                         assertFalse(completed.isDone());
                     }
                 } finally {
+                    if(blocker!=null) { blocker.rollback(); blocker.close(); }
                     releaseNext.complete(null);
                     if (newer != null) newer.close(); claim.close();
                 }
             }
+        }
+    }
+    private void awaitDeliveryBlock(int blockerPid) {
+        assertTimeoutPreemptively(Duration.ofSeconds(5),()-> {
+            while(true) {
+                try(var c=dataSource.getConnection();var s=c.prepareStatement("select exists(select 1 from pg_stat_activity where ?=any(pg_blocking_pids(pid)))")) {
+                    s.setInt(1,blockerPid); try(var r=s.executeQuery()) { r.next(); if(r.getBoolean(1)) return; }
+                }
+                Thread.sleep(10);
+            }
+        });
+    }
+    private boolean databaseExpired(JdbcInboxTaskLease.Lease lease) throws SQLException {
+        try(var c=dataSource.getConnection(); var s=c.prepareStatement("select expires_at<=clock_timestamp() from inbox.task_claim "
+                +"where tenant=? and instance_id=? and task_digest=?")) {
+            var task=lease.claim().task(); s.setString(1,task.tenant()); s.setString(2,task.instanceId().value()); s.setString(3,task.digest());
+            try(var r=s.executeQuery()) { assertTrue(r.next()); return r.getBoolean(1); }
         }
     }
     private void assertImmutable(InboxWait wait) throws Exception {
