@@ -88,6 +88,42 @@ class PersistenceCommitGateTest {
     }
 
     @Test
+    void cancelledStagesStayHeldForLateSuccessFailureAndTimeoutWithoutPoisoningOtherWork() throws Exception {
+        for (int outcome=0; outcome<5; outcome++) {
+            var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+            var actual = new CompletableFuture<Void>();
+            try (var gate = new PersistenceCommitGate(Duration.ofMillis(100),Clock.systemUTC())) {
+                final int scenario=outcome;
+                var stage=gate.commit(TASK_COMPLETED,()-> {
+                    if(scenario==4) { cancelled.set(true); throw new IllegalStateException("obsolete write failed"); }
+                    return actual;
+                },()->fail("cancelled work is not consumed"),()->!cancelled.get());
+                cancelled.set(true);
+                if(outcome==0) actual.complete(null);
+                if(outcome==1) actual.completeExceptionally(new IllegalStateException("obsolete write failed"));
+                if(outcome==2) actual.cancel(true);
+                assertTimeoutPreemptively(Duration.ofSeconds(5),()-> {
+                    while(gate.status().heldCalls()==0) Thread.sleep(5);
+                });
+                actual.complete(null); // Timeout cannot be revived by a late commit either.
+                assertFalse(stage.isDone()); assertTrue(gate.status().healthy());
+                assertTrue(gate.status().failure().isEmpty());
+                assertTrue(gate.commit(ABORTED,()->CompletableFuture.completedFuture(null),()->{}).isDone());
+                assertTrue(gate.commit(STARTED,()->CompletableFuture.completedFuture(null),()->{}).isDone());
+            }
+        }
+    }
+
+    @Test
+    void anAlreadyCancelledStageDoesNotInvokeItsWriterOrObserver() {
+        try(var gate=gate()) {
+            assertFalse(gate.commit(TASK_COMPLETED,()-> { fail("obsolete write"); return null; },
+                    ()->fail("obsolete commit"),()->false).isDone());
+            assertTrue(gate.status().healthy()); assertEquals(1,gate.status().heldCalls());
+        }
+    }
+
+    @Test
     void rejectsUnboundedOrNonPositiveTimeouts() {
         for (var timeout : java.util.List.of(Duration.ZERO, Duration.ofSeconds(-1), Duration.ofMinutes(6))) {
             assertThrows(IllegalArgumentException.class, () -> new PersistenceCommitGate(timeout, Clock.systemUTC()));

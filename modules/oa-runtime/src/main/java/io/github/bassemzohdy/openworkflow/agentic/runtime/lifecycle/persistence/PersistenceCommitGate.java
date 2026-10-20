@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import java.util.function.BooleanSupplier;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -67,17 +68,28 @@ public class PersistenceCommitGate implements AutoCloseable {
 
     /** Success observer is run only after actual writer success, never merely after another lifecycle listener. */
     public CompletableFuture<Void> commit(Operation operation, Supplier<CompletableFuture<Void>> write, Runnable committed) {
+        return commit(operation, write, committed, () -> true);
+    }
+
+    /** A trusted SDK cancellation makes this stage obsolete, never successfully committed. Cleanup remains required. */
+    CompletableFuture<Void> commit(Operation operation, Supplier<CompletableFuture<Void>> write, Runnable committed,
+                                   BooleanSupplier required) {
         Objects.requireNonNull(operation); Objects.requireNonNull(write); Objects.requireNonNull(committed);
+        Objects.requireNonNull(required);
         if (closed.get() || (failure.get() != null && operation != Operation.ABORTED)) {
             heldCalls.incrementAndGet(); return held;
         }
+        if (!required.getAsBoolean()) { heldCalls.incrementAndGet(); return held; }
         ProtectedFuture result = new ProtectedFuture();
         // 0 awaiting writer, 1 writer won, 2 timeout/failure/closure: a late commit cannot release this stage.
         AtomicInteger phase = new AtomicInteger();
         ScheduledFuture<?> watchdog;
         try {
             watchdog = timer.schedule(() -> {
-                if (phase.compareAndSet(0, 2)) fail(operation, "CheckpointTimeout");
+                if (phase.compareAndSet(0, 2)) {
+                    if (required.getAsBoolean()) fail(operation, "CheckpointTimeout");
+                    else heldCalls.incrementAndGet();
+                }
             }, timeout.toNanos(), TimeUnit.NANOSECONDS);
         } catch (java.util.concurrent.RejectedExecutionException stopping) {
             heldCalls.incrementAndGet(); return held;
@@ -88,6 +100,7 @@ public class PersistenceCommitGate implements AutoCloseable {
             actual.whenComplete((ignored, error) -> {
                 inFlight.decrementAndGet(); watchdog.cancel(false);
                 if (!phase.compareAndSet(0, error == null ? 1 : 2)) return;
+                if (!required.getAsBoolean()) { heldCalls.incrementAndGet(); return; }
                 if (error != null) { fail(operation, error); return; }
                 if (closed.get()) return;
                 try { committed.run(); result.succeed(); }
@@ -95,7 +108,10 @@ public class PersistenceCommitGate implements AutoCloseable {
             });
         } catch (RuntimeException writeFailure) {
             inFlight.decrementAndGet(); watchdog.cancel(false);
-            if (phase.compareAndSet(0, 2)) fail(operation, writeFailure);
+            if (phase.compareAndSet(0, 2)) {
+                if (required.getAsBoolean()) fail(operation, writeFailure);
+                else heldCalls.incrementAndGet();
+            }
         }
         return result;
     }
