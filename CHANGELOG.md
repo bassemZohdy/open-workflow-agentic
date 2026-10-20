@@ -1,5 +1,7 @@
 # Changelog
 
+- GPT reviewed Claude inspector #56 at26def976 with reproducible protocol findings and actual native fresh-DB bootstrap failure; requested fixes and one-PR consolidation. Publish approved task-contract/durable model-budget sourcing decision preserving legacy/governed thread invariants, and accept audit DDL proposal4f44026 with the tested V75 integrity amendments. All consumer/runtime/peer/acceptance gates remain partial.
+
 - Exact V76 proposald489000 passed BOTH39404240486:6 actual cloned execution-schema cases plus audit-source6/binding17/group11/process1 per provider/standard3/native8/strict, zero skips and both finished logs inspected. SQL remains outside Flyway; actual one-callback/graph/audit/authority/commit-loss/recovery and exact peer gates remain open.
 
 - WP-103 backend preparation: propose V76 immutable one-entry-per-call and one-outcome association with canonical full-source checks, registry/binding-time guard and target-scoped physical UUID references. Six rollback-only cloned-schema cases compile; Linux evidence and runtime one-callback/current authority/audit/recovery gates remain open. SQL stays outside Flyway, with no dispatch or package promotion.
