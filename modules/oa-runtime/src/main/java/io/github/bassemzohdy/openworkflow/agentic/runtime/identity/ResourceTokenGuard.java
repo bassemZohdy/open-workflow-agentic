@@ -17,8 +17,10 @@ import java.util.Set;
  *       the user's token through to a tool fails at the tool;</li>
  *   <li>it has an id ({@code jti}) and an issue time, and was issued for at most 300 seconds;</li>
  *   <li>it holds every scope the call needs;</li>
- *   <li>when a grant lookup is configured, an active grant of this user to this actor covers those scopes now (so a
- *       revoked grant stops a token that is still unexpired);</li>
+ *   <li>when a grant lookup is configured, the token has a durable binding to the exact grant that issued it
+ *       ({@link IssuedTokenBindings}), that grant and every ancestor are active now, and the token's user, tenant, actor
+ *       chain and scopes match that grant (so revoking the issuing grant stops a token that is still unexpired, even when
+ *       an equivalent grant stays active; a token without a binding is refused);</li>
  *   <li>it has not been used more than {@code maxUses} times (default 1).</li>
  * </ol>
  * The replay check runs last, so a refused token does not use up a use. Any failure of a dependency refuses.
@@ -29,15 +31,17 @@ public final class ResourceTokenGuard {
     private final String audience;
     private final ReplayCache replay;
     private final DelegationGrants grants;
+    private final IssuedTokenBindings bindings;
     private final Clock clock;
     private final int maxUses;
 
     /**
-     * @param grants  checked against the token's user, actor and tenant; null to skip the grant lookup
+     * @param grants   the grants a token is checked against; null to skip the grant check (then bindings is ignored)
+     * @param bindings the token-to-grant bindings; required when grants is set
      * @param maxUses how many times one token may be accepted; 1 makes a token a one-call credential
      */
     public ResourceTokenGuard(TokenVerifier verifier, String audience, ReplayCache replay, DelegationGrants grants,
-                              Clock clock, int maxUses) {
+                              IssuedTokenBindings bindings, Clock clock, int maxUses) {
         this.verifier = Objects.requireNonNull(verifier, "verifier");
         if (audience == null || audience.isBlank()) {
             throw new IllegalArgumentException("the resource audience is required");
@@ -45,6 +49,10 @@ public final class ResourceTokenGuard {
         this.audience = audience;
         this.replay = Objects.requireNonNull(replay, "replay");
         this.grants = grants;
+        if (grants != null) {
+            Objects.requireNonNull(bindings, "bindings are required with grants");
+        }
+        this.bindings = bindings;
         this.clock = Objects.requireNonNull(clock, "clock");
         if (maxUses < 1) {
             throw new IllegalArgumentException("maxUses must be at least 1");
@@ -96,14 +104,32 @@ public final class ResourceTokenGuard {
         if (token.tenant() == null) {
             throw new TokenRejectedException(TokenRejectedException.Reason.MISSING_CLAIM);
         }
-        List<DelegationGrant> active;
+        GrantCheck check;
+        DelegationGrant bound;
         try {
-            active = grants.activeFor(token.tenant(), token.subject().id(), token.actor());
+            java.util.Optional<io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid> id =
+                    bindings.grantOf(token.issuer(), token.tokenId());
+            if (id.isEmpty()) {
+                throw new TokenRejectedException(TokenRejectedException.Reason.GRANT_INACTIVE);
+            }
+            check = grants.check(id.get());
+        } catch (TokenRejectedException e) {
+            throw e;
         } catch (RuntimeException e) {
             throw new TokenRejectedException(TokenRejectedException.Reason.VERIFIER_UNAVAILABLE, e);
         }
-        boolean covered = active.stream().anyMatch(g -> g.covers(requiredScopes) && g.covers(token.scopes()));
-        if (!covered) {
+        if (!(check instanceof GrantCheck.Active active)) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.GRANT_INACTIVE);
+        }
+        bound = active.grant();
+        // the token must be what this grant issues: the same user, tenant and exact chain, within the grant's scopes
+        List<String> chain = new java.util.ArrayList<>(bound.chain());
+        java.util.Collections.reverse(chain);
+        boolean matches = bound.tenant().equals(token.tenant())
+                && bound.delegator().equals(token.subject())
+                && token.actors().equals(chain)
+                && bound.covers(requiredScopes) && bound.covers(token.scopes());
+        if (!matches) {
             throw new TokenRejectedException(TokenRejectedException.Reason.GRANT_INACTIVE);
         }
     }

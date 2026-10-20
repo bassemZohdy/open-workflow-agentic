@@ -63,6 +63,12 @@ public class IdentityProducers {
 
     @Produces
     @Singleton
+    public IssuedTokenBindings issuedTokenBindings(DataSource dataSource) {
+        return new JdbcIssuedTokenBindings(dataSource);
+    }
+
+    @Produces
+    @Singleton
     public InstanceAuthorityStore instanceAuthorityStore(DataSource dataSource) {
         return new InstanceAuthorityStore(dataSource);
     }
@@ -109,8 +115,8 @@ public class IdentityProducers {
      */
     @Produces
     @Singleton
-    public TokenExchanger tokenExchanger(SecretProvider secrets, DelegationGrants grants, TokenVerifier verifier,
-                                         IdentityAudit audit) {
+    public TokenExchanger tokenExchanger(SecretProvider secrets, DelegationGrants grants, IssuedTokenBindings bindings,
+                                         TokenVerifier verifier, IdentityAudit audit) {
         if (settings.tokenEndpoint().isEmpty()) {
             return request -> {
                 throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
@@ -127,6 +133,6 @@ public class IdentityProducers {
                         "agentic.identity.exchange.client-id is required with a token endpoint")),
                 exchange.clientSecretName().orElseThrow(() -> new IllegalStateException(
                         "agentic.identity.exchange.client-secret-name is required with a token endpoint")),
-                secrets, grants, verifier, audit, Clock.systemUTC(), exchange.timeout());
+                secrets, grants, bindings, verifier, audit, Clock.systemUTC(), exchange.timeout());
     }
 }

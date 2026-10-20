@@ -69,6 +69,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
     private final String clientSecretName;
     private final SecretProvider secrets;
     private final DelegationGrants grants;
+    private final IssuedTokenBindings bindings;
     private final TokenVerifier verifier;
     private final IdentityAudit audit;
     private final Clock clock;
@@ -76,13 +77,14 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
     private final HttpClient http;
 
     public Rfc8693TokenExchanger(String tokenEndpoint, String clientId, String clientSecretName, SecretProvider secrets,
-                                 DelegationGrants grants, TokenVerifier verifier, IdentityAudit audit, Clock clock,
-                                 Duration timeout) {
+                                 DelegationGrants grants, IssuedTokenBindings bindings, TokenVerifier verifier,
+                                 IdentityAudit audit, Clock clock, Duration timeout) {
         this.endpoint = checkedEndpoint(tokenEndpoint);
         this.clientId = requireText(clientId, "clientId");
         this.clientSecretName = requireText(clientSecretName, "clientSecretName");
         this.secrets = Objects.requireNonNull(secrets, "secrets");
         this.grants = Objects.requireNonNull(grants, "grants");
+        this.bindings = Objects.requireNonNull(bindings, "bindings");
         this.verifier = Objects.requireNonNull(verifier, "verifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -101,6 +103,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
             Instant subjectExpiry = verifyInputs(request, grant);
             IssuedToken token = requestToken(request, grant, subjectExpiry);
             recheckGrant(request, grant);
+            bind(token, grant);
             try {
                 audit.record(grant.agent(), ISSUED, IdentityAudit.TOKEN, grant.id().toString(), grant.tenant(), null,
                         issuedAttributes(request, token));
@@ -112,6 +115,19 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         } catch (ExchangeException e) {
             auditRefusal(grant, request, e);
             throw e;
+        }
+    }
+
+    /**
+     * Records which grant issued the token before it is returned (ADR 0021 H1): a resource admits the token only through
+     * this binding, so the grant that issued it, and its ancestors, decide whether it is still valid. No binding, no token.
+     */
+    private void bind(IssuedToken token, DelegationGrant grant) {
+        try {
+            bindings.bind(token.issuer(), token.tokenId(), grant.id(), grant.tenant(), token.expiresAt());
+        } catch (RuntimeException e) {
+            throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
+                    "the token was discarded because its grant binding could not be stored", e);
         }
     }
 
@@ -367,7 +383,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
             throw bad("expires_in is missing a valid value or longer than " + MAX_LIFETIME_SECONDS + " seconds");
         }
         return new IssuedToken(Credential.of(text), request.audience(), verified.scopes(), expires,
-                verified.tokenId(), verified.actors(), grant.id());
+                verified.issuer(), verified.tokenId(), verified.actors(), grant.id());
     }
 
     private static ExchangeException bad(String message) {

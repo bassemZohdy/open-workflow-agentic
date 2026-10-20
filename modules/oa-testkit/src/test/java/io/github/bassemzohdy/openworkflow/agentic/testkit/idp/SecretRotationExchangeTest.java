@@ -44,7 +44,7 @@ class SecretRotationExchangeTest {
         fx = new IdentityFixture("tool-cases");
         Files.writeString(secretsDir.resolve(CLIENT_SECRET_NAME), fx.clientSecret + "\n");
         FileSecretProvider provider = new FileSecretProvider(secretsDir, fx.clock, TTL, STALE, fx.audit());
-        exchanger = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME, provider, fx.grants,
+        exchanger = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME, provider, fx.grants, fx.bindings,
                 fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
         DelegationGrant grant = fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, Set.of("cases:read"),
                 fx.clock.instant().plus(Duration.ofHours(1)), null);

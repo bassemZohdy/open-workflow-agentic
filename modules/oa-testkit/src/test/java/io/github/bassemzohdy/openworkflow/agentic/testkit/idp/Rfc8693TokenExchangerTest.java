@@ -68,7 +68,7 @@ class Rfc8693TokenExchangerTest {
     }
 
     private Rfc8693TokenExchanger exchanger() {
-        return new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants,
+        return new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings,
                 fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
     }
 
@@ -284,7 +284,7 @@ class Rfc8693TokenExchangerTest {
     @Test
     void aServerThatIsNotListeningIsUnavailable() {
         Rfc8693TokenExchanger dead = new Rfc8693TokenExchanger("http://127.0.0.1:1/token", CLIENT_ID,
-                CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(1));
+                CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(1));
 
         assertEquals(Code.UNAVAILABLE, assertThrows(ExchangeException.class, () -> dead.exchange(request(
                 Set.of("cases:read")))).code());
@@ -351,7 +351,7 @@ class Rfc8693TokenExchangerTest {
             return verified;
         };
         Rfc8693TokenExchanger racing = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME,
-                fx.secrets, fx.grants, revokeWhenTheAnswerIsVerified, fx.audit(), fx.clock, Duration.ofSeconds(2));
+                fx.secrets, fx.grants, fx.bindings, revokeWhenTheAnswerIsVerified, fx.audit(), fx.clock, Duration.ofSeconds(2));
 
         ExchangeException e = assertThrows(ExchangeException.class, () -> racing.exchange(request(SCOPES)));
 
@@ -438,13 +438,13 @@ class Rfc8693TokenExchangerTest {
     @Test
     void theEndpointMustBeHttpsUnlessItIsLoopback() {
         assertThrows(IllegalArgumentException.class, () -> new Rfc8693TokenExchanger("http://sso.example/token",
-                CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.verifier, fx.audit(), fx.clock,
+                CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock,
                 Duration.ofSeconds(1)));
         assertThrows(IllegalArgumentException.class, () -> new Rfc8693TokenExchanger("https://u:p@sso.example/token",
-                CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.verifier, fx.audit(), fx.clock,
+                CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock,
                 Duration.ofSeconds(1)));
         assertNotNull(new Rfc8693TokenExchanger("https://sso.example/token", CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets,
-                fx.grants, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(1)));
+                fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(1)));
     }
 
     @Test

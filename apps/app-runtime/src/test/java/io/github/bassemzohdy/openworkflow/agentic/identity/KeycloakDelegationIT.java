@@ -196,18 +196,16 @@ class KeycloakDelegationIT {
         ExchangeException before = refused(h.exchanger, h.request(subject, TOOL, READ, revoked));
         assertEquals(Code.GRANT_INACTIVE, before.code());
 
-        // revoked after the token was issued: the resource stops an unexpired token. The token carries no grant id, so
-        // the guard asks whether ANY active grant of this user to this agent covers the scopes; the other grants of
-        // this pair are therefore ended first (docs/identity.md 9.3: revoking one of several equivalent grants does
-        // not stop a token, ending all of them does)
-        for (DelegationGrant open : h.grants.activeFor(KeycloakRealm.USER_TENANT, h.alice.id(), h.agent.id())) {
-            h.grants.revoke(open.id(), h.alice, "test isolation", null);
-        }
+        // revoked after the token was issued: the resource stops an unexpired token. The token is bound to the exact grant
+        // that issued it (identity.issued_token_binding), so an EQUIVALENT grant that stays active must not revive it
         DelegationGrant later = h.grant(READ, Duration.ofHours(1));
+        DelegationGrant equivalent = h.grant(READ, Duration.ofHours(1));
         IssuedToken live = h.exchanger.exchange(h.request(subject, TOOL, READ, later));
+        assertEquals(later.id(), h.bindings.grantOf(live.issuer(), live.tokenId()).orElseThrow());
         h.grants.revoke(later.id(), h.alice, "alice withdrew later", null);
+        assertTrue(h.grants.check(equivalent.id()).active(), "an equivalent grant is still active");
         assertEquals(Reason.GRANT_INACTIVE, rejected(h.guard(TOOL), live.accessToken().reveal(), READ),
-                "provider-side validity is not a substitute for the grant check");
+                "provider-side validity and an equivalent grant are not a substitute for the issuing grant");
 
         // revoked while the request is in flight: the token the server answered with is discarded
         DelegationGrant racing = h.grant(READ, Duration.ofHours(1));
