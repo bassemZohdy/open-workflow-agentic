@@ -95,7 +95,7 @@ public final class EffectAuditProducer {
         try(var q=c.prepareStatement("select purpose,target,request_fingerprint from effect.ledger"+WHERE)) {
             bind(q,fact.key());try(var r=q.executeQuery()){if(!r.next())throw inconsistent();purpose=r.getString(1);target=r.getString(2);request=r.getString(3);}
         }
-        var value=build(scope.get().scope(),fact,purpose,target,request,UlidGenerator.shared().next());
+        var value=build(scope.get().scope(),fact,purpose,target,request,UlidGenerator.shared().next(),manual(c,fact));
         try(var q=c.prepareStatement("""
                 insert into effect.audit_source(source_event_id,scope_initial_event_id,schema_version,scope_fingerprint,
                   key_fingerprint,transition,source_sequence,source_key,draft_id,occurred_at,actor_kind,actor_id,
@@ -129,7 +129,7 @@ public final class EffectAuditProducer {
                 if(scope.initialId()!=r.getLong("scope_initial_event_id")) throw inconsistent();
                 var fact=new Fact(journalId,r.getTimestamp("journal_time").toInstant(),key,state(r.getString("journal_from")),
                         EffectState.valueOf(r.getString("journal_to")),r.getString("journal_reason"));
-                var expected=build(scope.scope(),fact,r.getString("ledger_purpose"),r.getString("ledger_target"),r.getString("ledger_request"),Ulid.parse(r.getString("draft_id")));
+                var expected=build(scope.scope(),fact,r.getString("ledger_purpose"),r.getString("ledger_target"),r.getString("ledger_request"),Ulid.parse(r.getString("draft_id")),manual(c,fact));
                 var source=new AuditSource(r.getInt("schema_version"),r.getString("scope_fingerprint"),r.getString("key_fingerprint"),
                         AuditSource.Transition.valueOf(r.getString("transition")),r.getLong("source_sequence"),r.getString("content_fingerprint"));
                 var draft=new AuditEvent(Ulid.parse(r.getString("draft_id")),1,r.getTimestamp("occurred_at").toInstant(),
@@ -157,6 +157,15 @@ public final class EffectAuditProducer {
     }
 
     static Retained build(EffectScope scope,Fact fact,String purpose,String target,String request,Ulid draftId) {
+        return build(scope,fact,purpose,target,request,draftId,null);
+    }
+    private static EffectManualDecision manual(Connection c,Fact fact) throws SQLException {
+        if(!fact.reason().equals("effect.manual"))return null;
+        var stored=JdbcEffectManualDecisions.forJournal(c,fact.id());var d=stored.decision();
+        if(!d.command().key().equals(fact.key()) || d.outcome()!=fact.to() || !stored.occurredAt().equals(fact.occurredAt()))throw inconsistent();
+        return d;
+    }
+    private static Retained build(EffectScope scope,Fact fact,String purpose,String target,String request,Ulid draftId,EffectManualDecision manual) {
         if(fact.id()<1 || fact.occurredAt().getNano()%1000!=0 || !Set.of("EFFECT","COMPENSATION").contains(purpose)
                 || request==null || !request.matches("[0-9a-f]{64}")) throw inconsistent();
         scope.requireKey(fact.key());var transition=transition(fact);String sf=scopeFingerprint(scope),kf=keyFingerprint(fact.key());
@@ -167,11 +176,16 @@ public final class EffectAuditProducer {
         attrs.put("effect.scope",sf);attrs.put("effect.key",kf);attrs.put("effect.source",identity.key());attrs.put("effect.journal",Long.toString(fact.id()));
         attrs.put("effect.transition",transition.name());attrs.put("effect.from",fact.from()==null?"NONE":fact.from().name());attrs.put("effect.to",fact.to().name());
         attrs.put("effect.purpose",purpose);attrs.put("effect.target",fingerprint("oa.effect.audit-target.v1",target));attrs.put("effect.request",request);
+        if(transition==AuditSource.Transition.MANUAL) {
+            if(manual==null || !manual.scope().equals(scope) || !manual.command().target().equals(target) || !manual.command().requestFingerprint().equals(request))throw inconsistent();
+            attrs.putAll(manual.auditAttributes());
+        }else if(manual!=null)throw inconsistent();
         var draft=new AuditEvent(draftId,1,fact.occurredAt(),ACTOR,"effect."+transition.name().toLowerCase(Locale.ROOT),
                 "effect","efp1-"+kf,attrs,AuditHash.GENESIS,AuditHash.GENESIS);
         return new Retained(new AuditSource(1,sf,kf,transition,fact.id(),AuditDraftFingerprint.of(draft)),draft);
     }
     private static AuditSource.Transition transition(Fact f) {
+        if(f.reason().equals("effect.manual") && f.from()==EffectState.INTENDED && (f.to()==EffectState.CONFIRMED || f.to()==EffectState.FAILED))return AuditSource.Transition.MANUAL;
         if(f.reason().equals("effect.intended") && f.from()==null && f.to()==EffectState.INTENDED)return AuditSource.Transition.INTENT;
         if(f.reason().equals("effect.dispatch") && f.from()==EffectState.INTENDED && f.to()==EffectState.INTENDED)return AuditSource.Transition.DISPATCH;
         if(f.reason().equals("effect.outcome") && f.from()==EffectState.INTENDED && (f.to()==EffectState.CONFIRMED || f.to()==EffectState.FAILED))return AuditSource.Transition.OUTCOME;

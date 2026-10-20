@@ -45,4 +45,6 @@ Requirement-level decisions (ADR 0001 to 0007) restate decisions D01 to D07 of t
 
 | [0032](0032-bound-effect-storage-and-wire-outcome-metrics.md) | Bound short effect transactions and require outcome metrics | Proposed; whole-call/consumer/authority gates remain |
 
+| [0033](0033-retain-manual-effect-decisions-atomically.md) | Retain manual effect decisions atomically | Proposed; operator/authority/central/Flow gates remain |
+
 New decisions: copy the structure of an existing ADR, take the next number, add a row here.
