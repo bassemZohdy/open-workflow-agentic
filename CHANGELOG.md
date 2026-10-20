@@ -1,5 +1,7 @@
 # Changelog
 
+- Binding-store productc63130e passed BOTH39387463567:12 new actual PostgreSQL cases, existing issuing migration5/group11, core process recovery1 and standard3/native8, zero skips and strict evidence checks. Both completed-job logs inspected. Current-head peer/full CI, ordered foundations and actual governed dispatch remain open.
+
 - WP-108 coordination: specify stable journal/outbox identity, immutable audit drafts and idempotent central projection/readback after a lost actual commit reply. This is an explicit cross-owner proposal; no outbox/projector/mandatory audit gate is implemented or acceptance promoted.
 
 - WP-103 GPT preparation: V73 and JDBC resource-call attribution atomically retain immutable invocation contracts and issuer/jti mappings, enforce full registry and exact issuing metadata, preserve historical readback and refuse unknown commit replies.23 selected plain cases/application test compilation/tools76 pass;12 new actual PostgreSQL cases await Linux execution. No credential release, dispatch, workflow401 fix or acceptance promotion.

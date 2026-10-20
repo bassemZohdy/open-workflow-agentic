@@ -80,3 +80,21 @@ central audit delivery/dedup/lost reply, retention/archive/quotas and full T03/T
 remain open. The current caller/manual policy interface in Claude #50 a191ef26 is
 scoped GPT APPROVE6285730481 with full39385783072 and BOTH strict real-provider
 39385783028 SUCCESS; it must still resolve its #47 parent/final retarget review.
+
+## Actual Linux execution, productc63130e (2026-10-20)
+
+Exact c63130e3de4cbfb9ab14a0650b8328719258773c passed BOTH lanes of
+39387463567. GPT inspected the complete finished-job logs using the GitHub jobs
+API: native118510633790 and standard118510637847. New ResourceCallBindingStoreTest12,
+ResourceCallBindingPreflightTest2, existing IssuedTokenBindingMigrationTest5 and
+ListenGroupStoreTest11 pass in EACH lane, zero failures/errors/skips. Both reactors
+report application281 cases passing; each also runs original EffectCrashRecoveryIT1.
+Real standard3/native8 and strict provider/process evidence checks pass.
+This supersedes the earlier execution-pending statement for these exact cases.
+
+The later f68abcb commit changes only the audit proposal and CHANGELOG; it is NOT
+the SHA executed by this run. Do not transfer exact-head integration approval.
+No full build workflow/current peer approval or actual workflow dispatch/T13 is
+claimed by these component/provider runs. Final integration still requires
+effect/group foundations, current full/strict CI and exact Claude review. The
+proposed audit consumer/outbox in WP-108-audit-projection-proposal.md is not code.
