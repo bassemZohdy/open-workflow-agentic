@@ -1,6 +1,6 @@
 # WP-108 actual HTTP and process recovery preparation
 
-Owner/author verification: GPT. Consumer/reviewer: Claude. Status: preparation;
+Owner/author verification: GPT. Consumer/reviewer: Claude. Status: preparation verified;
 no second implementation PR or production activation. Sole GPT PR #55 stays
 frozen ea56f3319d0e896d54703d9f4d857252906ed2a4 pending exact Claude review.
 
@@ -81,7 +81,60 @@ preflights and authored diff checks pass. Actual standalone HTTP/real Narayana
 bootstrap --self-check succeeds. Initial compile caught an invalid try-with-
 resources assumption about SimpleMeterRegistry; corrected explicit finally
 cleanup preserves assertions. No local PostgreSQL/provider execution is claimed.
-Fresh exact Linux BOTH execution and inspection remain pending at publication.
+Fresh exact Linux execution/inspection is complete at the source SHA below.
+The initial publication correctly kept that proof pending.
+
+## Executed exact-source evidence
+
+reviewer=GPT (AUTHOR verification only, not peer approval); reviewed/tested SHA
+**c67f7afb5201256427cc44abbc725d8866ef2e0e**. Verdict: preparation PASS;
+integration HOLD for Claude exact peer/final PR/actual dependency adoption.
+This later documentation/tracking commit is not mislabeled as the tested code.
+
+[BOTH39449731514](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39449731514)
+is terminal SUCCESS at exactly that SHA, first attempt, no rerun. Both completed
+raw logs were downloaded and inspected: standard job118721036782 and native
+delegation job118721037134. Actual reactor totals EACH: contracts212/runtime351/
+testkit196/application unit391; boundary31/source-delivery17/model24/allocation15
+and all other selected component cases pass. Failsafe totals standard15/native20:
+HTTP7/source-ACK process4/original core process1 EACH, real standard3/native8.
+All four strict evidence markers pass, zero failures/errors/skips.
+
+Actual result archives, downloaded by exact id, with independently verified raw
+ZIP bytes against GitHub SHA256, CRC and safe owned-path checks:
+
+| Lane / artifact | Bytes | SHA256 |
+| --- | ---: | --- |
+| standard12277961758 | 2260690 | 1f93e6d6ce0127386749117ce24cc7fa45c69ff1864e4877eea625bd162e2778 |
+| native12279385860 | 2260880 | eb340d1ff133faa9e7b1f408eead0adbaa740ec61f2bcc9d24b9e6df77e74153 |
+
+All159 actual suite XML per lane parsed; positive consistent counters, unique
+case identities and no skipped/failed/errored cases. Exact HTTP7/boundary31/
+model24/allocation15 method sets match current source. Reran
+`python tools/require_keycloak_evidence.py --root <downloaded-lane> --profile
+<standard|delegation> --effect-recovery --effect-audit-recovery
+--effect-http-recovery` on EACH actual artifact, not preflight fixtures.
+
+Per lane, inspected11 HTTP server logs (NORMAL7/WAIT_CHARGE2/HALT_CHARGE1/
+HALT_REFUND1) and two client logs. Exact target charge/refund after-COMMIT halt
+markers, client after-reply halt and fresh client SAME_KEY confirmation occur
+once EACH. Existing14 worker.log files also retain all four expected source/ACK
+halts once plus six intent-create/reopen/four ACK-readback observations. Standard
+has one owned WAIT_CHARGE handler InterruptedException on server cleanup; its
+committed/release files both remain, actual timeout/recovery assertions pass.
+Standalone fixture LogManager bootstrap warnings are not hidden or counted as
+application/test failures. Native has no handler-failure marker. No assertion
+was weakened and no failed test was retried unchanged.
+
+Actual conformance report/48 outputs/74 exports/two known writer diagnostics also
+checked per lane; only the two already bounded wrong fork-order fingerprints
+are projected for comparison. Results remain30 MATCH/18 DIVERGED, not full
+semantic conformance. No earlier suite/peer approval is transferred.
+
+Source publication and explicit dependency handoff:
+[comment6294682324](https://github.com/bassemZohdy/open-workflow-agentic/pull/54#issuecomment-6294682324).
+Final local generated/authored-diff checks pass; package/acceptance counters and
+all production adoption gates below remain unchanged.
 
 ## Explicit handoff and remaining gates
 
