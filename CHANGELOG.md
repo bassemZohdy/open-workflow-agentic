@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-108: #54 merged after exact Claude approval and full/strict CI. Prepare executable retained-source V75 DDL outside Flyway with complete immutable attribution/event-head FKs and six rollback-only schema cases; Linux execution and cross-owner test/consumer review precede activation. Clarify canonical attribute ordering as UTF-16 code units. WP-103 graph-inspection proposal reviewed with explicit entry/fence/UNKNOWN gates. No package/acceptance promotion.
+
 - Exact c2decc1 passed BOTH39396747028: both actual PostgreSQL task-start/completion boundary controls, binding17/SDK3/process1 per provider/standard3/native8 and strict checkers, zero skips; both logs inspected. Publish the cross-owner graph execution versus immutable outcome-readback proposal. Complete occurrence/restore/execution and final peer/integration gates remain open.
 
 - WP-103 preparation: exercise actual SDK/JPA task-start versus task-completion metadata storage, with a negative control against treating task-start success as a durable occurrence reservation. New two PostgreSQL cases compile and both full workflow fixtures validate; Linux execution and production occurrence/restore gates remain open.
