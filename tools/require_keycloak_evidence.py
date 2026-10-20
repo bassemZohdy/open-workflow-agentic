@@ -25,6 +25,16 @@ AUDIT_RECOVERY = ('io.github.bassemzohdy.openworkflow.agentic.effect.EffectAudit
     'deathAfterLocalAckCommitRetainsAcknowledgmentAcrossFreshWorkers'})
 AUDIT_SOURCE_FILES = tuple('apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/' + name
                           for name in ('EffectAuditProcessRecoveryIT.java', 'EffectAuditProcessWorker.java', 'EffectAuditTestDatabase.java'))
+HTTP_RECOVERY = ('io.github.bassemzohdy.openworkflow.agentic.effect.EffectHttpRecoveryIT', {
+    'auditRefusalMakesZeroHttpRequests',
+    'registryClosureDuringAuditMakesZeroHttpRequests',
+    'targetDeathAfterChargeCommitRecoversByHttpLookupWithoutSecondPost',
+    'targetDeathAfterRefundCommitRetainsOriginalUntilHttpLookupConfirmsUndo',
+    'registryClosureAfterHttpCommitRetainsAuditedOutcomeAndRefusesPrivateResult',
+    'clientDeathAfterHttpReplyRecoversInFreshClientProcessWithoutSecondPost',
+    'httpTimeoutAfterTargetCommitStaysUnknownUntilReadOnlyLookup'})
+HTTP_SOURCE_FILES = tuple('apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/effect/' + name
+                         for name in ('EffectHttpRecoveryIT.java', 'EffectHttpProcessWorker.java', 'EffectHttpTestSupport.java', 'EffectAuditTestDatabase.java'))
 CHARACTERIZATION = ('KeycloakInteropIT', {
     'theVerifierAcceptsAUserTokenFromKeycloakAndReadsItsTenantAndScopes',
     'theWorkloadTokenOfTheAgentClientIsAnAgentOfItsOwnTenant',
@@ -63,6 +73,14 @@ def verify_effect_audit_recovery(root, profile, preflight=False):
         return [f'Missing audit process recovery source: {root / name}'
                 for name in AUDIT_SOURCE_FILES if not (root / name).is_file()]
     return _reports(root, profile, *AUDIT_RECOVERY, strict=True)
+
+
+def verify_effect_http_recovery(root, profile, preflight=False):
+    """Require actual HTTP/owned-process evidence, never source/spy/provider substitution."""
+    if preflight:
+        return [f'Missing HTTP recovery source: {root / name}'
+                for name in HTTP_SOURCE_FILES if not (root / name).is_file()]
+    return _reports(root, profile, *HTTP_RECOVERY, strict=True)
 
 
 def _reports(root, profile, test_class, required, strict=False):
@@ -122,21 +140,27 @@ def main():
                         help='Also require non-skipped real process-death effect/compensation recovery evidence')
     parser.add_argument('--effect-audit-recovery', action='store_true',
                         help='Also require all source/ACK commit-death windows AND the original effect recovery case')
+    parser.add_argument('--effect-http-recovery', action='store_true',
+                        help='Also require all HTTP recovery cases AND source/ACK/original effect recovery')
     args = parser.parse_args()
     errors = verify(args.root, args.profile, args.preflight, args.characterization)
-    if args.effect_recovery or args.effect_audit_recovery:
+    if args.effect_recovery or args.effect_audit_recovery or args.effect_http_recovery:
         errors += verify_effect_recovery(args.root, args.profile, args.preflight)
-    if args.effect_audit_recovery:
+    if args.effect_audit_recovery or args.effect_http_recovery:
         errors += verify_effect_audit_recovery(args.root, args.profile, args.preflight)
+    if args.effect_http_recovery:
+        errors += verify_effect_http_recovery(args.root, args.profile, args.preflight)
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         return 1
     kind = 'characterization (WP-102 still partial)' if args.characterization else 'strict contract'
     print(f'Keycloak {args.profile} {kind}: ' + ('Java test source present' if args.preflight else 'required Java cases passed'))
-    if args.effect_recovery or args.effect_audit_recovery:
+    if args.effect_recovery or args.effect_audit_recovery or args.effect_http_recovery:
         print('Effect process recovery: ' + ('Java test source present' if args.preflight else 'required Java case passed'))
-    if args.effect_audit_recovery:
+    if args.effect_audit_recovery or args.effect_http_recovery:
         print('Effect audit process recovery: ' + ('Java worker/test sources present' if args.preflight else 'all four Java commit-death cases passed'))
+    if args.effect_http_recovery:
+        print('Effect HTTP recovery: ' + ('Java worker/test sources present' if args.preflight else 'all seven Java HTTP/process cases passed'))
     return 0
 
 
