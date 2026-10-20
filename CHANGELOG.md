@@ -1,6 +1,6 @@
 # Changelog
 
-- WP-108 preparation: explicitly opt in to atomic retained effect audit provenance and original drafts; exact retry preserves source identity after uncertain commit replies. Proposed V77 guards scoped journal/source consistency and keeps legacy rows unproven. Six producer units pass; nine real SQL cases compile pending Linux execution. No central receipt, governed target/Flow activation or package promotion.
+- WP-108 preparation: explicitly opt in to atomic retained effect audit provenance and original drafts; exact retry preserves source identity after uncertain commit replies. Proposed V77 guards scoped journal/source consistency and keeps legacy rows unproven. Exact2941204 passes BOTH39410266875: nine real SQL/six producer cases, core process recovery in each lane and standard3/native8 with strict checkers, zero failures/errors/skips. No central receipt, governed target/Flow activation or package promotion.
 
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 
@@ -110,7 +110,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
   [PR #33](https://github.com/bassemZohdy/open-workflow-agentic/pull/33), [structure](docs/repository-structure.md).
 - Remove the five exploratory spike projects while keeping reports, measurements, confidence labels and ADRs.
   [PR #32](https://github.com/bassemZohdy/open-workflow-agentic/pull/32).
-- Record owner decisions in ADRs 0019–0023, including recovery liveness, secret-store conditions and version policy.
+- Record owner decisions in ADRs 0019â€“0023, including recovery liveness, secret-store conditions and version policy.
   [PR #27](https://github.com/bassemZohdy/open-workflow-agentic/pull/27).
 - Retain the bridge findings/ADR and the partial A2A wiring diagnosis as research outcomes; a working product A2A
   server/client is still required in WP-207. [PR #8](https://github.com/bassemZohdy/open-workflow-agentic/pull/8),
@@ -147,7 +147,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 - Retain LangGraph4j durability, identity/policy/secrets and MCP/A2A/AG-UI research findings in
   [spike reports](docs/spikes/) and [ADRs](docs/adr/README.md). Reported unknowns remain product validation tasks.
 
-## Implemented portions of requirements — 2026-10-19 snapshot
+## Implemented portions of requirements â€” 2026-10-19 snapshot
 
 Every row below has concrete implementation evidence. Coverage is **partial** for the full requirement; the
 remaining scope is tracked by its owning work packages in TODO.md. Research-only findings are excluded from

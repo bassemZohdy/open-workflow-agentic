@@ -1,6 +1,6 @@
 # ADR-0027: Identify retained audit projections and draft content
 
-Status: Proposed contract foundation; production projection not implemented
+Status: Shared contract foundation merged; producer preparation is explicit opt-in, production projection not activated
 
 Date: 2026-10-20
 
@@ -24,3 +24,22 @@ readback. Mandatory audit still precedes target entry; current authority/executi
 checks follow all blocking work. Source binding SQL, producer/consumer/relay,
 concurrency/commit-loss/restart/backup/retention and actual governed Flow evidence
 are adoption gates. No applied migration or package/acceptance status changes here.
+
+The prepared effect producer is specified in WP-108-audit-producer.md. A known
+fresh ledger insert establishes full-owner provenance and retains its actual
+journal id/time plus original draft in that same commit. Existing legacy rows
+cannot be upgraded by guessing their scope. Subsequent scoped facts retain their
+draft atomically too; proposed V77 defers the journal/source completeness check
+until commit and retains immutable parent references. Source identity uses the
+exact V75 pure as1 function; draft content uses the ONE merged Java helper.
+Compensation retains the original scope as historical data after a run ends.
+Short transactions and the complete cross-process claim suspend ambient JTA.
+
+These are producer data guarantees, not a target authorization or proof of a
+central append. Proposed V75/V77 stay outside Flyway until centrally ordered
+activation and exact review. An old writer's scoped journal mutation refuses,
+but an old read-only lookup/replay path is not fenced by deferred constraints.
+Require a coordinated adapter rollout, authentic task/target/owner/live identity,
+mandatory verified central receipt and final current execution/authority checks
+after blocking work before activation. Stable manual decisions, full Flow,
+retention/relay/partition/process/backup proof remain open; no legacy backfill.

@@ -53,8 +53,9 @@ content uses the shared Java helper, with no shadow canonical SQL recipe.
 Final local selected rerun passes sixteen cases (producer6/cancellation6/scope4),
 zero failures/errors/skips; all183 contracts separately pass. All application test
 sources compile, including nine new real PostgreSQL cases. Tools76/generated/diff
-pass. Local dependency-policy execution lacks verify-generated dependency lists;
-no new successful full dependency check or PostgreSQL execution is claimed. Independent Python length-prefixed UTF-8/BE-number golden:
+pass. A separate full-reactor verify -DskipTests BUILD SUCCESS supplies the
+dependency lists; the actual dependency/licence policy check then passes. That
+compile/package run is not labeled a passing full test suite or PostgreSQL run. Independent Python length-prefixed UTF-8/BE-number golden:
 
 - source as1-b023855cac45e7ca0ddc8afc5de026c401b3168e1443b74d56d20374850e8974
 - draft de438c3d273c9e3f5d224179a5985439a55d0043975c53fc4de87d97e4354151
@@ -66,14 +67,21 @@ or changes shared parent triggers. Teardown drops ONLY that successfully created
 database without FORCE. Corruption checks disable an OWN fixture trigger inside
 an always-rolled-back transaction; production guards are never weakened.
 
-Nine compiled cases: atomic initial facts/exact fresh-component retry; all finite
+Nine actual SQL cases: atomic initial facts/exact fresh-component retry; all finite
 transitions/compensation provenance after registry end; legacy/full-kind refusal;
 source-insert failure rolls back all four tables; an actual commit followed by
 injected lost reply retains one source; old-writer deferred refusal; four concurrent
 exact preparations; ambient caller rollback/claim isolation; immutable SQL guards
-and retained corruption refusal. Local PostgreSQL is unavailable: compilation is
-not actual database success. Fresh Linux BOTH evidence is required; strict real
-standard/native Keycloak and separate-worker core recovery checks remain intact.
+and retained corruption refusal. Local PostgreSQL is unavailable; actual execution is from completed Linux CI
+BOTH39410266875 at EXACT product2941204431b5737683605042255933ecc1b205d1.
+GPT downloaded and inspected BOTH complete raw logs: standard118586026879 and
+native118586026585. Producer SQL9/unit6/core separate-worker process1 EACH,
+standard3/native8 and strict provider/process checkers pass, zero failures/errors/
+skips. Reactor totals each:183 contracts/322 runtime/196 testkit/271 application
+cases. No failures were rerun or assertions weakened. This proves the proposed
+DDL/component in its owned database, not activated Flyway/central append/governed
+Flow/target entry. Documentation evidence commits are distinct from that tested
+product; exact peer review and final full/strict PR gates still remain.
 
 ## Integration gates / requests
 
