@@ -5,6 +5,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchAgent;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AgentResourceAdmission;
@@ -100,15 +101,20 @@ public class AgentResource {
             threadId = request.threadId() == null ? UUID.randomUUID().toString() : request.threadId();
             thread = threadOf(caller.tenant(), caller.subject(), "direct:" + threadId);
         } else {
-            // a workflow credential never selects a thread: until the dispatcher's resource-call binding names the
-            // invocation (GPT, docs/handoffs/gpt/WP-103-admission-review.md) it gets a fresh one in a namespace that a
-            // direct caller's id can never reach, so it cannot touch another invocation's or the user's thread
+            // a workflow credential never selects a thread: the thread is the one of its durable invocation binding
+            // (governed:<rc1-key>), so a credential refresh reaches the same thread and nothing else
             if (request.threadId() != null) {
                 throw new ProblemException(Response.Status.BAD_REQUEST,
                         "a delegated call does not choose a thread id");
             }
-            threadId = UUID.randomUUID().toString();
-            thread = threadOf(caller.tenant(), caller.subject(), "governed:" + threadId);
+            var call = admitted.delegated().call();
+            if (!call.scope().requestFingerprint().equals(ResourceCallScope.requestFingerprint(
+                    canonicalRequest(request.topic())))) {
+                throw new ProblemException(Response.Status.FORBIDDEN,
+                        "the request does not match the approved invocation");
+            }
+            threadId = call.scope().key();
+            thread = call.scope().threadId();
         }
         // policy and audit above can block: the authority is judged again immediately before anything runs
         if (admitted.delegated() != null) {
@@ -131,6 +137,19 @@ public class AgentResource {
         String owner = "s1-" + CanonicalEncoder.sha256Hex(new CanonicalEncoder("oa.thread.subject")
                 .text(subject.kind().name()).text(subject.id()).toBytes());
         return ThreadId.derive(tenant, owner, scope);
+    }
+
+    /**
+     * The canonical request text whose digest the dispatcher approved: the JSON object {@code {"topic":"<topic>"}} as
+     * Jackson writes it (one key, standard escaping). The dispatcher must derive the approved request fingerprint from
+     * the same text (docs/handoffs/claude/WP-103.md).
+     */
+    private String canonicalRequest(String topic) {
+        try {
+            return json.writeValueAsString(Map.of("topic", topic));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new ProblemException(Response.Status.BAD_REQUEST, "the request body is not valid");
+        }
     }
 
     private void revalidate(AgentResourceAdmission.Principal principal) {

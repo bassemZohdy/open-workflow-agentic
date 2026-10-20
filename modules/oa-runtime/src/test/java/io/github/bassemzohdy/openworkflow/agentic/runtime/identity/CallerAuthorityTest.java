@@ -125,7 +125,11 @@ class CallerAuthorityTest {
             admissions.incrementAndGet();
             return token;
         }, AUDIENCE, new InMemoryReplayCache(100), grants, bindings, clock, 1);
-        AgentResourceAdmission admission = new AgentResourceAdmission(guard);
+        var calls = new ResourceCallFixtures.InMemory();
+        calls.bind(ResourceCallFixtures.binding(token, grant.id(), ResourceCallFixtures.scope(tenant, ALICE, AUDIENCE,
+                io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep.AGENT_RESEARCH_RUN,
+                ResourceCallFixtures.TOPIC_REQUEST)));
+        AgentResourceAdmission admission = new AgentResourceAdmission(guard, calls, bindings, AUDIENCE);
         var principal = admission.admit("a.b.c");
         return new Delegated(grants, grant, admission.authority(principal, clock), admissions);
     }

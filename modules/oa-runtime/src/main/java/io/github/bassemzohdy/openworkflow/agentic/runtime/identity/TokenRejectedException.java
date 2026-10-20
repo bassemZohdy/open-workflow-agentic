@@ -37,6 +37,10 @@ public final class TokenRejectedException extends RuntimeException {
         GRANT_INACTIVE,
         /** The token lacks a scope the resource requires. */
         SCOPE,
+        /** No durable resource-call binding exists for the verified issuer and token id (WP-103): refused, never defaulted. */
+        BINDING_MISSING,
+        /** The resource-call binding disagrees with the token, its grant, or this resource's audience and operation. */
+        BINDING_MISMATCH,
         /** The verifier could not reach its key source or failed. Nothing was decided; the caller must refuse. */
         VERIFIER_UNAVAILABLE
     }

@@ -1,6 +1,10 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.identity;
 
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceCallBindings;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
+import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Clock;
@@ -31,21 +35,35 @@ public class AgentResourceAdmission {
 
     /** Who a delegated call is for and who makes it. */
     public record Principal(String tenant, Subject user, String actor, List<String> actors, Set<String> scopes,
-                            VerifiedToken token) {
+                            VerifiedToken token, ResourceCallBinding call) {
     }
 
     private final ResourceTokenGuard guard;
+    private final ResourceCallBindings calls;
+    private final IssuedTokenBindings issued;
+    private final String audience;
 
     @Inject
     public AgentResourceAdmission(IdentitySettings settings, TokenVerifier verifier, DelegationGrants grants,
-                                  IssuedTokenBindings bindings, javax.sql.DataSource data) {
+                                  IssuedTokenBindings bindings, javax.sql.DataSource data,
+                                  Instance<ResourceCallBindings> resourceCalls) {
         this(settings.agentResourceAudience().map(audience -> new ResourceTokenGuard(verifier, audience,
-                new JdbcReplayCache(data), grants, bindings, Clock.systemUTC(), 1)).orElse(null));
+                new JdbcReplayCache(data), grants, bindings, Clock.systemUTC(), 1)).orElse(null),
+                resourceCalls.isResolvable() ? resourceCalls.get() : null, bindings,
+                settings.agentResourceAudience().orElse(null));
     }
 
-    /** For tests and wiring without CDI. A null guard means the delegated path is not configured. */
-    public AgentResourceAdmission(ResourceTokenGuard guard) {
+    /**
+     * For tests and wiring without CDI. A null guard means the delegated path is not configured. Null
+     * {@code calls} means no durable resource-call binding store exists: every delegated token is then refused with
+     * {@link TokenRejectedException.Reason#BINDING_MISSING} (an unbound credential is never accepted).
+     */
+    public AgentResourceAdmission(ResourceTokenGuard guard, ResourceCallBindings calls, IssuedTokenBindings issued,
+                                  String audience) {
         this.guard = guard;
+        this.calls = calls;
+        this.issued = issued;
+        this.audience = audience;
     }
 
     /** True when a resource audience is configured, so delegated tokens can be admitted at all. */
@@ -63,7 +81,45 @@ public class AgentResourceAdmission {
             throw new TokenRejectedException(TokenRejectedException.Reason.AUDIENCE);
         }
         VerifiedToken token = guard.admit(Objects.requireNonNull(bearer, "bearer"), Set.of(SCOPE));
-        return new Principal(token.tenant(), token.subject(), token.actor(), token.actors(), token.scopes(), token);
+        ResourceCallBinding call = boundCall(token);
+        return new Principal(token.tenant(), token.subject(), token.actor(), token.actors(), token.scopes(), token,
+                call);
+    }
+
+    /**
+     * The durable invocation attribution of this verified token, found by the VERIFIED issuer and token id only (never a
+     * header or body field) and compared field by field. A missing binding, a disagreement or an unavailable store
+     * refuses; nothing is defaulted.
+     */
+    private ResourceCallBinding boundCall(VerifiedToken token) {
+        if (calls == null || issued == null) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.BINDING_MISSING);
+        }
+        java.util.Optional<ResourceCallBinding> found;
+        java.util.Optional<IssuedTokenBindings.Binding> grantBinding;
+        try {
+            found = calls.find(token.issuer(), token.tokenId());
+            grantBinding = issued.find(token.issuer(), token.tokenId());
+        } catch (RuntimeException unavailable) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.VERIFIER_UNAVAILABLE, unavailable);
+        }
+        ResourceCallBinding call = found.orElseThrow(
+                () -> new TokenRejectedException(TokenRejectedException.Reason.BINDING_MISSING));
+        var scope = call.scope();
+        boolean agrees = grantBinding.isPresent()
+                && call.issuer().equals(token.issuer())
+                && call.tokenId().equals(token.tokenId())
+                && call.issuingGrantId().equals(grantBinding.get().grantId())
+                && scope.tenant().equals(token.tenant())
+                && scope.owner().equals(token.subject())
+                && scope.audience().equals(audience)
+                && scope.operation().equals(Pep.AGENT_RESEARCH_RUN)
+                && call.issuedAt().equals(token.issuedAt())
+                && call.expiresAt().equals(token.expiresAt());
+        if (!agrees) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.BINDING_MISMATCH);
+        }
+        return call;
     }
 
     /**

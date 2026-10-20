@@ -7,7 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.AgentResource;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceCallBindings;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
 import io.github.bassemzohdy.openworkflow.agentic.identity.AgentFakeIdpResource;
 import io.github.bassemzohdy.openworkflow.agentic.identity.FakeIdpResource;
@@ -53,7 +57,29 @@ class AgentResourceDelegatedTest {
     @Inject
     DataSource dataSource;
 
-    private record Issued(String token, String jti, Instant expires) { }
+    @Inject
+    ResourceCallBindings calls;
+
+    private static final String TOPIC_REQUEST = "{\"topic\":\"agentic workflows\"}";
+
+    private record Issued(String token, String jti, Instant expires, Instant issued, ResourceCallScope scope) { }
+
+    /** The invocation the dispatcher approved for this user: a fresh registry instance, this resource's audience. */
+    private static ResourceCallScope scopeOf(String tenant, String user) {
+        return scope(tenant, user, AgentFakeIdpResource.AGENT_AUDIENCE, "agent:research:run", TOPIC_REQUEST);
+    }
+
+    private static ResourceCallScope scope(String tenant, String user, String audience, String operation,
+                                           String canonicalRequest) {
+        return new ResourceCallScope(tenant, UlidGenerator.shared().next(), new Subject(SubjectKind.USER, user), "app",
+                "engine-1", "ns", "research-and-approve", "1", "do/0/research", 1, "root", audience, operation,
+                "a".repeat(64), ResourceCallScope.requestFingerprint(canonicalRequest));
+    }
+
+    private void bindCall(Issued issued, String tenant, DelegationGrant grant, ResourceCallScope scope) {
+        calls.bind(new ResourceCallBinding(FakeIdpResource.idp().issuer(), issued.jti(), grant.id(), scope,
+                issued.issued(), issued.expires()));
+    }
 
     private DelegationGrant grantOf(String tenant, String user) {
         Subject subject = new Subject(SubjectKind.USER, user);
@@ -72,10 +98,16 @@ class AgentResourceDelegatedTest {
         tweak.accept(claims);
         String jti = (String) claims.get("jti");
         Instant exp = Instant.ofEpochSecond(((Number) claims.get("exp")).longValue());
+        Instant iat = Instant.ofEpochSecond(((Number) claims.get("iat")).longValue());
+        ResourceCallScope approved = scopeOf(tenant, user);
+        Issued issued = new Issued(idp.signClaims(claims), jti, exp, iat, approved);
         if (bind) {
             bindings.bind(idp.issuer(), jti, new IssuedTokenBindings.Binding(grant.id(), tenant, exp));
+            if (Duration.between(iat, exp).compareTo(Duration.ofSeconds(300)) <= 0) {
+                bindCall(issued, tenant, grant, approved);
+            }
         }
-        return new Issued(idp.signClaims(claims), jti, exp);
+        return issued;
     }
 
     private Issued valid(String tenant, String user) throws Exception {
@@ -102,9 +134,9 @@ class AgentResourceDelegatedTest {
     void aBoundDelegatedTokenRunsOnceOnAFreshGovernedThreadOfTheUser() throws Exception {
         String tenant = newTenant();
         Issued issued = valid(tenant, "alice");
-        String thread = run(issued.token(), null).statusCode(200).body("plan", containsString("[stub]")).extract()
-                .path("threadId");
-        String name = AgentResource.threadOf(tenant, new Subject(SubjectKind.USER, "alice"), "governed:" + thread).value();
+        run(issued.token(), null).statusCode(200).body("plan", containsString("[stub]"))
+                .body("threadId", equalTo(issued.scope().key()));
+        String name = issued.scope().threadId().value();
         assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '" + name + "'"));
         // single use: the same token again is refused and opens nothing new
         long threads = threads();
@@ -113,34 +145,53 @@ class AgentResourceDelegatedTest {
     }
 
     @Test
-    void aDelegatedCallCannotChooseAThreadSoItCannotReachADirectOrAnotherInvocationsThread() throws Exception {
+    void aDelegatedCallCannotChooseAThreadAndRunsOnlyOnItsBoundInvocationThread() throws Exception {
         String tenant = newTenant();
         String direct = newThread();
         long threads = threads();
         run(valid(tenant, "alice").token(), direct).statusCode(400);
         assertEquals(threads, threads(), "a refused call opens no thread");
-        // two delegated calls never share a thread, and neither is the direct namespace of the same visible id
-        String t1 = run(valid(tenant, "alice").token(), null).statusCode(200).extract().path("threadId");
-        String t2 = run(valid(tenant, "alice").token(), null).statusCode(200).extract().path("threadId");
-        assertEquals(false, t1.equals(t2));
+        // two invocations never share a thread, and neither is in the direct namespace of the same visible id
+        Issued one = valid(tenant, "alice");
+        Issued two = valid(tenant, "alice");
+        run(one.token(), null).statusCode(200);
+        run(two.token(), null).statusCode(200);
+        assertEquals(false, one.scope().threadId().equals(two.scope().threadId()));
         Subject alice = new Subject(SubjectKind.USER, "alice");
-        assertEquals(false, AgentResource.threadOf(tenant, alice, "direct:" + t1)
-                .equals(AgentResource.threadOf(tenant, alice, "governed:" + t1)));
         assertEquals(0, scalar("select count(*) from lg4jthread where thread_name = '"
-                + AgentResource.threadOf(tenant, alice, "direct:" + t1).value() + "'"));
+                + AgentResource.threadOf(tenant, alice, "direct:" + one.scope().key()).value() + "'"));
+    }
+
+    @Test
+    void aRefreshedCredentialOfTheSameInvocationReachesTheSameThread() throws Exception {
+        String tenant = newTenant();
+        DelegationGrant grant = grantOf(tenant, "alice");
+        Issued first = issue(tenant, "alice", grant, true, AgentFakeIdpResource.AGENT_AUDIENCE, RUN,
+                Duration.ofMinutes(5), c -> { });
+        Issued refreshed = issue(tenant, "alice", grant, false, AgentFakeIdpResource.AGENT_AUDIENCE, RUN,
+                Duration.ofMinutes(5), c -> { });
+        bindings.bind(FakeIdpResource.idp().issuer(), refreshed.jti(),
+                new IssuedTokenBindings.Binding(grant.id(), tenant, refreshed.expires()));
+        bindCall(refreshed, tenant, grant, first.scope()); // same invocation, new credential
+        run(first.token(), null).statusCode(200).body("threadId", equalTo(first.scope().key()));
+        run(refreshed.token(), null).statusCode(200).body("threadId", equalTo(first.scope().key()));
+        assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '"
+                + first.scope().threadId().value() + "'"));
     }
 
     @Test
     void theDelegatedPrincipalIsTheUserNotTheActor() throws Exception {
         String tenant = newTenant();
-        String thread = run(valid(tenant, "alice").token(), null).statusCode(200).extract().path("threadId");
-        String bobs = run(valid(tenant, "bob").token(), null).statusCode(200).extract().path("threadId");
-        assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '" + AgentResource.threadOf(tenant,
-                new Subject(SubjectKind.USER, "alice"), "governed:" + thread).value() + "'"));
-        assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '" + AgentResource.threadOf(tenant,
-                new Subject(SubjectKind.USER, "bob"), "governed:" + bobs).value() + "'"));
+        Issued alice = valid(tenant, "alice");
+        Issued bob = valid(tenant, "bob");
+        run(alice.token(), null).statusCode(200);
+        run(bob.token(), null).statusCode(200);
+        assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '"
+                + alice.scope().threadId().value() + "'"));
+        assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '"
+                + bob.scope().threadId().value() + "'"));
         assertEquals(0, scalar("select count(*) from lg4jthread where thread_name = '" + AgentResource.threadOf(tenant,
-                WORKFLOW, "governed:" + thread).value() + "'"), "the actor owns no thread");
+                WORKFLOW, "governed:" + alice.scope().key()).value() + "'"), "the actor owns no thread");
     }
 
     @Test
@@ -181,6 +232,44 @@ class AgentResourceDelegatedTest {
         // an actor chain that is not the grant's
         run(issue(tenant, "alice", grant, true, AgentFakeIdpResource.AGENT_AUDIENCE, RUN, Duration.ofMinutes(5),
                 c -> c.put("act", Map.of("sub", "someone-else"))).token(), thread).statusCode(401);
+        // a valid grant binding but no durable resource-call binding: refused, never defaulted
+        run(issue(tenant, "alice", grant, false, AgentFakeIdpResource.AGENT_AUDIENCE, RUN, Duration.ofMinutes(5),
+                c -> { }).token(), thread).statusCode(401);
+        Issued unbound = issue(tenant, "alice", grant, false, AgentFakeIdpResource.AGENT_AUDIENCE, RUN,
+                Duration.ofMinutes(5), c -> { });
+        bindings.bind(FakeIdpResource.idp().issuer(), unbound.jti(),
+                new IssuedTokenBindings.Binding(grant.id(), tenant, unbound.expires()));
+        run(unbound.token(), null).statusCode(401);
+        // a call binding that disagrees with the token: other owner, tenant, audience or operation
+        for (ResourceCallScope wrong : java.util.List.of(
+                scope(tenant, "mallory", AgentFakeIdpResource.AGENT_AUDIENCE, "agent:research:run", TOPIC_REQUEST),
+                scope("other-" + tenant, "alice", AgentFakeIdpResource.AGENT_AUDIENCE, "agent:research:run",
+                        TOPIC_REQUEST),
+                scope(tenant, "alice", "another-audience", "agent:research:run", TOPIC_REQUEST),
+                scope(tenant, "alice", AgentFakeIdpResource.AGENT_AUDIENCE, "agent:other:run", TOPIC_REQUEST))) {
+            Issued mismatched = issue(tenant, "alice", grant, false, AgentFakeIdpResource.AGENT_AUDIENCE, RUN,
+                    Duration.ofMinutes(5), c -> { });
+            bindings.bind(FakeIdpResource.idp().issuer(), mismatched.jti(),
+                    new IssuedTokenBindings.Binding(grant.id(), tenant, mismatched.expires()));
+            bindCall(mismatched, tenant, grant, wrong);
+            run(mismatched.token(), null).statusCode(401);
+        }
+        // a binding of another grant than the one that issued the token
+        DelegationGrant other = grantOf(tenant, "alice");
+        Issued regrant = issue(tenant, "alice", grant, false, AgentFakeIdpResource.AGENT_AUDIENCE, RUN,
+                Duration.ofMinutes(5), c -> { });
+        bindings.bind(FakeIdpResource.idp().issuer(), regrant.jti(),
+                new IssuedTokenBindings.Binding(grant.id(), tenant, regrant.expires()));
+        bindCall(regrant, tenant, other, regrant.scope());
+        run(regrant.token(), null).statusCode(401);
+        // a request other than the approved one (the approved fingerprint is not the body's)
+        Issued otherRequest = issue(tenant, "alice", grant, false, AgentFakeIdpResource.AGENT_AUDIENCE, RUN,
+                Duration.ofMinutes(5), c -> { });
+        bindings.bind(FakeIdpResource.idp().issuer(), otherRequest.jti(),
+                new IssuedTokenBindings.Binding(grant.id(), tenant, otherRequest.expires()));
+        bindCall(otherRequest, tenant, grant, scope(tenant, "alice", AgentFakeIdpResource.AGENT_AUDIENCE,
+                "agent:research:run", "{\"topic\":\"something else\"}"));
+        run(otherRequest.token(), null).statusCode(403);
         // garbage and no token
         run("not.a.jwt", thread).statusCode(401);
         given().contentType("application/json").body("{}").when().post("/agents/research").then().statusCode(401);

@@ -51,6 +51,8 @@ class AgentResourceAuthorityTest {
     private AtomicInteger graphRuns;
     private Runnable duringAudit;
     private AgentResource resource;
+    private io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope callScope;
+    private String ranThread;
 
     @BeforeEach
     void setUp() {
@@ -68,12 +70,17 @@ class AgentResourceAuthorityTest {
         bindings.bind(ISSUER, token.tokenId(), new IssuedTokenBindings.Binding(grant.id(), tenant, exp));
         ResourceTokenGuard guard = new ResourceTokenGuard((bearer, audience) -> token, AUDIENCE,
                 new InMemoryReplayCache(100), grants, bindings, clock, 1);
+        var calls = new ResourceCallFixtures.InMemory();
+        callScope = ResourceCallFixtures.scope(tenant, ALICE, AUDIENCE, Pep.AGENT_RESEARCH_RUN,
+                ResourceCallFixtures.TOPIC_REQUEST);
+        calls.bind(ResourceCallFixtures.binding(token, grant.id(), callScope));
         graphRuns = new AtomicInteger();
         duringAudit = () -> { };
         ResearchAgent agent = new ResearchAgent() {
             @Override
             public ResearchState run(String threadId, String topic) {
                 graphRuns.incrementAndGet();
+                ranThread = threadId;
                 return new ResearchState(Map.of(ResearchState.TOPIC, topic));
             }
         };
@@ -86,7 +93,7 @@ class AgentResourceAuthorityTest {
         Pep pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "ok",
                 new PolicyRef("test.permit", "1"), clock.instant()), slowAudit);
         resource = new AgentResource(agent, null, pep, new ObjectMapper(),
-                new AgentResourceAdmission(guard));
+                new AgentResourceAdmission(guard, calls, bindings, AUDIENCE));
     }
 
     private static HttpHeaders bearer() {
@@ -105,8 +112,11 @@ class AgentResourceAuthorityTest {
 
     @Test
     void thePositivePathRunsTheGraphOnceAndConsumesTheSingleUseOnce() {
-        assertEquals("x", call().get("topic"));
+        var response = call();
+        assertEquals("x", response.get("topic"));
         assertEquals(1, graphRuns.get());
+        assertEquals(callScope.threadId().value(), ranThread, "the thread is the one of the durable binding");
+        assertEquals(callScope.key(), response.get("threadId"));
         // a replay of the same token is refused at admission and runs nothing
         assertEquals(401, assertThrows(WebApplicationException.class, this::call).getResponse().getStatus());
         assertEquals(1, graphRuns.get());
