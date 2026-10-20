@@ -105,3 +105,21 @@ passes. This proposed ADR is not completion or approval evidence.
 - [Quarkus Flow persistence-common 1.2.0 source artifact](https://repo.maven.apache.org/maven2/io/quarkiverse/flow/quarkus-flow-persistence-common/1.2.0/quarkus-flow-persistence-common-1.2.0-sources.jar):
   `FlowPersistenceApplicationBuilderCustomizer`.
 - [WP-107 implementation and current handoff](https://github.com/bassemZohdy/open-workflow-agentic/pull/41).
+
+
+## Partial implementation checkpoint (2026-10-20)
+
+PR #41 d0243791450ee4997707eb27d517afebe4e0e853 adds an actual JPA writer
+wrapper through an alternative handler producer, preserving the existing
+customizer/exclusions/correlation factory and restore reader. Required writer
+failure or timeout holds forward progress, latches readiness down and blocks
+new starts; cancellation persistence and existing idempotent results remain
+usable. Immutable post-commit observer identity is captured before context
+mutation. The observer does not yet acknowledge any inbox signal.
+
+Local gate/writer/admission plus ingress/parser tests: 14 pass; application
+test-compile and 49 tools checks pass. New full CI 39353953446 and reciprocal
+review are pending. Previous ingress head 04b421f passed full CI 39352802891.
+This is infrastructure evidence only. All consumption/restart/cancellation/
+compensation proofs in the table above still gate this proposed decision and
+T13. The proposed status is unchanged.
