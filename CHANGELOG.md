@@ -1,5 +1,7 @@
 # Changelog
 
+- WP-605 partial preparation: measure34 OWS sources, actual JSON/YAML model roundtrips and24 pure executions with one pinned official CTK case. Record export/context and fork-output differences plus authoring/source and runtime-dependency limits; green reproduction is not semantic certification. Five local assessment/control tests pass. Full CTK, finding resolution, real authoring APIs, substitution and peer/CI gates remain open.
+
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 
 - WP-108 preparation: refuse interrupted callers before effect/refund dispatch and after blocking ledger/cleanup work, preserving committed facts and original recovery keys. Six local interruption cases pass; four new PostgreSQL cases compile and need fresh Linux execution. This is cooperative thread handling, not complete Flow/owner/authority cancellation.

@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: call-a2a
+  version: '1.0.0'
+do:
+- invoke:
+    call: a2a
+    with:
+      method: tasks/get
+      server:
+        uri: https://example.invalid/a2a
+      parameters:
+        id: ${ .taskId }
+    timeout:
+      after:
+        seconds: 1

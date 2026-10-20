@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: call-openapi
+  version: '1.0.0'
+do:
+- invoke:
+    call: openapi
+    with:
+      document:
+        endpoint: https://example.invalid/openapi.json
+      operationId: getItem
+      parameters:
+        id: ${ .id }
+    timeout:
+      after:
+        seconds: 1
