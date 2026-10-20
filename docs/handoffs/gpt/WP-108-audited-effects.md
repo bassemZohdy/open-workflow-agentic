@@ -74,7 +74,7 @@ or full Flow/acceptance proof is claimed.
 
 Author verification=GPT; current-product SHA/results recorded after fresh CI.
 Local selected17 pass: cancellation/replay7, producer6, scope4, zero skips. All
-application test sources compile, including22 new actual PostgreSQL/protocol cases.
+application test sources compile, including23 new actual PostgreSQL/protocol cases.
 Compilation is not SQL execution. Existing source/delivery17/audit-process4/model24/
 allocation15 and real standard3/delegation8/core1 regressions need FRESH combined
 execution; previous preparation evidence does not transfer. CURRENT_AUDITED_CI_PENDING
@@ -93,3 +93,12 @@ owns the complete registry/task/occurrence/executor/lease composite and rollout.
 Please review frozen #55. #53 d38776c/#56 26def97 findings and one-PR consolidation
 remain. No final-head peer/full PR/consumer activation, full WP-108/T03/T06 status
 promotion or whole-WP-102 dependency is introduced.
+
+Initial df3604b / BOTH39437679183 FAILED the new fixture bootstrap: all22 cases
+hit JdbcInstanceStore.requireSameIdentity BEFORE the audited boundary, because
+the test created an InstanceRecord with nanosecond createdAt and then used it
+against PostgreSQL's microsecond round-trip value. Correct the fixture's original
+registry timestamp to exact microseconds, matching the established source fixture.
+Do not weaken the store's immutable identity comparison or claim those22 cases
+executed their boundary assertions. Retain the failed run and complete logs;
+fresh product execution is required after the fix.

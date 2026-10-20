@@ -33,6 +33,7 @@ class AuditedEffectsStoreTest {
     EffectAuditProducer producer;
     JdbcEffectLedger ledger;
     static final Subject OWNER=new Subject(SubjectKind.USER,"alice-𝄞");
+    static Instant now(){return Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);}
     record Fixture(EffectScope scope,EffectCommand command) {
         EffectInvocation invocation(){return new EffectInvocation(scope,command,null);}
     }
@@ -43,8 +44,8 @@ class AuditedEffectsStoreTest {
     @AfterAll void dropOnlyOwnedDatabase() throws Exception {if(db!=null)db.close();}
     Fixture fixture() {
         var req=new StartRequest("audited-effect-"+UUID.randomUUID(),OWNER,new DefinitionRef("agentic/audited-effect-test","1"),Map.of(),"start");
-        var row=registry.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(),req,Instant.now()),"test.start").record();
-        registry.replace(row.successor(Instant.now(),InstanceStatus.RUNNING,"engine-"+row.id(),1,null,null),row.version(),"test.running",OWNER);
+        var row=registry.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(),req,now()),"test.start").record();
+        registry.replace(row.successor(now(),InstanceStatus.RUNNING,"engine-"+row.id(),1,null,null),row.version(),"test.running",OWNER);
         var scope=new EffectScope(row.tenant(),row.id(),OWNER);
         return new Fixture(scope,scope.command("charge","item/1","approved-charge","amount=10"));
     }
@@ -145,6 +146,8 @@ class AuditedEffectsStoreTest {
     }
     @Test void privateFenceDenialAfterAuditIsNotSwallowedAsATargetUnknown() {
         var f=fixture();var t=target(f);var live=new AtomicBoolean(true);
+        assertThrows(SecurityException.class,()->gate(this::fixtureReceipt).invoke(f.invocation(),t,(i,b)->{throw new SecurityException("PREPARE denied");}));
+        assertTrue(ledger.find(f.command().key()).isEmpty());assertEquals(0,t.sends.get());
         EffectExecutionFence guard=(i,b)->{if(!live.get())throw new SecurityException("private protocol fence closed");};
         assertThrows(SecurityException.class,()->gate((s,d)->{var receipt=fixtureReceipt(s,d);if(s.transition()==AuditSource.Transition.DISPATCH)live.set(false);return receipt;}).invoke(f.invocation(),t,guard));
         assertEquals(0,t.sends.get());assertEquals(0,t.reads.get());assertEquals(2,history(f.command().key()).size());
@@ -213,6 +216,23 @@ class AuditedEffectsStoreTest {
             assertEquals(EffectState.CONFIRMED,gate(this::fixtureReceipt).invoke(new EffectInvocation(f.scope(),undo,f.command().key()),t,current()).state());
             assertEquals(EffectState.CONFIRMED,effect(f).state());assertEquals(1,ledger.manualQueue(f.scope().threadId(),20).stream().filter(x->x.key().equals(f.command().key())).count());
             assertEquals(0,pending(f.command().key()));assertEquals(0,pending(undo.key()));
+        }
+    }
+    @Test void lostUndoOrOriginalAuditRetainsConfirmationAndNeverRefundsAgain() {
+        for(boolean originalAudit:List.of(false,true)) {
+            var f=fixture();gate(this::fixtureReceipt).invoke(f.invocation(),target(f),current());
+            var undo=f.scope().command("refund","undo","approved-refund","amount=10");var t=new Target(undo.target());
+            var invocation=new EffectInvocation(f.scope(),undo,f.command().key());
+            assertThrows(IllegalStateException.class,()->gate((s,d)->{
+                boolean fail=originalAudit?s.transition()==AuditSource.Transition.COMPENSATION:
+                        s.transition()==AuditSource.Transition.OUTCOME && d.attributes().get("effect.purpose").equals("COMPENSATION");
+                if(fail)throw new IllegalStateException("undo/original audit unavailable");
+                return fixtureReceipt(s,d);
+            }).invoke(invocation,t,current()));
+            assertEquals(EffectState.CONFIRMED,ledger.find(undo.key()).orElseThrow().state());
+            assertEquals(originalAudit?EffectState.COMPENSATED:EffectState.CONFIRMED,effect(f).state());assertEquals(1,t.sends.get());
+            assertEquals(EffectState.COMPENSATED,gate(this::fixtureReceipt).invoke(invocation,t,current()).state());
+            assertEquals(1,t.sends.get());assertEquals(0,t.reads.get());assertEquals(0,pending(undo.key()));assertEquals(0,pending(f.command().key()));
         }
     }
     @Test void missingQueueAndOverBoundHistoryRefuseInsteadOfAcceptingAPartialPage() throws Exception {

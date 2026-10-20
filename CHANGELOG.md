@@ -1,6 +1,6 @@
 # Changelog
 
-- WP-108 audited boundary preparation reuses the core effect/compensation protocol with complete retained-source receipts before target lookup/dispatch and cached/private results, full current-fence hooks and compensation proof. Recheck both replay windows after blocking telemetry/audit/fence, retaining another dispatch fact for actual replay. Local17 selected cases pass;22 new SQL/protocol cases compile, fresh combined CI/peer/actual consumer gates pending. No activation or acceptance promotion.
+- WP-108 audited boundary preparation reuses the core effect/compensation protocol with complete retained-source receipts before target lookup/dispatch and cached/private results, full current-fence hooks and compensation proof. Recheck both replay windows after blocking telemetry/audit/fence, retaining another dispatch fact for actual replay. Local17 selected cases pass;23 new SQL/protocol cases compile, fresh combined CI/peer/actual consumer gates pending. No activation or acceptance promotion.
 
 - WP-108 process recovery preparation: require four actual source/local-ACK commit-death windows in both real-provider lanes, with new-JVM readback and strict non-skipped XML checks. Exactfaef72e/BOTH39414376142 passes new process4/source-delivery17/core1 EACH, standard3/native8 and all three strict checkers, zero failures/errors/skips; actual XML and14 owned child logs per lane inspected. Tools82 pass. Central receipt fixtures do not prove the real audit consumer; no activation or package promotion.
 
