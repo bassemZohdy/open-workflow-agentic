@@ -67,10 +67,12 @@ Application reactor test -DskipTests BUILD SUCCESS: all new worker/IT sources
 compile. Actual standalone --self-check starts locally with the real Narayana
 manager and no database, which proves worker bootstrap ONLY. Tools82 pass
 (six new refusal/CLI cases; no duplicated imported test classes), dependency
-policy and both strict source preflights pass. Sixteen selected plain cases
-(producer6/cancellation6/scope4) pass, zero failures/errors/skips. Fresh exact
-Linux BOTH evidence is still required and will be recorded at its tested product. Local PostgreSQL is
-unavailable: no local database/process-commit success is claimed yet.
+policy and both strict source preflights pass. Separate full-reactor verify
+-DskipTests BUILD SUCCESS supplies the dependency lists and actual dependency/
+licence policy passes; this compile/package command is not a full local test run.
+Sixteen selected plain cases
+(producer6/cancellation6/scope4) pass, zero failures/errors/skips. Local PostgreSQL
+is unavailable; actual database/process proof is from completed Linux CI below.
 
 Claude: no owned identity/policy/audit/agent edit is requested for these tests.
 The actual appendOnce consumer/current stored chain validation, authority after
@@ -81,3 +83,33 @@ preparation. These tests still use proposals OUTSIDE Flyway. Final activation
 must move the exact approved schemas in order and update this fixture to the
 then-applied migrations, not baseline or reapply duplicate definitions.
 No review/CI transfer, second implementation PR or whole-WP-102 prerequisite.
+
+
+## Completed actual process verification
+
+Verification owner=GPT; tested SHA=faef72e35d8c53ed2263d7baff46b7e3dec5dc93.
+Verdict COMPONENT_PROCESS_TESTS_PASS, NOT peer approval/consumer activation or
+package completion. BOTH39414376142 SUCCESS. GPT downloaded and inspected BOTH
+completed raw logs: standard118599694957/native118599694747. New process4,
+source/delivery17, producer6 and original core process1 EACH; standard3/native8
+and all THREE strict provider/core/new-process checker markers pass, zero
+failures/errors/skips. Each reactor183 contracts/322 runtime/196 testkit/279
+application cases. Failsafe totals standard8/native13 include the four new cases.
+
+Downloaded BOTH retained result artifacts and independently reran the strict
+checker on actual XML (--profile standard/delegation --effect-audit-recovery):
+provider/core/new process checks all pass. Windows extended absolute roots avoid
+the copied artifact tree's long-path limit; no report or assertion was changed.
+Inspected all14 OWNED worker logs per lane: one halt at EACH of the four exact
+windows, six successful intent reopen/create workers and four successful ACK
+readback workers. Parent tests independently asserted actual rollback/retention
+and exact original source/id/time/content/receipt/fact counts after those exits.
+No failed matrix was rerun or assertion weakened. Both owned databases tear down
+normally; no FORCE/other-session termination. Child logs and argument files are
+retained in the CI artifacts.
+
+This supersedes new-process-execution-pending statements ONLY for that exact
+product. Documentation evidence heads are distinct from the tested code. The
+central DATA-fixture limitation and all final exact peer/full PR/real consumer/
+current authority/Flow/partition/backup/manual gates above remain open. No new
+acceptance annotation, package promotion or whole-WP-102 prerequisite.
