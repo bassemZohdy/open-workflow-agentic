@@ -68,6 +68,13 @@ later parent task-completed marker. The original reader's position-only task
 map and repeated child occurrence/iteration identity need explicit loop/parallel
 and stream restoration evidence before any production stream activation.
 
+V71 storage preparation now implements retained configuration, selection and
+membership only; its precise boundaries, compile-only SQL cases and remaining
+runtime work are in [WP-107-group-storage.md](WP-107-group-storage.md). It is
+stacked after the prepared V70 foundation, without changing applied migrations
+or opening another implementation PR. The earlier no-migration statement
+describes the original behavior/contract preparation stage.
+
 ## Next implementation and verification
 
 ### Framework-free group and membership contract

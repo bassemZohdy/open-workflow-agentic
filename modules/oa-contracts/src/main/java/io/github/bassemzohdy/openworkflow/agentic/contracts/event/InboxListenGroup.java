@@ -49,6 +49,12 @@ public record InboxListenGroup(InboxTask task,Strategy strategy,List<String> dat
         return CanonicalEncoder.sha256Hex(value.toBytes());
     }
     public String key() {return "ig1-"+digest();}
+    /** Exact UTF-8 snapshot identity; the trusted producer owns JSON canonicalization and approval validation. */
+    public static String snapshotFingerprint(String snapshot) {
+        Checks.requireText("listen configuration snapshot",snapshot,262144);
+        if(CanonicalEncoder.strictUtf8(snapshot).length>262144) throw new IllegalArgumentException("listen snapshot exceeds 256 KiB");
+        return CanonicalEncoder.sha256Hex(new CanonicalEncoder("oa.inbox.listen-configuration.v1").text(snapshot).toBytes());
+    }
 
     /** ANY [] has one logical wildcard slot, regardless of the broker's number of physical registrations. */
     public List<Slot> slots(Role role) {

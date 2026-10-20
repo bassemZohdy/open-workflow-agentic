@@ -86,4 +86,11 @@ class InboxListenGroupTest {
         var other=group(Strategy.ANY,List.of(B,A),Stop.ONE,List.of(A),null).slots(Role.DATA).get(1);
         assertThrows(IllegalArgumentException.class,()->new Match(Disposition.DATA,List.of(data.getFirst(),other)));
     }
+    @Test void snapshotFingerprintPinsExactBytesAndRejectsMalformedOrOversizedUtf8() {
+        assertEquals(InboxListenGroup.snapshotFingerprint("{\"x\":1}"),InboxListenGroup.snapshotFingerprint("{\"x\":1}"));
+        assertNotEquals(InboxListenGroup.snapshotFingerprint("{\"x\":1}"),InboxListenGroup.snapshotFingerprint("{ \"x\":1 }"));
+        assertNotEquals(InboxListenGroup.snapshotFingerprint("{\"x\":\"é\"}"),InboxListenGroup.snapshotFingerprint("{\"x\":\"e\u0301\"}"));
+        assertThrows(IllegalArgumentException.class,()->InboxListenGroup.snapshotFingerprint("\uD800"));
+        assertThrows(IllegalArgumentException.class,()->InboxListenGroup.snapshotFingerprint("😀".repeat(65537)));
+    }
 }
