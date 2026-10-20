@@ -399,14 +399,16 @@ Deliverables:
 Implementation status: **partial**.
 - Implemented: JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.
 - Implemented: Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied.
+- Implemented: Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.
+- Implemented: Bounded canonical envelope preservation, before/after central audit and fixed-label receipt metrics; HTTP/native-policy CI for this increment remains required.
 
 Remaining gates:
 
-- Add authorized CloudEvents HTTP ingress, event-triggered starts and a durable idempotent engine wait adapter with restart replay.
-- Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, central audit, metrics and tracing.
+- Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.
+- Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.
 - Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.
 
-Evidence: [docs/handoffs/gpt/WP-107.md](../../docs/handoffs/gpt/WP-107.md)
+Evidence: [docs/handoffs/gpt/WP-107.md](../../docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](../../docs/lifecycle.md)
 
 Reuse: quarkus-flow-messaging
 

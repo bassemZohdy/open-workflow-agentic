@@ -16,7 +16,7 @@ A checked deliverable records implemented scope. A work package closes only when
 - [ ] **WP-105 Run lifecycle and canonical progress** — Complete idempotent event/schedule initiation with WP-107 and WP-109.
 - [ ] **WP-109 Timers, deadlines and durable failover** — Complete persisted maximum lifetimes, escalation timers and deadline recovery across restart.
 - [ ] **WP-106 Human task service** — Tasks bound to workflow waits; assign, delegate, reassign, approve, reject, escalate
-- [ ] **WP-107 Event correlation and idempotent inbox** — Add authorized CloudEvents HTTP ingress, event-triggered starts and a durable idempotent engine wait adapter with restart replay.
+- [ ] **WP-107 Event correlation and idempotent inbox** — Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.
 - [ ] **WP-110 Resilience and overload** — Apply retry budgets, circuit breaking, bounded concurrency, rate limits and load shedding to all dependency boundaries.
 
 WP-105 core is implemented. Build WP-108 on that core before closing the effect-aware recovery gate; start dependencies describe implementation order, not proof that every closure gate is satisfied.
@@ -319,18 +319,20 @@ Implemented scope:
 
 - JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.
 - Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied.
+- Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.
+- Bounded canonical envelope preservation, before/after central audit and fixed-label receipt metrics; HTTP/native-policy CI for this increment remains required.
 
 Additional closure/integration tasks:
 
-- [ ] Add authorized CloudEvents HTTP ingress, event-triggered starts and a durable idempotent engine wait adapter with restart replay.
-- [ ] Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, central audit, metrics and tracing.
+- [ ] Complete event-triggered starts and a durable idempotent Flow wait adapter with restart replay and persisted acknowledgement; HTTP receipt alone is insufficient.
+- [ ] Prove cancellation after matching and process-death delivery; add dedup retention/tombstone cleanup, durable delivery auditing and tracing.
 - [ ] Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.
 
 Acceptance gates:
 
 - [ ] T13: implement, run in CI and record passing evidence
 
-Evidence: [docs/handoffs/gpt/WP-107.md](docs/handoffs/gpt/WP-107.md)
+Evidence: [docs/handoffs/gpt/WP-107.md](docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](docs/lifecycle.md)
 
 ### WP-108 Effect ledger and compensation — partial
 

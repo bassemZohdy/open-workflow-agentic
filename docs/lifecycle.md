@@ -584,3 +584,30 @@ Run after the last code change, with `DB_URL=jdbc:postgresql://localhost:5432/wp
 - `python3 tools/check_dependency_policy.py`: `dependency policy: holds (oa-contracts is dependency-free on the main classpath; all licences allowed for their scope)`, exit 0.
 - `python3 tools/render_requirements.py --check`: `requirements docs up to date`, exit 0.
 - `AcceptanceStatus --check`: `annotated test methods observed: 0 (passing: 0); markers whose class has no entry in any surefire or failsafe report: 0`, `test-status.json is consistent with the build`, exit 0. No test is annotated, so T16 is not recorded as passing.
+
+
+## 12. External CloudEvents receipt (WP-107, partial)
+
+`POST /instances/{id}/events/{correlation}` receives a structured CloudEvents 1.0
+JSON envelope (`application/cloudevents+json`, maximum 64 KiB). The caller must
+have a verified bearer token and `oa.events.receive`, pass the dedicated event
+PEP, and match an explicit `agentic.events.producers.<name>` deployment binding
+for tenant, subject kind/id, source, event type, target definition and correlation
+occurrence. Without producer bindings ingress is denied. Development headers are
+accepted only through the existing explicit development/test caller seam.
+
+The complete envelope is persisted before any listener wake. A new receipt is
+202, an identical source/id retry is 200, and changed content or routing is 409.
+Tenant/target metadata in the event is untrusted. Missing authentication is 401,
+denial is 403, an absent/other-tenant instance is 404, invalid input is 400/413/415,
+and unavailable policy, database or audit is 503. Retry the same event id after
+an uncertain response. Retention defaults to 24 hours and is bounded to 30 days;
+a duplicate never extends its original retention. Audit and fixed-label receipt
+metrics are emitted; raw payloads and bearer tokens are not logged.
+
+A successful response confirms durable receipt, not workflow consumption. The
+inbox matcher persists one wake signal for a stable logical wait under the
+instance lock. Early and out-of-order occurrences wait for their matching route;
+committed cancellation, terminal status and expired waits prevent new matching.
+The durable Flow adapter, restart delivery acknowledgement and complete T13
+remain open. See [the WP-107 contract and verification](handoffs/gpt/WP-107.md).
