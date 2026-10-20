@@ -1,5 +1,7 @@
 # Changelog
 
+- Combined6fbb9fb passed BOTH39388831952: actual effects16/group11/binding12/interruption6/core process1/standard3/native8, zero skips/strict checks. Three later full-SDK workflow observations prove retry counters can change for the same loop index; naive scope derivation is unsafe and the durable producer remains open. All three fixtures validate against OWS1.0.3.
+
 - GPT preparation normally combines frozen #51 current interruption code with group V71/V72 and binding V73, preserving source histories.62 local plain tests/app compilation/tools76 pass; fresh combined-head SQL/provider/full/peer evidence is required. This does not merge #51 to main or activate dispatch/acceptance.
 
 - Binding-store productc63130e passed BOTH39387463567:12 new actual PostgreSQL cases, existing issuing migration5/group11, core process recovery1 and standard3/native8, zero skips and strict evidence checks. Both completed-job logs inspected. Current-head peer/full CI, ordered foundations and actual governed dispatch remain open.

@@ -113,3 +113,11 @@ runtime41), zero failures/errors/skips, all application tests compile. Tools76,
 generated and diff checks pass. This does NOT transfer old c63130e CI evidence
 to the changed combined head. Fresh current-head Linux/peer/full verification
 and ordered integration remain required. No dispatch/acceptance activation.
+
+Exact combined product6fbb9fb subsequently passed BOTH39388831952. GPT inspected
+finished standard118515146162/native118515146729 logs: actual effects16/group11/
+binding12, interruption6, original process recovery1, standard3/native8 and strict
+checks pass, zero failures/errors/skips. Final-head full/peer/integration remains.
+The later SDK occurrence investigation/tests in WP-103-sdk-occurrence.md establish
+an additional production-producer gate: never derive a new call from a changing
+SDK task-entry counter on retry. No actual workflow credential driver is enabled.
