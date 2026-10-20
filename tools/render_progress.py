@@ -1,4 +1,5 @@
 """Implementation-progress validation and root TODO rendering; no file writes on import."""
+from render_agent_backlogs import agent_backlogs_md, assignments, validate_assignments
 
 
 def cell(value):
@@ -15,7 +16,7 @@ def evidence_links(paths, prefix=''):
 
 
 def validate_progress(root, plan, requirements, statuses, tests_by_requirement, owners_by_requirement):
-    errors = []
+    errors = validate_assignments(plan)
     packages = {w['id']: w for w in plan['work_packages']}
     for ident, w in packages.items():
         p = w.get('progress', {})
@@ -80,13 +81,10 @@ def todo_md(plan, requirements, statuses, tests, tests_by_requirement, owners_by
            f"**{counts['not-started']} not started**. Acceptance: **{automated}/{len(tests)} automated**.", '',
            'A checked deliverable records implemented scope. A work package closes only when its remaining gates and '
            'owned acceptance tests are complete. Research completion records findings; it does not establish a product feature. '
-           'Requirement coverage remains partial until the complete requirement is evidenced.', '', '## Next work', '']
-    for ident in reviewed['next_work']:
-        w = packages[ident]
-        next_task = w['progress']['remaining_tasks'][0] if w['progress']['remaining_tasks'] else w['deliverables'][0]
-        out.append(f"- [ ] **{ident} {w['title']}** — {next_task}")
-    out += ['', 'WP-105 core is implemented. Build WP-108 on that core before closing the effect-aware recovery gate; '
-            'start dependencies describe implementation order, not proof that every closure gate is satisfied.', '',
+           'Requirement coverage remains partial until the complete requirement is evidenced.', '']
+    out += agent_backlogs_md(plan)
+    owned = assignments(plan)
+    out += ['',
             '## Requirement coverage', '',
             'All requirements are listed below. `partial` means a concrete capability is implemented; '
             '`planned` means no product coverage is claimed; `deferred` retains an explicit revisit condition. '
@@ -110,6 +108,10 @@ def todo_md(plan, requirements, statuses, tests, tests_by_requirement, owners_by
                     'Requirements: ' + (', '.join(w['requirements']) or 'Build support') + '. '
                     'Owned acceptance tests: ' + (', '.join(w['tests']) or 'Component/build verification') + '. '
                     'Start dependencies: ' + (', '.join(w['depends_on']) or 'None') + '.', '']
+            if w['id'] in owned:
+                task = owned[w['id']]
+                out += [f"Implementation owner: **{task['owner']}**; reviewer: **{task['reviewer']}**; "
+                        f"backlog: {task['ticket']}. Shared paths follow the exclusive write areas above.", '']
             out += [f"- [{'x' if text in p['completed_deliverables'] else ' '}] {text}" for text in w['deliverables']]
             if p['status'] == 'partial':
                 out += ['', 'Implemented scope:', ''] + [f'- {text}' for text in p['implemented']]

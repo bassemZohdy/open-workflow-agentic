@@ -291,6 +291,7 @@ Implementation status: **partial**.
 - Implemented: H3 actor-expiry bound at Claude b0e3b18: full CI39355478836/34 exchanger cases pass. V65 H4 schema provided in GPT f97f193; five direct SQL cases pass in full CI39356040766 atd05fc17. H4 product consumer is still open.
 - Implemented: ADR0021 H3 freshness direction selected for implementation, explicitly superseding actor-output-exp acceptance only when replacement including H4 passes. Old strict baseline remains; current #39 1abcfbd is reviewed as incompatibility evidence only, not provider acceptance.
 - Implemented: Shared checkpoint correction: diagnostic SDK1893c17/39364160057 reproduced late task completion after SDK cancellation deleting its parent (real JPA23503, one new failing case in both lanes). Gate now holds known-cancelled work without ACK/success or poisoning independent work; transaction-scoped SDK mutation/cleanup ordering prevents resurrection. Active failures and required ABORTED cleanup retain their gates. Ten local gate/writer/SDK unit cases pass; two real-JPA regressions and corrected current CI remain pending. Current #39 fc0376c still has two P1 acceptance findings and failed full build despite green matrix; H3/H4 unintegrated, package partial.
+- Implemented: Claude c6a9228 strict Java tests and product hardening integrated into GPT #40; prior399fda1 full CI and six real delegation cases pass, standard never reached its IT. Current665547e reruns after a GPT fault-proxy fixture correction; H3/H4 remain open.
 
 PR #40 integrates reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858. KeycloakInteropIT is characterization only; all ten cases were skipped in build run 39262137012. Separate non-skipped characterization CI is wired; strict H1/H2 consumer cases and WP-102 closure remain open. No merge to main or real-provider pass is claimed.
 
@@ -305,6 +306,8 @@ Remaining gates:
 - Integrate H4 exact issuer+jti binding consumer with expiry/tenant equality, live exact grant/ancestor checks and conflict/outage/revocation tests; V64 must integrate before V65 on main.
 - Implement actor freshness before request and after slow binding/audit before release, strict signed subject/grant/output bounds and independent resource exp>now/iat<=now+5s admission; resolve H4 metadata/commit/conflict/null-dependency findings and prove deterministic non-skipped native success under the amended contract. Old actor-output-exp tests are historical, not transferable passes.
 - Fix the supported-media route discovery probe with Claude: combined bf3e9f4 CI39358079308/matrix39358079363 fail on CloudEvents route415 from hardcoded ordinary JSON; retain401 requirement and all routes. FaultProxyPostgresTest2/2 passes.
+- H3: bound actual signed credential by verified actor expiry as well as subject/grant/300s; H4: durable exact issuer+jti-to-grant/chain binding, with equivalent-grant revocation tests.
+- Strict combined-head matrix/reciprocal review still required; ordinary builds running zero Keycloak cases are not provider evidence.
 
 Evidence: [docs/identity.md](../../docs/identity.md), [docs/audit.md](../../docs/audit.md), [docs/handoffs/gpt/WP-102.md](../../docs/handoffs/gpt/WP-102.md)
 
@@ -430,6 +433,9 @@ Implementation status: **partial**.
 - Implemented: Diagnostic1893c17 workflow39364160057 failed only the new late-cancelled-checkpoint regression in both lanes (207 app cases each): actual JPA23503 after parent cleanup poisoned its gate. Correction holds cancelled stages without success/ACK, retains active failure gates, and serializes SDK mutations/cleanup in the actual JPA transaction to prevent resurrection. Ten local gate/writer/SDK lifecycle unit cases pass; two real-JPA cancellation ordering regressions require current CI. Draft #43; complete delivery/T13 still open.
 - Implemented: SDK2cb33c1 full39364985191 SUCCESS: checkpoint3, selection6, protocol9, cancellation2 non-skipped. Parent6a0081d full39364933849/matrix39364933841 SUCCESS, including2 cancellation cases each lane and old-profile standard3/native7; amended H3/H4 unaccepted. Reciprocal current-head reviews remain required.
 - Implemented: Isolated task-ownership successor adds V68 task-shared renewable owner/epoch with short transactions, retained identity and audited decisions, mandatory format2 marker fencing in the actual SDK/proof transaction including fresh expiry after blocking row locks. Local app test-compile and5 task/wait identity cases pass;7 PostgreSQL lease and6 actual SDK/JPA cases await execution. ADR0026 Proposed; no production consumer/complete ownership/T13 claim. Owned matching/reservation, coordinator, ACK/restore/partition/loop/foreach/manual/starts/cleanup/tracing remain open.
+- Implemented: Draft #41 implements durable inbox signals and authorized/audited scoped CloudEvents receipt; ingress/privacy04b421f full CI39352802891 green.
+- Implemented: Actual JPA checkpoint guard, unhealthy readiness and new-start refusal implemented at499550a; full CI39354335254 passes, including selected guarded writer/original reader and existing restart tests. This is not end-to-end inbox consumption.
+- Implemented: PR #41 merged as e738218 after exact cd3f57b Claude APPROVE-partial and CI39355182128; main postmerge39357918414 passed. Durable delivery/ACK and full T13 remain open.
 
 Remaining gates:
 
@@ -438,8 +444,11 @@ Remaining gates:
 - Automate complete T13 including late/duplicate events, cancellation races and failed compensation; storage-only tests are insufficient.
 - Integrate authoritative SDK task-completed receipt proof, bounded delivery coordinator and lost-claim fencing; prove loop/parallel restore and checkpoint-before-ACK crash recovery with actual engine persistence. Protocol-port doubles are not T13 proof.
 - Complete shared-task ownership across all/any registrations without retaining JDBC connections through partial waits; epoch-fence actual checkpoints and prove lost-owner behavior. Nonblocking ACK-before-advance and pre-restore repair remain mandatory; per-wait sessions and three atomic tests are insufficient.
+- Complete durable Flow wait delivery and persisted signal ACK; prove receipt-before-registration, restart/crash windows and stable loop/parallel occurrence identity.
+- Recheck cancellation under the dispatch reservation lock; use named system:event-recovery SERVICE principal and audit every attempt before releasing callbacks; manual changes require authorized oa.recover operation.
+- Complete event-triggered starts, retention/tombstones and delivery tracing; automate full T13 including failed compensation.
 
-Evidence: [docs/handoffs/gpt/WP-107.md](../../docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](../../docs/lifecycle.md)
+Evidence: [docs/handoffs/gpt/WP-107.md](../../docs/handoffs/gpt/WP-107.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/INTEGRATION-2026-10-20.md](../../docs/handoffs/gpt/INTEGRATION-2026-10-20.md)
 
 Reuse: quarkus-flow-messaging
 
@@ -459,7 +468,7 @@ Deliverables:
 Implementation status: **partial**.
 - Implemented: JDBC EffectLedger with committed write-ahead intents, request binding, stable occurrence keys and serialized state transitions.
 - Implemented: Opt-in effect executor with cross-process claims, bounded replay after unknown outcomes, durable compensation links and a thread-scoped manual-resolution queue.
-- Implemented: Reviewed99f475d merged to main at2f722cf after Claude current-head PASS and full CI39349314182; remaining package gates stay partial.
+- Implemented: Reviewed component #38 merged to main at2f722cfa5a44aac3c6376ae38719d81d362236df: Claude PASS99f475d, full CI39349314182 and T03 green; package remains partial.
 
 Remaining gates:
 

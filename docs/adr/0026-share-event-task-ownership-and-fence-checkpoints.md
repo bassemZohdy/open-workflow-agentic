@@ -50,7 +50,7 @@ registration while a partial `all` listen waits.
 
 Process/partition loss, whole task vectors, loop/parallel restore, governed
 `foreach` effects and complete T13 remain acceptance gates. Existing proposed
-ADR0025 is carried by the separate reviewed plan in #35; this decision does not
+ADR0025 is included by the merged reviewed plan #35; this decision does not
 accept that plan or close WP-107. Metrics/tracing, retention cleanup, manual
 OPERATION policy and event starts remain in the package checklist. No production
 consumer is activated by V68, and no arbitrary-target exactly-once claim is made.
