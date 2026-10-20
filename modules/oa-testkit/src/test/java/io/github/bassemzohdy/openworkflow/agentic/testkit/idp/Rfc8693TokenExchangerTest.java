@@ -370,6 +370,17 @@ class Rfc8693TokenExchangerTest {
         assertTrue(e.getMessage().contains("subject"), e.getMessage());
     }
 
+    @Test
+    void anIssuedTokenThatOutlivesTheActorTokenIsRefusedNotShortened() throws Exception {
+        workload = fx.as.workloadToken("planner", fx.tenant, Duration.ofSeconds(60));
+        fx.as.fault(DelegationAuthorizationServer.Fault.IGNORE_SUBJECT_EXPIRY); // the server issues its full lifetime
+
+        ExchangeException e = refused(request(Set.of("cases:read")));
+
+        assertEquals(Code.BAD_RESPONSE, e.code());
+        assertTrue(e.getMessage().contains("actor"), e.getMessage());
+    }
+
     // ---- secrets ---------------------------------------------------------------------------------------------------
 
     @Test
