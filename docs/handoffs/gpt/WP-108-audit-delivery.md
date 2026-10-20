@@ -49,10 +49,21 @@ restore, lease/current identity/authority, manual decision or full Flow proof.
 
 ## Actual test scope / peer request
 
-New shared port/delivery compile and all existing sixteen selected local cases
-pass (producer6/cancellation6/scope4), zero failures/errors/skips. Eight additional
-real SQL cases compile, bringing the owned-database source/delivery fixture to17.
-Fresh exact-head Linux BOTH proof is required before calling these passed.
+All183 contracts and sixteen selected local cases pass (producer6/cancellation6/
+scope4), zero failures/errors/skips. All application test sources compile, tools76/
+generated/dependency checks pass. Separate full-reactor verify -DskipTests BUILD
+SUCCESS supplies dependency lists; that compile/package command is not labeled
+a full local test run. Eight added actual SQL cases bring the fixture to17.
+
+Verification owner=GPT; tested product SHA=c4adaabad02e0bdffbce54324302b8f6b1f7a13d.
+Verdict COMPONENT_TESTS_PASS, NOT peer approval/activation/package completion.
+BOTH39412132989 SUCCESS. Downloaded and inspected BOTH complete raw logs:
+standard118592238766/native118592239679. Source/delivery SQL17/unit6 and original
+separate-worker core recovery1 EACH, standard3/native8 and strict provider/process
+checkers pass, zero failures/errors/skips. Each reactor183 contracts/322 runtime/
+196 testkit/279 application cases. No failed matrix rerun or weakened assertion.
+Documentation evidence heads remain distinct from this tested product; final
+exact peer/full PR/real-consumer/current-authority/Flow gates remain open.
 
 SQL cases cover direct/ready per-key predecessor refusal, actual stored-binding
 requirement and changed sealed-hash refusal, irreversible ACK/update/delete/

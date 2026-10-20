@@ -1,6 +1,6 @@
 # Changelog
 
-- WP-108 delivery preparation: publish the shared append-once port and explicit bounded delivery with atomic pending rows, per-key ordering, actual central-binding ACK checks and uncertain-reply recovery. Eight additional SQL cases compile; new-head Linux proof and real Claude consumer remain required. No dispatch/Flow activation or package promotion.
+- WP-108 delivery preparation: publish the shared append-once port and explicit bounded delivery with atomic pending rows, per-key ordering, actual central-binding ACK checks and uncertain-reply recovery. Exactc4adaab passes BOTH39412132989: source/delivery SQL17, process1 in each lane, standard3/native8 and strict checks, zero failures/errors/skips. Queue tests use explicit central data fixtures; real atomic Claude consumer/peer/activation gates remain. No dispatch/Flow activation or package promotion.
 
 - WP-108 preparation: explicitly opt in to atomic retained effect audit provenance and original drafts; exact retry preserves source identity after uncertain commit replies. Proposed V77 guards scoped journal/source consistency and keeps legacy rows unproven. Exact2941204 passes BOTH39410266875: nine real SQL/six producer cases, core process recovery in each lane and standard3/native8 with strict checkers, zero failures/errors/skips. No central receipt, governed target/Flow activation or package promotion.
 
