@@ -15,18 +15,21 @@ import java.util.Set;
  * @param audience    the one audience of the token
  * @param scopes      the scopes of the token; a subset of what was asked
  * @param expiresAt   the token's expiry: at most 300 seconds after issue and never after the grant's expiry
- * @param tokenId     the {@code jti}, or null
+ * @param issuer      the verified issuer of the token (with the {@code jti} it is the key of the grant binding)
+ * @param tokenId     the {@code jti}
  * @param actors      the delegation chain recorded in the token, nearest actor first
  * @param grantId     the grant that authorized the exchange
  */
 public record IssuedToken(Credential accessToken, String audience, Set<String> scopes, Instant expiresAt,
-                          String tokenId, List<String> actors, Ulid grantId) {
+                          String issuer, String tokenId, List<String> actors, Ulid grantId) {
 
     public IssuedToken {
         Objects.requireNonNull(accessToken, "accessToken");
         Objects.requireNonNull(audience, "audience");
         scopes = Set.copyOf(scopes);
         Objects.requireNonNull(expiresAt, "expiresAt");
+        Objects.requireNonNull(issuer, "issuer");
+        Objects.requireNonNull(tokenId, "tokenId");
         actors = List.copyOf(actors);
         Objects.requireNonNull(grantId, "grantId");
     }

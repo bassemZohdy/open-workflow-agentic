@@ -5,6 +5,7 @@ import static io.github.bassemzohdy.openworkflow.agentic.testkit.idp.IdentityFix
 import static io.github.bassemzohdy.openworkflow.agentic.testkit.idp.IdentityFixture.CLIENT_SECRET_NAME;
 import static io.github.bassemzohdy.openworkflow.agentic.testkit.idp.IdentityFixture.PLANNER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,7 +14,9 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Credential;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.DelegationGrant;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ExchangeRequest;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InMemoryReplayCache;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ExchangeException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedTokenBindings;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.JdbcReplayCache;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ReplayCache;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ResourceTokenGuard;
@@ -60,12 +63,12 @@ class ResourceTokenGuardTest {
     void start() throws Exception {
         fx = new IdentityFixture(RESOURCE, "tool-search");
         exchanger = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets,
-                fx.grants, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
+                fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock, Duration.ofSeconds(2));
         grant = fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, SCOPES, fx.clock.instant().plus(Duration.ofHours(1)),
                 null);
         userToken = fx.as.userToken("alice", fx.tenant, "oa-api", SCOPES, Duration.ofMinutes(30));
         workload = fx.as.workloadToken("planner", fx.tenant, Duration.ofMinutes(30));
-        guard = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), fx.grants, fx.clock, 1);
+        guard = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), fx.grants, fx.bindings, fx.clock, 1);
     }
 
     @AfterEach
@@ -152,6 +155,72 @@ class ResourceTokenGuardTest {
         assertEquals(Reason.EXPIRED, refusedWith(fx.idp.signClaims(claims), Set.of("cases:read")));
     }
 
+    @Test
+    void aFirstUseJustBeforeExpiryIsAdmittedButExactlyAtExpiryAndInsideTheVerifierSkewIsNot() {
+        // the verifier would accept these (skew 30 s); the resource never grants delegated authority past exp
+        IssuedToken justBefore = issue(RESOURCE, Set.of("cases:read"));
+        IssuedToken atExpiry = issue(RESOURCE, Set.of("cases:read"));
+        IssuedToken inSkew = issue(RESOURCE, Set.of("cases:read"));
+        fx.clock.advance(Duration.ofSeconds(299));
+        assertEquals(Set.of("cases:read"), guard.admit(justBefore.accessToken().reveal(), Set.of("cases:read")).scopes());
+        fx.clock.advance(Duration.ofSeconds(1));
+        assertEquals(Reason.EXPIRED, refusedWith(atExpiry.accessToken().reveal(), Set.of("cases:read")));
+        fx.clock.advance(Duration.ofSeconds(10));
+        assertEquals(Reason.EXPIRED, refusedWith(inSkew.accessToken().reveal(), Set.of("cases:read")));
+    }
+
+    @Test
+    void aTokenIssuedInTheFutureBeyondFiveSecondsIsRefusedEvenInsideTheVerifierSkew() throws Exception {
+        Map<String, Object> claims = forged(RESOURCE);
+        claims.put("iat", fx.clock.instant().plusSeconds(6).getEpochSecond());
+        claims.put("exp", fx.clock.instant().plusSeconds(120).getEpochSecond());
+        assertEquals(Reason.NOT_YET_VALID, refusedWith(fx.idp.signClaims(claims), Set.of("cases:read")));
+    }
+
+    @Test
+    void aTokenThatExpiresWhileTheGrantAndBindingAreBeingCheckedIsRefusedBeforeItsUseIsConsumed() {
+        IssuedToken token = issue(RESOURCE, Set.of("cases:read"));
+        fx.clock.advance(Duration.ofSeconds(299));
+        IssuedTokenBindings slow = new IssuedTokenBindings() {
+            @Override
+            public void bind(String issuer, String tokenId, Binding binding) {
+                fx.bindings.bind(issuer, tokenId, binding);
+            }
+
+            @Override
+            public java.util.Optional<Binding> find(String issuer, String tokenId) {
+                java.util.Optional<Binding> found = fx.bindings.find(issuer, tokenId);
+                fx.clock.advance(Duration.ofSeconds(2)); // a slow lookup: now it is past exp
+                return found;
+            }
+        };
+        ReplayCache cache = new InMemoryReplayCache(100);
+        ResourceTokenGuard slowGuard = new ResourceTokenGuard(fx.verifier, RESOURCE, cache, fx.grants, slow, fx.clock, 1);
+
+        assertEquals(Reason.EXPIRED, assertThrows(TokenRejectedException.class,
+                () -> slowGuard.admit(token.accessToken().reveal(), Set.of("cases:read"))).reason());
+        assertTrue(cache.use(token.issuer() + "|" + token.tokenId(), token.expiresAt(), 1, fx.clock.instant().minusSeconds(10)),
+                "the actual token's use was not consumed");
+    }
+
+    @Test
+    void aTokenThatExpiresWhileTheReplayStoreIsSlowIsNeverReturnedAsAuthority() {
+        IssuedToken token = issue(RESOURCE, Set.of("cases:read"));
+        fx.clock.advance(Duration.ofSeconds(299));
+        InMemoryReplayCache inner = new InMemoryReplayCache(100);
+        ReplayCache slow = (key, expiresAt, maxUses, now) -> {
+            boolean allowed = inner.use(key, expiresAt, maxUses, now);
+            fx.clock.advance(Duration.ofSeconds(2)); // a slow blocking store: now it is past exp
+            return allowed;
+        };
+        ResourceTokenGuard slowGuard = new ResourceTokenGuard(fx.verifier, RESOURCE, slow, fx.grants, fx.bindings, fx.clock, 1);
+
+        assertEquals(Reason.EXPIRED, assertThrows(TokenRejectedException.class,
+                () -> slowGuard.admit(token.accessToken().reveal(), Set.of("cases:read"))).reason());
+        // the late first use consumed its use (a denied late use may), and nothing was returned
+        assertFalse(inner.use(token.issuer() + "|" + token.tokenId(), token.expiresAt(), 1, fx.clock.instant().minusSeconds(10)));
+    }
+
     // ---- replay -----------------------------------------------------------------------------------------------
 
     @Test
@@ -165,8 +234,8 @@ class ResourceTokenGuardTest {
 
     @Test
     void aTokenMayBeUsedAsOftenAsTheResourceAllowsAndNoMore() {
-        ResourceTokenGuard three = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), null,
-                fx.clock, 3);
+        ResourceTokenGuard three = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), fx.grants,
+                fx.bindings, fx.clock, 3);
         String token = issue(RESOURCE, Set.of("cases:read")).accessToken().reveal();
 
         for (int i = 0; i < 3; i++) {
@@ -199,7 +268,7 @@ class ResourceTokenGuardTest {
         ReplayCache broken = (key, expiresAt, maxUses, now) -> {
             throw new IllegalStateException("database down");
         };
-        ResourceTokenGuard failing = new ResourceTokenGuard(fx.verifier, RESOURCE, broken, null, fx.clock, 1);
+        ResourceTokenGuard failing = new ResourceTokenGuard(fx.verifier, RESOURCE, broken, fx.grants, fx.bindings, fx.clock, 1);
         String token = issue(RESOURCE, Set.of("cases:read")).accessToken().reveal();
 
         assertEquals(Reason.VERIFIER_UNAVAILABLE, assertThrows(TokenRejectedException.class,
@@ -226,14 +295,11 @@ class ResourceTokenGuardTest {
     }
 
     @Test
-    void withoutAGrantLookupARevokedGrantStillWaitsForTheTokenToExpire() {
-        ResourceTokenGuard noLookup = new ResourceTokenGuard(fx.verifier, RESOURCE, new InMemoryReplayCache(100), null,
-                fx.clock, 1);
-        String token = issue(RESOURCE, Set.of("cases:read")).accessToken().reveal();
-        fx.grants.revoke(grant.id(), ALICE, "withdrawn", null);
-
-        assertEquals("alice", noLookup.admit(token, Set.of("cases:read")).subject().id(),
-                "this is the revocation latency docs/identity.md describes: at most the token lifetime");
+    void aGuardWithoutGrantsOrBindingsCannotBeBuilt() {
+        assertThrows(NullPointerException.class, () -> new ResourceTokenGuard(fx.verifier, RESOURCE,
+                new InMemoryReplayCache(100), null, fx.bindings, fx.clock, 1));
+        assertThrows(NullPointerException.class, () -> new ResourceTokenGuard(fx.verifier, RESOURCE,
+                new InMemoryReplayCache(100), fx.grants, null, fx.clock, 1));
     }
 
     // ---- the replay caches themselves ------------------------------------------------------------------------
@@ -303,5 +369,85 @@ class ResourceTokenGuardTest {
                 assertEquals(2, rs.getInt(1), "a refused use is not counted");
             }
         }
+    }
+
+    // ---- the exact issuing grant (ADR 0021 H1) --------------------------------------------------------------------
+
+    @Test
+    void revokingTheIssuingGrantStopsTheTokenEvenWhileAnEquivalentGrantStaysActive() {
+        DelegationGrant equivalent = fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, SCOPES,
+                fx.clock.instant().plus(Duration.ofHours(1)), null);
+        String token = issue(RESOURCE, Set.of("cases:read")).accessToken().reveal();
+
+        fx.grants.revoke(grant.id(), ALICE, "withdrawn", null);
+
+        assertTrue(fx.grants.check(equivalent.id()).active(), "the equivalent grant is still active");
+        assertEquals(Reason.GRANT_INACTIVE, refusedWith(token, Set.of("cases:read")));
+    }
+
+    @Test
+    void theTokenIsBoundToItsGrantBeforeItIsReturned() {
+        IssuedToken token = issue(RESOURCE, Set.of("cases:read"));
+
+        IssuedTokenBindings.Binding binding = fx.bindings.find(fx.idp.issuer(), token.tokenId()).orElseThrow();
+        assertEquals(grant.id(), binding.grantId());
+        assertEquals(fx.tenant, binding.tenant());
+        assertEquals(token.expiresAt(), binding.expiresAt());
+    }
+
+    @Test
+    void aTokenWithoutABindingIsRefusedEvenWhenAnActiveGrantCoversIt() {
+        IssuedToken token = issue(RESOURCE, Set.of("cases:read"));
+        fx.bindings.forget(fx.idp.issuer(), token.tokenId());
+
+        assertEquals(Reason.GRANT_INACTIVE, refusedWith(token.accessToken().reveal(), Set.of("cases:read")));
+    }
+
+    @Test
+    void aTokenSignedByTheIssuerButNeverExchangedHasNoBindingAndIsRefused() throws Exception {
+        assertEquals(Reason.GRANT_INACTIVE, refusedWith(fx.idp.signClaims(forged(RESOURCE)), Set.of("cases:read")));
+    }
+
+    @Test
+    void anOutageOfTheBindingStoreRefusesAtTheResourceAndDiscardsTheTokenAtTheExchange() {
+        IssuedToken token = issue(RESOURCE, Set.of("cases:read"));
+
+        fx.bindings.fail(true);
+        assertEquals(Reason.VERIFIER_UNAVAILABLE, refusedWith(token.accessToken().reveal(), Set.of("cases:read")));
+        ExchangeException e = assertThrows(ExchangeException.class, () -> issue(RESOURCE, Set.of("cases:read")));
+        assertEquals(ExchangeException.Code.UNAVAILABLE, e.code());
+        assertTrue(e.getMessage().contains("binding"), e.getMessage());
+
+        fx.bindings.fail(false);
+        assertEquals("alice", guard.admit(token.accessToken().reveal(), Set.of("cases:read")).subject().id(),
+                "nothing was used up while the store was down");
+    }
+
+    @Test
+    void anOldProofWithTheSameJtiButAnotherSignedExpiryIsRefused() throws Exception {
+        IssuedToken issued = issue(RESOURCE, Set.of("cases:read"));
+        Map<String, Object> claims = forged(RESOURCE);
+        claims.put("jti", issued.tokenId());
+        // same issuer, same jti, same grant facts, but a different signed exp than the one that was bound
+        assertNotEquals(issued.expiresAt(), Instant.ofEpochSecond(((Number) claims.get("exp")).longValue()));
+
+        assertEquals(Reason.GRANT_INACTIVE, refusedWith(fx.idp.signClaims(claims), Set.of("cases:read")));
+    }
+
+    @Test
+    void bindingTheSameTokenAgainChangesNothingUnlessEverythingIsIdentical() {
+        IssuedToken issued = issue(RESOURCE, Set.of("cases:read"));
+        IssuedTokenBindings.Binding same = fx.bindings.find(fx.idp.issuer(), issued.tokenId()).orElseThrow();
+
+        fx.bindings.bind(fx.idp.issuer(), issued.tokenId(), same); // an idempotent retry is accepted
+
+        for (IssuedTokenBindings.Binding changed : List.of(
+                new IssuedTokenBindings.Binding(same.grantId(), same.tenant(), same.expiresAt().plusSeconds(1)),
+                new IssuedTokenBindings.Binding(same.grantId(), "another-tenant", same.expiresAt()),
+                new IssuedTokenBindings.Binding(fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, SCOPES,
+                        fx.clock.instant().plus(Duration.ofHours(1)), null).id(), same.tenant(), same.expiresAt()))) {
+            assertThrows(IllegalStateException.class, () -> fx.bindings.bind(fx.idp.issuer(), issued.tokenId(), changed));
+        }
+        assertEquals(same, fx.bindings.find(fx.idp.issuer(), issued.tokenId()).orElseThrow(), "nothing was updated");
     }
 }
