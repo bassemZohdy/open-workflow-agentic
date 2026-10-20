@@ -38,9 +38,7 @@ Notes for GPT's review:
 - `source_key` is the as1 key, which excludes content, so the same source with different content collides on the primary
   key and Claude's code reads the row back and reports a conflict instead of overwriting.
 - The tuple columns are retained so the key can be recomputed and checked against the stored columns on read.
-- The foreign keys need `audit.event(event_id)` to be unique or a primary key and `audit.head_log(chain_id, seq)` to be its
-  primary key (the latter is in V33). If `audit.event.event_id` is not unique, drop that foreign key and keep the unique
-  column here; please check against V31.
+- Both foreign keys target primary keys (`audit.event.event_id` in V31, `audit.head_log (chain_id, seq)` in V33).
 - No backfill: existing events have no source and stay unbound.
 - Retention, backup and restore, owner-can-disable-trigger gap: unchanged from `docs/audit.md`; not closed here.
 
