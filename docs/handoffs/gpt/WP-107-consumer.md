@@ -143,3 +143,10 @@ new-owner reconstruction, every later continuation/effect fence, process and
 partition proof, loop/parallel reader handling and complete T13 remain open.
 The after-ACK owner check is a local boundary check, not a lease spanning every
 later observer/effect. No marker-free task is treated as consumed event evidence.
+
+Exact50ce5af executed in39373064706 SUCCESS BOTH lanes: actual SDK/JPA11,
+owned10, writer5, native8/standard3, all zero skips. Logs independently inspected;
+the three ACK/after-checkpoint-owner cases are now executed, not compile-only.
+The next repair increment and its separate scoped evidence/remaining gates are
+in [WP-107-recovery.md](WP-107-recovery.md). Do not transfer this11-case pass
+to the new original-reader/pre-start-repair or lifecycle failure cases.
