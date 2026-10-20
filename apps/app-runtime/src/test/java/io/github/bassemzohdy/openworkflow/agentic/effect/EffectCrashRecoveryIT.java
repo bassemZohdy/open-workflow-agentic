@@ -12,16 +12,29 @@ import java.sql.Connection;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
 /** Real process death with durable PostgreSQL state and a separate target commit. Executed by failsafe in CI. */
 class EffectCrashRecoveryIT {
+    private static final String TARGET_SCHEMA = "effect_crash_" + UUID.randomUUID().toString().replace("-", "");
+
     @BeforeAll
     static void targetTable() throws Exception {
-        // app-runtime's boot tests migrate the same CI database before the failsafe phase.
+        // Standalone execution must not depend on another boot test migrating first.
+        org.flywaydb.core.Flyway.configure().dataSource(EffectCrashWorker.dataSource())
+                .locations("classpath:db/migration").load().migrate();
         try (Connection c = EffectCrashWorker.dataSource().getConnection(); var s = c.createStatement()) {
-            s.execute("create table if not exists effect.test_target "
+            s.execute("create schema " + TARGET_SCHEMA);
+            s.execute("create table " + TARGET_SCHEMA + ".test_target "
                     + "(run_id varchar(64) not null, effect_key varchar(200) primary key)");
+        }
+    }
+
+    @AfterAll
+    static void removeOwnTargetSchema() throws Exception {
+        try (Connection c = EffectCrashWorker.dataSource().getConnection(); var s = c.createStatement()) {
+            s.execute("drop schema if exists " + TARGET_SCHEMA + " cascade");
         }
     }
 
@@ -48,7 +61,7 @@ class EffectCrashRecoveryIT {
 
     private static long targetEffects(String run) throws Exception {
         try (Connection c = EffectCrashWorker.dataSource().getConnection(); var s = c.prepareStatement(
-                "select count(*) from effect.test_target where run_id = ?")) {
+                "select count(*) from " + TARGET_SCHEMA + ".test_target where run_id = ?")) {
             s.setString(1, run);
             try (var r = s.executeQuery()) { r.next(); return r.getLong(1); }
         }
@@ -59,7 +72,7 @@ class EffectCrashRecoveryIT {
         Files.createDirectories(log.getParent());
         String classpath = System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
         Process child = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "-cp", classpath, EffectCrashWorker.class.getName(), run, mode)
+                "-cp", classpath, EffectCrashWorker.class.getName(), run, mode, TARGET_SCHEMA)
                 .redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {
             assertTrue(child.waitFor(30, TimeUnit.SECONDS), () -> "child timed out: " + log);

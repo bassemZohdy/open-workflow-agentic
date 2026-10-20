@@ -41,6 +41,8 @@ import javax.sql.DataSource;
 public class JdbcEffectLedger implements EffectLedger {
     private static final String WHERE = " where thread_name = ? and node_id = ? and idempotency_key = ?";
     private static final String SELECT = "select * from effect.ledger";
+    // PostgreSQL's two-int advisory namespace is disjoint from the bigint audit/lifecycle locks.
+    private static final int LOCK_CLASS = 0x4F414546; // OAEF
     private final DataSource dataSource;
 
     public record Prepared(Effect effect, boolean attempted, Instant replayUntil, Instant createdAt) { }
@@ -253,11 +255,11 @@ public class JdbcEffectLedger implements EffectLedger {
         byte[] digest = java.util.HexFormat.of().parseHex(CanonicalEncoder.sha256Hex(
                 new CanonicalEncoder("oa.effect.lock.v1").text(key.threadId().value())
                         .text(key.nodeId()).text(key.idempotencyKey()).toBytes()));
-        long lock = ByteBuffer.wrap(digest).getLong();
+        int lock = ByteBuffer.wrap(digest).getInt();
         try (Connection c = dataSource.getConnection()) {
             c.setAutoCommit(true);
-            try (PreparedStatement s = c.prepareStatement("select pg_try_advisory_lock(?)")) {
-                s.setLong(1, lock);
+            try (PreparedStatement s = c.prepareStatement("select pg_try_advisory_lock(?, ?)")) {
+                s.setInt(1, LOCK_CLASS); s.setInt(2, lock);
                 try (ResultSet r = s.executeQuery()) {
                     r.next();
                     if (!r.getBoolean(1)) throw new EffectBusyException();
@@ -265,14 +267,14 @@ public class JdbcEffectLedger implements EffectLedger {
             }
             try { return work.get(); }
             finally {
-                try (PreparedStatement s = c.prepareStatement("select pg_advisory_unlock(?)")) {
-                    s.setLong(1, lock); s.execute();
+                try (PreparedStatement s = c.prepareStatement("select pg_advisory_unlock(?, ?)")) {
+                    s.setInt(1, LOCK_CLASS); s.setInt(2, lock); s.execute();
                 }
             }
         } catch (SQLException e) { throw new StoreUnavailableException("effect claim database failed", e); }
     }
 
-    public static class EffectBusyException extends IllegalStateException {
+    public static class EffectBusyException extends RuntimeException {
         public EffectBusyException() { super("effect is being handled by another worker; retry later with the same key"); }
     }
 

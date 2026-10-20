@@ -22,6 +22,8 @@ public class EffectCrashWorker {
 
     public static void main(String[] args) {
         String run = args[0], mode = args[1];
+        String targetSchema = args[2];
+        if (!targetSchema.matches("effect_crash_[0-9a-f]{32}")) throw new IllegalArgumentException("invalid test schema");
         PGSimpleDataSource ds = dataSource();
         JdbcEffectLedger ledger = new JdbcEffectLedger(ds);
         DurableEffects effects = new DurableEffects(ledger);
@@ -32,7 +34,7 @@ public class EffectCrashWorker {
             public Duration replayWindow() { return Duration.ofHours(1); }
             public Reply execute(String key) throws Exception {
                 try (Connection c = ds.getConnection(); var s = c.prepareStatement(
-                        "insert into effect.test_target (run_id, effect_key) values (?, ?) on conflict do nothing")) {
+                        "insert into " + targetSchema + ".test_target (run_id, effect_key) values (?, ?) on conflict do nothing")) {
                     s.setString(1, run); s.setString(2, key); s.executeUpdate(); // Auto-commit in the target database.
                 }
                 if (mode.endsWith("crash")) Runtime.getRuntime().halt(77);

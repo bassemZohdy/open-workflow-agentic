@@ -168,6 +168,43 @@ class DurableEffectsTest {
     }
 
     @Test
+    void effectClaimsDoNotShareTheAuditAndLifecycleBigintNamespace() throws Exception {
+        EffectCommand command = JdbcEffectLedgerTest.command("lock-namespace");
+        byte[] digest = java.util.HexFormat.of().parseHex(
+                io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder.sha256Hex(
+                new io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder("oa.effect.lock.v1")
+                        .text(command.key().threadId().value()).text(command.key().nodeId())
+                        .text(command.key().idempotencyKey()).toBytes()));
+        long previousKey = java.nio.ByteBuffer.wrap(digest).getLong();
+        try (var connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try (var statement = connection.prepareStatement("select pg_advisory_xact_lock(?)")) {
+                statement.setLong(1, previousKey); statement.execute();
+            }
+            try {
+                assertEquals(EffectState.CONFIRMED, effects.execute(command, new Target()).state());
+            } finally { connection.rollback(); }
+        }
+    }
+
+    @Test
+    void anotherCompensationKeyCannotLeaveAnOrphanIntentOrDispatch() {
+        EffectCommand original = JdbcEffectLedgerTest.command("orphan-regression"); Target target = new Target();
+        effects.execute(original, target);
+        EffectCommand undo = EffectCommand.of(original.key().threadId(), "refund", "1", target.target(), "refund=10");
+        assertEquals(EffectState.COMPENSATED, effects.compensate(original.key(), undo, target).state());
+        var unresolved = ledger.findUnresolved(original.key().threadId());
+        var queue = ledger.manualQueue(original.key().threadId(), 10);
+        int calls = target.calls.get();
+        EffectCommand other = EffectCommand.of(original.key().threadId(), "refund-again", "1", target.target(), "refund=10");
+        assertThrows(IllegalStateException.class, () -> effects.compensate(original.key(), other, target));
+        assertTrue(ledger.find(other.key()).isEmpty(), "intent must roll back when its link is refused");
+        assertEquals(unresolved, ledger.findUnresolved(original.key().threadId()));
+        assertEquals(queue, ledger.manualQueue(original.key().threadId(), 10));
+        assertEquals(calls, target.calls.get());
+    }
+
+    @Test
     void unrelatedConfirmedEffectCannotBeReusedAsProofOfCompensation() {
         EffectCommand original = JdbcEffectLedgerTest.command("original"); Target target = new Target();
         effects.execute(original, target);
