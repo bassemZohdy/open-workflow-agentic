@@ -395,6 +395,55 @@ class Rfc8693TokenExchangerTest {
     }
 
     @Test
+    void aSignedResponseWithAnOverlongSignedLifetimeIsRefusedEvenWhenTheResidualLooksFine() {
+        assertBadResponse(Fault.BACKDATED_IAT); // iat now-301, exp now+299: 600 s signed lifetime
+    }
+
+    @Test
+    void aSignedResponseIssuedMoreThanFiveSecondsInTheFutureIsRefusedInsideTheVerifierSkew() {
+        assertBadResponse(Fault.FUTURE_IAT);    // iat now+6 is inside the verifier's 30 s skew but beyond 5 s
+    }
+
+    @Test
+    void anActorThatTurnsStaleWhileTheInputsAreVerifiedOrTheSecretIsFetchedGetsNoRequestSent() throws Exception {
+        long now = fx.clock.instant().getEpochSecond();
+        // 59 s old when the exchange begins; two slow seconds later it is 61 s old
+        workload = actorWith(c -> { c.put("iat", now - 59); c.put("exp", now + 600); });
+        io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenVerifier slowVerifier = (token, audience) -> {
+            var verified = fx.verifier.verify(token, audience);
+            if (audience.equals(CLIENT_ID)) {
+                fx.clock.advance(Duration.ofSeconds(2));
+            }
+            return verified;
+        };
+        Rfc8693TokenExchanger slowVerification = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID,
+                CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings, slowVerifier, fx.audit(), fx.clock,
+                Duration.ofSeconds(2));
+        int before = fx.as.requestCount();
+        ExchangeException e = assertThrows(ExchangeException.class,
+                () -> slowVerification.exchange(request(Set.of("cases:read"))));
+        assertEquals(Code.INPUT_REJECTED, e.code());
+        assertTrue(e.getMessage().contains("stale"), e.getMessage());
+        assertEquals(before, fx.as.requestCount(), "nothing was sent to the issuer");
+
+        // the same through a slow secret lookup
+        fx.clock.advance(Duration.ofSeconds(0));
+        long later = fx.clock.instant().getEpochSecond();
+        workload = actorWith(c -> { c.put("iat", later - 59); c.put("exp", later + 600); });
+        io.github.bassemzohdy.openworkflow.agentic.runtime.identity.SecretProvider slowSecret = name -> {
+            fx.clock.advance(Duration.ofSeconds(2));
+            return fx.secrets.current(name);
+        };
+        Rfc8693TokenExchanger slowSecrets = new Rfc8693TokenExchanger(fx.as.tokenEndpoint(), CLIENT_ID,
+                CLIENT_SECRET_NAME, slowSecret, fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock,
+                Duration.ofSeconds(2));
+        ExchangeException secret = assertThrows(ExchangeException.class,
+                () -> slowSecrets.exchange(request(Set.of("cases:read"))));
+        assertEquals(Code.INPUT_REJECTED, secret.code());
+        assertEquals(before, fx.as.requestCount(), "nothing was sent to the issuer");
+    }
+
+    @Test
     void aMissingStaleFutureOrExpiredActorIsRefusedBeforeAnythingIsSent() throws Exception {
         long now = fx.clock.instant().getEpochSecond();
         Map<String, java.util.function.Consumer<Map<String, Object>>> cases = new java.util.LinkedHashMap<>();

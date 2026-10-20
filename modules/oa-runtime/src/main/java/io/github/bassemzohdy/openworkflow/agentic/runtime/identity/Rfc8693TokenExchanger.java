@@ -101,7 +101,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         DelegationGrant grant = activeGrant(request);
         try {
             Inputs inputs = verifyInputs(request, grant);
-            IssuedToken token = requestToken(request, grant, inputs.subjectExpiry());
+            IssuedToken token = requestToken(request, grant, inputs);
             recheckGrant(request, grant);
             bind(token, grant);
             try {
@@ -276,13 +276,20 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
 
     // ---- the request --------------------------------------------------------------------------------------------
 
-    private IssuedToken requestToken(ExchangeRequest request, DelegationGrant grant, Instant subjectExpiry) {
+    private IssuedToken requestToken(ExchangeRequest request, DelegationGrant grant, Inputs inputs) {
         Credential secret;
         try {
             secret = secrets.current(clientSecretName);
         } catch (SecretUnavailableException e) {
             throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
                     "the client secret '" + clientSecretName + "' is unavailable", e);
+        }
+        // Verification and the secret lookup can block: the inputs are judged at the moment of sending, not when the
+        // exchange began. A request is never sent for a stale actor or an expired subject.
+        Instant sending = clock.instant();
+        requireFreshActor(inputs, sending);
+        if (!inputs.subjectExpiry().isAfter(sending)) {
+            throw input("the subject token is expired");
         }
         Map<String, String> form = new LinkedHashMap<>();
         form.put("grant_type", GRANT_TYPE);
@@ -320,7 +327,7 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
             throw new ExchangeException(ExchangeException.Code.BAD_RESPONSE, "the response is too large");
         }
         if (status == 200) {
-            return accept(parse(body), request, grant, subjectExpiry);
+            return accept(parse(body), request, grant, inputs.subjectExpiry());
         }
         if (status == 400 || status == 401 || status == 403) {
             throw new ExchangeException(ExchangeException.Code.REFUSED,
@@ -411,6 +418,16 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         }
         if (expires.isAfter(now.plusSeconds(MAX_LIFETIME_SECONDS))) {
             throw bad("the issued token lives longer than " + MAX_LIFETIME_SECONDS + " seconds");
+        }
+        // the signed claims themselves, independent of the verifier's skew: positive exact lifetime of at most 300 s and
+        // an issue time at most 5 s ahead (ADR 0021 H3, signed response contract)
+        java.time.Duration lifetime = java.time.Duration.between(verified.issuedAt(), expires);
+        if (lifetime.isNegative() || lifetime.isZero()
+                || lifetime.compareTo(java.time.Duration.ofSeconds(MAX_LIFETIME_SECONDS)) > 0) {
+            throw bad("the issued token's signed lifetime is not positive and at most " + MAX_LIFETIME_SECONDS + " seconds");
+        }
+        if (verified.issuedAt().isAfter(now.plus(ACTOR_FUTURE_ALLOWANCE))) {
+            throw bad("the issued token was issued in the future");
         }
         if (expires.isAfter(grant.expiresAt())) {
             throw bad("the issued token outlives the delegation grant");

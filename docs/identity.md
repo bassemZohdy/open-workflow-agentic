@@ -67,12 +67,13 @@ lists the checks; they are all in force:
 | The grant, and every grant above it, is active now | before the request; nothing is sent otherwise |
 | The token is bound to its issuing grant (`IssuedTokenBindings`) before it is returned; a failed binding discards it | before return |
 | The scopes asked are all held by the grant **and** by the verified subject token | before the request |
-| Both input tokens verify (signature, issuer, time) with the exchanging client as audience; the subject token is the grant's user in the grant's tenant and carries exactly the delegation chain of the grant's parent (none for a root grant); the actor token is the grant's own, undelegated workload token, **fresh**: signed `iat` with `now-60s <= iat <= now+5s` and `exp > now` (missing, stale, future or expired fails closed; fixed bounds, not settings); the subject is not expired | before the request, and the actor window again before the token is returned |
+| Both input tokens verify (signature, issuer, time) with the exchanging client as audience; the subject token is the grant's user in the grant's tenant and carries exactly the delegation chain of the grant's parent (none for a root grant); the actor token is the grant's own, undelegated workload token, **fresh**: signed `iat` with `now-60s <= iat <= now+5s` and `exp > now` (missing, stale, future or expired fails closed; fixed bounds, not settings); the subject is not expired | before the request (re-judged at the moment of sending, after verification and the secret lookup), and the actor window again before the token is returned |
 | No `refresh_token` in the answer; token type Bearer | on the answer |
 | The token verifies (signature, issuer, time), for exactly the audience asked and no other, with a `jti` and an issue time | on the answer |
 | Subject is the grant's user, tenant is the grant's tenant, the actors are exactly the grant's chain, nearest first (a missing or different chain is refused, never flattened) | on the answer |
 | Token scopes are a non-empty subset of the scopes asked | on the answer |
 | The signed `exp` is at most 300 s away and not beyond the grant's expiry **or the verified subject token's expiry**. The signed token need not end with the workload proof (ADR 0021 H3 freshness amendment). An overlong bearer is refused; only the signed `exp` counts, never a shortened Java-side expiry | on the answer |
+| The signed claims themselves: `iat` at most 5 s ahead and a positive signed lifetime `exp-iat` of at most 300 s (exact comparison, independent of the verifier's skew) | on the answer, before binding, audit and release |
 | The token is not the subject or actor token handed back | on the answer |
 | The grant is active and still covers the scopes **after** the answer; then, as the last step after the binding and audit writes, the signed `exp` is still in the future and the actor is still fresh | after the answer, immediately before the token is returned |
 
