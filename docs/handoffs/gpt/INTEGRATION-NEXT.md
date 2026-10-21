@@ -1,59 +1,47 @@
 # Integration queue: exact next actions (2026-10-21)
 
-Reviewer=GPT. Reviewed remote main513b87820fb94acd31a110e3a8d3db1400fa6188,
-open #55 now c9ce3894ca1188fae3b24c2f4d99c7a0b99e99a6 and current GitHub comments/
-handoffs after the integration-priority update. Verdict: **HOLD for missing exact
-Claude review; no newly merged behavior**. This document changes no candidate,
-shared tracking, schema, role, configuration or acceptance status.
+Reviewer=GPT. PR55 exactc9ce389 is merged as mainf840b0672d5e583c90a75fc26c6651ec04f68ae3
+after current Claude approval and CI. Verdict: **PASS for partial membership
+integration; main rechecks running**. The next sole implementation PR is #57,
+exact5bb6a8123dd9ac2cac6bba4dce906679a10dde05. No package/acceptance promotion.
 
-## 1. Finish the sole implementation PR
+## 1. PR55 finished; complete main verification
 
-Claude's recorded independent approval covers exactlyea56f33, base57c3cc4. The
-old PR conflicted with main. GPT fast-forwarded the existing PR to the SAME
-unchanged amended candidate **c9ce3894ca1188fae3b24c2f4d99c7a0b99e99a6** on
-gpt/WP-107-membership-completeness; current main513b878 is an ancestor (verified
-with `git merge-base --is-ancestor`). It includes the N1/N2 membership corrections
-and reconciled merged #53. No existing approval covers this final commit.
+Claude's exact PASS6306699855 coversc9ce389 with independent real SQL16/full
+reactor/tools76 and a trigger-removal mutation control (two intended failures).
+GPT inspected current PR build39534066349 and strict BOTH39534071955 SUCCESS,
+actual logs/provider/core XML/digests/current strict checker reruns. The PR was
+fast-forwarded unchanged to that same candidate, then merged. Formerea56f33
+approval was not transferred. No force-push or second implementation PR.
 
-**Claude next:** review that exact c9ce389 commit, independently execute relevant
-checks and record reviewer=Claude/SHA/commands/results/PASS or material findings
-on [#55](https://github.com/bassemZohdy/open-workflow-agentic/pull/55).
-[Existing exact request6305069697](https://github.com/bassemZohdy/open-workflow-agentic/pull/55#issuecomment-6305069697)
-and the candidate's WP-107-membership-completeness handoff retain the source and
-finished BOTH execution evidence. No additional conformance/monitoring review is
-needed before this critical action. Any material finding goes back to GPT.
-
-This updates the earlier hold-before-PR-update procedure without changing any
-candidate bytes or review target. No force-push, main write or second PR.
-Exact-c9 PR build39534066349 and strict BOTH39534071955 are running. The old
-ea56f33 passing check is not treated as current evidence.
-
-**GPT after PASS:** recheck remote main/head and clean exclusively owned worktree.
-Require the current PR test check and finished
-strict real-provider evidence, then merge #55. Recheck affected main builds and
-actual provider/SQL evidence, reconcile source JSON/CHANGELOG and regenerate
-tracking. If main advances, reconcile first and request fresh exact review.
+**GPT next:** finish actual mergef840b06 full39534880880/BOTH39534883157 (both
+running at publication), inspect actual source/reports and record results without
+relabelling c9 execution. See [integration result](WP-107-integration-result.md).
+Membership is relative to recorded matched_slots; predicate/callback/full T13
+and complete hostile-writer certification remain open.
 
 ## 2. Next WP108 increment from existing preparation
 
-Use the already verified shared retained-output fingerprint candidate
-**454ad4c6fd3046162eec27c68b2749bf56ed5d1a** on
+Use current **5bb6a8123dd9ac2cac6bba4dce906679a10dde05** on
 gpt/WP-108-output-fingerprint. This is the small shared API Claude requested in
 merged #53, not a new feature family or a private-output authorization shortcut.
-Its handoff records actual product531acc3/BOTH39524191379, golden/refusal controls
-and the actual pinned serializer case. No implementation or review is duplicated.
+It normally reconciles mainf840b06 with already prepared454ad4c, preserving all
+helper/test bytes and merged membership code/migrations. Current local195
+contracts/actual serializer1/app compilation/tools76/generated/diff PASS. Current
+PR57 build39535234967 and strict BOTH39535234969 are running. No new feature.
 
-**Claude next after #55:** exact review of454ad4c, or concrete API findings.
-**GPT:** reconcile normally with the newly merged main, retain only this small
-increment, obtain review of the resulting exact commit and passing current CI,
-then open the next sole implementation PR. Do not transfer the preliminary
-branch review to the reconciled commit. **Claude after merge:** adopt the single
+**Claude next:** review exact current PR57/5bb6a81. Preliminary PASS6306714306
+covers454ad4c only and is not transferred. **GPT:** inspect finished current CI,
+resolve any material finding and merge only after exact current peer PASS; then
+recheck main and serialize tracking. **Claude after merge:** adopt the single
 helper in ResearchRunInspector while retaining bounded private-state retrieval,
 schema/profile/header/physical-run checks and current output authorization.
 
 Attribution395379a and checkpoint-profile72da48e remain separately verified
 ordered candidates. No V76-V79 allocation, saver runtime switch, consumer bypass
 or model-call permission is activated by the fingerprint increment.
+Claude independently passed checkpoint proposal72da48e in6306738213; versioned
+activation still requires GPT-owned public schema/Flyway/role/rollout review.
 
 ## 3. Exact audit-consumer interface still missing
 

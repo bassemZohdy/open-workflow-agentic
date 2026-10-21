@@ -1,0 +1,135 @@
+{
+  "reviewer": "GPT",
+  "reviewedSha": "c9ce3894ca1188fae3b24c2f4d99c7a0b99e99a6",
+  "verdict": "PASS: current CI execution only; exact Claude review still required",
+  "buildRun": 39534066349,
+  "strictRun": 39534071955,
+  "profiles": [
+    {
+      "profile": "standard",
+      "job": 119006512049,
+      "artifact": 12316962111,
+      "bytes": 33648,
+      "sha256": "sha256:3188aa85a01c701bde81ca075854b8ce238d03a65e234361fb6860a7019f3be5",
+      "sqlEvidence": "Full job log and suite count16; this workflow retains no SQL method XML",
+      "moduleTests": {
+        "contracts": 192,
+        "runtime": 401,
+        "testkit": 196,
+        "app": 295
+      },
+      "selectedSuites": {
+        "io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedLlmClientTest": 12,
+        "io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ModelBoundaryArchitectureTest": 3,
+        "io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchRunInspectorTest": 24,
+        "io.github.bassemzohdy.openworkflow.agentic.event.ListenGroupStoreTest": 16,
+        "io.github.bassemzohdy.openworkflow.agentic.model.ProviderRetryAuditTest": 1
+      },
+      "actualFailsafeCases": [
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT",
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT",
+          "realIssuerSignatureAndAudienceAreVerified"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT",
+          "theServerStillRefusesWhatItCanSee"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT",
+          "actorlessExchangeIsRejected"
+        ]
+      ],
+      "actualFailsafeCount": 4,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "processLogCount": 4,
+      "processLogBytes": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "strictCheckerPassed": true,
+      "logSha256": "6ff4f1a49967c3692c04a02fee2cb37f54e2ac60e931aa1f3ee7cc79a8e1bf13"
+    },
+    {
+      "profile": "delegation",
+      "job": 119006511909,
+      "artifact": 12316707722,
+      "bytes": 33832,
+      "sha256": "sha256:45172bb5d4897d1846898485c05baf00935620311570fda99ee9675362072229",
+      "sqlEvidence": "Full job log and suite count16; this workflow retains no SQL method XML",
+      "moduleTests": {
+        "contracts": 192,
+        "runtime": 401,
+        "testkit": 196,
+        "app": 295
+      },
+      "selectedSuites": {
+        "io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedLlmClientTest": 12,
+        "io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ModelBoundaryArchitectureTest": 3,
+        "io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchRunInspectorTest": 24,
+        "io.github.bassemzohdy.openworkflow.agentic.event.ListenGroupStoreTest": 16,
+        "io.github.bassemzohdy.openworkflow.agentic.model.ProviderRetryAuditTest": 1
+      },
+      "actualFailsafeCases": [
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT",
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT",
+          "nativeDelegationPreservesAuthorityBounds"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT",
+          "delegationRequiresPermissionAndConsent"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT",
+          "anActorTokenOlderThanSixtySecondsIsRefusedBeforeAnythingIsSent"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT",
+          "issuerKeyRotationIsHandled"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT",
+          "subjectExpiryBoundsIssuedCredential"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT",
+          "revokedOrExpiredGrantIsRejected"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT",
+          "invalidActorIsRejected"
+        ],
+        [
+          "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT",
+          "aFreshActorYieldsACredentialThatOutlivesTheActorTokenWithinTheStatedContract"
+        ]
+      ],
+      "actualFailsafeCount": 9,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "processLogCount": 4,
+      "processLogBytes": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "strictCheckerPassed": true,
+      "logSha256": "694b1cbc5686d088a48505a73a2af15be0416342b8188d2e31e8726c1a08cc0a"
+    }
+  ],
+  "buildLogSha256": "00dd0c7944d804dd26d740b1394ee6c5325d689b1f5f57527a1de8a0871c2ff1",
+  "scope": "Exact current PR build, real Keycloak standard/delegation and retained SQL/process recovery component evidence; no peer approval/full T03/T13 or package promotion"
+}

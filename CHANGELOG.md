@@ -1,5 +1,7 @@
 # Changelog
 
+- Integrate PR55 exactc9ce389 as mainf840b06 after Claude6306699855 and current full39534066349/strict BOTH39534071955. Retain pinned groups and add complete recorded-match/finalized-read/replay fences; actual SQL16/provider/core evidence inspected. Main rechecks running; full T13 remains partial. Next sole WP108 PR57 reconciles the existing shared fingerprint at5bb6a81, requiring new exact review/current CI.
+
 - Reconcile the final serialized main tracking into the held membership candidate, preserving all current proof and queue boundaries. This is documentation only; runtime/test/migration bytes remain at verifieddb43b3b. Hold this final review head and main tracking stable until exact peer/current required PR gates clear.
 
 - Verify current-main membership correction atdb43b3b/BOTH39521278476: SQL16 EACH, integrated inspector24/governed-model12/rule3/actual provider1 and real standard3/delegation8/core1 pass zero skips. Actual full logs/archived provider XML/digests/strict checkers inspected. Final documented candidate needs exact Claude review/current PR checks before #55 advances; unchanged tests/migrations and partial acceptance retained.
@@ -136,7 +138,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
   [PR #33](https://github.com/bassemZohdy/open-workflow-agentic/pull/33), [structure](docs/repository-structure.md).
 - Remove the five exploratory spike projects while keeping reports, measurements, confidence labels and ADRs.
   [PR #32](https://github.com/bassemZohdy/open-workflow-agentic/pull/32).
-- Record owner decisions in ADRs 0019–0023, including recovery liveness, secret-store conditions and version policy.
+- Record owner decisions in ADRs 0019â€“0023, including recovery liveness, secret-store conditions and version policy.
   [PR #27](https://github.com/bassemZohdy/open-workflow-agentic/pull/27).
 - Retain the bridge findings/ADR and the partial A2A wiring diagnosis as research outcomes; a working product A2A
   server/client is still required in WP-207. [PR #8](https://github.com/bassemZohdy/open-workflow-agentic/pull/8),
@@ -173,7 +175,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 - Retain LangGraph4j durability, identity/policy/secrets and MCP/A2A/AG-UI research findings in
   [spike reports](docs/spikes/) and [ADRs](docs/adr/README.md). Reported unknowns remain product validation tasks.
 
-## Implemented portions of requirements — 2026-10-19 snapshot
+## Implemented portions of requirements â€” 2026-10-19 snapshot
 
 Every row below has concrete implementation evidence. Coverage is **partial** for the full requirement; the
 remaining scope is tracked by its owning work packages in TODO.md. Research-only findings are excluded from
