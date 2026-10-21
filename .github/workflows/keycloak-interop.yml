@@ -111,6 +111,7 @@ jobs:
             apps/app-runtime/target/surefire-reports/
             modules/*/target/surefire-reports/
             modules/oa-runtime/target/observability/
+            apps/app-runtime/target/observability/
           if-no-files-found: ignore
       - name: Stop the disposable server
         if: always()

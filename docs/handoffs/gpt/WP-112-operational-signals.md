@@ -43,6 +43,12 @@ runbook for cardinality/privacy, missing telemetry, recovery and rollout limits.
 
 - Runtime OutboxMetrics with four actual cache/failure/concurrency/real Prometheus
   registry cases, including exact exported names and no private labels.
+- Actual application HTTP scrape at `/q/metrics` and real PostgreSQL observation,
+  with five exact unlabeled finite signals/healthy1 and nonnegative counts and
+  observation age. Oldest-row age retains the existing wall-clock SQL meaning.
+  Only the bounded
+  outbox lines are retained, not unrelated application/route/tenant metrics.
+  This added boot case is compiled locally only until fresh combined CI executes.
 - Shared test-only BOM-managed micrometer-registry-prometheus dependency, already
   used by the deployable; no production dependency/provider/version upgrade.
 - Example collector config, six-panel Grafana JSON and five candidate warning

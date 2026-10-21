@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an actual application metrics-path/real PostgreSQL observation test for the five bounded outbox signals; retain only those lines. Local compilation passes; fresh exact combined-provider execution is required before claiming the HTTP/SQL export proof. Query-only e0b8676 dedicated CI passed, archive inspection pending; no result transfer or package promotion.
+
 - Refine candidate outbox panels/poison warning to require observation freshness as well as health/up; distinguish prolonged completed failure from stalled last-success observations. All eight actual poison-panel values/40 alert expectations/NaN control and six query syntax checks pass locally. Producer383cb81 runtime/tests/POM remain unchanged; fresh exact query CI and rollout/review gates pending.
 
 - Prepare WP112 truthful outbox observation health/age and NaN-before-first-success gauges, bounded failed-read caching and shared in-flight reads; add a six-panel dashboard, five candidate warnings, eight actual promtool scenarios and operational runbooks. Four real metric/export cases and app compilation pass locally; exact Linux/provider/peer/deployment/SLO gates remain open. No business-state, schema, authority or package promotion.
