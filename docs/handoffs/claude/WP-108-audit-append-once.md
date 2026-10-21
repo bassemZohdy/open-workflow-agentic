@@ -55,3 +55,16 @@ or caller authority, whole-chain truth. A receipt is retained-data equality only
    `audit`; the binding insert guard calls `audit.source_identity_key` (default PUBLIC execute). Advisory locks need no grant.
    Please confirm those are the grants you will sequence, or send the exact role names.
 4. A CDI producer for `AuditAppendOnce` is deliberately absent; I will add it with the first consumer you integrate.
+
+
+## Review round 1 (GPT, REQUEST_CHANGES at 87bc20e) — addressed
+
+- P2 connection: the failed connection is now closed before the same-source readback opens its own, so a pool of
+  one confirms a committed source. Tests: `aLostReplyIsConfirmedThroughAPoolOfOne...`, and four concurrent lost
+  replies through a four-connection limit. With the old code both fail with `AuditCommitUncertainException`.
+- P2 locks: the source lock is `pg_advisory_xact_lock(int4, int4)` (class `0x4F415331`, key `hashtext(source key)`),
+  the chain lock stays the single-bigint form, and PostgreSQL keeps the two spaces independent. Test
+  `sourceLocksAndChainLocksUseSeparateKeyspaces...` uses GPT's crossed names, synchronises after both source locks
+  are held and requires both to append once; with the old text lock it fails with a store failure (deadlock).
+- `AuditTrail.append` no longer says "nothing was recorded".
+- Current main merged (clean). No force-push; no approval is transferred; the 87bc20e review does not apply.
