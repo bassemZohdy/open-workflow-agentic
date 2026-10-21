@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify original checkpoint proposal651e12a/BOTH39525585412: nine actual SQL methods/all20 report observations and real saver/negative/strict evidence pass; all148 actual XML EACH checked. Final refinement also refuses NULLS NOT DISTINCT in required indexes (ten methods/23 cases), compile-only pending fresh exact SQL. Superseded queued run cancelled; no applied schema/role/runtime/package promotion.
+
 - Refine unversioned checkpoint profile adoption proposal to refuse table inheritance in either direction; add two real JDBC observations to the ten-method/22-case suite. App compilation/JVM augmentation pass; actual SQL/refined strict evidence pending. No applied migration, role, runtime switch or package promotion.
 
 - Prepare an unversioned checkpoint-profile adoption proposal outside Flyway, with strict compatible-history validation, fresh-pair creation and NOWAIT writer refusal. Nine methods/20 expected observations compile, including actual saver compatibility and legacy failures; SQL/Linux proof pending. No runtime switch, role/version allocation, applied migration or package promotion.

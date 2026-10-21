@@ -134,6 +134,7 @@ begin
           where i.indrelid=wanted.relation_oid and x.relname=wanted.index_name and x.relnamespace=namespace_oid;
         if not found or actual.relam<>btree_oid or not actual.indisvalid or not actual.indisready
            or not actual.indimmediate or actual.indisprimary or actual.indisunique<>wanted.is_unique
+           or actual.indnullsnotdistinct
            or actual.indnkeyatts<>wanted.key_count or actual.indnatts<>wanted.key_count
            or actual.indkey::text<>wanted.keys or actual.indoption::text<>wanted.sort_options
            or actual.indexprs is not null or actual.predicate is distinct from wanted.predicate then

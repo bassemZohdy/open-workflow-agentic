@@ -134,6 +134,7 @@ class ResearchCheckpointSchemaTest {
         cases.put("missing-index","drop index %1$s.idx_lg4jcheckpoint_thread_id");
         cases.put("predicate","drop index %1$s.idx_unique_lg4jthread_thread_name_unreleased; create unique index idx_unique_lg4jthread_thread_name_unreleased on %1$s.lg4jthread(thread_name) where is_released=true");
         cases.put("sort-order","drop index %1$s.idx_lg4jcheckpoint_thread_id_saved_at_desc; create index idx_lg4jcheckpoint_thread_id_saved_at_desc on %1$s.lg4jcheckpoint(thread_id,saved_at asc)");
+        cases.put("nulls-not-distinct","drop index %1$s.idx_unique_lg4jthread_thread_name_unreleased; create unique index idx_unique_lg4jthread_thread_name_unreleased on %1$s.lg4jthread(thread_name) nulls not distinct where is_released=false");
         cases.put("extra-unique","create unique index no_released_duplicates on %1$s.lg4jthread(thread_name)");
         for(var entry:cases.entrySet())fixture(true,(c,s)->{seed(c,s);sql(c,entry.getValue().formatted(s));refused(c,s,"23514",entry.getKey());});
     }
@@ -231,7 +232,7 @@ class ResearchCheckpointSchemaTest {
     }
     @AfterAll static void evidence() throws Exception {
         Set<String> expected=Set.of("fresh-idempotent","legacy-preserved","partial-pair","type","nullability","default","primary-key","foreign-key","extra-column",
-                "missing-index","predicate","sort-order","extra-unique","namespace-shadow","view","row-security","check","trigger","inheritance-parent","inheritance-child","actual-saver","writer-lock");
+                "missing-index","predicate","sort-order","nulls-not-distinct","extra-unique","namespace-shadow","view","row-security","check","trigger","inheritance-parent","inheritance-child","actual-saver","writer-lock");
         var ids=new HashSet<String>();for(var row:RESULTS)assertTrue(ids.add((String)row.get("case")));assertEquals(expected,ids);
         var sorted=RESULTS.stream().sorted(Comparator.comparing(r->(String)r.get("case"))).toList();
         var report=Map.of("scope","Proposed checkpoint profile in owned UUID namespaces; no activation or execution authority",

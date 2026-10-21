@@ -2,9 +2,9 @@
 
 Reviewer=GPT (author verification, not peer approval).
 First product commit:651e12a1e054426ee7fc4e3dc0c1f8fe12f674da (nine methods/20 cases).
-Current refinement adds inheritance refusal; exact final product is recorded below after execution.
-Verdict: app/test compilation and JVM augmentation PASS; actual proposed SQL,
-real saver compatibility, failure cases and strict Linux execution PENDING.
+Current refinement adds inheritance/null-uniqueness refusal; exact final product is recorded below after execution.
+Verdict: original651e12a proposed SQL/real saver/negative/strict execution PASS.
+Refinement compiles/JVM augmentation PASS; its actual SQL/strict execution PENDING.
 This is not an applied migration, runtime change or completed work package.
 
 ## Scope, source and ownership
@@ -62,13 +62,13 @@ backup/restore/retention/authority protocols.
 
 ## Verification plan and fixture boundaries
 
-ResearchCheckpointSchemaTest now has ten compiled methods/22 required observations:
+ResearchCheckpointSchemaTest now has ten compiled methods/23 required observations:
 
 | Verification | Required result | Current evidence |
 | --- | --- | --- |
 | Fresh/idempotent and compatible nonempty adoption | Same constraint identities, original row ids/private text unchanged | Compiled; Linux execution pending |
 | Partial, wrong type/nullability/default/PK/FK/extra column |23514, no completion/reset/repair, identical original rows/keys | Compiled; pending |
-| Missing index/wrong predicate/order/extra uniqueness |23514 with unchanged history | Compiled; pending |
+| Missing index/wrong predicate/order/NULLS NOT DISTINCT/extra uniqueness |23514 with unchanged history | Compiled; pending |
 | Namespace shadow/view/RLS/check/user trigger |23514 before adoption, no guard removal or shadow store | Compiled; pending |
 | Inherited parent/descendant |23514, including measured descendant rows in ordinary saver queries | Compiled; pending |
 | Actual pinned saver createTables(false) | Real INSERT/read/UPDATE/release through committed physical connections still work | Compiled; pending |
@@ -95,7 +95,7 @@ re-entry for a governed invocation.
 
 CI retains actual app/module XML plus target/conformance/checkpoint-schema/cases.json.
 The report must name the exact product SHA, pinned/proposed source hashes and
-ALL22 unique expected observations. Passing source compilation, generated tests,
+ALL23 unique expected observations. Passing source compilation, generated tests,
 an incomplete report, skipped tests or another product's green CI is not execution
 evidence. Local package -DskipTests compiles the new source and augments the app;
 it does not run PostgreSQL or native Cedar. Required actual results remain open.
@@ -132,3 +132,39 @@ compilation/JVM augmentation PASS; actual SQL remains pending. Original
 BOTH39525585412 retains its own651e12a SHA/results and cannot prove this refinement.
 The new exact product requires fresh BOTH evidence. No applied migration, runtime
 call, role or Claude source is changed; main513b878/c9ce389 remain frozen.
+
+## Original exact execution and remaining refinement gate
+
+Reviewer=GPT author verification PASS at original651e12a1e054426ee7fc4e3dc0c1f8fe12f674da.
+[BOTH39525585412](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39525585412)
+SUCCESS attempt1: standard118979328141/delegation118979327889. BOTH finished
+complete logs and ALL148 actual XML suites EACH inspected,1060/1065 cases,
+contracts183/runtime389/testkit196/app288 plus Failsafe4/9, consistent unique
+cases and zero failures/errors/skips. Exact original checkpoint9/inspector24/
+governed12/rule3/physical-provider1 method sets match that source. Real strict
+standard3/delegation8/core1 current checkers rerun successfully on actual archives.
+
+BOTH actual cases.json reports have the exact651e12a product SHA, pinned DDL/
+proposal hashes and ALL20 original unique observations. All negative SQLSTATEs
+match23514 or writer55P03; exact before/after retained-row diagnostic hashes
+match. Actual saver createTables(false)/changed checkpoint id/release retained
+history/re-entry additional physical run assertions pass. The latter is measured
+hazard evidence, not authority to re-enter governed work.
+
+| Profile | Artifact | Bytes | SHA256 |
+| --- | --- | --- | --- |
+| standard |12313582179|1869684|1c5a85028a69011a3b5db8c34f973ea1b26f0e87931076681aa9f2fb914fe100|
+| delegation |12312696965|1868497|4846abef8b8357a8b21bf0ff244e46e700516f366debda5573055ad3eb1cf791|
+
+GitHub metadata/digests/CRC/bounded safe extraction verified. This proof remains
+under its ACTUAL original SHA: it does not prove the later two inheritance cases
+or the later null-uniqueness refusal. The superseded inheritance-only263e53a/
+BOTH39526209425 was cancelled while QUEUED before tests; both job conclusions
+are cancelled and no execution success is claimed.
+
+A second catalog review found that required index indnullsnotdistinct must be
+false to preserve pinned nullable-name uniqueness. The final refinement adds
+that guard plus one negative case, giving ten compiled methods/23 observations.
+Local app/test compilation/JVM augmentation and tooling76/generated checks pass.
+The final exact product needs fresh BOTH before peer/activation claims. No
+version/role/applied migration/runtime/Claude source change or package promotion.
