@@ -1,5 +1,7 @@
 # Changelog
 
+- Fix combined candidate CDI ambiguity by exposing concrete/canonical storage separately and providing a default legacy admission-port bridge. Preserve Claude's test override and add a production-default wiring boot case. be45a08 strict CI failed before app discovery; failed artifacts retained, no SQL/provider pass claimed. Nine local controls/app compilation pass; fresh exact Linux/strict evidence pending.
+
 - Normally refresh the queued V73/V74 attribution increment onto integrated Claude #53/current membership correction. Existing resource-store/schema/test bytes remain unchanged; previousf25de24 actual142-suite proof stays historical. Fresh combined-head compile/SQL/provider and current review/PR gates required; no consumer or V75 activation.
 
 - Normally reconcile the pending membership correction with reviewed integrated Claude #53/current main. No membership runtime/test/migration bytes change; previous5522bce strict success remains historical. Fresh combined-head CI and exact Claude review are required before #55 advances.

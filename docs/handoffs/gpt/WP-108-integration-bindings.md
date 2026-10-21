@@ -11,7 +11,8 @@ This is a queued candidate, not a second implementation PR or package completion
 Base5522bce is the membership correction awaiting Claude review6304631674; #55
 remains at its earlier reviewed ea56f33. This candidate isolates existing
 preparation694a238 without merging that branch's later execution/audit proposals.
-The nine selected source/test files are byte-identical to that preparation.
+The initial nine selected source/test files were byte-identical to that preparation;
+the current GPT-owned CDI bridge correction is recorded below.
 No V71/V72/72.1 applied file is edited; V73/V74 retain their existing prepared
 bytes. V75..V80 are absent. After #55 integrates, normally merge current main
 and rerun affected checks before requesting a new implementation PR review.
@@ -135,3 +136,34 @@ retained and generated documents regenerated. The old green results above are
 historical, not proof of the combined component wiring. Fresh current-head
 compilation/strict SQL and exact peer/current required PR checks remain required.
 No new implementation PR, V75 activation or package promotion.
+
+## Combined CDI failure and owned correction
+
+Refreshed productbe45a08/BOTH39521430092 FAILED both profiles during app test
+discovery: ResourceCallBindings has two ordinary beans, the JDBC store and
+Claude's unchanged InMemoryResourceCallBindings test double. AgentResourceDelegatedTest
+injection is ambiguous. All99 archived unit suites per lane precede that failure
+(contracts193/runtime403/testkit196); app/SQL17/provider/core tests do NOT execute.
+This failure is retained; no old green proof is transferred.
+
+Actual failed artifacts12311965013 (1007699 bytes,SHA256
+6522efbdba47c45b7eae78dfe27bff18b69b5881e0c250e067bdd2ac37347aca) and12311830074
+(1007710 bytes,SHA256d14c20f1aec025f78a56c3a1d967bd11b2683f0968f07345059182bb188affc5)
+match GitHub metadata/CRC/safe paths. Both full logs and the discovery exception
+were inspected. Compilation-only augmentation had not discovered test beans.
+
+GPT corrects its own JDBC wiring: @Typed exposes the concrete store and canonical
+ResourceInvocations independently; a narrow @DefaultBean producer supplies the
+legacy ResourceCallBindings port when no override exists. Claude's test store
+can override that port while concrete/canonical storage remains injectable.
+No Claude source, consumer, fixture or permission rule is edited. The V73/V74
+SQL and existing17 storage cases remain unchanged.
+
+New ResourceBindingsDefaultWiringTest boots a profile excluding only that test
+double and requires concrete, canonical and legacy injections to resolve to the
+actual JDBC implementation. Existing delegated HTTP cases retain their override
+and are also required to pass. Nine local scope/preflight controls and app source
+compilation/JVM augmentation pass; the new boot test is compiled, not locally
+executed. Fresh exact combined-head Linux/provider execution is required before
+this correction is considered verified. No source/API authority or package gate
+is weakened and no failed matrix is rerun without this code change.
