@@ -70,7 +70,8 @@ public final class AuditTrail implements AuditSink {
         }
     }
 
-    private static AuditEvent appendInTransaction(Connection connection, String chain, AuditEvent draft)
+    /** Seals and inserts one event on the chain head inside the caller's transaction (also used by {@link AuditAppendOnce}). */
+    static AuditEvent appendInTransaction(Connection connection, String chain, AuditEvent draft)
             throws SQLException {
         lock(connection, chain);
         long previousSequence = 0;
