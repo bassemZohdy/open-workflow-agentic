@@ -1,5 +1,9 @@
 # Changelog
 
+- Reconcile the existing V73/V74 attribution branch with reviewed merged membership/main and current serialized tracking. Runtime/test/migration/build/CI bytes remain identical to tested2f59db1; no backend results are relabeled or repeated. Legacy production admission stays unwired; queue behind current PR57 and require its later current-base/peer/CI gate. No new feature or V75 activation.
+
+- Review Claude PR58 exact87bc20e: request changes for bounded-pool commit-readback exhaustion and valid source/chain lock-argument aliasing. Independent detached current-class JDBC/input probes and compilation pass; no local PostgreSQL execution claimed. Publish concrete fixes/tests/role-boundary handoff. GPT PR57 remains5bb6a81/all current full+strict green, pending exact Claude review.
+
 - Verify final DATA-only attribution product2f59db1/BOTH39523039921: all155 actual suites EACH/storage17/negative production-default wiring1 and strict real providers/core pass zero skips; exact current methods/archives/digests independently inspected. Canonical storage stays available and legacy admission stays unsatisfied. Exact peer/current PR/prerequisite integration and actual consumer/authority/V75/package gates remain open.
 
 - Keep historical attribution from activating legacy admission before the current execution gate: expose concrete/canonical storage only and remove the intermediate default legacy producer. Production-default boot regression now requires the admission port to stay unsatisfied. Intermediate26bdce4 strict CI passed155 suites EACH, but its positive-default proof is historical; nine local controls/app compile pass, fresh final-boundary Linux evidence required. SQL/tests/consumer ownership and package gates retained.
@@ -10,7 +14,13 @@
 
 - Normally reconcile the pending membership correction with reviewed integrated Claude #53/current main. No membership runtime/test/migration bytes change; previous5522bce strict success remains historical. Fresh combined-head CI and exact Claude review are required before #55 advances.
 
-- Integrate Claude #53 exacta71fb1f as main2f10662 after GPT exact-head review6304838496 and full/real-Keycloak CI. Consolidates closed #56, corrects read-only research inspection and gates all current model nodes through audited PEP with no allowing production context. Actual provider one-request failure test passes; concrete-provider architecture-rule gap remains a nonblocking follow-up. Publish the concrete V75 central-audit transaction/duplicate/chain/role/test handoff; activation/consumer/shared execution and package gates remain partial. Postmerge full39520880781/BOTH39520880697 pending.
+- Integrate PR55 exactc9ce389 as mainf840b06 after Claude6306699855 and current full39534066349/strict BOTH39534071955. Retain pinned groups and add complete recorded-match/finalized-read/replay fences; actual SQL16/provider/core evidence inspected. Actual main postmerge full39534880880/BOTH39534883157 SUCCESS with logs/provider XML/strict checks/digests inspected; full T13 remains partial. Next sole WP108 PR57 reconciles the existing shared fingerprint at5bb6a81, current full39535234967/BOTH39535234969 SUCCESS with154 actual XML EACH/zero skips inspected; exact current review still gates merge.
+
+- Reconcile the final serialized main tracking into the held membership candidate, preserving all current proof and queue boundaries. This is documentation only; runtime/test/migration bytes remain at verifieddb43b3b. Hold this final review head and main tracking stable until exact peer/current required PR gates clear.
+
+- Verify current-main membership correction atdb43b3b/BOTH39521278476: SQL16 EACH, integrated inspector24/governed-model12/rule3/actual provider1 and real standard3/delegation8/core1 pass zero skips. Actual full logs/archived provider XML/digests/strict checkers inspected. Final documented candidate needs exact Claude review/current PR checks before #55 advances; unchanged tests/migrations and partial acceptance retained.
+
+- Normally reconcile the pending membership correction with reviewed integrated Claude #53/current main. No membership runtime/test/migration bytes change; previous5522bce strict success remains historical. Fresh combined-head CI and exact Claude review are required before #55 advances.
 
 - Queue a small WP-108 prerequisite integration candidate from existing preparation: V73 immutable resource attribution and V74 canonical occurrence/JDBC store, preserving original call identity across SDK counter changes. Nine selected source/test files retain preparation bytes;193 contracts/nine focused controls/app compile pass,17 SQL cases await fresh exact Linux execution. Retain app/module Surefire XML in strict provider artifacts. No dispatcher/graph/audit-consumer activation, second implementation PR or package promotion.
 
@@ -31,6 +41,10 @@
 - WP-107 preparation: four actual SDK full-workflow listen-group cases establish ALL order/overlap and negative controls for ANY post-completion mutation and concurrent foreach/until completion. All four fixtures validate; these observations do not close durable delivery, FIFO or T13 gates.
 
 - WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. Eight new verifier cases and all76 tooling tests pass; new product process execution still needs fresh Linux CI. No acceptance promotion.
+
+- Publish the isolated retained-output fingerprint proposal and local verification (186 contracts/four controls) for the requested Claude consumer; implementation remains queued4e45373. Membership correction e6a873b awaits exact peer/current checks after combined-product SQL16 pass. Separate attribution bridge fix26bdce4 is under fresh CI after a retained CDI discovery failure; no activation or package promotion.
+
+- Integrate Claude #53 exacta71fb1f as main2f10662 after GPT exact-head review6304838496 and full/real-Keycloak CI. Consolidates closed #56, corrects read-only research inspection and gates all current model nodes through audited PEP with no allowing production context. Actual provider one-request failure test passes; concrete-provider architecture-rule gap remains a nonblocking follow-up. Publish the concrete V75 central-audit transaction/duplicate/chain/role/test handoff; activation/consumer/shared execution and package gates remain partial. Postmerge full39520880781/BOTH39520880697 and documentationc20d37f build39521142788 SUCCESS; actual logs/archived provider XML/strict checkers inspected.
 
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 
@@ -140,7 +154,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
   [PR #33](https://github.com/bassemZohdy/open-workflow-agentic/pull/33), [structure](docs/repository-structure.md).
 - Remove the five exploratory spike projects while keeping reports, measurements, confidence labels and ADRs.
   [PR #32](https://github.com/bassemZohdy/open-workflow-agentic/pull/32).
-- Record owner decisions in ADRs 0019–0023, including recovery liveness, secret-store conditions and version policy.
+- Record owner decisions in ADRs 0019â€“0023, including recovery liveness, secret-store conditions and version policy.
   [PR #27](https://github.com/bassemZohdy/open-workflow-agentic/pull/27).
 - Retain the bridge findings/ADR and the partial A2A wiring diagnosis as research outcomes; a working product A2A
   server/client is still required in WP-207. [PR #8](https://github.com/bassemZohdy/open-workflow-agentic/pull/8),
@@ -177,7 +191,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 - Retain LangGraph4j durability, identity/policy/secrets and MCP/A2A/AG-UI research findings in
   [spike reports](docs/spikes/) and [ADRs](docs/adr/README.md). Reported unknowns remain product validation tasks.
 
-## Implemented portions of requirements — 2026-10-19 snapshot
+## Implemented portions of requirements â€” 2026-10-19 snapshot
 
 Every row below has concrete implementation evidence. Coverage is **partial** for the full requirement; the
 remaining scope is tracked by its owning work packages in TODO.md. Research-only findings are excluded from

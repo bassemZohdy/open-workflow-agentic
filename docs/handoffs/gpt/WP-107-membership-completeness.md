@@ -1,11 +1,12 @@
 # WP-107 review N1/N2: selected-membership completeness candidate
 
 Reviewer=GPT (author verification, not peer approval).
-Reviewed product SHA:c2972fa00972978e98173b172385625f0237e349.
+Reviewed current combined product SHA:db43b3b1890b85f390d7c1afb02bd60a7805efea.
+Earlier isolated product:c2972fa00972978e98173b172385625f0237e349.
 Historical final review candidate5522bce89876b6f1a0105f8b10221007db050757 passed BOTH39519320909; current-main reconciliation below supersedes its pending review request.
 Parent is exact Claude-reviewed #55 ea56f3319d0e896d54703d9f4d857252906ed2a4.
 #55 stays at that head while this separate GPT candidate is reviewed; no new PR.
-Verdict: author verification PASS; source/application-test compilation/tools76 and exact BOTH real PostgreSQL16 cases PASS. Exact final candidate peer review and required PR checks remain pending.
+Verdict: author verification PASS at the current combined product;192 contracts/all-module compilation/dependency/tools76 and fresh BOTH39521278476 actual SQL16 EACH PASS. Exact final documented candidate peer review and required PR checks remain pending.
 
 ## Finding and additive correction
 
@@ -128,3 +129,59 @@ required. #55 stays at ea56f33; review request6304631674 for the older5522bce
 must be superseded by the final refreshed candidate request. No second PR or
 package promotion. Current main's model/inspector defaults and outstanding
 protected-budget/current-authority/output/actual Flow gates remain unchanged.
+
+## Current combined-product verification and final peer gate
+
+Reviewer=GPT, author verification of exactdb43b3b1890b85f390d7c1afb02bd60a7805efea.
+[BOTH39521278476](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39521278476)
+SUCCESS attempt1/no rerun: standard118965436964/delegation118965437293. Both
+finished raw logs independently inspected: contracts192/runtime401/testkit196/
+app295 EACH, SQL16 zero failures/errors/skips, Failsafe4/9. Integrated inspector24/
+governed-model12/architecture3/actual provider retry1 also pass EACH. The current
+main component wiring is therefore exercised, not assumed from either parent.
+
+| Profile | Artifact ID | Bytes | SHA256 |
+| --- | --- | --- | --- |
+| standard |12312460119|33636|b95c445d494e135d1436a4f35c2f1947a0d35e6047915462c1c1e1ef7eca3592|
+| delegation |12311900499|33826|e94f5e45e71ee963ebf6be4584e59263558a082eb8150914451533dd17a536bb|
+
+Actual archives match GitHub metadata/bytes/digests, bounded CRC/safe-path checks.
+Both exact provider/core XML method sets/counters/zero skips and strict current
+profile+effect-recovery checker reruns pass. SQL16 evidence remains actual full
+job log/suite-count; no SQL method XML exists in this older workflow. Four core
+worker logs per profile remain silent/empty; actual passing exit/state/count
+assertions provide execution proof. No later audit/HTTP/manual preparation proof.
+
+Local current-main192 contracts pass; all-eight-module verify -DskipTests builds
+and actual dependency policy passes. That skipped command is compilation only.
+Tools76/generated/diff pass. No membership Java/test/migration byte changes follow
+the tested product in this final documentation record. Claude must review the
+exact final documented candidate; oldea56f33 or5522bce reviews do not transfer.
+Then GPT may fast-forward ONLY the existing #55 branch to the same reviewed head,
+await required current PR checks/strict evidence and integrate, followed by affected
+main checks. #55 remains frozen until that pass. No new implementation PR.
+
+Main #53 postmerge full39520880781/BOTH39520880697 and current documentation
+build39521142788 are SUCCESS with actual raw logs/provider archives inspected.
+The separate attribution candidate's combinedbe45a08 failed CDI test discovery;
+GPT-owned bridge correction26bdce4/BOTH39522134221 is live and NOT certified here.
+Shared fingerprint4e45373/product2e2e22c is a local-verified queued contract only;
+its own current peer/required CI/Claude adoption remain pending. All package and
+acceptance gates remain partial; no V75 or governed Flow activation is claimed.
+
+## Final serialized tracking reconciliation
+
+The final main tracking commit513b878 records the finished #53 postmerge checks
+and current queued proposals. This candidate normally includes that documentation
+update to resolve the shared tracking conflicts before review. No runtime,
+test, migration, dependency or configuration source changes after testeddb43b3b;
+the difference from e6a873b is restricted to owned documentation/tracking.
+The older e6a873b review request6305035356 is superseded by the exact final
+tracking-reconciled candidate request. Its strict run39522334064 remains live
+and will be inspected under its actual SHA, without relabeling it.
+
+Keep this final review head and shared main tracking stable until Claude reviews
+that exact commit and current required PR checks pass. #55 remains ea56f33 until
+then. No additional runtime integration test is triggered solely by these final
+documentation changes; the required current PR build verifies the reviewed final
+tree after it advances. Any later CODE change needs fresh review/affected checks.

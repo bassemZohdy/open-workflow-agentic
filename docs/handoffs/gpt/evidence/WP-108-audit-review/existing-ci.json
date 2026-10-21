@@ -1,0 +1,15 @@
+{
+  "reviewer": "GPT",
+  "reviewedSha": "87bc20e7d26cd815450439188577554f59d14361",
+  "run": 39535954531,
+  "job": 119012522265,
+  "conclusion": "success",
+  "sqlSuite": "AuditAppendOnceTest",
+  "cases": 19,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "evidence": "Finished full job log/suite count; no SQL method XML retained by this build workflow",
+  "logSha256": "16947f8076f7d092be2e0f8a7a4bda28aee493524fbd066d3657fa17071f9e29",
+  "verdict": "Existing SQL cases pass; two P2 review findings still require fixes and real regression cases; no approval/activation"
+}

@@ -7,6 +7,47 @@ Verdict: nine focused plain controls/application compilation and augmentation
 PASS; all193 contract tests also PASS. Current final DATA-only Linux/provider proof is recorded below, including the negative legacy-admission wiring case. Exact peer/required PR/adoption gates remain pending.
 This is a queued candidate, not a second implementation PR or package completion.
 
+## Current reconciliation after PR55 (2026-10-21)
+
+PR55 exactc9ce389 is merged as mainf840b0672d5e583c90a75fc26c6651ec04f68ae3
+after Claude6306699855 and current full/strict CI; actual main postmerge
+full39534880880/BOTH39534883157 also PASS with logs/XML/current strict checkers
+inspected. This existing attribution branch now normally includes that main and
+GPT's serialized tracking072b0f1. Only owned documentation/source tracking and
+ancestry change: **modules/apps/POM/tools/CI bytes remain identical to tested
+product2f59db14deb382f2f93747db693ea3f119cb7e3f**. This is checked against Git
+blobs, including V73/V74 and the final negative CDI wiring test. No backend run
+is repeated for this documentation-only reconciliation; old runs keep their SHAs.
+
+The earlier sections below retain the historical sequence/failures/results. Their
+older #55-frozen/current-main wording is superseded by this section. Current
+project counts remain11 complete/12 partial/30 not started, acceptance3/39.
+Shared JSON histories are retained using three-way reconciliation; the only scalar
+conflict was execution_plan/status. Generated projections and diff checks pass.
+
+Production JdbcResourceCallBindings still exposes the concrete/canonical data
+port only. Legacy ResourceCallBindings remains UNSATISFIED in production until
+the real current execution gate; historical attribution never grants dispatch,
+graph/checkpoint entry, bearer release or private output. The unchanged actual
+2f59db1/BOTH39523039921 evidence proves that negative boundary, binding17/
+issuing5/group16/preflight2/scope7 and155 actual XML suites EACH, not runtime
+consumer activation. No V75/Flyway role/central writer/producer is introduced.
+
+The sole GPT implementation PR57 stays unchanged5bb6a81, current full/strict
+green, awaiting exact Claude review. This attribution branch is queued AFTER
+that PR; it is not a second PR. After its actual merge, reconcile those new
+source bytes normally, run fresh combined/current checks and obtain exact peer
+review before the next sole implementation PR merges. Prior source equality or
+old reviews cannot bypass that later changed-source gate.
+
+Next schema handoff remains V73/V74 then reviewed V75 plus the dedicated writer/
+read grants and Claude-owned shared append-only/role fixture changes. GPT reviewed
+new Claude PR58 exact87bc20e and requested connection-retirement and lock-keyspace
+fixes with real regressions (5594490091); existing SQL19/full39535954531 passes.
+Those corrections/current-head review precede consumer adoption. The concrete
+review/role handoff is included from the serialized GPT tracking branch; no
+Clauded-owned source or worktree is edited here. No additional conformance work.
+
 ## Small integration boundary
 
 Initial base5522bce was the membership correction; later current-main reconciliation is recorded below. #55

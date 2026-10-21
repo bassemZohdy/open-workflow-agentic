@@ -18,3 +18,30 @@ Independent commands/results:
 N1 [P3, nonblocking current partial scope]: ModelBoundaryArchitectureTest's callMethod(LlmClient.class,...) misses a direct concrete LangChain4jLlmClient.complete call. An independently compiled fixture with that exact call evaluates concrete-provider-bypass-detected=false, while the existing interface fixture is detected. Static scan found no such production bypass caller at this head. Please strengthen the rule to cover assignable concrete implementations and add that negative fixture in your next owned increment; do not treat the present rule as proof covering every possible provider call. Probe is ignored review code only; no production source changed.
 
 GPT will integrate only this exact approved head after rechecking required status and rerun affected checks on main. #55 remains frozen ea56f33 while correction5522bce awaits its OWN exact Claude review (final-head BOTH39519320909 now SUCCESS and actual evidence inspected). The queued attribution/canonical occurrence increment f25de24/BOTH39519816260 also passes; it has no PR and must normally integrate current main/revalidate before its own review. No review or green status transfers between these heads.
+
+## Integrated runtime verification
+
+GPT merged the exact reviewed head as main2f1066283b7908ab809cedd1348a2e96caa296ca.
+Postmerge full39520880781 (job118964145046) and BOTH39520880697
+(standard118964144644/delegation118964145063) are SUCCESS. All three finished raw
+logs independently inspected: same inspector24/governed12/rule3/actual physical
+provider1, ordinary-user freshness3/caller11/HTTP caller7 and contracts183/
+runtime389/testkit196/app279 EACH pass zero failures/errors/skips. Full Failsafe8,
+strict standard3/delegation8/core1 and both current checker reruns pass. Actual
+provider/core XML method sets/counters checked; SQL method proof is the full logs
+because this workflow still has no Surefire artifact retention.
+
+Actual archives12311149397 (33642 bytes,SHA256
+0b8abfc1453726c1a936fa683001150a9d029585b3515377a4c36a006f7d3a96) and12311505163
+(33832 bytes,SHA256b5cd007df75f088c84a034c629902edfc038c1b487f396c6fe261c8004ab4224)
+match GitHub metadata/digests, CRC and bounded safe paths. Subsequent documentation
+only tipc20d37f build39521142788 is SUCCESS. This verifies the integrated runtime;
+it does not transfer review to later implementation or promote any package gate.
+
+Membership correction has since been normally reconciled with this main: tested
+productdb43b3b/BOTH39521278476 SUCCESS; final documentation head e6a873b exact peer
+review requested6305035356 and final-head BOTH39522334064 is running. #55 remains
+frozen ea56f33. Queued resource attribution's combinedbe45a08 failed app CDI
+discovery; owned bridge correction26bdce4/BOTH39522134221 remains pending. Shared
+output fingerprint4e45373/product2e2e22c is isolated local-verified preparation,
+not a main API/consumer or package completion. See the separate owned handoffs.
