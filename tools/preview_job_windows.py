@@ -135,6 +135,8 @@ class OwnedJob:
 class NativeProcess:
     """The small process-handle interface needed by this owned preview."""
     def __init__(self, handle, pid, readers):
+        import _winapi
+        self._api = _winapi
         self._handle = handle; self.pid = pid; self.returncode = None
         self.stdout = readers.get('stdout'); self.stderr = readers.get('stderr')
 
@@ -159,6 +161,11 @@ class NativeProcess:
 
     kill = terminate
 
+    def close(self):
+        if self._handle:
+            self._api.CloseHandle(self._handle); self._handle = None
+        for stream in (self.stdout, self.stderr):
+            if stream:stream.close()
+
     def __del__(self):
-        import _winapi
-        if self._handle:_winapi.CloseHandle(self._handle); self._handle = None
+        if self._handle:self._api.CloseHandle(self._handle); self._handle = None

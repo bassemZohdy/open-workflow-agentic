@@ -58,6 +58,7 @@ try:
             if sentinel and sentinel.poll() is None:
                 sentinel.terminate(); sentinel.wait(timeout=10)
             executor.shutdown(wait=True)
+            if parent:parent.close()
 finally:
     output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
 assert len(report['cases']) == 4

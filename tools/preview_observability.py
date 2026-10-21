@@ -215,10 +215,10 @@ finally:
     report['jobCleanup']={'membersBeforeStop':before,'membersAfterStop':[], 'componentJobs':summaries,
                           'killOnClose':all(s['killOnClose'] and not s['membersAfterStop'] for s in summaries)}
     for child in reversed(children):
-        if child.poll() is None:
-            child.terminate()
-            try:child.wait(timeout=15)
-            except subprocess.TimeoutExpired:child.kill();child.wait(timeout=5)
+        # Zero job membership can precede a native process handle becoming signalled.
+        # The entire job was already terminated: wait for that exit, do not terminate twice.
+        child.wait(timeout=15)
+        child.close()
     for log in logs:log.close()
     report['allOwnedChildrenStopped']=all(p.poll() is not None for p in children)
     report['childExitCodes']=[p.returncode for p in children];save()

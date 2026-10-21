@@ -61,6 +61,14 @@ checks but actual Grafana inspection found its native descendants outside the
 job. That revision is superseded, not accepted cleanup proof. Only its own15
 remaining private native processes were identity-checked and stopped. The final
 suspended-target implementation and stronger native cases address that gap.
+At e80c5a9 the actual17-member family included Grafana/all13 plugins, Prometheus
+and their console hosts; every native Grafana process was independently checked
+against job membership. All six backend stages passed and shutdown left zero
+native processes. The controller then exposed an exit-notification race: an
+empty job can precede a signalled process handle, and a redundant termination
+returned access-denied. It now waits for the already-requested exit and closes
+native handles explicitly. That earlier controller exit1 is not a clean-run
+pass; final exact-source cleanup proof remains required.
 
 ## Reproducible owned preview boundary
 
