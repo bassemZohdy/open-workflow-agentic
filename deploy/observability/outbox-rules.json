@@ -44,7 +44,7 @@
         },
         {
           "alert": "OutboxObservationStale",
-          "expr": "(agentic_outbox_observation_age_seconds > 120) and on(job,instance) (up{job=\"open-workflow-agentic\"} == 1)",
+          "expr": "(agentic_outbox_observation_age_seconds > 120) and on(job,instance) (up{job=\"open-workflow-agentic\"} == 1) and on(job,instance) (agentic_outbox_observation_healthy == 1)",
           "for": "1m",
           "labels": {
             "severity": "warning",
@@ -57,7 +57,7 @@
         },
         {
           "alert": "OutboxPoisonRows",
-          "expr": "(agentic_outbox_failed > 0) and on(job,instance) (agentic_outbox_observation_healthy == 1) and on(job,instance) (up{job=\"open-workflow-agentic\"} == 1)",
+          "expr": "(agentic_outbox_failed > 0) and on(job,instance) (agentic_outbox_observation_healthy == 1) and on(job,instance) (up{job=\"open-workflow-agentic\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds <= 120)",
           "for": "5m",
           "labels": {
             "severity": "warning",

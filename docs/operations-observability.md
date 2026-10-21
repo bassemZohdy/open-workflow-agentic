@@ -50,7 +50,8 @@ network/access controls; no collection endpoint is made public by this increment
 Import `outbox-dashboard.json` into a separately governed Grafana instance and
 select its approved Prometheus datasource. The six time-series panels show up,
 observation health/age and three lag values. Lag panels require a reachable target
-AND a healthy observation. Missing/failed telemetry remains missing, not a green
+AND a healthy observation no older than the candidate120s freshness window.
+Missing/failed/stale telemetry remains missing, not a green
 zero. Multiple replicas can report the SAME database-wide outbox: display by
 target, never sum replica observations into a fictional queue total. This also
 does not prove isolation across independently configured databases/tenants.
@@ -95,7 +96,9 @@ do not delete/requeue rows merely because the observer failed.
 <a id="observation-stale"></a>
 ### Observation stale
 
-Last successful observation older than120s for1m while target remains reachable.
+Last successful observation older than120s for1m while target remains reachable
+and the last completed read was successful. Completed read failures use the
+observation-unavailable warning instead of an additional stale warning.
 Check a blocked/slow observation and scrape timing. Cached success is not fresh
 success. Read-attempt caching does not cancel an executing database operation.
 This threshold is an example, not an inferred maximum recovery time.
@@ -103,7 +106,8 @@ This threshold is an example, not an inferred maximum recovery time.
 <a id="poison-rows"></a>
 ### Poison rows
 
-A healthy current observation reports failed rows for5m. Use authorized failure
+A healthy observation within the candidate120s freshness window reports failed
+rows for5m. Use authorized failure
 inspection to identify the fixed error class and cause, preserve original rows,
 repair the cause, then use the reviewed requeue operation if authorized. Relays
 are at-least-once: verify consumer idempotency. A failed observer suppresses this
@@ -118,8 +122,9 @@ python tools/check_observability.py --promtool <verified-promtool3.15.0>
 ```
 
 The checker requires actual non-skipped method XML, evaluates eight rule scenarios
-against ALL five firing/non-firing alerts, tests NaN comparison behavior and checks
-all dashboard query syntax. The real Micrometer Prometheus registry test covers
+against ALL five firing/non-firing alerts, evaluates the poison-panel values in
+all eight healthy/unhealthy/stale/missing/recovery scenarios, tests NaN comparison
+behavior and checks all dashboard query syntax. The real Micrometer Prometheus registry test covers
 the exact initial-failure NaN/export/recovery names; promtool's input fixture
 format does not accept literal NaN samples, so the rule fixture separately checks
 unavailable initial observation and evaluates `vector(0/0) > 0` to an empty vector.

@@ -47,7 +47,9 @@ runbook for cardinality/privacy, missing telemetry, recovery and rollout limits.
   used by the deployable; no production dependency/provider/version upgrade.
 - Example collector config, six-panel Grafana JSON and five candidate warning
   rules. Eight scenarios evaluate every firing AND non-firing alert. Healthy lag
-  queries guard observation health and up; replica observations are never summed.
+  queries guard observation health, up and candidate120s freshness; replica
+  observations are never summed. The actual poison-panel expression is evaluated
+  in all eight states, in addition to all five alerts and a NaN expression control.
 - Checker requires actual four-case XML, pinned promtool3.15.0, evaluated rule
   scenarios and six syntactically valid dashboard queries; artifacts contain
   source hashes and the exact CI product SHA.
@@ -76,3 +78,22 @@ Use the existing priority for reviews: membershipc9ce389 first, then the shared
 fingerprint454ad4c and checkpoint72da48e; this independent preparation does not
 move those heads. WP-605's producer capability check is already verified as
 preparation and remains gated on its own consumer/peer/current integration.
+
+## Current operator-query refinement
+
+Initial producer/monitoring product383cb81 has dedicated39528905998 and
+BOTH39528905982 running at its actual SHA. Runtime/test/POM bytes are unchanged
+by this later query-only refinement. Actual source comparison will be recorded
+with the completed runs, without relabeling their SHAs.
+
+Review found that a stalled read can leave the latest completed observation
+healthy but old. The final queue panels and poison warning also require the
+candidate120s freshness window; stale values do not appear as current queue
+counts. Stale and completed-failure warnings are separated. The same eight
+scenarios now execute the actual poison-panel expression and include a prolonged
+failed observation retaining poison counts and a stale formerly successful
+observation retaining poison counts. Both suppress the queue view and poison
+warning in favor of the correct observation warning. All40 alert expectations,
+eight query-value expectations, the separate NaN expression and six query syntax
+checks pass locally. Fresh exact dedicated verification of this query revision
+remains required. This does not introduce an approved SLO or paging policy.

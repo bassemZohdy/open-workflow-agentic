@@ -51,6 +51,18 @@
           "alertname": "OutboxPoisonRows",
           "exp_alerts": []
         }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": [
+            {
+              "labels": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+              "value": 0
+            }
+          ]
+        }
       ]
     },
     {
@@ -67,7 +79,7 @@
         },
         {
           "series": "agentic_outbox_observation_age_seconds{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
-          "values": "10x10"
+          "values": "200x10"
         },
         {
           "series": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
@@ -112,6 +124,13 @@
           "eval_time": "5m",
           "alertname": "OutboxPoisonRows",
           "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": []
         }
       ]
     },
@@ -162,6 +181,13 @@
           "eval_time": "5m",
           "alertname": "OutboxPoisonRows",
           "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": []
         }
       ]
     },
@@ -225,6 +251,13 @@
           "alertname": "OutboxPoisonRows",
           "exp_alerts": []
         }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": []
+        }
       ]
     },
     {
@@ -287,6 +320,18 @@
             }
           ]
         }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": [
+            {
+              "labels": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+              "value": 1
+            }
+          ]
+        }
       ]
     },
     {
@@ -307,7 +352,7 @@
         },
         {
           "series": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
-          "values": "0x10"
+          "values": "4x10"
         }
       ],
       "alert_rule_test": [
@@ -348,6 +393,13 @@
           "eval_time": "5m",
           "alertname": "OutboxPoisonRows",
           "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": []
         }
       ]
     },
@@ -397,6 +449,18 @@
           "eval_time": "5m",
           "alertname": "OutboxPoisonRows",
           "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": [
+            {
+              "labels": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+              "value": 0
+            }
+          ]
         }
       ]
     },
@@ -456,6 +520,11 @@
       "promql_expr_test": [
         {
           "expr": "vector(0/0) > 0",
+          "eval_time": "5m",
+          "exp_samples": []
+        },
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
           "eval_time": "5m",
           "exp_samples": []
         }

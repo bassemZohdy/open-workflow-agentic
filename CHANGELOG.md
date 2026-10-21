@@ -1,5 +1,7 @@
 # Changelog
 
+- Refine candidate outbox panels/poison warning to require observation freshness as well as health/up; distinguish prolonged completed failure from stalled last-success observations. All eight actual poison-panel values/40 alert expectations/NaN control and six query syntax checks pass locally. Producer383cb81 runtime/tests/POM remain unchanged; fresh exact query CI and rollout/review gates pending.
+
 - Prepare WP112 truthful outbox observation health/age and NaN-before-first-success gauges, bounded failed-read caching and shared in-flight reads; add a six-panel dashboard, five candidate warnings, eight actual promtool scenarios and operational runbooks. Four real metric/export cases and app compilation pass locally; exact Linux/provider/peer/deployment/SLO gates remain open. No business-state, schema, authority or package promotion.
 
 - Publish the isolated retained-output fingerprint proposal and local verification (186 contracts/four controls) for the requested Claude consumer; implementation remains queued4e45373. Membership correction e6a873b awaits exact peer/current checks after combined-product SQL16 pass. Separate attribution bridge fix26bdce4 is under fresh CI after a retained CDI discovery failure; no activation or package promotion.

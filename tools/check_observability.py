@@ -39,6 +39,8 @@ def main():
     for scenario in scenarios:
         if {r['alertname'] for r in scenario['alert_rule_test']} != {r['alert'] for r in rules}:
             raise ValueError('Each scenario must check every alert, including expected non-firing alerts')
+    if sum(len(s.get('promql_expr_test', [])) for s in scenarios) != 9:
+        raise ValueError('Require eight evaluated dashboard-value cases and the separate NaN comparison')
     for rule in rules:
         if rule['labels'] != {'severity': 'warning', 'owner': 'runtime-operations'}:
             raise ValueError('These candidates are owned warnings, not an approved paging/SLO policy')
@@ -56,8 +58,8 @@ def main():
     if set(re.findall(r'agentic_[a-z_]+', all_queries)) != METRICS:
         raise ValueError('Unexpected or missing metric names')
     for q in queries[3:]:
-        if 'observation_healthy' not in q or '== 1' not in q or 'up{' not in q:
-            raise ValueError('Queue views require a healthy observation and reachable target')
+        if 'observation_healthy' not in q or '== 1' not in q or 'up{' not in q or 'observation_age_seconds' not in q or '<= 120' not in q:
+            raise ValueError('Queue views require a reachable target and healthy observation within the candidate freshness window')
     runbook = (ROOT / 'docs' / 'operations-observability.md').read_text(encoding='utf-8')
     for rule in rules:
         anchor = rule['annotations']['runbook_url'].rsplit('#', 1)[1]
@@ -103,7 +105,7 @@ def main():
         ['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         'workingTreeDirty': bool(subprocess.check_output(['git', 'status', '--porcelain'], cwd=ROOT)),
         'promtoolVersion': version.strip(), 'metricMethods': sorted(METHODS),
-        'ruleScenarios': [s['name'] for s in scenarios], 'dashboardQueries': len(queries),
+        'ruleScenarios': [s['name'] for s in scenarios], 'dashboardQueries': len(queries), 'queryValueEvaluations': 9,
         'sourceSha256': {name: hashlib.sha256((ASSETS / name).read_bytes()).hexdigest() for name in sorted(assets)},
         'metricSampleSha256': sample_hashes,
         'producerSha256': hashlib.sha256((ROOT / 'modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/outbox/OutboxMetrics.java').read_bytes()).hexdigest(),

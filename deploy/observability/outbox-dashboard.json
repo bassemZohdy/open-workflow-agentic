@@ -163,7 +163,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agentic_outbox_unpublished{job=~\"$job\",instance=~\"$instance\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"$job\",instance=~\"$instance\"} == 1) and on(job,instance) (up{job=~\"$job\",instance=~\"$instance\"} == 1)",
+          "expr": "agentic_outbox_unpublished{job=~\"$job\",instance=~\"$instance\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"$job\",instance=~\"$instance\"} == 1) and on(job,instance) (up{job=~\"$job\",instance=~\"$instance\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"$job\",instance=~\"$instance\"} <= 120)",
           "legendFormat": "{{instance}}",
           "range": true
         }
@@ -192,7 +192,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agentic_outbox_unpublished_oldest_age_seconds{job=~\"$job\",instance=~\"$instance\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"$job\",instance=~\"$instance\"} == 1) and on(job,instance) (up{job=~\"$job\",instance=~\"$instance\"} == 1)",
+          "expr": "agentic_outbox_unpublished_oldest_age_seconds{job=~\"$job\",instance=~\"$instance\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"$job\",instance=~\"$instance\"} == 1) and on(job,instance) (up{job=~\"$job\",instance=~\"$instance\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"$job\",instance=~\"$instance\"} <= 120)",
           "legendFormat": "{{instance}}",
           "range": true
         }
@@ -221,7 +221,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "agentic_outbox_failed{job=~\"$job\",instance=~\"$instance\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"$job\",instance=~\"$instance\"} == 1) and on(job,instance) (up{job=~\"$job\",instance=~\"$instance\"} == 1)",
+          "expr": "agentic_outbox_failed{job=~\"$job\",instance=~\"$instance\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"$job\",instance=~\"$instance\"} == 1) and on(job,instance) (up{job=~\"$job\",instance=~\"$instance\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"$job\",instance=~\"$instance\"} <= 120)",
           "legendFormat": "{{instance}}",
           "range": true
         }
