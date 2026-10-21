@@ -2,9 +2,9 @@
 
 Reviewer=GPT (author verification, not peer approval).
 First product commit:651e12a1e054426ee7fc4e3dc0c1f8fe12f674da (nine methods/20 cases).
-Current refinement adds inheritance/null-uniqueness refusal; exact final product is recorded below after execution.
-Verdict: original651e12a proposed SQL/real saver/negative/strict execution PASS.
-Refinement compiles/JVM augmentation PASS; its actual SQL/strict execution PENDING.
+Current reviewed product: ae254531bb3f8e417cb6886389043298f43946a9.
+Verdict: GPT author verification PASS for final exact proposed SQL/real saver/negative/strict execution.
+Other-agent/current PR/migration/role/runtime adoption gates remain HOLD; no peer approval is claimed.
 This is not an applied migration, runtime change or completed work package.
 
 ## Scope, source and ownership
@@ -66,13 +66,13 @@ ResearchCheckpointSchemaTest now has ten compiled methods/23 required observatio
 
 | Verification | Required result | Current evidence |
 | --- | --- | --- |
-| Fresh/idempotent and compatible nonempty adoption | Same constraint identities, original row ids/private text unchanged | Compiled; Linux execution pending |
-| Partial, wrong type/nullability/default/PK/FK/extra column |23514, no completion/reset/repair, identical original rows/keys | Compiled; pending |
-| Missing index/wrong predicate/order/NULLS NOT DISTINCT/extra uniqueness |23514 with unchanged history | Compiled; pending |
-| Namespace shadow/view/RLS/check/user trigger |23514 before adoption, no guard removal or shadow store | Compiled; pending |
-| Inherited parent/descendant |23514, including measured descendant rows in ordinary saver queries | Compiled; pending |
-| Actual pinned saver createTables(false) | Real INSERT/read/UPDATE/release through committed physical connections still work | Compiled; pending |
-| Concurrent table writer |55P03 NOWAIT, unchanged history, no mutation retry | Compiled; pending |
+| Fresh/idempotent and compatible nonempty adoption | Same constraint identities, original row ids/private text unchanged | PASS: final exact Linux/BOTH |
+| Partial, wrong type/nullability/default/PK/FK/extra column |23514, no completion/reset/repair, identical original rows/keys | PASS: final exact Linux/BOTH |
+| Missing index/wrong predicate/order/NULLS NOT DISTINCT/extra uniqueness |23514 with unchanged history | PASS: final exact Linux/BOTH |
+| Namespace shadow/view/RLS/check/user trigger |23514 before adoption, no guard removal or shadow store | PASS: final exact Linux/BOTH |
+| Inherited parent/descendant |23514, including measured descendant rows in ordinary saver queries | PASS: final exact Linux/BOTH |
+| Actual pinned saver createTables(false) | Real INSERT/read/UPDATE/release through committed physical connections still work | PASS: final exact Linux/BOTH |
+| Concurrent table writer |55P03 NOWAIT, unchanged history, no mutation retry | PASS: final exact Linux/BOTH |
 
 Most DDL/DML fixtures ALWAYS roll back their UUID namespace. Two deliberately
 commit an OWNED fresh UUID namespace to exercise real saver transactions and a
@@ -98,7 +98,8 @@ The report must name the exact product SHA, pinned/proposed source hashes and
 ALL23 unique expected observations. Passing source compilation, generated tests,
 an incomplete report, skipped tests or another product's green CI is not execution
 evidence. Local package -DskipTests compiles the new source and augments the app;
-it does not run PostgreSQL or native Cedar. Required actual results remain open.
+it does not run PostgreSQL or native Cedar. Actual final Linux results are recorded
+below; activation gates remain open.
 
 ## Activation, freshness and restore gates
 
@@ -128,7 +129,7 @@ One new method exercises two actual owned fixtures: a checkpoint descendant with
 another retained row (ordinary parent SELECT observes two rows), and a checkpoint
 inheriting a separate ancestor column. Both must refuse23514 with original row/
 constraint snapshots unchanged. Most other cases remain unchanged. App/test
-compilation/JVM augmentation PASS; actual SQL remains pending. Original
+compilation/JVM augmentation passed at publication; actual SQL was then pending. Original
 BOTH39525585412 retains its own651e12a SHA/results and cannot prove this refinement.
 The new exact product requires fresh BOTH evidence. No applied migration, runtime
 call, role or Claude source is changed; main513b878/c9ce389 remain frozen.
@@ -166,5 +167,71 @@ A second catalog review found that required index indnullsnotdistinct must be
 false to preserve pinned nullable-name uniqueness. The final refinement adds
 that guard plus one negative case, giving ten compiled methods/23 observations.
 Local app/test compilation/JVM augmentation and tooling76/generated checks pass.
-The final exact product needs fresh BOTH before peer/activation claims. No
-version/role/applied migration/runtime/Claude source change or package promotion.
+At that refinement publication, final exact BOTH remained required; the finished
+verification is below. Peer/activation gates still remain. No version/role/applied
+migration/runtime/Claude source change or package promotion.
+
+## Final exact refined execution
+
+Reviewer=GPT; reviewed product **ae254531bb3f8e417cb6886389043298f43946a9**; author verification
+verdict PASS for this bounded unversioned proposal. Other-agent/current required
+PR/activation gates remain HOLD. No independent peer approval is implied.
+[BOTH39526547517](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39526547517)
+SUCCESS attempt1/no rerun, standard118982436133/delegation118982436382.
+Both finished full logs and ALL148 actual XML suites EACH independently inspected:
+1061/1066 cases, contracts183/runtime389/testkit196/app289 plus Failsafe4/9,
+consistent nonzero unique counters and zero failures/errors/skips.
+
+Exact current source-method sets match checkpoint10/inspector24/governed12/rule3/
+physical-provider1/real standard3/delegation8/core process1. Both strict current
+provider/effect-recovery checkers rerun on the actual archives. Both actual
+cases.json name this EXACT product, the pinned DDL and current proposal hash,
+and ALL23 unique observations. Expected23514 refusals (including both inheritance
+endpoints and NULLS NOT DISTINCT), writer55P03 and matching before/after row hashes
+pass. Actual saver createTables(false), original/replacement state/id reads,
+release flag with retained physical thread and re-entry second physical run pass.
+The latter remains measured hazard evidence, never permission to re-enter.
+
+| Profile | Artifact | Bytes | SHA256 |
+| --- | --- | --- | --- |
+| standard |12313278655|1869104|15ea5c7891153ab9280fd0bb10de5436555d7e1f684e895424054a1ec81c5757|
+| delegation |12313518379|1873248|8676cc4fe4bd9bb8f10cee4a9de5d4cccbceee84baba91115e464c1a04b20988|
+
+Actual archive bytes/digests match GitHub metadata, CRC/bounded extraction/safe
+paths verified. Original651e12a/20-case success remains historical, and cancelled
+queued263e53a has no success evidence. No tested source/configuration follows
+this final product in the documentation record.
+
+Commands/results:
+
+```text
+mvn -B -pl apps/app-runtime -am package -DskipTests
+  PASS: all reactor compilation, test compilation and JVM augmentation (local;
+  no local PostgreSQL/native execution claimed).
+python -m unittest discover -s tools -p 'test_*.py'
+  PASS:76 tooling controls.
+python tools/render_requirements.py --check
+  PASS: tracking regenerated from source JSON; no status/acceptance promotion.
+git diff --check
+  PASS.
+# Actual Linux CI in EACH profile, with the pinned real Keycloak server:
+mvn -B -pl apps/app-runtime -am verify
+  -Dit.test=KeycloakStandardIT,EffectCrashRecoveryIT
+  -Dfailsafe.failIfNoSpecifiedTests=false -Dkeycloak.required=true
+  -Dkeycloak.profile=standard -Dkeycloak.url=http://127.0.0.1:18080
+# Delegation substitutes KeycloakDelegationIT/profile=delegation. BOTH PASS.
+python tools/require_keycloak_evidence.py --profile <profile>
+  --root <actual extracted artifact root> --effect-recovery
+  BOTH PASS; actual XML exact method sets and all23 report/source-hash controls
+  additionally inspected independently, not inferred from green workflow status.
+```
+
+After prioritized c9ce389 membership review and the tiny shared fingerprint API,
+request exact final documented-branch peer review of this proposal/actual tests.
+A preliminary branch PASS does not bypass later current-main reconciliation,
+the sole implementation PR/current required checks or ordered version allocation.
+Activation still requires a reviewed migration/role/datasource/startup contract
+and Claude's owned createTables(false) change AFTER migration integration, with
+fresh-start/incompatible-storage-before-provider tests. No applied migration,
+version allocation, role grant, runtime switch, private output/current authority,
+retention/restore/T03/full WP108 or acceptance promotion is made here.

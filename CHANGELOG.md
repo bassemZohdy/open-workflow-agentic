@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify final unversioned checkpoint proposal ae25453/BOTH39526547517: all148 actual XML EACH/ten SQL methods/all23 report observations, real pinned saver/inheritance/null-uniqueness/negative/writer-lock and strict regressions pass zero skips. Actual source hashes and archive digests inspected; exact peer/current PR/ordered migration/role/runtime activation gates remain open. No schema activation or package promotion.
+
 - Verify original checkpoint proposal651e12a/BOTH39525585412: nine actual SQL methods/all20 report observations and real saver/negative/strict evidence pass; all148 actual XML EACH checked. Final refinement also refuses NULLS NOT DISTINCT in required indexes (ten methods/23 cases), compile-only pending fresh exact SQL. Superseded queued run cancelled; no applied schema/role/runtime/package promotion.
 
 - Refine unversioned checkpoint profile adoption proposal to refuse table inheritance in either direction; add two real JDBC observations to the ten-method/22-case suite. App compilation/JVM augmentation pass; actual SQL/refined strict evidence pending. No applied migration, role, runtime switch or package promotion.
