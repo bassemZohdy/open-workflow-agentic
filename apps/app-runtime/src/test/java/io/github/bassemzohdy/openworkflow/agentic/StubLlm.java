@@ -18,8 +18,12 @@ public class StubLlm implements LlmClient {
     private final ScriptedLlmClient model = ScriptedLlmClient.create()
             .fallback((system, user) -> "{\"text\":\"[stub] " + system.split("\\.")[0] + "\",\"actions\":[],\"escalation\":null}");
 
+    /** Calls that reached this "provider"; a refused model call must leave it unchanged. */
+    public static final java.util.concurrent.atomic.AtomicInteger CALLS = new java.util.concurrent.atomic.AtomicInteger();
+
     @Override
     public String complete(String system, String user) {
+        CALLS.incrementAndGet();
         return model.complete(system, user);
     }
 }

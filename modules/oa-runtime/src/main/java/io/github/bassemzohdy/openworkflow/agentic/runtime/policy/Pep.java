@@ -140,7 +140,9 @@ public final class Pep {
     public enum InstanceOperation {
         INSPECT("operation:inspect"),
         RETRY("operation:retry"),
-        RECOVER("operation:recover");
+        RECOVER("operation:recover"),
+        /** A manual decision on an unknown governed effect (WP-108); needs the verified oa.recover scope. */
+        RESOLVE_EFFECT("operation:resolve-effect");
 
         private final String resource;
 
@@ -164,6 +166,30 @@ public final class Pep {
         Objects.requireNonNull(instanceId, "instanceId");
         return decide(operator, ActionKind.OPERATION, operation.resource(), instanceId,
                 new PolicyContext(operatorScopes, null, null, null, null, null));
+    }
+
+    /** Resource of a direct invocation of the research agent over HTTP (WP-103). */
+    public static final String AGENT_RESEARCH_RUN = "agent:research:run";
+
+    /**
+     * A verified caller runs the research agent directly ({@code POST /agents/research}). The request is an
+     * {@code OPERATION} on {@link #AGENT_RESEARCH_RUN}; {@link SafeRecovery} does not name it, so when the policy
+     * engine is unavailable the call is refused (ERROR) and the agent does not run.
+     */
+    public Decision agentInvocation(Subject caller, Set<String> callerScopes) {
+        return decide(caller, ActionKind.OPERATION, AGENT_RESEARCH_RUN, null,
+                new PolicyContext(callerScopes, null, null, null, null, null));
+    }
+
+    /**
+     * A verified caller reads or verifies the audit trail (WP-103). A {@code DATA_ACCESS} decision on the action name
+     * ({@code audit.events.read} or {@code audit.chains.verify}); the decision is audited and bounded like every PEP
+     * decision, and an unavailable engine is ERROR (safe recovery covers {@code OPERATION} only).
+     */
+    public Decision auditAccess(Subject caller, Set<String> callerScopes, String action) {
+        Objects.requireNonNull(action, "action");
+        return decide(caller, ActionKind.DATA_ACCESS, action, null,
+                new PolicyContext(callerScopes, null, null, null, null, null));
     }
 
     /** Decides any request through the full path: engine, audit, and the recovery rule when the engine is unavailable. */

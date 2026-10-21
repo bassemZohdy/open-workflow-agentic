@@ -125,4 +125,16 @@ class OperationsDegradedTest {
         assertEquals("RUNNING", status(dataSource, id));
         assertEquals(0, historyWithReason(dataSource, id, "operator.cancel"));
     }
+
+    /** WP-103: with no policy snapshot the audit API is 503 for a caller who holds the scope, and nothing is read. */
+    @org.junit.jupiter.api.Test
+    void anUnavailablePolicyIs503ForTheAuditApiAndNeverAnAllow() {
+        for (String scopes : new String[] {"oa.audit.read,oa.audit.verify", "oa.recover"}) {
+            io.restassured.RestAssured.given().header("X-Tenant", "t").header("X-Subject", "auditor")
+                    .header("X-Scopes", scopes).when().get("/audit/events").then().statusCode(503)
+                    .contentType("application/problem+json");
+            io.restassured.RestAssured.given().header("X-Tenant", "t").header("X-Subject", "auditor")
+                    .header("X-Scopes", scopes).when().post("/audit/verify").then().statusCode(503);
+        }
+    }
 }

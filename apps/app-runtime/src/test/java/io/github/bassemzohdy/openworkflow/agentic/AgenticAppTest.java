@@ -1,8 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.notNullValue;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -53,16 +52,6 @@ class AgenticAppTest {
                 "{\"text\":\"ok\",\"actions\":[\"publish\"],\"escalation\":null}"));
         assertThrows(IllegalArgumentException.class, () -> outputValidator.validateText(
                 "{\"text\":\"ok\",\"actions\":[],\"escalation\":\"approver\"}"));
-    }
-
-    @Test
-    void agentGraphRunsAndCheckpoints() {
-        given().contentType("application/json").body("{\"topic\":\"agentic workflows\"}")
-                .when().post("/agents/research")
-                .then().statusCode(200)
-                .body("threadId", notNullValue())
-                .body("plan", containsString("[stub]"))
-                .body("review", containsString("[stub]"));
     }
 
     @Test

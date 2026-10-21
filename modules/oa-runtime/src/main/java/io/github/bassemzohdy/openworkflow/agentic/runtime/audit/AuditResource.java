@@ -3,7 +3,9 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.audit;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.api.PageRequest;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerContextResolver;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.BadRequestException;
 import jakarta.ws.rs.GET;
@@ -88,19 +90,24 @@ public class AuditResource {
                             @QueryParam("to") String to,
                             @QueryParam("cursor") String cursor,
                             @QueryParam("limit") Integer limit) {
-        access.require(AuditAccess.READ, callers.resolve(headers));
+        CallerAuthority who = callers.resolveAuthority(headers);
+        access.require(AuditAccess.READ, who.caller());
         AuditQuery.Filter filter = new AuditQuery.Filter(instanceId, correlationId, badRequestOnInvalid(
                 () -> chainId == null ? null : AuditKeys.requireChainId(chainId)), type, instant("from", from),
                 instant("to", to));
-        AuditQuery.Page page = badRequestOnInvalid(() -> query.find(filter, PageRequest.of(cursor, limit)));
+        PageRequest paging = badRequestOnInvalid(() -> PageRequest.of(cursor, limit));
+        current(who);
+        AuditQuery.Page page = badRequestOnInvalid(() -> query.find(filter, paging));
         return new EventPage(page.items().stream().map(EventView::of).toList(), page.nextCursor());
     }
 
     @GET
     @Path("/events/{eventId}")
     public EventView event(@Context HttpHeaders headers, @PathParam("eventId") String eventId) {
-        access.require(AuditAccess.READ, callers.resolve(headers));
+        CallerAuthority who = callers.resolveAuthority(headers);
+        access.require(AuditAccess.READ, who.caller());
         Ulid id = badRequestOnInvalid(() -> Ulid.parse(eventId));
+        current(who);
         return query.byId(id).map(EventView::of)
                 .orElseThrow(() -> new NotFoundException("no audit event with that id"));
     }
@@ -108,11 +115,35 @@ public class AuditResource {
     @POST
     @Path("/verify")
     public VerifyResult verify(@Context HttpHeaders headers, @QueryParam("chainId") String chainId) {
-        access.require(AuditAccess.VERIFY, callers.resolve(headers));
-        List<ChainReport> reports = chainId == null
-                ? verifier.verifyAll()
-                : List.of(verifier.verify(badRequestOnInvalid(() -> AuditKeys.requireChainId(chainId))));
+        CallerAuthority who = callers.resolveAuthority(headers);
+        access.require(AuditAccess.VERIFY, who.caller());
+        String chain = chainId == null ? null : badRequestOnInvalid(() -> AuditKeys.requireChainId(chainId));
+        current(who);
+        List<ChainReport> reports = chain == null ? verifier.verifyAll() : List.of(verifier.verify(chain));
         return new VerifyResult(reports.stream().allMatch(ChainReport::intact), reports);
+    }
+
+    /**
+     * The signed expiry of a verified token is judged again after policy, audit and parsing, immediately before any
+     * query or verification I/O: 401 when it has passed or the authority is gone, 503 when that cannot be decided. The
+     * development header seam has no signed expiry and is not rechecked (it exists only in dev and test profiles).
+     */
+    private static void current(CallerAuthority who) {
+        if (!who.caller().verified()) {
+            return;
+        }
+        try {
+            who.requireCurrent(java.util.Set.of());
+        } catch (AuthorityLostException lost) {
+            if (lost.reason() == AuthorityLostException.Reason.UNAVAILABLE) {
+                throw new io.github.bassemzohdy.openworkflow.agentic.runtime.api.problem.ProblemException(
+                        jakarta.ws.rs.core.Response.Status.SERVICE_UNAVAILABLE,
+                        "the caller's authority could not be checked; nothing was read");
+            }
+            throw new jakarta.ws.rs.WebApplicationException("the caller's authority is no longer valid",
+                    jakarta.ws.rs.core.Response.status(jakarta.ws.rs.core.Response.Status.UNAUTHORIZED)
+                            .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer error=\"invalid_token\"").build());
+        }
     }
 
     private static Instant instant(String name, String text) {
