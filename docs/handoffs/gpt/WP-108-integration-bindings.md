@@ -1,14 +1,15 @@
 # WP-108 prerequisite increment: resource attribution and canonical occurrence
 
 Reviewer=GPT (author verification, not peer approval).
+Reviewed current DATA-only product SHA:2f59db14deb382f2f93747db693ea3f119cb7e3f.
 Historical isolated product SHA:f25de243462fd7487ee28ff44f49479a4d011682.
 Verdict: nine focused plain controls/application compilation and augmentation
-PASS; all193 contract tests also PASS. Historical isolated Linux SQL/provider proof is recorded below; refreshed combined-head execution is pending.
+PASS; all193 contract tests also PASS. Current final DATA-only Linux/provider proof is recorded below, including the negative legacy-admission wiring case. Exact peer/required PR/adoption gates remain pending.
 This is a queued candidate, not a second implementation PR or package completion.
 
 ## Small integration boundary
 
-Base5522bce is the membership correction awaiting Claude review6304631674; #55
+Initial base5522bce was the membership correction; later current-main reconciliation is recorded below. #55
 remains at its earlier reviewed ea56f33. This candidate isolates existing
 preparation694a238 without merging that branch's later execution/audit proposals.
 The initial nine selected source/test files were byte-identical to that preparation;
@@ -203,3 +204,42 @@ negative boot case is compiled only. Fresh exact Linux/strict evidence must prov
 the FINAL boundary;26bdce4's opposite positive-default test is historical only.
 V73/V74, all17 SQL tests and Claude fixtures/consumers remain unchanged. No new
 implementation PR, current-head approval transfer or package promotion.
+
+## Final admission-held product verification
+
+Reviewer=GPT; author verdict PASS for DATA storage preparation ONLY at exact
+2f59db14deb382f2f93747db693ea3f119cb7e3f.
+[BOTH39523039921](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39523039921)
+SUCCESS attempt1/no rerun: standard118971183228/delegation118971182773.
+Both complete raw logs and ALL155 actual XML suites EACH independently inspected,
+1109/1114 cases with consistent counters/unique cases, zero failures/errors/skips:
+contracts193/runtime403/testkit196/app313 plus Failsafe4/9.
+
+Exact current method sets checked: storage17, issuing migration5, membership16,
+preflight2, scope7, inspector24, governed model12, model-rule3, actual physical
+provider1 and delegated HTTP7. Crucially, the real negative default-wiring1 method
+canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired passed EACH:
+canonical/concrete JDBC remains present while the legacy admission port is
+UNSATISFIED without its test override. The old positive-default test name is not
+accepted as this proof. Actual current strict provider/core checker reruns pass.
+
+| Profile | Artifact ID | Bytes | SHA256 |
+| --- | --- | --- | --- |
+| standard |12311828195|1955935|af32118d798309019aac8122dca6472996f88347a9b0f3858caf5da69bf0c99c|
+| delegation |12311273236|1955619|3bbbeac5b4cf7b24843363279fbadd04430607af243042d9fe6ce843cabdf501|
+
+Actual ZIP bytes/digests match GitHub metadata; CRC/bounded safe paths checked.
+Surefire retention is actual: SQL/boot methods above are read from archived XML,
+not merely suite totals. Real standard3/delegation8/core1 pass; four silent core
+worker logs per lane are retained, not used as fabricated execution messages.
+No later audit/HTTP/manual process recovery preparation is included or claimed.
+
+Current local nine scope/preflight controls, application/test compilation/JVM
+augmentation, tools76/generated/diff also pass. This final documentation record
+changes no runtime/test/migration/configuration bytes after the tested product.
+Before any later implementation PR, reconcile merged prerequisites/current main
+and require exact peer/current PR checks. #55 and main tracking remain frozen for
+Claude's exactc9ce389 review; its older documentation-head e6a873b/BOTH39522334064
+also passed with raw/provider evidence inspected. Main documentation513b878
+build39522477814 is SUCCESS. No review transfer, second implementation PR or
+premature legacy consumer/real execution/V75/role/package/acceptance activation.

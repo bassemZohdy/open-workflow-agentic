@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify final DATA-only attribution product2f59db1/BOTH39523039921: all155 actual suites EACH/storage17/negative production-default wiring1 and strict real providers/core pass zero skips; exact current methods/archives/digests independently inspected. Canonical storage stays available and legacy admission stays unsatisfied. Exact peer/current PR/prerequisite integration and actual consumer/authority/V75/package gates remain open.
+
 - Keep historical attribution from activating legacy admission before the current execution gate: expose concrete/canonical storage only and remove the intermediate default legacy producer. Production-default boot regression now requires the admission port to stay unsatisfied. Intermediate26bdce4 strict CI passed155 suites EACH, but its positive-default proof is historical; nine local controls/app compile pass, fresh final-boundary Linux evidence required. SQL/tests/consumer ownership and package gates retained.
 
 - Fix combined candidate CDI ambiguity by exposing concrete/canonical storage separately and providing a default legacy admission-port bridge. Preserve Claude's test override and add a production-default wiring boot case. be45a08 strict CI failed before app discovery; failed artifacts retained, no SQL/provider pass claimed. Nine local controls/app compilation pass; fresh exact Linux/strict evidence pending.
