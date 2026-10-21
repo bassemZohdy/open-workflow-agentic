@@ -29,9 +29,33 @@ null gaps. Metric names, query expressions, alert rules, Java/POM/app bytes and
 authority/configuration defaults remain unchanged.
 
 Local actual metric4,40 alert expectations/eight panel-value cases/NaN control
-and six syntax checks pass. Corrected exact-source Grafana rendering and fresh
-dedicated CI are PENDING at this initial publication; no baseline result is
-transferred to the new colour configuration.
+and six syntax checks pass. Corrected rendering at86e1cb9 and its dedicated
+CI39531606323 passed; artifact inspection and final evidence publication follow
+the process-family correction below. Series colour represents the latest value,
+not the status of every historical point; binary history retains its numeric
+step values. Unknown age can render as an empty curve rather than literal text.
+
+## Preview process-family finding
+
+The original controller stopped direct child handles but left26 Grafana plugin
+workers from two preview runs. Therefore its `allOwnedChildrenStopped` field is
+NOT proof of complete cleanup. GPT identified only executables in this session's
+new private Grafana tool directory, rechecked each PID/path/creation time/parent,
+stopped those26 workers and verified none remained there. No shared service or
+other session's process was stopped. The guarded cleanup record remains ignored
+at target/preview-orphan-cleanup.json; this finding is not hidden as a clean pass.
+
+The corrected Windows fixture uses a separate unnamed private Job Object per
+component. A trusted launcher waits for a stdin handshake before creating its
+native target, so job assignment precedes target/descendant creation. No breakaway
+flags are set. Kill-on-close is read back from the kernel; normal shutdown also
+terminates and waits for zero job members. This follows Microsoft's
+[Job Object lifecycle](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects).
+There are no global process-name/PID kills in the published driver. Two actual
+Windows checks cover live/exited leaders, a surviving grandchild and an unrelated
+sentinel. Local checks pass; exact-source native Grafana and Windows CI proof are
+PENDING for this process-family revision. Initial handshake testing exposed and
+fixed Windows CRLF handling; that failed attempt is not a passing result.
 
 ## Reproducible owned preview boundary
 
@@ -51,7 +75,9 @@ simulation changes only observation age to200s. Exporter loss returns503;
 collector loss terminates ONLY the owned Prometheus subprocess and requires all
 six Grafana queries to report connection refusal. Recovery starts that same
 owned component; no workflow or business state is reset. Final cleanup waits
-for all owned child handles to become terminal and closes the fixture listener.
+for all private job members and direct handles to become terminal and closes
+the fixture listener. This helper currently requires Windows; Linux CI compiles
+its syntax, and a separate Windows job executes the native process checks.
 
 Executed native tools were verified against upstream archive hashes:
 

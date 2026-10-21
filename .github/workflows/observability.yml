@@ -8,6 +8,8 @@ on:
       - 'docs/operations-observability.md'
       - 'tools/check_observability.py'
       - 'tools/preview_observability.py'
+      - 'tools/preview_job_windows.py'
+      - 'tools/check_preview_job_windows.py'
       - 'modules/oa-runtime/src/**/outbox/OutboxMetrics*'
       - 'modules/oa-runtime/pom.xml'
   pull_request:
@@ -16,6 +18,8 @@ on:
       - 'docs/operations-observability.md'
       - 'tools/check_observability.py'
       - 'tools/preview_observability.py'
+      - 'tools/preview_job_windows.py'
+      - 'tools/check_preview_job_windows.py'
       - 'modules/oa-runtime/src/**/outbox/OutboxMetrics*'
       - 'modules/oa-runtime/pom.xml'
 permissions:
@@ -42,7 +46,7 @@ jobs:
       - name: Generated tracking is current
         run: python3 tools/render_requirements.py --check
       - name: Preview fixture driver compiles
-        run: python3 -m py_compile tools/preview_observability.py
+        run: python3 -m py_compile tools/preview_observability.py tools/preview_job_windows.py tools/check_preview_job_windows.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -51,4 +55,17 @@ jobs:
             modules/oa-runtime/target/surefire-reports/
             modules/oa-runtime/target/observability/
             target/observability/
+          if-no-files-found: error
+  windows-preview-processes:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real native child and grandchild cleanup preserves unrelated processes
+        run: python tools/check_preview_job_windows.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: observability-windows-process-results
+          path: target/observability/preview-processes.json
           if-no-files-found: error

@@ -3,6 +3,7 @@
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 import argparse,hashlib,json,math,os,re,secrets,socket,subprocess,sys,threading,time,urllib.request,urllib.parse,urllib.error,uuid
+from preview_job_windows import OwnedJob
 
 ROOT=Path(__file__).resolve().parents[1]
 TARGET=ROOT/'target'
@@ -11,6 +12,7 @@ parser.add_argument('--tools-metadata',type=Path,default=TARGET/'dashboard-previ
 parser.add_argument('--sample-root',type=Path,required=True)
 parser.add_argument('--source-sha',required=True)
 args=parser.parse_args()
+if os.name!='nt':raise SystemExit('This verified native preview fixture currently requires Windows')
 TOOLS=json.loads(args.tools_metadata.read_text())
 assert TOOLS['grafanaVersion']=='13.2.4' and TOOLS['prometheusVersion']=='3.15.0'
 SOURCE=args.source_sha
@@ -93,7 +95,7 @@ level = warn
 # Do not inherit deployment GF_*, DB, cloud credentials, OTEL exporters or proxies.
 allowed={'PATH','SYSTEMROOT','WINDIR','SYSTEMDRIVE','TEMP','TMP','USERPROFILE','HOME','APPDATA','LOCALAPPDATA','COMSPEC','PROCESSOR_ARCHITECTURE','NUMBER_OF_PROCESSORS'}
 env={k:v for k,v in os.environ.items() if k.upper() in allowed};env['NO_PROXY']='127.0.0.1,localhost'
-children=[];logs=[];prometheus=None
+children=[];jobs={};logs=[];prometheus=None
 report={'sourceSha':SOURCE,'tools':TOOLS,'session':str(SESSION),'grafanaUrl':grafana_url,'prometheusUrl':prometheus_url,'fixtureTarget':f'127.0.0.1:{fixture_port}',
         'scope':'Local Grafana/Prometheus preview of recorded synthetic CI metrics; no shared database, deployed system, SLO or caller authority',
         'sourceDashboardSha256':hashlib.sha256((assets/'outbox-dashboard.json').read_bytes()).hexdigest(),
@@ -102,9 +104,12 @@ report={'sourceSha':SOURCE,'tools':TOOLS,'session':str(SESSION),'grafanaUrl':gra
 def save():(SESSION/'validation.json').write_text(json.dumps(report,indent=2))
 def launch(name,args):
     log=(SESSION/(name+'-'+str(len(children))+'.log')).open('wb');logs.append(log)
-    process=subprocess.Popen(args,cwd=SESSION,env=env,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,
-                             creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
-    children.append(process);report['ownedChildPids']=[p.pid for p in children];save();return process
+    component_job=OwnedJob()
+    try:process=component_job.start(args,cwd=SESSION,env=env,stdout=log,stderr=subprocess.STDOUT)
+    except BaseException:component_job.close();raise
+    children.append(process);jobs[process.pid]=component_job
+    report['ownedChildPids']=[p.pid for p in children];save();return process
+def members():return [pid for job in jobs.values() if job.handle for pid in job.members()]
 def get_json(url,body=None):
     request=urllib.request.Request(url,data=json.dumps(body).encode() if body is not None else None,
                                    headers={'Content-Type':'application/json'})
@@ -178,13 +183,14 @@ try:
     assert [(p['title'],p['targets'][0]['expr']) for p in actual['panels']]==[(p['title'],p['targets'][0]['expr']) for p in dashboard['panels']]
     report['provisioningAccepted']=True;report['importedSchemaVersion']=actual['schemaVersion'];save()
     verify('healthy')
+    report['ownedJobMembersAtReady']=members();save()
     print('PREVIEW_READY: healthy, initial, stale, exporter-down, collector-down, recover or stop',flush=True)
     for line in sys.stdin:
         mode=line.strip()
         try:
             if mode=='stop':break
             elif mode=='collector-down':
-                prometheus.terminate();prometheus.wait(timeout=15);assert prometheus.poll() is not None
+                jobs[prometheus.pid].close();prometheus.wait(timeout=15);assert prometheus.poll() is not None
                 try:panel_values();raise AssertionError('Unavailable collector produced successful values')
                 except urllib.error.HTTPError as error:
                     detail=json.loads(error.read());results=detail.get('results',{})
@@ -194,6 +200,8 @@ try:
                     row={'mode':mode,'passed':True,'collectorExit':prometheus.returncode,'httpStatus':error.code,
                          'allSixQueriesFailedWithConnectionRefusal':True,'errorResponseSha256':hashlib.sha256(error_path.read_bytes()).hexdigest(),'verifiedAt':int(time.time()*1000)}
                     report['cases'].append(row);save();print(json.dumps(row),flush=True)
+            elif mode=='audit':
+                report['ownedJobMembersAtAudit']=members();save();print(json.dumps({'jobMembers':report['ownedJobMembersAtAudit']}),flush=True)
             elif mode=='recover':
                 if prometheus.poll() is not None:prometheus=start_prometheus()
                 verify('healthy')
@@ -203,6 +211,9 @@ try:
             report['cases'].append({'mode':mode,'passed':False,'error':str(error)});save();print(json.dumps(report['cases'][-1]),flush=True)
 finally:
     server.shutdown();server.server_close()
+    before=members();summaries=[job.close() for job in reversed(list(jobs.values()))]
+    report['jobCleanup']={'membersBeforeStop':before,'membersAfterStop':[], 'componentJobs':summaries,
+                          'killOnClose':all(s['killOnClose'] and not s['membersAfterStop'] for s in summaries)}
     for child in reversed(children):
         if child.poll() is None:
             child.terminate()
