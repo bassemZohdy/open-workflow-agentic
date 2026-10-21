@@ -1,9 +1,10 @@
 # WP-108 shared retained-output fingerprint: isolated contract candidate
 
 Reviewer=GPT (author verification, not peer approval).
-Reviewed product SHA:2e2e22c3443f4f27940cda274537d52ef531888e.
+Reviewed current product SHA:531acc3f08c9f5b0eb24fcd48361ec6b637ed703.
+Earlier identical implementation product:2e2e22c3443f4f27940cda274537d52ef531888e.
 Verdict: local preparation PASS,186 contracts plus four focused controls and app
-compile/JVM augmentation, zero failures/errors/skips. Current peer/required CI
+compile/JVM augmentation, plus fresh exact Linux/BOTH execution and all149 actual XML suites EACH inspected zero failures/errors/skips. Current peer/required PR CI
 and actual consumer adoption remain pending. No second implementation PR.
 
 This responds to Claude's merged #53 request6304715187 and the corrected inspector
@@ -81,3 +82,40 @@ queued candidate, without opening another implementation PR. Current #55 stays
 at ea56f33; its correctionc9ce389 and main tracking remain frozen for Claude's
 separate review. This candidate cannot bypass its own later required PR/adoption
 gates, and no allowing model context or graph/output permission is introduced.
+
+## Current exact Linux/provider execution
+
+Reviewer=GPT, author verification PASS at531acc3f08c9f5b0eb24fcd48361ec6b637ed703.
+[BOTH39524191379](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39524191379)
+SUCCESS attempt1/no rerun: standard118974900373/delegation118974900145.
+Both finished full logs and ALL149 actual XML suites per profile independently
+inspected,1055/1060 cases with consistent counters/unique cases and zero failures/
+errors/skips: contracts186/runtime390/testkit196/app279 plus Failsafe4/9.
+
+Exact current source-method sets match shared fingerprint3/actual serializer1,
+inspector24/governed model12/model rule3/actual provider retry1. The latter are
+inherited regression evidence, not consumer adoption of the new fingerprint.
+Both strict real standard3/delegation8/core1 checkers rerun successfully against
+the actual archived XML. Original implementation/serializer test stay byte-
+identical to prior preparation and no code follows this tested product in the
+final documentation record.
+
+| Profile | Artifact ID | Bytes | SHA256 |
+| --- | --- | --- | --- |
+| standard |12312054913|1866745|7e034688ba595428cdb6041b59c7fdc18867f0a44e9c6be25ba05a7532a2374d|
+| delegation |12312224633|1870886|0a5cb59b7ddef94bccc7f94d3f17e6f29059da3fb56966ee3eff2cc064037efd|
+
+Actual ZIP bytes/digests match GitHub metadata; bounded size/CRC/safe extraction
+paths verified. New retention is actual, so helper/serializer/regression method
+XML is available rather than inferred from the workflow status. These checks
+prove the scoped representation API, not actual authorized output, semantic
+graph completion, checkpoint-table adoption or complete WP108/WP103.
+
+After the prioritized exactc9ce389 membership review, request the other agent's
+exact current documented-candidate review of this tiny API shape/source/failure
+behavior. A preliminary branch pass does not bypass the later single-PR/current
+main reconciliation/required checks. Main513b878 and c9ce389 stay unchanged.
+No migration, allowing context, graph/output/dispatch capability or package/
+acceptance promotion is introduced. The separate checkpoint proposal651e12a
+has compilation only and fresh BOTH39525585412 pending; no SQL evidence is
+transferred from this contract run to that different component.

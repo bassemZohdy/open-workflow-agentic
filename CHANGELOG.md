@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify isolated shared output-fingerprint product531acc3/BOTH39524191379: all149 actual suites EACH/helper3/actual serializer1 and inherited inspector/model/provider tests pass zero skips; actual archive digests/current method sets/strict checkers inspected. No source changes in final documentation. Exact peer/current required PR/consumer and package gates remain open.
+
 - Reconcile the tiny shared output-fingerprint candidate with current main and retain app/module Surefire reports for its fresh exact Linux checks. API/serializer/control bytes remain unchanged; consumer, peer, required PR and package gates remain open.
 
 - Record exact pinned checkpoint-saver v1.1 schema/command hashes and mutable-operation facts for Claude's table-ownership request. Intake and future adoption tests only; no migration, role, version allocation or runtime change.
