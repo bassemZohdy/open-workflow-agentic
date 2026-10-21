@@ -1,10 +1,10 @@
 # Changelog
 
+- Reconcile the final serialized main tracking into the held membership candidate, preserving all current proof and queue boundaries. This is documentation only; runtime/test/migration bytes remain at verifieddb43b3b. Hold this final review head and main tracking stable until exact peer/current required PR gates clear.
+
 - Verify current-main membership correction atdb43b3b/BOTH39521278476: SQL16 EACH, integrated inspector24/governed-model12/rule3/actual provider1 and real standard3/delegation8/core1 pass zero skips. Actual full logs/archived provider XML/digests/strict checkers inspected. Final documented candidate needs exact Claude review/current PR checks before #55 advances; unchanged tests/migrations and partial acceptance retained.
 
 - Normally reconcile the pending membership correction with reviewed integrated Claude #53/current main. No membership runtime/test/migration bytes change; previous5522bce strict success remains historical. Fresh combined-head CI and exact Claude review are required before #55 advances.
-
-- Integrate Claude #53 exacta71fb1f as main2f10662 after GPT exact-head review6304838496 and full/real-Keycloak CI. Consolidates closed #56, corrects read-only research inspection and gates all current model nodes through audited PEP with no allowing production context. Actual provider one-request failure test passes; concrete-provider architecture-rule gap remains a nonblocking follow-up. Publish the concrete V75 central-audit transaction/duplicate/chain/role/test handoff; activation/consumer/shared execution and package gates remain partial. Postmerge full39520880781/BOTH39520880697 pending.
 
 - WP-107 review N1/N2 candidate: additive72.1 requires full retained-match coverage at advancement, allowing only earlier exclusive memberships as substitutes; finalized reads/replay refuse pending rows. V71/V72 remain unchanged and their prior direct-SQL wording is narrowed to late additions/per-member checks. Five new SQL cases (16 total), app test compilation/tools76 pass; exactc2972fa BOTH39518381586 SUCCESS, actual full logs confirm SQL16 and all module totals zero skips EACH; archived exact real-provider3/8/core1 XML and strict checkers independently verified. SQL method XML is not archived by the parent workflow. Final candidate peer review/current required PR checks pending. #55 remains frozen at reviewed ea56f33; no package promotion.
 
@@ -23,6 +23,10 @@
 - WP-107 preparation: four actual SDK full-workflow listen-group cases establish ALL order/overlap and negative controls for ANY post-completion mutation and concurrent foreach/until completion. All four fixtures validate; these observations do not close durable delivery, FIFO or T13 gates.
 
 - WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. Eight new verifier cases and all76 tooling tests pass; new product process execution still needs fresh Linux CI. No acceptance promotion.
+
+- Publish the isolated retained-output fingerprint proposal and local verification (186 contracts/four controls) for the requested Claude consumer; implementation remains queued4e45373. Membership correction e6a873b awaits exact peer/current checks after combined-product SQL16 pass. Separate attribution bridge fix26bdce4 is under fresh CI after a retained CDI discovery failure; no activation or package promotion.
+
+- Integrate Claude #53 exacta71fb1f as main2f10662 after GPT exact-head review6304838496 and full/real-Keycloak CI. Consolidates closed #56, corrects read-only research inspection and gates all current model nodes through audited PEP with no allowing production context. Actual provider one-request failure test passes; concrete-provider architecture-rule gap remains a nonblocking follow-up. Publish the concrete V75 central-audit transaction/duplicate/chain/role/test handoff; activation/consumer/shared execution and package gates remain partial. Postmerge full39520880781/BOTH39520880697 and documentationc20d37f build39521142788 SUCCESS; actual logs/archived provider XML/strict checkers inspected.
 
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 
