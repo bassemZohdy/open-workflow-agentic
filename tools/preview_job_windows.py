@@ -1,10 +1,7 @@
 """Own a Windows preview process family, including plugin grandchildren. Not an untrusted-process sandbox."""
 import ctypes
 import os
-from pathlib import Path
-import json
 import subprocess
-import sys
 import time
 from ctypes import wintypes
 
@@ -53,22 +50,54 @@ class OwnedJob:
     def start(self, arguments, **options):
         if not self.handle:
             raise RuntimeError('Cannot launch into a closed preview job')
-        # A trusted launcher waits for stdin before creating the target. Association therefore
-        # happens BEFORE even a fast target can create descendants or exit.
-        options.pop('stdin', None)
-        options['creationflags'] = subprocess.CREATE_NO_WINDOW
-        process = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--owned-launch', json.dumps(arguments)],
-                                   stdin=subprocess.PIPE, **options)
+        # Create the native target suspended. Assign its actual process handle before
+        # resuming its primary thread: no launcher/alias descendant inheritance assumption.
+        import _winapi
+        import msvcrt
+        streams = []
+        readers = {}
+        def stream(value, name):
+            if value == subprocess.PIPE:
+                read, write = os.pipe()
+                readers[name] = os.fdopen(read, 'r' if options.get('text') else 'rb')
+                opened = os.fdopen(write, 'wb')
+                streams.append(opened)
+            elif value is None or value == subprocess.DEVNULL:
+                opened = open(os.devnull, 'rb' if name == 'stdin' else 'wb'); streams.append(opened)
+            else:
+                opened = value
+            return msvcrt.get_osfhandle(opened.fileno())
+        handles = []
+        process = None; thread = None
         try:
-            if not self.kernel.AssignProcessToJobObject(self.handle, wintypes.HANDLE(int(process._handle))):
+            startup = subprocess.STARTUPINFO()
+            startup.dwFlags = subprocess.STARTF_USESTDHANDLES
+            startup.hStdInput = stream(subprocess.DEVNULL, 'stdin')
+            startup.hStdOutput = stream(options.get('stdout'), 'stdout')
+            startup.hStdError = startup.hStdOutput if options.get('stderr') == subprocess.STDOUT else stream(options.get('stderr'), 'stderr')
+            handles = list(set([startup.hStdInput, startup.hStdOutput, startup.hStdError]))
+            for handle in handles:os.set_handle_inheritable(handle, True)
+            startup.lpAttributeList = {'handle_list': handles}
+            handle, thread, pid, _ = _winapi.CreateProcess(str(arguments[0]), subprocess.list2cmdline(arguments),
+                None, None, True, subprocess.CREATE_NO_WINDOW | 0x4, options.get('env'),
+                str(options['cwd']) if options.get('cwd') else None, startup)
+            process = NativeProcess(handle, pid, readers)
+            if not self.kernel.AssignProcessToJobObject(self.handle, wintypes.HANDLE(handle)):
                 raise ctypes.WinError(ctypes.get_last_error())
-            process.stdin.write('go\n' if options.get('text') else b'go\n')
-            process.stdin.flush(); process.stdin.close()
+            resume = self.kernel.ResumeThread
+            resume.argtypes = [wintypes.HANDLE]; resume.restype = wintypes.DWORD
+            if resume(wintypes.HANDLE(thread)) == 0xffffffff:
+                raise ctypes.WinError(ctypes.get_last_error())
             return process
         except BaseException:
-            if process.poll() is None:
+            if process and process.poll() is None:
                 process.terminate(); process.wait(timeout=10)
+            for reader in readers.values():reader.close()
             raise
+        finally:
+            if thread is not None:_winapi.CloseHandle(thread)
+            for handle in handles:os.set_handle_inheritable(handle, False)
+            for opened in streams:opened.close()
 
     def members(self):
         if not self.handle:
@@ -103,11 +132,33 @@ class OwnedJob:
             self.kernel.CloseHandle(self.handle); self.handle = None
 
 
-if __name__ == '__main__':
-    if os.name != 'nt' or len(sys.argv) != 3 or sys.argv[1] != '--owned-launch':
-        sys.exit('Internal Windows preview launcher only')
-    if sys.stdin.readline() != 'go\n':
-        sys.exit(2)
-    target = subprocess.Popen(json.loads(sys.argv[2]), stdin=subprocess.DEVNULL,
-                              creationflags=subprocess.CREATE_NO_WINDOW)
-    sys.exit(target.wait())
+class NativeProcess:
+    """The small process-handle interface needed by this owned preview."""
+    def __init__(self, handle, pid, readers):
+        self._handle = handle; self.pid = pid; self.returncode = None
+        self.stdout = readers.get('stdout'); self.stderr = readers.get('stderr')
+
+    def poll(self):
+        import _winapi
+        if self.returncode is None and _winapi.WaitForSingleObject(self._handle, 0) == _winapi.WAIT_OBJECT_0:
+            self.returncode = _winapi.GetExitCodeProcess(self._handle)
+        return self.returncode
+
+    def wait(self, timeout=None):
+        import _winapi
+        if self.returncode is None:
+            result = _winapi.WaitForSingleObject(self._handle, _winapi.INFINITE if timeout is None else int(timeout * 1000))
+            if result == _winapi.WAIT_TIMEOUT:raise subprocess.TimeoutExpired('owned preview', timeout)
+            if result != _winapi.WAIT_OBJECT_0:raise RuntimeError('Owned native process wait failed')
+            self.returncode = _winapi.GetExitCodeProcess(self._handle)
+        return self.returncode
+
+    def terminate(self):
+        import _winapi
+        if self.poll() is None:_winapi.TerminateProcess(self._handle, 1)
+
+    kill = terminate
+
+    def __del__(self):
+        import _winapi
+        if self._handle:_winapi.CloseHandle(self._handle); self._handle = None

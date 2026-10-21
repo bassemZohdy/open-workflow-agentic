@@ -46,16 +46,21 @@ other session's process was stopped. The guarded cleanup record remains ignored
 at target/preview-orphan-cleanup.json; this finding is not hidden as a clean pass.
 
 The corrected Windows fixture uses a separate unnamed private Job Object per
-component. A trusted launcher waits for a stdin handshake before creating its
-native target, so job assignment precedes target/descendant creation. No breakaway
+component. It creates the native target suspended, assigns its actual process
+handle and then resumes its primary thread. No breakaway
 flags are set. Kill-on-close is read back from the kernel; normal shutdown also
 terminates and waits for zero job members. This follows Microsoft's
 [Job Object lifecycle](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects).
 There are no global process-name/PID kills in the published driver. Two actual
-Windows checks cover live/exited leaders, a surviving grandchild and an unrelated
-sentinel. Local checks pass; exact-source native Grafana and Windows CI proof are
+Python and native PowerShell checks each cover live/exited leaders, a surviving
+grandchild and an unrelated sentinel (four cases). Local checks pass; exact-source native Grafana and Windows CI proof are
 PENDING for this process-family revision. Initial handshake testing exposed and
 fixed Windows CRLF handling; that failed attempt is not a passing result.
+The intermediate becc6d4 launcher revision passed Python-only local/Windows CI
+checks but actual Grafana inspection found its native descendants outside the
+job. That revision is superseded, not accepted cleanup proof. Only its own15
+remaining private native processes were identity-checked and stopped. The final
+suspended-target implementation and stronger native cases address that gap.
 
 ## Reproducible owned preview boundary
 
