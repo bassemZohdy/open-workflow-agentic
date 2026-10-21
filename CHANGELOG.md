@@ -1,5 +1,7 @@
 # Changelog
 
+- Record exact pinned checkpoint-saver v1.1 schema/command hashes and mutable-operation facts for Claude's table-ownership request. Intake and future adoption tests only; no migration, role, version allocation or runtime change.
+
 - Isolate the requested shared retained-output fingerprint helper from existing preparation, byte-identical recipe and actual serializer control, without execution types/ports/schema or consumer activation. Product2e2e22c passes186 contracts/four focused controls/app compilation; independent stored-text golden reproduced. Peer/required CI/inspector adoption and package gates remain open; no second GPT implementation PR.
 
 - Integrate Claude #53 exacta71fb1f as main2f10662 after GPT exact-head review6304838496 and full/real-Keycloak CI. Consolidates closed #56, corrects read-only research inspection and gates all current model nodes through audited PEP with no allowing production context. Actual provider one-request failure test passes; concrete-provider architecture-rule gap remains a nonblocking follow-up. Publish the concrete V75 central-audit transaction/duplicate/chain/role/test handoff; activation/consumer/shared execution and package gates remain partial. Postmerge full39520880781/BOTH39520880697 pending.
