@@ -1,5 +1,7 @@
 # Changelog
 
+- Validate queued WP112 dashboard in actual local Grafana/Prometheus with recorded synthetic samples; correct default green health0 presentation using explicit binary colours/axes/title and null gaps. Existing metric/rule/query controls pass; corrected rendering and fresh dedicated CI pending. Frozen cc4d948 remains available, and no Java/query/alert/authority/package status changes.
+
 - Verify WP112 current b14722e/BOTH39529291379 (149 actual suites EACH/metric4/real application SQL+HTTP scrape1) and identical final querye0b8676/dedicated39529071270 (40 alerts/eight panel values/NaN/six query syntax), all zero skips. Actual XML/metric samples/source hashes/archive digests inspected. Peer/current PR/Grafana/deployed collector/SLO/full tracing and package gates remain open.
 
 - Add an actual application metrics-path/real PostgreSQL observation test for the five bounded outbox signals; retain only those lines. Local compilation passes; fresh exact combined-provider execution is required before claiming the HTTP/SQL export proof. Query-only e0b8676 dedicated CI passed, archive inspection pending; no result transfer or package promotion.
