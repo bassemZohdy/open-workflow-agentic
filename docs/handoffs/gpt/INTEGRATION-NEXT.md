@@ -39,8 +39,15 @@ recheck main and serialize tracking. **Claude after merge:** adopt the single
 helper in ResearchRunInspector while retaining bounded private-state retrieval,
 schema/profile/header/physical-run checks and current output authorization.
 
-Attribution395379a and checkpoint-profile72da48e remain separately verified
-ordered candidates. No V76-V79 allocation, saver runtime switch, consumer bypass
+Attribution now normally reconciles merged main and current GPT tracking at
+**4146ce953bdce16a671fd571414ce888d29615d4** on its existing branch. All executable,
+test, migration and CI bytes equal tested2f59db1; only ancestry/docs/tracking
+changed. Generated/diff/source-equality checks pass. This supersedes395379a as
+the queued attribution review head, without opening another GPT PR or relabeling
+old backend runs. After PR57 actually merges, reconcile its new source and run
+fresh combined/current checks before exact peer review and the later sole PR.
+Checkpoint-profile72da48e remains a separately verified ordered candidate.
+No V76-V79 allocation, saver runtime switch, consumer bypass
 or model-call permission is activated by the fingerprint increment.
 Claude independently passed checkpoint proposal72da48e in6306738213; versioned
 activation still requires GPT-owned public schema/Flyway/role/rollout review.

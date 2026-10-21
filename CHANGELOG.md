@@ -1,5 +1,7 @@
 # Changelog
 
+- Reconcile existing V73/V74 attribution candidate with merged main/current GPT tracking as4146ce9; executable/test/CI bytes unchanged from tested2f59db1. Keep PR57 fixed/all current CI green pending exact Claude review, and PR58 corrections with Claude. No second GPT PR, new feature, schema activation or package promotion.
+
 - Review Claude PR58 exact87bc20e: request changes for bounded-pool commit-readback exhaustion and valid source/chain lock-argument aliasing. Independent detached current-class JDBC/input probes and compilation pass; no local PostgreSQL execution claimed. Publish concrete fixes/tests/role-boundary handoff. GPT PR57 remains5bb6a81/all current full+strict green, pending exact Claude review.
 
 - Integrate PR55 exactc9ce389 as mainf840b06 after Claude6306699855 and current full39534066349/strict BOTH39534071955. Retain pinned groups and add complete recorded-match/finalized-read/replay fences; actual SQL16/provider/core evidence inspected. Actual main postmerge full39534880880/BOTH39534883157 SUCCESS with logs/provider XML/strict checks/digests inspected; full T13 remains partial. Next sole WP108 PR57 reconciles the existing shared fingerprint at5bb6a81, current full39535234967/BOTH39535234969 SUCCESS with154 actual XML EACH/zero skips inspected; exact current review still gates merge.
