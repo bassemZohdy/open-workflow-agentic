@@ -1,9 +1,9 @@
 # WP-605 checked schema-format materialization preparation
 
 Reviewer=GPT (author verification, not peer approval).
-Reviewed current product SHA: pending cache-binding fix commit.
+Reviewed current product SHA:1b8b98b3f05a4d81ce62f731df85c0bd1482cf3b.
 Earlier uncached-source checkpoint:5f56bf77db1540f3e14478ad5bf8e94efa0d1735.
-Verdict:55 local focused controls/package compile PASS including identity-cache conflict/races; fresh exact current-product CI pending. Earlier uncached-source zero-fetch Linux/BOTH proof is scoped history. Consumer integration and package completion remain open.
+Verdict: PASS for producer preparation, including identity-cache conflict/races, exact Linux/BOTH execution and independently inspected actual artifacts. Earlier uncached-source proof remains scoped history. Consumer integration, peer review and package completion remain open.
 Integration HOLD for current Claude review and final required PR checks.
 
 ## Producer, consumers and explicit boundary
@@ -180,13 +180,57 @@ and actual SDK output matching that winner's prepared data. Raw outcomes are
 retained in target/conformance/materializer/cache-races.json. Existing alias,
 BOM, private-byte/hash and before-fetch controls remain unchanged.
 55 final focused cases and application compilation/augmentation pass locally;
-new exact Linux/BOTH evidence remains pending. No previous green CI is transferred
+fresh exact Linux/BOTH evidence is recorded below. No previous green CI is transferred
 to the changed binding code. Earlier5f56bf7 proofs above remain factual for
 uncached materialization only; they did not cover this identity-cache gap.
 
+## Current cache-binding product verification
+
+Exact product1b8b98b3f05a4d81ce62f731df85c0bd1482cf3b, attempt1/no rerun:
+
+- Dedicated [39517882571](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39517882571)
+  SUCCESS: all84 actual XML suites/619 tests, contracts220/runtime399.
+- BOTH [39517882762](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39517882762)
+  SUCCESS: standard118954313665/delegation118954313908. Each has contracts220/
+  runtime399/testkit196/app426 plus failsafe23/28 respectively. All170/170 actual
+  XML suites,1264/1269 tests, zero failures/errors/skips and unique exact cases.
+
+| Lane | Artifact ID | Bytes | SHA256 |
+| --- | --- | --- | --- |
+| dedicated |12309555080|908077|d4f4af8163904c2ba2c084d5fb992496f33c5ded368e04dd46d244f34e2c888c|
+| standard |12310111398|2745027|52279ff9af1669c8bdb241179762c85152d2bdc734f6568181c84e617d6fcb82|
+| delegation |12310600183|2750081|cf776285bdc1015d4911926e53236f537eef30256b847d27c4bfd4274bb81d5f|
+
+Actual ZIP bytes/digests match GitHub metadata; CRC/bounds/safe extraction paths
+checked. All three archives independently checked against eight exact current
+materializer methods,28 structural refusal records and correct alias output.
+Each has five actual cache-race records, one winner/one conflict per identity
+and SDK output matching that winner. Preloaded raw-cache refusal is an exact
+non-skipped method. BOTH archives additionally retain both exact injected Flow
+methods: three unsupported declarations refuse before schema GET/task effect,
+and approved-view preparation yields one schema GET/one HTTP task/COMPLETED
+output with exact source/view fingerprints and valid engine ULID. This proves
+the checked adapter's behavior, not caller approval or publication authority.
+
+Author verification commands: focused Maven package55 locally; independently
+parse every archived TEST-*.xml and compare current materializer/codec method
+sets; reparse original42 bytes/hashes and78 typed-data conversions; inspect
+native/platform21 scenarios/all45 assertions, provider observations and actual
+URI/raw-input-schema/checked-materializer boot records. Actual native14/seven
+and platform15/six findings, raw-schema four MATCH/two DIVERGED and bounded
+48 outputs/74 exports/two pinned writer failures remain unchanged.
+
+Both fresh provider archives also pass the exact standard3/delegation8/core1/
+audit4/HTTP7/manual8 methods and all five strict evidence checks. Current
+profile checker reruns with all four recovery flags pass. All14 audit logs,
+13 HTTP logs,32 manual workers/eight original decisions/56 backend sessions
+and halt/outcome/purpose matrices checked; known owned WAIT_CHARGE cleanup
+interruption remains visible. These are retained DATA preparation checks,
+not actual signed operator or atomic central audit-consumer completion.
+
 ## Review and integration next steps
 
-The current producer also needs the cache-binding fix's fresh exact CI before verification is final.
+The current checked capability/materializer producer is verified as preparation.
 Claude WP601 must still adopt the checked port after review/integration, approve
 and retain exact source/view/resources and bind publication/access controls.
 Raw SDK APIs still bypass it. Other semantic/authoring/reference/deployment and
