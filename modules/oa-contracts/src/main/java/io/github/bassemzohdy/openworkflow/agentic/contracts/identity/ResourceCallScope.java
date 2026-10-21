@@ -7,8 +7,10 @@ import java.util.regex.Pattern;
 
 /**
  * Immutable attribution of one governed resource invocation, supplied by the trusted dispatcher, never request body
- * fields. logicalOccurrence pins the complete enclosing loop/foreach occurrence; retry/resume/owner epochs and token
- * ids are not occurrences. Data only: the consumer still checks the current registry/full owner, exact issuing grant,
+ * fields. logicalOccurrence pins the complete business occurrence, including genuine leaf/enclosing loop or goto
+ * coordinates; retry/resume/owner epochs and token ids are not occurrences. iteration retains the original accepted
+ * entry attribution: use the producer's canonical lookup, never copy a new SDK counter on retry. Data only: the
+ * consumer still checks the current registry/full owner, exact issuing grant,
  * token expiry/replay, registered target, policy/audit and dispatch ownership before acting.
  */
 public record ResourceCallScope(String tenant,Ulid instanceId,Subject owner,String applicationId,String engineInstanceId,
@@ -39,6 +41,18 @@ public record ResourceCallScope(String tenant,Ulid instanceId,Subject owner,Stri
                 .text(tenant).text(instanceId.value()).text(owner.kind().name()).text(owner.id())
                 .text(applicationId).text(engineInstanceId).text(namespace).text(definition).text(version)
                 .text(taskPosition).number(iteration).text(logicalOccurrence).toBytes());
+    }
+    /**
+     * Stable complete BUSINESS occurrence, independent of the SDK task-entry counter (which can advance on retry).
+     * The trusted producer must include genuine leaf/enclosing loop or goto coordinates in logicalOccurrence, never
+     * retry/resume/worker/token epochs. Storage anchors this occurrence to the FIRST retained scope/rc1 key. This
+     * lookup key neither derives those coordinates nor grants current authority, ownership or execution permission.
+     */
+    public String occurrenceKey() {
+        return "ro1-"+CanonicalEncoder.sha256Hex(new CanonicalEncoder("oa.resource.occurrence.v1")
+                .text(tenant).text(instanceId.value()).text(owner.kind().name()).text(owner.id())
+                .text(applicationId).text(engineInstanceId).text(namespace).text(definition).text(version)
+                .text(taskPosition).text(logicalOccurrence).toBytes());
     }
     /** The immutable target/request contract bound to key(). This fingerprint is not authorization. */
     public String fingerprint() {
