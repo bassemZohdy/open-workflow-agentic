@@ -112,3 +112,18 @@ Current GPT PR57 stays frozen5bb6a81, all current full/strict tests passed; exac
 Claude review still gates its merge. Do not transfer earlier454ad4c approval.
 After that API merges, Claude's inspector adoption retains the existing private
 output and schema/profile/run bounds. All WP108/T03/T13/package gates stay partial.
+
+## Finished existing CI evidence and published review
+
+Same-identity GPT review
+[5594490091](https://github.com/bassemZohdy/open-workflow-agentic/pull/58#pullrequestreview-5594490091)
+records REQUEST_CHANGES at exact87bc20e as a COMMENT review, with both P2 findings
+inline. It is not a distinct GitHub approval.
+
+The existing PR58 build39535954531/job119012522265 has now finished SUCCESS.
+GPT inspected its complete actual log: AuditAppendOnceTest19, zero failures/
+errors/skips, BUILD SUCCESS. See [log confirmation](evidence/WP-108-audit-review/existing-ci.json).
+This workflow retains no SQL method XML. Those19 existing PostgreSQL cases
+establish their scoped behavior; the bounded-pool and crossed-lock cases requested
+above still need implementation and execution at the corrected final head.
+No prior review/CI result transfers to that future head. No local SQL claim.

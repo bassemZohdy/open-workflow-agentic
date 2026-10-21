@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-PR55 mergedc9ce389/mainf840b06 after exact reciprocal review/current checks; actual postmerge full39534880880/BOTH39534883157 PASS inspected. Sole GPT PR57 remains5bb6a81/all current full39535234967/BOTH39535234969 PASS, ALL154 XML EACH verified; awaiting exact Claude review. New sole Claude PR58 exact87bc20e GPT REQUEST_CHANGES: release failed connection before same-source readback; separate source/chain advisory lock namespaces, add real regression cases and reconcile current main. Detached review/probe evidence pushed; no SQL execution/activation/old approval transfer or package promotion. Continue existing integration/consumer handoffs; no more conformance features..
+PR55 mergedc9ce389/mainf840b06 after exact reciprocal review/current checks; actual postmerge full39534880880/BOTH39534883157 PASS inspected. Sole GPT PR57 remains5bb6a81/all current full39535234967/BOTH39535234969 PASS, ALL154 XML EACH verified; awaiting exact Claude review. New sole Claude PR58 exact87bc20e GPT REQUEST_CHANGES: release failed connection before same-source readback; separate source/chain advisory lock namespaces, add real regression cases and reconcile current main. Detached review/probe evidence pushed; no SQL execution/activation/old approval transfer or package promotion. Continue existing integration/consumer handoffs; no more conformance features. Existing PR58 full39535954531 now SUCCESS; actual SQL suite19/zero skips/full log inspected, two P2 corrections and new real regression cases remain required..
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-21).
 
