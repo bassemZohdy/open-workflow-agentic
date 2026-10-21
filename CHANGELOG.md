@@ -1,5 +1,7 @@
 # Changelog
 
+- Integrate PR55 exactc9ce389 as mainf840b06 after Claude6306699855 and current full/real-Keycloak checks. Retain matched-slot completeness and finalized-read/replay bounds; full T13 remains partial. Postmerge checks running. Reconcile the existing tiny WP108 output fingerprint candidate with merged membership/main; new combined execution and exact peer review pending.
+
 - Reconcile the final serialized main tracking into the held membership candidate, preserving all current proof and queue boundaries. This is documentation only; runtime/test/migration bytes remain at verifieddb43b3b. Hold this final review head and main tracking stable until exact peer/current required PR gates clear.
 
 - Verify current-main membership correction atdb43b3b/BOTH39521278476: SQL16 EACH, integrated inspector24/governed-model12/rule3/actual provider1 and real standard3/delegation8/core1 pass zero skips. Actual full logs/archived provider XML/digests/strict checkers inspected. Final documented candidate needs exact Claude review/current PR checks before #55 advances; unchanged tests/migrations and partial acceptance retained.
