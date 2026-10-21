@@ -152,7 +152,7 @@ Actual failed artifacts12311965013 (1007699 bytes,SHA256
 match GitHub metadata/CRC/safe paths. Both full logs and the discovery exception
 were inspected. Compilation-only augmentation had not discovered test beans.
 
-GPT corrects its own JDBC wiring: @Typed exposes the concrete store and canonical
+The intermediate26bdce4 approach corrected JDBC wiring: @Typed exposes the concrete store and canonical
 ResourceInvocations independently; a narrow @DefaultBean producer supplies the
 legacy ResourceCallBindings port when no override exists. Claude's test store
 can override that port while concrete/canonical storage remains injectable.
@@ -164,6 +164,42 @@ double and requires concrete, canonical and legacy injections to resolve to the
 actual JDBC implementation. Existing delegated HTTP cases retain their override
 and are also required to pass. Nine local scope/preflight controls and app source
 compilation/JVM augmentation pass; the new boot test is compiled, not locally
-executed. Fresh exact combined-head Linux/provider execution is required before
-this correction is considered verified. No source/API authority or package gate
-is weakened and no failed matrix is rerun without this code change.
+executed. Intermediate exact execution and the subsequent admission boundary
+tightening are recorded below; no unchanged failed matrix was simply retried.
+
+## Intermediate bridge verification and final admission-held boundary
+
+Intermediate26bdce4667f751392ede9b9b5391b69a8c9e8c46/BOTH39522134221 SUCCESS,
+standard118968223239/delegation118968223380. All155 actual XML suites per profile
+(1109/1114 cases) and both full logs independently inspected, zero failures/errors/
+skips: contracts193/runtime403/testkit196/app313 EACH plus Failsafe4/9. Actual
+SQL17, old positive-default wiring1, delegated HTTP7 exact method sets matched
+THAT commit, with both current strict provider/core checkers passing.
+
+Artifacts12311401998 (1957127 bytes,SHA256
+e1310fbdc7adc3dc80b08ef363a4aed8727390ace6eaa99bfaeb7ecb035fe67d) and12311521882
+(1955577 bytes,SHA256c895fccc53aa33f305f26144ccdb43333b5a264f69597a679d0b4646862d49b2)
+match GitHub metadata/digests/CRC/bounded paths. That proves the intermediate
+wiring works; it does not approve production admission activation.
+
+Review of the combined path confirms the earlier H2 adoption boundary: legacy
+AgentResourceAdmission reads historical bindings and revalidates signed caller/
+grant, but the actual current registry/task/execution gate is not integrated.
+Exposing this DATA store as its legacy port would activate that path too early.
+Default model refusal does not authorize graph/checkpoint re-entry.
+
+The final candidate therefore REMOVES the default legacy producer. @Typed
+exposes only JdbcResourceCallBindings and ResourceInvocations; normal production
+Instance<ResourceCallBindings> stays UNSATISFIED until the reviewed consumer/
+execution integration supplies its own gate. Canonical attribution remains
+available; the existing Claude admission test double stays unchanged and unique.
+No hidden fallback, new permission or interface definition is introduced.
+
+The owned boot case now explicitly excludes only the test double and requires
+concrete/canonical REAL JDBC beans PLUS an unsatisfied legacy admission port.
+This is a stronger adoption gate, not a weakened storage or authority assertion.
+Nine local scope/preflight controls/app compilation/JVM augmentation pass; that
+negative boot case is compiled only. Fresh exact Linux/strict evidence must prove
+the FINAL boundary;26bdce4's opposite positive-default test is historical only.
+V73/V74, all17 SQL tests and Claude fixtures/consumers remain unchanged. No new
+implementation PR, current-head approval transfer or package promotion.

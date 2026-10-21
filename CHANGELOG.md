@@ -1,5 +1,7 @@
 # Changelog
 
+- Keep historical attribution from activating legacy admission before the current execution gate: expose concrete/canonical storage only and remove the intermediate default legacy producer. Production-default boot regression now requires the admission port to stay unsatisfied. Intermediate26bdce4 strict CI passed155 suites EACH, but its positive-default proof is historical; nine local controls/app compile pass, fresh final-boundary Linux evidence required. SQL/tests/consumer ownership and package gates retained.
+
 - Fix combined candidate CDI ambiguity by exposing concrete/canonical storage separately and providing a default legacy admission-port bridge. Preserve Claude's test override and add a production-default wiring boot case. be45a08 strict CI failed before app discovery; failed artifacts retained, no SQL/provider pass claimed. Nine local controls/app compilation pass; fresh exact Linux/strict evidence pending.
 
 - Normally refresh the queued V73/V74 attribution increment onto integrated Claude #53/current membership correction. Existing resource-store/schema/test bytes remain unchanged; previousf25de24 actual142-suite proof stays historical. Fresh combined-head compile/SQL/provider and current review/PR gates required; no consumer or V75 activation.

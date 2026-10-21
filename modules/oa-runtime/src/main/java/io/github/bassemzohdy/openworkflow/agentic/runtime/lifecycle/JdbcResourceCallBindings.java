@@ -4,14 +4,10 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEnco
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.Checks;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
-import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceCallBindings;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceInvocations;
-import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Produces;
 import jakarta.enterprise.inject.Typed;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import jakarta.transaction.Transaction;
 import jakarta.transaction.TransactionManager;
 import java.sql.*;
@@ -30,6 +26,8 @@ import javax.sql.DataSource;
  * return a binding; reconcile the SAME issuer/jti/call. No raw bearer/request is stored. PostgreSQL timestamps retain
  * microseconds: unsupported precision/range is rejected before I/O rather than silently rounded.
  */
+// Expose attribution to the trusted producer, not legacy admission: historical DATA is not current execution permission.
+// The existing consumer stays unwired until the reviewed execution/authority adapter supplies its own gate.
 @ApplicationScoped
 @Typed({JdbcResourceCallBindings.class, ResourceInvocations.class})
 public class JdbcResourceCallBindings implements ResourceInvocations {
@@ -50,16 +48,6 @@ public class JdbcResourceCallBindings implements ResourceInvocations {
         this.data = Objects.requireNonNull(data, "data");
         this.transactions = transactions;
     }
-
-    /**
-     * Legacy admission uses the durable store unless a test/deployment supplies its own port bean.
-     * Keep the concrete store and canonical producer port available independently of that override.
-     * Producing the narrower interface avoids ambiguous CDI resolution without changing owned consumers.
-     */
-    @Produces
-    @Singleton
-    @DefaultBean
-    ResourceCallBindings admissionBindings() { return this; }
 
     @Override public ResourceCallBinding bind(ResourceCallBinding binding) {
         Objects.requireNonNull(binding, "binding");
