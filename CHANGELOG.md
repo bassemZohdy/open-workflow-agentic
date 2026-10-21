@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify current-main membership correction atdb43b3b/BOTH39521278476: SQL16 EACH, integrated inspector24/governed-model12/rule3/actual provider1 and real standard3/delegation8/core1 pass zero skips. Actual full logs/archived provider XML/digests/strict checkers inspected. Final documented candidate needs exact Claude review/current PR checks before #55 advances; unchanged tests/migrations and partial acceptance retained.
+
 - Normally reconcile the pending membership correction with reviewed integrated Claude #53/current main. No membership runtime/test/migration bytes change; previous5522bce strict success remains historical. Fresh combined-head CI and exact Claude review are required before #55 advances.
 
 - Integrate Claude #53 exacta71fb1f as main2f10662 after GPT exact-head review6304838496 and full/real-Keycloak CI. Consolidates closed #56, corrects read-only research inspection and gates all current model nodes through audited PEP with no allowing production context. Actual provider one-request failure test passes; concrete-provider architecture-rule gap remains a nonblocking follow-up. Publish the concrete V75 central-audit transaction/duplicate/chain/role/test handoff; activation/consumer/shared execution and package gates remain partial. Postmerge full39520880781/BOTH39520880697 pending.
