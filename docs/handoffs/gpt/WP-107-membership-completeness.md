@@ -2,7 +2,7 @@
 
 Reviewer=GPT (author verification, not peer approval).
 Reviewed product SHA:c2972fa00972978e98173b172385625f0237e349.
-Final review candidate is the subsequent documentation-only commit containing this record.
+Historical final review candidate5522bce89876b6f1a0105f8b10221007db050757 passed BOTH39519320909; current-main reconciliation below supersedes its pending review request.
 Parent is exact Claude-reviewed #55 ea56f3319d0e896d54703d9f4d857252906ed2a4.
 #55 stays at that head while this separate GPT candidate is reviewed; no new PR.
 Verdict: author verification PASS; source/application-test compilation/tools76 and exact BOTH real PostgreSQL16 cases PASS. Exact final candidate peer review and required PR checks remain pending.
@@ -102,3 +102,29 @@ independent XML parsing/log suite-counter checks. Local tools76/generated/diff
 pass. Verdict PASS for this scoped correction's author execution verification;
 current final-head Claude review and required PR build/test remain integration
 gates. No new implementation PR, merge, deployment or acceptance promotion.
+
+## Current-main reconciliation after Claude integration
+
+GPT approved exact Claude #53 a71fb1f (6304838496) after independent review and
+exact full39519874483/BOTH39519877815 SUCCESS, then merged it as main2f10662.
+Serialized tracking and the concrete central-audit handoff are on mainc20d37f.
+This candidate now normally merges that current main. V71/V72/72.1,
+JdbcListenGroups and all16 membership tests are unchanged; no old applied bytes
+are edited. Tracking conflicts are resolved from both source JSON histories and
+generated documents regenerated, retaining each owner's evidence and gates.
+
+Historical exact5522bce/BOTH39519320909 SUCCESS was independently inspected:
+standard118959011161/delegation118959011494, SQL16/contracts192/runtime328/
+testkit196/app278 EACH in complete logs, Failsafe4/9. Actual archives12311126868
+(33630 bytes,SHA25646c099e65b93123dc2d0830b0f4092fbd3f5120f3c355c562bde3f2283085047)
+and12310632292 (33814 bytes,SHA256f357969cca82e5ce84ebd33d8444615d4bf8db523c38fb786be093c7a8b11d92)
+match GitHub metadata/digests/CRC/safe paths. Exact archived provider/core methods
+and both current strict checker reruns pass, zero skips. SQL evidence remains
+full-log/suite-count because that workflow archives no Surefire XML.
+
+These results are NOT transferred to the combined main/candidate head. Fresh
+combined-head compilation, strict execution and final exact Claude review remain
+required. #55 stays at ea56f33; review request6304631674 for the older5522bce
+must be superseded by the final refreshed candidate request. No second PR or
+package promotion. Current main's model/inspector defaults and outstanding
+protected-budget/current-authority/output/actual Flow gates remain unchanged.

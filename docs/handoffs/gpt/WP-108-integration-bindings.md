@@ -1,9 +1,9 @@
 # WP-108 prerequisite increment: resource attribution and canonical occurrence
 
 Reviewer=GPT (author verification, not peer approval).
-Product SHA: pending preparation commit.
+Historical isolated product SHA:f25de243462fd7487ee28ff44f49479a4d011682.
 Verdict: nine focused plain controls/application compilation and augmentation
-PASS; all193 contract tests also PASS. Fresh Linux SQL/provider execution pending.
+PASS; all193 contract tests also PASS. Historical isolated Linux SQL/provider proof is recorded below; refreshed combined-head execution is pending.
 This is a queued candidate, not a second implementation PR or package completion.
 
 ## Small integration boundary
@@ -93,3 +93,45 @@ recovery. Full WP103 needs governed producer/consumer/workflow401 and model
 boundaries. #53/#56 remain unchanged with standing correction/consolidation
 findings. No whole-WP102 completion dependency is introduced. No status or
 acceptance promotion, new implementation PR, merge or deployment is claimed.
+
+## Historical isolated-product verification
+
+Exactf25de243462fd7487ee28ff44f49479a4d011682,
+[BOTH39519816260](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39519816260)
+SUCCESS, attempt1/no rerun. Standard118960621329/delegation118960621144. Both
+full raw logs and ALL142 actual XML suites per lane independently inspected:
+contracts193/runtime330/testkit196/app295 EACH plus Failsafe4/9,1018/1023 total
+cases, consistent counters/unique method identities and zero failures/errors/skips.
+
+Actual current-source method sets matched for binding SQL17, issuing migration5,
+no-I/O preflight2, scope7, membership SQL16, real standard3/delegation8/core1.
+Both strict profile+effect-recovery checker reruns against the downloaded XML
+pass. Four silent core-worker log files per lane are empty; the actual non-skipped
+core case asserts exit77/0, retained states and one charge/one refund. No later
+audit/HTTP/manual process suite exists in this candidate or is claimed.
+
+| Profile | Artifact ID | Bytes | SHA256 |
+| --- | --- | --- | --- |
+| standard |12309898726|1772097|a9e37181d280f2eea6ddee529acc822fb2b182a3334626d06e282eb5bcbd5b63|
+| delegation |12310278542|1775550|7faf617d6bce181ae94452b88c55f1c3f7484e481b41a9195173811181782068|
+
+Actual archive bytes/digests match GitHub metadata; bounded size/CRC/safe paths
+checked. New Surefire retention is confirmed by actual app/module test XML,
+not just workflow text. The previous parent's lack of individual SQL method
+artifacts is not repeated in this isolated increment.
+
+## Reconcile integrated main before current review
+
+GPT approved exact Claude #53 a71fb1f (6304838496), then merged it as main2f10662
+after exact full39519874483/BOTH39519877815 SUCCESS. Tracking and the concrete
+central-audit handoff are on mainc20d37f. Membership correction now normally
+includes that main atdb43b3b and awaits fresh BOTH39521278476/current Claude review;
+#55 remains frozen ea56f33.
+
+This queued candidate normally merges the same current main/membership parent.
+Its nine selected source/test files and Surefire-retention workflow stay unchanged
+from f25de24; no old applied migration is edited. Both tracking histories are
+retained and generated documents regenerated. The old green results above are
+historical, not proof of the combined component wiring. Fresh current-head
+compilation/strict SQL and exact peer/current required PR checks remain required.
+No new implementation PR, V75 activation or package promotion.

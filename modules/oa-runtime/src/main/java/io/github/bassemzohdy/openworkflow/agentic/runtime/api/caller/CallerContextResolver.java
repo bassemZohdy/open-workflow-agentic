@@ -61,6 +61,7 @@ public class CallerContextResolver {
     private final TokenVerifier verifier;
     private final String audience;
     private final boolean seamEnabled;
+    private final java.time.Clock clock;
 
     @Inject
     public CallerContextResolver(
@@ -84,6 +85,13 @@ public class CallerContextResolver {
      */
     public CallerContextResolver(TokenVerifier verifier, String audience, boolean trustCallerHeaders,
                                  Set<String> seamProfiles, Set<String> activeProfiles) {
+        this(verifier, audience, trustCallerHeaders, seamProfiles, activeProfiles, java.time.Clock.systemUTC());
+    }
+
+    /** As above, with the clock that {@link CallerAuthority#requireCurrent} samples (tests move it). */
+    public CallerContextResolver(TokenVerifier verifier, String audience, boolean trustCallerHeaders,
+                                 Set<String> seamProfiles, Set<String> activeProfiles, java.time.Clock clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
         this.verifier = Objects.requireNonNull(verifier, "verifier");
         this.audience = audience == null || audience.isBlank() ? null : audience;
         Set<String> allowed = seamProfiles.stream().map(CallerContextResolver::normalise)
@@ -116,6 +124,14 @@ public class CallerContextResolver {
      *                                 development header is malformed, 503 when the token could not be checked
      */
     public CallerContext resolve(HttpHeaders headers) {
+        return resolveAuthority(headers).caller();
+    }
+
+    /**
+     * The caller of this request with the handle that proves its authority is still current (WP-108). A verified token
+     * keeps its signed claims privately; the development seam yields a handle that is never current.
+     */
+    public CallerAuthority resolveAuthority(HttpHeaders headers) {
         List<String> authorization = headers.getRequestHeader(HttpHeaders.AUTHORIZATION);
         if (authorization != null && !authorization.isEmpty()) {
             return fromToken(authorization);
@@ -123,12 +139,12 @@ public class CallerContextResolver {
         if (!seamEnabled) {
             throw unauthorized("authentication is required: send a bearer token", false);
         }
-        return fromDevelopmentHeaders(headers);
+        return CallerAuthority.unverified(fromDevelopmentHeaders(headers), clock);
     }
 
     // ---- verified path -------------------------------------------------------------------------------------------------
 
-    private CallerContext fromToken(List<String> authorization) {
+    private CallerAuthority fromToken(List<String> authorization) {
         if (authorization.size() != 1) {
             throw unauthorized("the bearer token is not valid", true);
         }
@@ -162,8 +178,7 @@ public class CallerContextResolver {
             throw new ProblemException(Response.Status.SERVICE_UNAVAILABLE,
                     "the bearer token could not be verified; try again later");
         }
-        return new CallerContext(token.tenant(), token.subject(), token.scopes(),
-                CallerContext.Provenance.VERIFIED_TOKEN);
+        return CallerAuthority.ofUserToken(token, clock);
     }
 
     private static WebApplicationException unauthorized(String detail, boolean tokenPresented) {
