@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify WP112 current b14722e/BOTH39529291379 (149 actual suites EACH/metric4/real application SQL+HTTP scrape1) and identical final querye0b8676/dedicated39529071270 (40 alerts/eight panel values/NaN/six query syntax), all zero skips. Actual XML/metric samples/source hashes/archive digests inspected. Peer/current PR/Grafana/deployed collector/SLO/full tracing and package gates remain open.
+
 - Add an actual application metrics-path/real PostgreSQL observation test for the five bounded outbox signals; retain only those lines. Local compilation passes; fresh exact combined-provider execution is required before claiming the HTTP/SQL export proof. Query-only e0b8676 dedicated CI passed, archive inspection pending; no result transfer or package promotion.
 
 - Refine candidate outbox panels/poison warning to require observation freshness as well as health/up; distinguish prolonged completed failure from stalled last-success observations. All eight actual poison-panel values/40 alert expectations/NaN control and six query syntax checks pass locally. Producer383cb81 runtime/tests/POM remain unchanged; fresh exact query CI and rollout/review gates pending.
