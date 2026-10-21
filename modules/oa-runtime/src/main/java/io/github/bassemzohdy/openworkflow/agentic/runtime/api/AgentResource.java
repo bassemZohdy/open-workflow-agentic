@@ -7,6 +7,8 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEnco
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ModelCallRefused;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchAgent;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AgentResourceAdmission;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
@@ -17,6 +19,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerConte
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerContextResolver;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.problem.ProblemException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PolicyDenied;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -119,7 +122,25 @@ public class AgentResource {
         }
         // policy and audit above can block: the authority is judged again immediately before anything runs
         current(admitted.who());
-        var state = agent.run(thread.value(), request.topic());
+        ResearchState state;
+        try {
+            state = agent.run(thread.value(), request.topic());
+        } catch (RuntimeException failure) {
+            // the graph wraps a node's exception; a refusal of the model boundary is found in the cause chain
+            for (Throwable t = failure; t != null && t.getCause() != t; t = t.getCause()) {
+                if (t instanceof ModelCallRefused) {
+                    // no approved context for the model call: nothing reached the provider, and nothing is invented
+                    throw new ProblemException(Response.Status.SERVICE_UNAVAILABLE, "the model call is not approved");
+                }
+                if (t instanceof PolicyDenied denied) {
+                    // DENY, or ERROR when the PEP could not decide or record it; the provider was not called
+                    throw new ProblemException(denied.decision().outcome() == DecisionOutcome.DENY
+                            ? Response.Status.FORBIDDEN : Response.Status.SERVICE_UNAVAILABLE,
+                            "the model call was refused by policy");
+                }
+            }
+            throw failure;
+        }
         return Map.of(
                 "threadId", threadId,
                 "topic", request.topic(),

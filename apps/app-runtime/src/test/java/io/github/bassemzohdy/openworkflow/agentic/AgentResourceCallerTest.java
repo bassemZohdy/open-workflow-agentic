@@ -55,6 +55,22 @@ class AgentResourceCallerTest {
     }
 
     @Test
+    void withNoApprovedModelContextTheRunIs503AndNoProviderCallIsMade() {
+        int before = StubLlm.CALLS.get();
+        TestModelGovernance.APPROVED.set(false);
+        try {
+            given().header("X-Tenant", "t-agent").header("X-Subject", "alice").header("X-Scopes", "oa.agent.run")
+                    .contentType("application/json").body("{\"topic\":\"agentic workflows\"}")
+                    .when().post("/agents/research")
+                    .then().statusCode(503);
+        } finally {
+            TestModelGovernance.APPROVED.set(true);
+        }
+        org.junit.jupiter.api.Assertions.assertEquals(before, StubLlm.CALLS.get(),
+                "a refused model call must not reach the provider");
+    }
+
+    @Test
     void anAnonymousCallerIs401WhateverTheBodyAndTheAgentDoesNotRun() throws Exception {
         String thread = newThread();
         long allThreads = threads();

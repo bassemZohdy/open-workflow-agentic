@@ -52,7 +52,7 @@ class ResearchRunInspectorTest {
 
     private static ResearchAgent agent(DataSource dataSource, LlmClient llm) throws Exception {
         ResearchAgent agent = new ResearchAgent();
-        agent.llm = llm;
+        agent.llm = GovernedFixtures.allowing(llm);
         agent.dataSource = dataSource;
         agent.outputValidator = new AgentOutputValidator(new ObjectMapper(), target -> false);
         agent.build();
@@ -230,10 +230,12 @@ class ResearchRunInspectorTest {
         String thread = "equal-time-" + UUID.randomUUID();
         UUID run = insertThread(thread, true);
         Instant same = Instant.parse("2026-01-01T00:00:00Z");
-        List<UUID> ids = List.of(UUID.fromString("ffffffff-0000-4000-8000-000000000004"),
-                UUID.fromString("eeeeeeee-0000-4000-8000-000000000003"),
-                UUID.fromString("dddddddd-0000-4000-8000-000000000002"),
-                UUID.fromString("00000000-0000-4000-8000-000000000001"));
+        // ids that sort against the graph order; the low part is random so the test can run again on the same database
+        long tail = UUID.randomUUID().getMostSignificantBits() & 0xFFFFFFFFFFFFL;
+        List<UUID> ids = List.of(UUID.fromString(String.format("ffffffff-0000-4000-8000-%012x", tail)),
+                UUID.fromString(String.format("eeeeeeee-0000-4000-8000-%012x", tail)),
+                UUID.fromString(String.format("dddddddd-0000-4000-8000-%012x", tail)),
+                UUID.fromString(String.format("00000000-0000-4000-8000-%012x", tail)));
         String[][] chain = {{"__START__", "plan"}, {"plan", "draft"}, {"draft", "review"}, {"review", "__END__"}};
         for (int i = 0; i < 4; i++) {
             insertCheckpoint(run, ids.get(i), chain[i][0], chain[i][1], CT, STREAM, same);

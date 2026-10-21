@@ -25,7 +25,7 @@ import org.bsc.langgraph4j.serializer.std.ObjectStreamStateSerializer;
 public class ResearchAgent {
 
     @Inject
-    LlmClient llm;
+    GovernedLlmClient llm;
 
     @Inject
     DataSource dataSource;
