@@ -1,0 +1,50 @@
+{
+  "reviewer": "GPT",
+  "reviewedSha": "5bb6a8123dd9ac2cac6bba4dce906679a10dde05",
+  "verdict": "PASS: scoped author execution; current Claude review required",
+  "buildRun": 39535234967,
+  "strictRun": 39535234969,
+  "profiles": [
+    {
+      "profile": "standard",
+      "job": 119010240674,
+      "artifact": 12316639967,
+      "bytes": 1921557,
+      "sha256": "sha256:bfb67bbb3713ca9ea09f0038739ecedc9041a82ee690a8bd116730667e80b6c0",
+      "logSha256": "239a561a78f1a9830a88b78a00e7eeec74e5fbe8e9a9877c90640ed96c87933b"
+    },
+    {
+      "profile": "delegation",
+      "job": 119010240482,
+      "artifact": 12316584735,
+      "bytes": 1914579,
+      "sha256": "sha256:37927b631cc82a9e31304c0fde9620b708d60d5d3f500cab25701d888e8134b5",
+      "logSha256": "3bb5140e16ab9000606344330316e3e4ee7dd40a9c2606a6b235791a71849dd6"
+    }
+  ],
+  "actualInspection": [
+    "Keycloak standard strict contract: required Java cases passed",
+    "Effect process recovery: required Java case passed",
+    "Keycloak delegation strict contract: required Java cases passed",
+    "Effect process recovery: required Java case passed",
+    "standard ListenGroupStoreTest 16 EXACT_CURRENT_METHODS_PASS",
+    "standard ResearchOutputFingerprintTest 3 EXACT_CURRENT_METHODS_PASS",
+    "standard ResearchOutputEncodingTest 1 EXACT_CURRENT_METHODS_PASS",
+    "standard ResearchRunInspectorTest 24 EXACT_CURRENT_METHODS_PASS",
+    "standard GovernedLlmClientTest 12 EXACT_CURRENT_METHODS_PASS",
+    "standard ModelBoundaryArchitectureTest 3 EXACT_CURRENT_METHODS_PASS",
+    "standard ProviderRetryAuditTest 1 EXACT_CURRENT_METHODS_PASS",
+    "standard ALL_ACTUAL_XML 154 CASES 1092 ZERO_FAILURE_ERROR_SKIP {('oa-contracts', 'surefire-reports'): 195, ('oa-runtime', 'surefire-reports'): 402, ('oa-testkit', 'surefire-reports'): 196, ('app-runtime', 'surefire-reports'): 295, ('app-runtime', 'failsafe-reports'): 4}",
+    "Author verification PASS of shared representation contract; no peer, consumer, private output, schema or package completion",
+    "delegation ListenGroupStoreTest 16 EXACT_CURRENT_METHODS_PASS",
+    "delegation ResearchOutputFingerprintTest 3 EXACT_CURRENT_METHODS_PASS",
+    "delegation ResearchOutputEncodingTest 1 EXACT_CURRENT_METHODS_PASS",
+    "delegation ResearchRunInspectorTest 24 EXACT_CURRENT_METHODS_PASS",
+    "delegation GovernedLlmClientTest 12 EXACT_CURRENT_METHODS_PASS",
+    "delegation ModelBoundaryArchitectureTest 3 EXACT_CURRENT_METHODS_PASS",
+    "delegation ProviderRetryAuditTest 1 EXACT_CURRENT_METHODS_PASS",
+    "delegation ALL_ACTUAL_XML 154 CASES 1097 ZERO_FAILURE_ERROR_SKIP {('oa-contracts', 'surefire-reports'): 195, ('oa-runtime', 'surefire-reports'): 402, ('oa-testkit', 'surefire-reports'): 196, ('app-runtime', 'surefire-reports'): 295, ('app-runtime', 'failsafe-reports'): 9}",
+    "Author verification PASS of shared representation contract; no peer, consumer, private output, schema or package completion"
+  ],
+  "buildLogSha256": "9e175703e49959053656413f32f4613d80533e48deed1504ec922e95282e114b"
+}
