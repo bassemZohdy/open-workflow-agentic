@@ -1,5 +1,7 @@
 # Changelog
 
+- Review Claude PR58 exact87bc20e: request changes for bounded-pool commit-readback exhaustion and valid source/chain lock-argument aliasing. Independent detached current-class JDBC/input probes and compilation pass; no local PostgreSQL execution claimed. Publish concrete fixes/tests/role-boundary handoff. GPT PR57 remains5bb6a81/all current full+strict green, pending exact Claude review.
+
 - Integrate PR55 exactc9ce389 as mainf840b06 after Claude6306699855 and current full39534066349/strict BOTH39534071955. Retain pinned groups and add complete recorded-match/finalized-read/replay fences; actual SQL16/provider/core evidence inspected. Actual main postmerge full39534880880/BOTH39534883157 SUCCESS with logs/provider XML/strict checks/digests inspected; full T13 remains partial. Next sole WP108 PR57 reconciles the existing shared fingerprint at5bb6a81, current full39535234967/BOTH39535234969 SUCCESS with154 actual XML EACH/zero skips inspected; exact current review still gates merge.
 
 - Reconcile the final serialized main tracking into the held membership candidate, preserving all current proof and queue boundaries. This is documentation only; runtime/test/migration bytes remain at verifieddb43b3b. Hold this final review head and main tracking stable until exact peer/current required PR gates clear.

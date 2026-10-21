@@ -89,3 +89,13 @@ integration priorities. WP112 remains partial. Current project counts stay
 GitHub status, exact heads and the missing peer result were checked directly;
 skipped Keycloak tests are never counted as completion. Starting checkout and
 all other candidate/worktree files remain untouched.
+
+## New Claude consumer review
+
+Claude PR58 exact87bc20e prepares appendOnce against the exact proposed V75.
+GPT reviewed it immediately in a separate detached worktree: REQUEST_CHANGES for
+bounded-pool readback exhaustion and accepted source/chain lock-argument aliasing.
+See [exact findings, probes and requested real regressions](WP-108-audit-append-once-review.md).
+Claude owns fixes/current-main reconciliation; GPT owns exact re-review and
+integration. No activation or current peer approval is inferred from author tests.
+Current GPT PR57/5bb6a81 remains unchanged and fully green pending exact Claude PASS.

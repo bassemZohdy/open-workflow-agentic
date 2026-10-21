@@ -1,0 +1,3 @@
+CONFIRMED_JDBC_ORDER: commit reached; readback asks for connection2 while connection1 remains open; bounded pool refuses; original closes only afterward
+CONFIRMED_VALID_LOCK_ARGUMENT_ALIAS: A.sourceLock==B.chainLock and B.sourceLock==A.chainLock; both use the same bigint hashtextextended advisory-lock function
+SCOPE: real AuditAppendOnce control flow plus JDBC proxies/valid contract inputs; no real database commit or PostgreSQL deadlock execution claimed
