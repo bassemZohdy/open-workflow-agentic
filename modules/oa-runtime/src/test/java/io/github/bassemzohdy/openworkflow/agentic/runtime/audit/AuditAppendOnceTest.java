@@ -22,6 +22,8 @@ import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Connection;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CyclicBarrier;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -430,6 +432,75 @@ class AuditAppendOnceTest {
         assertEquals(1, events(f.chain));
     }
 
+    @Test
+    void aLostReplyIsConfirmedThroughAPoolOfOneBecauseTheFailedConnectionIsReleasedFirst() throws SQLException {
+        Fixture f = fixture();
+        AuditAppendOnce flaky = new AuditAppendOnce(oneConnectionAtATime(failingCommit(db.dataSource(), true, false)));
+
+        AuditReceipt receipt = flaky.appendOnce(f.source, f.draft);
+
+        receipt.requireMatches(f.source, f.draft);
+        assertEquals(1, events(f.chain));
+        assertEquals(1, bindings(f.chain));
+        assertEquals(receipt, once.appendOnce(f.source, f.draft));
+    }
+
+    @Test
+    void concurrentLostRepliesThroughASmallPoolAllConfirmWithoutSpareConnections() throws Exception {
+        int calls = 4;
+        List<Fixture> fixtures = new ArrayList<>();
+        for (int i = 0; i < calls; i++) {
+            fixtures.add(fixture());
+        }
+        DataSource limited = limitedTo(failingEveryFirstCommit(db.dataSource()), calls);
+        AuditAppendOnce flaky = new AuditAppendOnce(limited);
+        ExecutorService pool = Executors.newFixedThreadPool(calls);
+        try {
+            List<Future<AuditReceipt>> futures = new ArrayList<>();
+            for (Fixture f : fixtures) {
+                futures.add(pool.submit(() -> flaky.appendOnce(f.source, f.draft)));
+            }
+            for (int i = 0; i < calls; i++) {
+                futures.get(i).get(60, TimeUnit.SECONDS).requireMatches(fixtures.get(i).source, fixtures.get(i).draft);
+                assertEquals(1, events(fixtures.get(i).chain));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void sourceLocksAndChainLocksUseSeparateKeyspacesSoCrossedNamesNeverDeadlock() throws Exception {
+        // Source identity does not depend on content, so both source keys are known before the chains are chosen.
+        AuditEvent probe = draft(newChain(), newId(), "probe");
+        AuditSource keyA = source("scope-a-" + newChain(), "key-a", Transition.INTENT, 1, probe);
+        AuditSource keyB = source("scope-b-" + newChain(), "key-b", Transition.INTENT, 1, probe);
+        String chainA = "oa.audit.source:" + keyB.key();
+        String chainB = "oa.audit.source:" + keyA.key();
+        AuditEvent draftA = draft(chainA, newId(), "crossed-a");
+        AuditEvent draftB = draft(chainB, newId(), "crossed-b");
+        AuditSource sourceA = new AuditSource(1, keyA.scopeFingerprint(), keyA.keyFingerprint(), Transition.INTENT, 1,
+                AuditDraftFingerprint.of(draftA));
+        AuditSource sourceB = new AuditSource(1, keyB.scopeFingerprint(), keyB.keyFingerprint(), Transition.INTENT, 1,
+                AuditDraftFingerprint.of(draftB));
+        assertEquals(keyA.key(), sourceA.key());
+        assertEquals(keyB.key(), sourceB.key());
+
+        CyclicBarrier bothHoldSourceLocks = new CyclicBarrier(2);
+        AuditAppendOnce synchronised = new AuditAppendOnce(afterSourceLock(db.dataSource(), bothHoldSourceLocks));
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<AuditReceipt> a = pool.submit(() -> synchronised.appendOnce(sourceA, draftA));
+            Future<AuditReceipt> b = pool.submit(() -> synchronised.appendOnce(sourceB, draftB));
+            a.get(60, TimeUnit.SECONDS).requireMatches(sourceA, draftA);
+            b.get(60, TimeUnit.SECONDS).requireMatches(sourceB, draftB);
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(1, events(chainA));
+        assertEquals(1, events(chainB));
+    }
+
     // ------------------------------------------------------------------ corruption, outage and missing schema
 
     @Test
@@ -615,6 +686,95 @@ class AuditAppendOnceTest {
                                     throw new SQLException("connection lost before the commit reply", "08006");
                                 }
                                 return invoke(m, connection, a);
+                            });
+                });
+    }
+
+    /** Refuses a second connection while one is still checked out, like a pool of size one. */
+    private static DataSource oneConnectionAtATime(DataSource real) {
+        return limitedTo(real, 1);
+    }
+
+    private static DataSource limitedTo(DataSource real, int size) {
+        java.util.concurrent.Semaphore permits = new java.util.concurrent.Semaphore(size);
+        return (DataSource) Proxy.newProxyInstance(DataSource.class.getClassLoader(), new Class<?>[] {DataSource.class},
+                (proxy, method, args) -> {
+                    if (!method.getName().equals("getConnection")) {
+                        return invoke(method, real, args);
+                    }
+                    if (!permits.tryAcquire(5, TimeUnit.SECONDS)) {
+                        throw new SQLException("pool exhausted: a connection is still checked out");
+                    }
+                    Connection connection;
+                    try {
+                        connection = (Connection) invoke(method, real, args);
+                    } catch (Throwable t) {
+                        permits.release();
+                        throw t;
+                    }
+                    AtomicInteger closed = new AtomicInteger();
+                    return Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+                            (p, m, a) -> {
+                                if (m.getName().equals("close") && closed.getAndIncrement() == 0) {
+                                    try {
+                                        return invoke(m, connection, a);
+                                    } finally {
+                                        permits.release();
+                                    }
+                                }
+                                return invoke(m, connection, a);
+                            });
+                });
+    }
+
+    /** Every connection's first commit really commits and then reports a lost reply; later commits are normal. */
+    private static DataSource failingEveryFirstCommit(DataSource real) {
+        return (DataSource) Proxy.newProxyInstance(DataSource.class.getClassLoader(), new Class<?>[] {DataSource.class},
+                (proxy, method, args) -> {
+                    Object result = invoke(method, real, args);
+                    if (!method.getName().equals("getConnection")) {
+                        return result;
+                    }
+                    Connection connection = (Connection) result;
+                    AtomicInteger commits = new AtomicInteger();
+                    return Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+                            (p, m, a) -> {
+                                if (m.getName().equals("commit") && commits.getAndIncrement() == 0
+                                        && !connection.isReadOnly()) {
+                                    connection.commit();
+                                    throw new SQLException("connection lost before the commit reply", "08006");
+                                }
+                                return invoke(m, connection, a);
+                            });
+                });
+    }
+
+    /** Waits at the barrier right after each connection's FIRST advisory lock (the source lock) is held, so both callers hold one first. */
+    private static DataSource afterSourceLock(DataSource real, CyclicBarrier barrier) {
+        return (DataSource) Proxy.newProxyInstance(DataSource.class.getClassLoader(), new Class<?>[] {DataSource.class},
+                (proxy, method, args) -> {
+                    Object result = invoke(method, real, args);
+                    if (!method.getName().equals("getConnection")) {
+                        return result;
+                    }
+                    Connection connection = (Connection) result;
+                    java.util.concurrent.atomic.AtomicBoolean first = new java.util.concurrent.atomic.AtomicBoolean();
+                    return Proxy.newProxyInstance(Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+                            (p, m, a) -> {
+                                Object statement = invoke(m, connection, a);
+                                if (!m.getName().equals("prepareStatement")
+                                        || !String.valueOf(a[0]).contains("pg_advisory_xact_lock") || !first.compareAndSet(false, true)) {
+                                    return statement;
+                                }
+                                PreparedStatement real2 = (PreparedStatement) statement;
+                                return Proxy.newProxyInstance(PreparedStatement.class.getClassLoader(),
+                                        new Class<?>[] {PreparedStatement.class}, (sp, sm, sa) -> {
+                                            Object out = invoke(sm, real2, sa);
+                                            if (sm.getName().equals("execute")) {
+                                                barrier.await(30, TimeUnit.SECONDS);
+                                            }
+                                            return out;
+                                        });
                             });
                 });
     }

@@ -38,7 +38,12 @@ import javax.sql.DataSource;
  */
 public final class AuditAppendOnce {
 
-    private static final String SOURCE_LOCK = "select pg_advisory_xact_lock(hashtextextended(?, 0))";
+    /**
+     * Source locks use the two-integer advisory-lock space; {@link AuditTrail} chain locks use the single-bigint space.
+     * PostgreSQL keeps the two spaces independent, so no accepted chain text can ever name a source lock.
+     */
+    private static final String SOURCE_LOCK = "select pg_advisory_xact_lock(?, hashtext(?))";
+    private static final int SOURCE_LOCK_CLASS = 0x4F415331; // "OAS1"
     private static final String BINDING = "select source_key, schema_version, scope_fingerprint, key_fingerprint, "
             + "transition, source_sequence, content_fingerprint, event_id, chain_id, chain_sequence, hash "
             + "from audit.source_binding where source_key = ?";
@@ -74,6 +79,7 @@ public final class AuditAppendOnce {
         }
         Connection connection = null;
         boolean commitAttempted = false;
+        SQLException lostReply = null;
         try {
             connection = dataSource.getConnection();
             connection.setAutoCommit(false);
@@ -85,20 +91,25 @@ public final class AuditAppendOnce {
             if (connection != null) {
                 rollbackQuietly(connection, failure);
             }
-            if (commitAttempted && failure instanceof SQLException) {
-                return readbackAfterLostReply(source, draft, failure);
+            if (commitAttempted && failure instanceof SQLException sql) {
+                lostReply = sql;
+            } else {
+                throw translate(failure, chain);
             }
-            throw translate(failure, chain);
         } finally {
             closeQuietly(connection);
         }
+        // The original connection is closed before readback, so recovery never needs a second pool connection
+        // while the first is still checked out (a pool of one must still be able to confirm a committed source).
+        return readbackAfterLostReply(source, draft, lostReply);
     }
 
     private AuditReceipt inTransaction(Connection c, AuditSource source, AuditEvent draft, String chain)
             throws SQLException {
         String key = source.key();
         try (PreparedStatement lock = c.prepareStatement(SOURCE_LOCK)) {
-            lock.setString(1, "oa.audit.source:" + key);
+            lock.setInt(1, SOURCE_LOCK_CLASS);
+            lock.setString(2, key);
             lock.execute();
         }
         Optional<Binding> existing = binding(c, key);
