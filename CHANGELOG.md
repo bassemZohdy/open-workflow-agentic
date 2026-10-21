@@ -1,5 +1,7 @@
 # Changelog
 
+- Prepare WP112 truthful outbox observation health/age and NaN-before-first-success gauges, bounded failed-read caching and shared in-flight reads; add a six-panel dashboard, five candidate warnings, eight actual promtool scenarios and operational runbooks. Four real metric/export cases and app compilation pass locally; exact Linux/provider/peer/deployment/SLO gates remain open. No business-state, schema, authority or package promotion.
+
 - Publish the isolated retained-output fingerprint proposal and local verification (186 contracts/four controls) for the requested Claude consumer; implementation remains queued4e45373. Membership correction e6a873b awaits exact peer/current checks after combined-product SQL16 pass. Separate attribution bridge fix26bdce4 is under fresh CI after a retained CDI discovery failure; no activation or package promotion.
 
 - Integrate Claude #53 exacta71fb1f as main2f10662 after GPT exact-head review6304838496 and full/real-Keycloak CI. Consolidates closed #56, corrects read-only research inspection and gates all current model nodes through audited PEP with no allowing production context. Actual provider one-request failure test passes; concrete-provider architecture-rule gap remains a nonblocking follow-up. Publish the concrete V75 central-audit transaction/duplicate/chain/role/test handoff; activation/consumer/shared execution and package gates remain partial. Postmerge full39520880781/BOTH39520880697 and documentationc20d37f build39521142788 SUCCESS; actual logs/archived provider XML/strict checkers inspected.

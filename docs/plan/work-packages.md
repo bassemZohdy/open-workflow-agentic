@@ -582,13 +582,15 @@ Implementation status: **partial**.
 - Implemented: Correlation IDs, health endpoints, Prometheus metrics and outbox-lag metrics exist.
 - Implemented: WP-108 preparation supplies bounded OTel effect/dispatch/lookup/compensation spans using pinned existing Quarkus3.39.5 BOM/API1.62.0, custom schema1 and disabled SDK by default. Five in-process SDK/fault cases pass; actual ledger/CDI trace execution and end-to-end Flow/agent/tool/model, async/restart propagation, collector/runbook/dashboard/alert/SLO evidence remain open. No full observability deliverable or acceptance promotion.
 - Implemented: Effect trace producte2dc636 executed in39376019493 SUCCESS both Linux lanes: ledger/CDI3 and SDK/fault5 zero skips, plus existing service/guard/provider regressions. This proves only component emission/privacy/failure semantics; production collector/deployment, complete Flow/agent/tool/model and async/restart/outbound correlation, runbook/dashboard/alert/SLO gates remain open.
+- Implemented: Independent operational-signals preparation on main513b878: outbox metrics explicitly distinguish first-sample unknown, failed/stale retained values and recovery, cache failed attempts and share one in-flight read. Four actual local metric/cache/concurrency/Prometheus-registry cases, all-reactor app/test compilation/JVM augmentation, eight real promtool3.15.0 scenarios checking all five warning alerts and six dashboard query syntax controls PASS. Candidate collector/dashboard/runbooks and strict artifact checker are prepared; fresh exact Linux/full provider regressions and peer/current PR/deployed Grafana/collector/SLO gates remain open. No namespace/schema/business/authority change or package promotion.
 
 Remaining gates:
 
 - Add OpenTelemetry across workflow, graph, tool and model spans under one correlation ID.
 - Finish structured operational logs and dashboards as code; document collection and alerting.
+- Review and integrate truthful outbox observation gauges and monitoring proposal; verify actual Grafana import/rendering, collector loss/private access/target inventory, operational owner/routing/retention and load/query-timeout budgets. Candidate warning delays are not approved user-facing SLIs/SLOs or installed paging policy. Full correlated Flow/graph/tool/model/async/restart observability remains open.
 
-Evidence: [README.md](../../README.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](../../docs/handoffs/gpt/WP-108-tracing.md)
+Evidence: [README.md](../../README.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](../../docs/handoffs/gpt/WP-108-tracing.md), [docs/operations-observability.md](../../docs/operations-observability.md), [docs/handoffs/gpt/WP-112-operational-signals.md](../../docs/handoffs/gpt/WP-112-operational-signals.md), [deploy/observability/outbox-dashboard.json](../../deploy/observability/outbox-dashboard.json)
 
 Reuse: quarkus-flow-opentelemetry, langgraph4j-opentelemetry, quarkus-opentelemetry
 

@@ -1030,17 +1030,22 @@
         "implemented": [
           "Correlation IDs, health endpoints, Prometheus metrics and outbox-lag metrics exist.",
           "WP-108 preparation supplies bounded OTel effect/dispatch/lookup/compensation spans using pinned existing Quarkus3.39.5 BOM/API1.62.0, custom schema1 and disabled SDK by default. Five in-process SDK/fault cases pass; actual ledger/CDI trace execution and end-to-end Flow/agent/tool/model, async/restart propagation, collector/runbook/dashboard/alert/SLO evidence remain open. No full observability deliverable or acceptance promotion.",
-          "Effect trace producte2dc636 executed in39376019493 SUCCESS both Linux lanes: ledger/CDI3 and SDK/fault5 zero skips, plus existing service/guard/provider regressions. This proves only component emission/privacy/failure semantics; production collector/deployment, complete Flow/agent/tool/model and async/restart/outbound correlation, runbook/dashboard/alert/SLO gates remain open."
+          "Effect trace producte2dc636 executed in39376019493 SUCCESS both Linux lanes: ledger/CDI3 and SDK/fault5 zero skips, plus existing service/guard/provider regressions. This proves only component emission/privacy/failure semantics; production collector/deployment, complete Flow/agent/tool/model and async/restart/outbound correlation, runbook/dashboard/alert/SLO gates remain open.",
+          "Independent operational-signals preparation on main513b878: outbox metrics explicitly distinguish first-sample unknown, failed/stale retained values and recovery, cache failed attempts and share one in-flight read. Four actual local metric/cache/concurrency/Prometheus-registry cases, all-reactor app/test compilation/JVM augmentation, eight real promtool3.15.0 scenarios checking all five warning alerts and six dashboard query syntax controls PASS. Candidate collector/dashboard/runbooks and strict artifact checker are prepared; fresh exact Linux/full provider regressions and peer/current PR/deployed Grafana/collector/SLO gates remain open. No namespace/schema/business/authority change or package promotion."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
           "Add OpenTelemetry across workflow, graph, tool and model spans under one correlation ID.",
-          "Finish structured operational logs and dashboards as code; document collection and alerting."
+          "Finish structured operational logs and dashboards as code; document collection and alerting.",
+          "Review and integrate truthful outbox observation gauges and monitoring proposal; verify actual Grafana import/rendering, collector loss/private access/target inventory, operational owner/routing/retention and load/query-timeout budgets. Candidate warning delays are not approved user-facing SLIs/SLOs or installed paging policy. Full correlated Flow/graph/tool/model/async/restart observability remains open."
         ],
         "evidence": [
           "README.md",
           "docs/lifecycle.md",
-          "docs/handoffs/gpt/WP-108-tracing.md"
+          "docs/handoffs/gpt/WP-108-tracing.md",
+          "docs/operations-observability.md",
+          "docs/handoffs/gpt/WP-112-operational-signals.md",
+          "deploy/observability/outbox-dashboard.json"
         ]
       }
     },
@@ -2664,7 +2669,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-21",
-    "status": "Claude consolidated #53 exacta71fb1f is integrated as main2f10662 after GPT APPROVE6304838496/current CI; postmerge full39520880781/BOTH39520880697 and current c20d37f documentation build39521142788 SUCCESS, actual logs/provider XML/checkers inspected. #56 closed. Frozen GPT#55 remains ea56f33: final current-main correction e6a873b (tested runtime db43b3b/BOTH39521278476 PASS SQL16 EACH) awaits exact Claude review6305035356 and current required checks; final-head BOTH39522334064 running. Queued attribution combinedbe45a08 failed test CDI ambiguity; owned bridge correction26bdce4/BOTH39522134221 live, no success transferred. Tiny shared fingerprint4e45373/product2e2e22c passes186 contracts/four local representation controls; only proposal handoff is on main, API/peer/CI/adoption unmerged. V75 proposal published for Claude preparation; actual activation/appendOnce/protected model/current authority/Flow/recovery/package acceptance stay gated. No second GPT implementation PR or acceptance promotion",
+    "status": "Main513b878/membershipc9ce389/#55 ea56f33 remain frozen for Claude exact review6305069697. Fingerprint454ad4c/checkpoint72da48e verified/pushed and queued for peer; human policy intake7981714 requests retained-fact mapping without activating WP106. Next independent owned WP112 operational signals use merged WP105 outbox: local four metric cases/app compilation/eight promtool rule scenarios/six dashboard expressions PASS; fresh exact Linux/Keycloak regressions and peer/current PR/deployed monitoring/SLO gates remain pending. No second implementation PR, migration or acceptance promotion",
     "agents": [
       {
         "id": "GPT",

@@ -648,3 +648,10 @@ case holds the delivered wait before the next task, with no consumption observer
 and unhealthy readiness. This is a regression of the barrier only. In particular,
 TASK_STARTED is a no-op in the JPA writer and cannot establish consumption. Actual
 inbox ACK/replay and loop/parallel restoration still require end-to-end proof.
+
+
+Outbox observation health/age and unavailable-sample semantics, candidate
+monitoring configuration and operator runbooks are specified in
+[operational observations](operations-observability.md). Queue counts are repeated
+database-wide observations per replica; never sum them or coerce missing data
+to a healthy zero. Deployment/SLO and full end-to-end tracing gates remain open.
