@@ -1,0 +1,32 @@
+document:
+  dsl: '1.0.3'
+  namespace: agentic-test
+  name: listen-foreach-until
+  version: '1.0.0'
+  summary: Negative-control stream fixture; test broker supplies ordered A data and a stop event while the first child blocks.
+input:
+  schema:
+    format: json
+    document: { type: object }
+output:
+  schema:
+    format: json
+    document: { type: array }
+do:
+  - awaitEvents:
+      listen:
+        to:
+          any:
+            - with: { type: org.openworkflow.agentic.group.a }
+          until:
+            one:
+              with: { type: org.openworkflow.agentic.group.stop }
+      foreach:
+        item: event
+        at: index
+        do:
+          - processItem:
+              set:
+                id: '${ .id }'
+                seq: '${ .seq }'
+      timeout: { after: PT30S }

@@ -119,3 +119,29 @@ No migration, allowing context, graph/output/dispatch capability or package/
 acceptance promotion is introduced. The separate checkpoint proposal651e12a
 has compilation only and fresh BOTH39525585412 pending; no SQL evidence is
 transferred from this contract run to that different component.
+
+## Integration after reviewed PR55
+
+PR55 exactc9ce389 is now merged as mainf840b0672d5e583c90a75fc26c6651ec04f68ae3
+after Claude PASS6306699855, current full39534066349 and strict BOTH39534071955.
+GPT inspected actual SQL16/full logs and real standard3/delegation8/core1 XML,
+strict checker reruns and archive digests, zero failures/errors/skips in BOTH.
+Postmerge full39534880880/BOTH39534883157 are running under their actual main SHA.
+
+This existing fingerprint branch normally merges that main, preserving the
+merged membership API/SQL/tests. Conflict resolution keeps main's source JSON
+history plus this candidate's scoped evidence, regenerates projections and
+records the merge without changing a package/acceptance status. The helper,
+its three tests and actual serializer test are byte-identical to454ad4c. No new
+feature or alternate recipe is introduced. Only their fresh combined execution
+and current final peer/PR gates may authorize this integration; the historical
+531acc3 execution and pending454ad4c review are not transferred.
+
+The next sole PR is this small shared representation API, requested by Claude.
+Claude owns subsequent ResearchRunInspector adoption after merge, preserving
+current authorization and the stricter SQL retrieval/header/profile/physical-run
+guards. A digest never proves semantic graph completion or authorizes private
+state release. The V73/V74 attribution, V75 appendOnce, checkpoint profile/role/
+runtime switch and complete T03/T13 remain separate reviewed integration gates.
+Local combined checks and fresh Linux/provider execution are pending at this
+initial reconciliation commit; exact results will be recorded before review.

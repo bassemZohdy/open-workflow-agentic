@@ -1,0 +1,22 @@
+document:
+  dsl: '1.0.3'
+  namespace: agentic-test
+  name: listen-any-overlap
+  version: '1.0.0'
+  summary: Negative-control fixture exposing captured ANY loser callbacks in the pinned engine, not a conformance pass.
+input:
+  schema:
+    format: json
+    document: { type: object }
+output:
+  schema:
+    format: json
+    document: { type: array }
+do:
+  - awaitEvents:
+      listen:
+        to:
+          any:
+            - with: { type: org.openworkflow.agentic.group.a }
+            - with: { type: org.openworkflow.agentic.group.a }
+      timeout: { after: PT30S }

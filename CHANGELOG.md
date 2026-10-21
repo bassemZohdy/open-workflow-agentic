@@ -1,12 +1,30 @@
 # Changelog
 
-- Verify isolated shared output-fingerprint product531acc3/BOTH39524191379: all149 actual suites EACH/helper3/actual serializer1 and inherited inspector/model/provider tests pass zero skips; actual archive digests/current method sets/strict checkers inspected. No source changes in final documentation. Exact peer/current required PR/consumer and package gates remain open.
+- Integrate PR55 exactc9ce389 as mainf840b06 after Claude6306699855 and current full/real-Keycloak checks. Retain matched-slot completeness and finalized-read/replay bounds; full T13 remains partial. Postmerge checks running. Reconcile the existing tiny WP108 output fingerprint candidate with merged membership/main; new combined execution and exact peer review pending.
 
-- Reconcile the tiny shared output-fingerprint candidate with current main and retain app/module Surefire reports for its fresh exact Linux checks. API/serializer/control bytes remain unchanged; consumer, peer, required PR and package gates remain open.
+- Reconcile the final serialized main tracking into the held membership candidate, preserving all current proof and queue boundaries. This is documentation only; runtime/test/migration bytes remain at verifieddb43b3b. Hold this final review head and main tracking stable until exact peer/current required PR gates clear.
 
-- Record exact pinned checkpoint-saver v1.1 schema/command hashes and mutable-operation facts for Claude's table-ownership request. Intake and future adoption tests only; no migration, role, version allocation or runtime change.
+- Verify current-main membership correction atdb43b3b/BOTH39521278476: SQL16 EACH, integrated inspector24/governed-model12/rule3/actual provider1 and real standard3/delegation8/core1 pass zero skips. Actual full logs/archived provider XML/digests/strict checkers inspected. Final documented candidate needs exact Claude review/current PR checks before #55 advances; unchanged tests/migrations and partial acceptance retained.
 
-- Isolate the requested shared retained-output fingerprint helper from existing preparation, byte-identical recipe and actual serializer control, without execution types/ports/schema or consumer activation. Product2e2e22c passes186 contracts/four focused controls/app compilation; independent stored-text golden reproduced. Peer/required CI/inspector adoption and package gates remain open; no second GPT implementation PR.
+- Normally reconcile the pending membership correction with reviewed integrated Claude #53/current main. No membership runtime/test/migration bytes change; previous5522bce strict success remains historical. Fresh combined-head CI and exact Claude review are required before #55 advances.
+
+- WP-107 review N1/N2 candidate: additive72.1 requires full retained-match coverage at advancement, allowing only earlier exclusive memberships as substitutes; finalized reads/replay refuse pending rows. V71/V72 remain unchanged and their prior direct-SQL wording is narrowed to late additions/per-member checks. Five new SQL cases (16 total), app test compilation/tools76 pass; exactc2972fa BOTH39518381586 SUCCESS, actual full logs confirm SQL16 and all module totals zero skips EACH; archived exact real-provider3/8/core1 XML and strict checkers independently verified. SQL method XML is not archived by the parent workflow. Final candidate peer review/current required PR checks pending. #55 remains frozen at reviewed ea56f33; no package promotion.
+
+- WP-107 pinned group/snapshot/V71-V72 ordered-membership increment is refreshed onto reviewed main54 for exact-head peer/full/strict review.192 contracts/25 selected cases/app test compilation/tools76/four OWS fixtures pass locally; full selector/coordinator/FIFO/restore/T13 and package gates remain open. Main54 postmerge full and both strict provider/process lanes passed; finished logs inspected.
+
+- Combined preparation on reviewed #48 and effect/process-CI foundation passed BOTH39381927960 atc1fd835: snapshots6/group SQL11/actual SDK-JPA11/receipt recovery5/restore gate5/CDI tracing3/core effect process recovery1/standard3/native8, zero skips and strict checkers. Production group selector/coordinator/execution/recovery/T13 remains open.
+
+- WP-107 preparation: derive pinned group snapshots from actual SDK listen tasks, scoped approved producer routes and explicit correlation parameters. Preserve duplicate ordinals and empty ANY arrays. Forty selected plain cases pass; full consumer/coordinator/recovery remains open. Exact V72 product4d75161 independently passed both39379015967 lanes (11 SQL cases, zero skips).
+
+- WP-107 storage hardening: additive V72 closes late membership INSERTs after selection and binds members to the original match set; readback also fails closed on changed membership. Thirty local plain cases pass; eleven SQL cases compile and await fresh CI. V71 remains unchanged.
+
+- WP-107 preparation: centrally sequenced V71 and task-fenced group selection retain configuration/deadline, ordered receipt memberships and stream/stop roles. Twenty-eight plain cases/app compile pass; ten PostgreSQL cases await CI. Selection grants no callback, checkpoint or ACK; full consumer/recovery/T13 stays open.
+
+- WP-107 preparation: framework-free listen-group identities preserve duplicate filter ordinals, data/until roles, wildcard ANY and pinned configuration. Receipt-match classification excludes stopping events from data; it grants no execution permission. All172 contract tests pass, including8 new cases; durable storage/coordinator and full acceptance remain open.
+
+- WP-107 preparation: four actual SDK full-workflow listen-group cases establish ALL order/overlap and negative controls for ANY post-completion mutation and concurrent foreach/until completion. All four fixtures validate; these observations do not close durable delivery, FIFO or T13 gates.
+
+- WP-108 CI preparation: run the existing real process-death charge/compensation IT beside each real provider lane, and refuse missing/skipped/contradictory recovery XML. Eight new verifier cases and all76 tooling tests pass; new product process execution still needs fresh Linux CI. No acceptance promotion.
 
 - Publish the isolated retained-output fingerprint proposal and local verification (186 contracts/four controls) for the requested Claude consumer; implementation remains queued4e45373. Membership correction e6a873b awaits exact peer/current checks after combined-product SQL16 pass. Separate attribution bridge fix26bdce4 is under fresh CI after a retained CDI discovery failure; no activation or package promotion.
 

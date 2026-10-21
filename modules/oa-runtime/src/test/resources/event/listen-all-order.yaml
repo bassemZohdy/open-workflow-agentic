@@ -1,0 +1,22 @@
+document:
+  dsl: '1.0.3'
+  namespace: agentic-test
+  name: listen-all-order
+  version: '1.0.0'
+  summary: Test fixture consuming A and B payloads; the test broker supplies both and verifies arrival order.
+input:
+  schema:
+    format: json
+    document: { type: object }
+output:
+  schema:
+    format: json
+    document: { type: array }
+do:
+  - awaitEvents:
+      listen:
+        to:
+          all:
+            - with: { type: org.openworkflow.agentic.group.a }
+            - with: { type: org.openworkflow.agentic.group.b }
+      timeout: { after: PT30S }
