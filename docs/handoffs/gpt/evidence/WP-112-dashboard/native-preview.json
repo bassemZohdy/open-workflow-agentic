@@ -1,0 +1,154 @@
+{
+  "reviewer": "GPT",
+  "verdict": "PASS: scoped local preview only",
+  "sourceSha": "5312221ee7f781914de8aadb53169db63026b343",
+  "scope": "Local Grafana/Prometheus preview of recorded synthetic CI metrics; no shared database, deployed system, SLO or caller authority",
+  "grafanaVersion": "13.2.4",
+  "prometheusVersion": "3.15.0",
+  "sourceDashboardSha256": "8cfac2d65b996169ea488f7819d6021712175dba409e2470d52b17ebeb44b47d",
+  "boundDashboardSha256": "cf3d5c667d6c3f0fbc55484a14e69bf628073e0aa62b63677ca4de96ded3e95b",
+  "fixtureSha256": {
+    "healthy": "11302166bc87b533545276cc7d2e7c1c1fcdf8d85fb5e45dcfa5c8a79a0a9759",
+    "initial": "936332cd6a245d80e2527dca3e95ed82ab7665d646d198bbeafb1ab920c2bb39",
+    "stale": "705f2467e9b9dd1bc613caa712971043974ec9762029fd85e8ac27812db98d50"
+  },
+  "provisioningAccepted": true,
+  "importedSchemaVersion": 39,
+  "cases": [
+    {
+      "mode": "healthy",
+      "passed": true,
+      "values": {
+        "1": [
+          1
+        ],
+        "2": [
+          1
+        ],
+        "3": [
+          0.002923898
+        ],
+        "4": [
+          7
+        ],
+        "5": [
+          0.213649
+        ],
+        "6": [
+          0
+        ]
+      },
+      "startedAt": 1792549986810,
+      "verifiedAt": 1792549986841,
+      "queryResponseSha256": "62ce7bc09cbfdb3b5eb683caef0a0c8413cfa3d418fdbfb9182379b60fac4c1c"
+    },
+    {
+      "mode": "initial",
+      "passed": true,
+      "values": {
+        "1": [
+          1
+        ],
+        "2": [
+          0
+        ],
+        "3": [],
+        "4": [],
+        "5": [],
+        "6": []
+      },
+      "startedAt": 1792549994354,
+      "verifiedAt": 1792549994891,
+      "queryResponseSha256": "daa5c246e301878c39e422829162f8e375f4554165102ff94cc59689a32d5a5d"
+    },
+    {
+      "mode": "stale",
+      "passed": true,
+      "values": {
+        "1": [
+          1
+        ],
+        "2": [
+          1
+        ],
+        "3": [
+          200
+        ],
+        "4": [],
+        "5": [],
+        "6": []
+      },
+      "startedAt": 1792549994899,
+      "verifiedAt": 1792549995949,
+      "queryResponseSha256": "ae784be9ef6c51260e759e5cb0d2af05eb47e8b9694f6d76432884439c8aa61e"
+    },
+    {
+      "mode": "exporter-down",
+      "passed": true,
+      "values": {
+        "1": [
+          0
+        ],
+        "2": [],
+        "3": [],
+        "4": [],
+        "5": [],
+        "6": []
+      },
+      "startedAt": 1792549995957,
+      "verifiedAt": 1792549997000,
+      "queryResponseSha256": "ae2b29ebce4f84ef4f33f618e6756b268d6f05f4704153c210a8e7d4966a79cd"
+    },
+    {
+      "mode": "collector-down",
+      "passed": true,
+      "collectorExit": 0,
+      "httpStatus": 400,
+      "allSixQueriesFailedWithConnectionRefusal": true,
+      "errorResponseSha256": "71d2ae423552ad2987642eb3b0db8320cca8e8519132d35ba3ecb8708eb32396",
+      "verifiedAt": 1792549997051
+    },
+    {
+      "mode": "healthy",
+      "passed": true,
+      "values": {
+        "1": [
+          1
+        ],
+        "2": [
+          1
+        ],
+        "3": [
+          0.002923898
+        ],
+        "4": [
+          7
+        ],
+        "5": [
+          0.213649
+        ],
+        "6": [
+          0
+        ]
+      },
+      "startedAt": 1792549997561,
+      "verifiedAt": 1792550002771,
+      "queryResponseSha256": "f28858c68eca03151ffe3398c58b662945f5f8b9fbc8e76ac9b4202d91f7534c"
+    }
+  ],
+  "cleanup": {
+    "controllerExit": 0,
+    "jobMembersAtReady": 17,
+    "componentMemberCountsBeforeStop": [
+      2,
+      2,
+      15
+    ],
+    "remainingJobMembers": [],
+    "allNativeHandlesTerminal": true,
+    "privateNativeProcessesAfterExit": 0,
+    "allThreeLoopbackListenersClosed": true,
+    "killOnCloseReadBack": true
+  },
+  "dashboardTargetsAndAlertRulesUnchangedFrom": "cc4d948"
+}

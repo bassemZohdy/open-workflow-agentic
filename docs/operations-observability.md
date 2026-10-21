@@ -137,6 +137,13 @@ Windows archive SHA2565d333b385557d9adc2ff015d13da9809baccc52fb800a82d1e5c94b792
 This is verification tooling, not a deployed Prometheus upgrade or recommendation.
 
 Actual artifact results belong in the GPT handoff at their exact tested SHA.
+The [dashboard render handoff](handoffs/gpt/WP-112-dashboard-render.md) records
+actual isolated Grafana/Prometheus import, six synthetic failure/recovery states
+and Windows process-family cleanup, with original screenshots and exact-source
+CI evidence. Binary health uses red0/green1 and fixed0..1 axes; series colour is
+the most recent value, while step history retains numeric status. Unknown age
+can appear as an empty curve. Those local replay checks do not certify a deployed
+receiver, private production access or alert delivery.
 Until peer/current PR review and rollout checks pass, all of this is preparation.
 Full structured logs/correlated asynchronous/restart/outbound traces, approved
 SLIs/SLOs, collector/sampling/redaction/retention and production dashboard/alert

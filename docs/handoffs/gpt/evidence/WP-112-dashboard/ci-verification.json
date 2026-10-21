@@ -1,0 +1,93 @@
+{
+  "reviewer": "GPT",
+  "verdict": "PASS: scoped component checks only",
+  "signals": [
+    {
+      "sourceSha": "86e1cb9f686a8a308ffb72f9aebb30020309801c",
+      "run": 39531606323,
+      "artifact": 12315214157,
+      "sha256": "6c892afdad486a5291a8c3b57e23d0b9cc9d86773240db085c7dd5bcbb7218c7",
+      "exactMetricMethods": 4,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "alertExpectations": 40,
+      "panelValueCases": 8,
+      "nanControl": 1,
+      "querySyntax": 6,
+      "sourceAndSampleHashesVerified": true
+    },
+    {
+      "sourceSha": "e80c5a96a889207c625b5b5f38ffe262c149a267",
+      "run": 39533486453,
+      "artifact": 12316326846,
+      "sha256": "40a77fcd51a7326bca865de89fbaf0c96e5b554460984356d7253c40c7db7945",
+      "exactMetricMethods": 4,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "alertExpectations": 40,
+      "panelValueCases": 8,
+      "nanControl": 1,
+      "querySyntax": 6,
+      "sourceAndSampleHashesVerified": true
+    },
+    {
+      "sourceSha": "5312221ee7f781914de8aadb53169db63026b343",
+      "run": 39533627266,
+      "artifact": 12316805587,
+      "sha256": "484a12c1463e7229f66489274a910bda04754b2691bb0c32910f20c2e425e8f5",
+      "exactMetricMethods": 4,
+      "failures": 0,
+      "errors": 0,
+      "skips": 0,
+      "alertExpectations": 40,
+      "panelValueCases": 8,
+      "nanControl": 1,
+      "querySyntax": 6,
+      "sourceAndSampleHashesVerified": true
+    }
+  ],
+  "windows": {
+    "sourceSha": "5312221ee7f781914de8aadb53169db63026b343",
+    "run": 39533627266,
+    "artifact": 12316621136,
+    "sha256": "0cf427f349b631494a4d682d45f38b96c2421bb59a0177603ede54d1d37e9673",
+    "cases": [
+      {
+        "kind": "python",
+        "case": "leader-alive",
+        "passed": true,
+        "descendantInJobBeforeStop": true,
+        "remainingMembersAfterStop": [],
+        "unrelatedSentinelSurvived": true
+      },
+      {
+        "kind": "python",
+        "case": "leader-exited",
+        "passed": true,
+        "descendantInJobBeforeStop": true,
+        "remainingMembersAfterStop": [],
+        "unrelatedSentinelSurvived": true
+      },
+      {
+        "kind": "native-powershell",
+        "case": "leader-alive",
+        "passed": true,
+        "descendantInJobBeforeStop": true,
+        "remainingMembersAfterStop": [],
+        "unrelatedSentinelSurvived": true
+      },
+      {
+        "kind": "native-powershell",
+        "case": "leader-exited",
+        "passed": true,
+        "descendantInJobBeforeStop": true,
+        "remainingMembersAfterStop": [],
+        "unrelatedSentinelSurvived": true
+      }
+    ],
+    "sourceHashesVerified": true
+  },
+  "scope": "Actual archives matched GitHub digests, CRC/safe extraction, exact methods/counts/source hashes. No peer approval, current PR check, production monitoring or package completion."
+}

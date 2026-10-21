@@ -53,8 +53,8 @@ terminates and waits for zero job members. This follows Microsoft's
 [Job Object lifecycle](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects).
 There are no global process-name/PID kills in the published driver. Two actual
 Python and native PowerShell checks each cover live/exited leaders, a surviving
-grandchild and an unrelated sentinel (four cases). Local checks pass; exact-source native Grafana and Windows CI proof are
-PENDING for this process-family revision. Initial handshake testing exposed and
+grandchild and an unrelated sentinel (four cases). Local checks pass; final
+exact-source native Grafana and Windows CI proof are recorded below. Initial handshake testing exposed and
 fixed Windows CRLF handling; that failed attempt is not a passing result.
 The intermediate becc6d4 launcher revision passed Python-only local/Windows CI
 checks but actual Grafana inspection found its native descendants outside the
@@ -68,7 +68,7 @@ native processes. The controller then exposed an exit-notification race: an
 empty job can precede a signalled process handle, and a redundant termination
 returned access-denied. It now waits for the already-requested exit and closes
 native handles explicitly. That earlier controller exit1 is not a clean-run
-pass; final exact-source cleanup proof remains required.
+pass; the final exact-source cleanup proof is recorded below.
 
 ## Reproducible owned preview boundary
 
@@ -125,8 +125,8 @@ under target. This preview does not install an OS service or production receiver
 
 ## Scope and remaining gates
 
-Actual screenshots and sanitized query/cleanup evidence will be recorded at the
-corrected exact source SHA after execution. Query data and screenshots use only
+Actual screenshots and sanitized query/cleanup evidence are retained under
+[evidence/WP-112-dashboard](evidence/WP-112-dashboard). Query data and screenshots use only
 synthetic replay samples; a real deployed exporter/collector, production auth/
 access, target inventory, approved routing/retention/load/query-timeout/SLI/SLO
 and full correlated Flow/graph/tool/model/restart tracing remain open. Local
@@ -136,3 +136,60 @@ Keep membership reviewc9ce389 first. Exact other-agent review, current-main/
 single-PR reconciliation and current required CI still precede integration.
 Original metrics candidatecc4d948 stays available; this correction must receive
 its own exact review. WP112 remains partial, acceptance3/39 unchanged.
+
+## Finished author verification (reviewer=GPT)
+
+Reviewed product **5312221ee7f781914de8aadb53169db63026b343**; verdict **PASS for
+scoped local rendering/process ownership and component CI; HOLD for peer/current
+PR/deployment and complete WP112**. Final evidence/tracking changes are documentation
+only. No approval or run SHA is transferred to a later documentation head.
+
+- `python tools/preview_observability.py --source-sha 5312221ee7f781914de8aadb53169db63026b343 --tools-metadata target/dashboard-preview-tools.json --sample-root ../gpt-wp112-signals/target/obs-current-s`:
+  clean exact-source native Grafana13.2.4/Prometheus3.15.0, all six proxy-query
+  stages PASS. Unknown/stale queue samples are absent; exporter-down gives up0;
+  collector-down requires all six actual connection-refused errors with Grafana
+  itself still healthy; recovery restores the original five synthetic values.
+  Controller exits0, all three native handles exit0,17 job members become zero,
+  all component jobs empty, independent private-native inventory0 and all three
+  loopback listeners closed. See [sanitized result](evidence/WP-112-dashboard/native-preview.json).
+- `python tools/check_preview_job_windows.py`: four physical local cases PASS;
+  both native PowerShell and Python cover live/exited parents, stopped descendants
+  and an unrelated sentinel that survives. Fresh exact-source Windows
+  [39533627266](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39533627266),
+  job119005061725 also PASS. Actual archive12316621136,573bytes,
+  SHA2560cf427f349b631494a4d682d45f38b96c2421bb59a0177603ede54d1d37e9673;
+  report source5312221/clean worktree/four cases/canonical source hashes checked.
+- Same exact run's Linux signals job119005061968 PASS: actual XML has all four
+  exact metric methods, zero failures/errors/skips; promtool checks40 alert
+  expectations/eight panel values/NaN/six query syntax. Actual archive12316805587,
+  14804bytes,SHA256484a12c1463e7229f66489274a910bda04754b2691bb0c32910f20c2e425e8f5.
+  Source/producer/sample hashes match actual5312221 Git blobs. Report and exact
+  archive verification are [retained](evidence/WP-112-dashboard/ci-verification.json).
+- Earlier UI source86e1cb9/run39531606323 and native sourcee80c5a9/run39533486453
+  actual Linux archives were independently inspected too. Their component checks
+  pass under their original SHAs; neither certifies final native cleanup.
+- `python -m unittest discover -s tools -p 'test_*.py'`:76 pass.
+  `python tools/render_requirements.py --check`, Python compilation and
+  `git diff --check`:pass. Originalcc4d948 Java/POM/app/rules/query bytes unchanged;
+  its earlier real PostgreSQL/HTTP/BOTH proof stays in the operational-signals handoff.
+
+Actual browser images retain their own execution SHA/hash in
+[screenshots.json](evidence/WP-112-dashboard/screenshots.json). Dashboard bytes
+are identical at86e1cb9/e80c5a9/5312221. GPT visually inspected all images;
+earlier Grafana scroll-container viewports can crop lower panels. The recovery
+image shows all six panels. These are replayed CI samples, not deployed users.
+
+| Case | Retained browser image |
+|---|---|
+| Original default green health0 | [baseline](evidence/WP-112-dashboard/baseline-initial.png) |
+| Healthy | [corrected](evidence/WP-112-dashboard/healthy.png) |
+| Initial unknown; red0 and queue No data | [corrected](evidence/WP-112-dashboard/initial.png) |
+| Stale200s; queue No data | [corrected](evidence/WP-112-dashboard/stale.png) |
+| Exporter unavailable; red up0 | [corrected](evidence/WP-112-dashboard/exporter-down.png) |
+| Collector unavailable; six panel errors | [corrected](evidence/WP-112-dashboard/collector-down.png) |
+| Recovered six panels | [corrected](evidence/WP-112-dashboard/recovered.png) |
+
+Integration priority remains c9ce389/#55, then the existing WP108 shared
+fingerprint/schema/current execution/audit handoffs. No further observability or
+conformance preparation is authorized by this record. Claude must review the
+final correction head before its later single-PR/current-main integration.

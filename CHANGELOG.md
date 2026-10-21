@@ -1,6 +1,6 @@
 # Changelog
 
-- Validate queued WP112 dashboard in actual local Grafana/Prometheus with recorded synthetic samples; correct default green health0 presentation using explicit binary colours/axes/title and null gaps. Existing metric/rule/query controls pass; corrected rendering and fresh dedicated CI pending. Frozen cc4d948 remains available, and no Java/query/alert/authority/package status changes.
+- Verify queued WP112 UI correction/product5312221 with actual six-stage Grafana/Prometheus replay, final native job-family shutdown and Linux/Windows39533627266. Inspect actual four-method XML/40 alerts/eight panel values/NaN/six syntax/four native cleanup cases and publish original screenshots/source hashes. Retain earlier orphan/launcher/exit-notification findings and fixes. All private preview workers/listeners stopped. Keep WP112 partial; prioritize held #55 and existing WP108 integration handoffs, with no new conformance preparation.
 
 - Verify WP112 current b14722e/BOTH39529291379 (149 actual suites EACH/metric4/real application SQL+HTTP scrape1) and identical final querye0b8676/dedicated39529071270 (40 alerts/eight panel values/NaN/six query syntax), all zero skips. Actual XML/metric samples/source hashes/archive digests inspected. Peer/current PR/Grafana/deployed collector/SLO/full tracing and package gates remain open.
 
@@ -122,7 +122,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
   [PR #33](https://github.com/bassemZohdy/open-workflow-agentic/pull/33), [structure](docs/repository-structure.md).
 - Remove the five exploratory spike projects while keeping reports, measurements, confidence labels and ADRs.
   [PR #32](https://github.com/bassemZohdy/open-workflow-agentic/pull/32).
-- Record owner decisions in ADRs 0019–0023, including recovery liveness, secret-store conditions and version policy.
+- Record owner decisions in ADRs 0019â€“0023, including recovery liveness, secret-store conditions and version policy.
   [PR #27](https://github.com/bassemZohdy/open-workflow-agentic/pull/27).
 - Retain the bridge findings/ADR and the partial A2A wiring diagnosis as research outcomes; a working product A2A
   server/client is still required in WP-207. [PR #8](https://github.com/bassemZohdy/open-workflow-agentic/pull/8),
@@ -159,7 +159,7 @@ remaining checklist is [TODO.md](TODO.md); implementation status is maintained i
 - Retain LangGraph4j durability, identity/policy/secrets and MCP/A2A/AG-UI research findings in
   [spike reports](docs/spikes/) and [ADRs](docs/adr/README.md). Reported unknowns remain product validation tasks.
 
-## Implemented portions of requirements — 2026-10-19 snapshot
+## Implemented portions of requirements â€” 2026-10-19 snapshot
 
 Every row below has concrete implementation evidence. Coverage is **partial** for the full requirement; the
 remaining scope is tracked by its owning work packages in TODO.md. Research-only findings are excluded from
