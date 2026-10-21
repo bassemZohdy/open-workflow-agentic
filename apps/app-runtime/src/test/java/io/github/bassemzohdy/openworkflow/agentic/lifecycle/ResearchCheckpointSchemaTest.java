@@ -152,6 +152,20 @@ class ResearchCheckpointSchemaTest {
         for(var entry:cases.entrySet())fixture(true,(c,s)->{seed(c,s);sql(c,entry.getValue().formatted(s));refused(c,s,"23514",entry.getKey());});
     }
 
+    @Test void inheritedParentsAndDescendantsCannotExtendTheCheckpointQueryProfile() throws Exception {
+        fixture(true,(c,s)->{seed(c,s);
+            sql(c,"create table "+s+".checkpoint_descendant () inherits ("+s+".lg4jcheckpoint)");
+            sql(c,"insert into "+s+".checkpoint_descendant select gen_random_uuid(),parent_checkpoint_id,thread_id,node_id,next_node_id,state_data,state_content_type,saved_at from "+s+".lg4jcheckpoint limit 1");
+            try(var q=c.createStatement();var r=q.executeQuery("select count(*) from "+s+".lg4jcheckpoint")) {
+                assertTrue(r.next());assertEquals(2,r.getInt(1),"ordinary saver queries include descendant rows");
+            }
+            refused(c,s,"23514","inheritance-parent");});
+        fixture(true,(c,s)->{seed(c,s);
+            sql(c,"create table "+s+".checkpoint_ancestor(parent_checkpoint_id uuid)");
+            sql(c,"alter table "+s+".lg4jcheckpoint inherit "+s+".checkpoint_ancestor");
+            refused(c,s,"23514","inheritance-child");});
+    }
+
     void committed(CommittedWork work) throws Exception {
         String schema=name();boolean created=false;
         try {
@@ -217,7 +231,7 @@ class ResearchCheckpointSchemaTest {
     }
     @AfterAll static void evidence() throws Exception {
         Set<String> expected=Set.of("fresh-idempotent","legacy-preserved","partial-pair","type","nullability","default","primary-key","foreign-key","extra-column",
-                "missing-index","predicate","sort-order","extra-unique","namespace-shadow","view","row-security","check","trigger","actual-saver","writer-lock");
+                "missing-index","predicate","sort-order","extra-unique","namespace-shadow","view","row-security","check","trigger","inheritance-parent","inheritance-child","actual-saver","writer-lock");
         var ids=new HashSet<String>();for(var row:RESULTS)assertTrue(ids.add((String)row.get("case")));assertEquals(expected,ids);
         var sorted=RESULTS.stream().sorted(Comparator.comparing(r->(String)r.get("case"))).toList();
         var report=Map.of("scope","Proposed checkpoint profile in owned UUID namespaces; no activation or execution authority",

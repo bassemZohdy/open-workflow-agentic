@@ -1,7 +1,8 @@
 # WP-108 checkpoint profile adoption: executable proposal
 
 Reviewer=GPT (author verification, not peer approval).
-Current product commit: pending preparation commit.
+First product commit:651e12a1e054426ee7fc4e3dc0c1f8fe12f674da (nine methods/20 cases).
+Current refinement adds inheritance refusal; exact final product is recorded below after execution.
 Verdict: app/test compilation and JVM augmentation PASS; actual proposed SQL,
 real saver compatibility, failure cases and strict Linux execution PENDING.
 This is not an applied migration, runtime change or completed work package.
@@ -42,7 +43,7 @@ partial pair refuses. Legacy tables get no DDL repair or data rewrite: verify
 regular permanent relations, target namespace, exact columns/types/nullability/
 defaults, nongenerated identity, keys/retained cascade, required named btree
 index structure/operators/order/collation/predicate and expected uniqueness.
-Unsupported rules/RLS/user triggers/check constraints refuse rather than being
+Unsupported inheritance/rules/RLS/user triggers/check constraints refuse rather than being
 removed. Additional nonunique indexes are not repaired or certified. This is
 bounded compatibility validation, not hostile-administrator or disk/index
 corruption immunity.
@@ -61,7 +62,7 @@ backup/restore/retention/authority protocols.
 
 ## Verification plan and fixture boundaries
 
-ResearchCheckpointSchemaTest has nine compiled methods/20 required observations:
+ResearchCheckpointSchemaTest now has ten compiled methods/22 required observations:
 
 | Verification | Required result | Current evidence |
 | --- | --- | --- |
@@ -69,6 +70,7 @@ ResearchCheckpointSchemaTest has nine compiled methods/20 required observations:
 | Partial, wrong type/nullability/default/PK/FK/extra column |23514, no completion/reset/repair, identical original rows/keys | Compiled; pending |
 | Missing index/wrong predicate/order/extra uniqueness |23514 with unchanged history | Compiled; pending |
 | Namespace shadow/view/RLS/check/user trigger |23514 before adoption, no guard removal or shadow store | Compiled; pending |
+| Inherited parent/descendant |23514, including measured descendant rows in ordinary saver queries | Compiled; pending |
 | Actual pinned saver createTables(false) | Real INSERT/read/UPDATE/release through committed physical connections still work | Compiled; pending |
 | Concurrent table writer |55P03 NOWAIT, unchanged history, no mutation retry | Compiled; pending |
 
@@ -93,7 +95,7 @@ re-entry for a governed invocation.
 
 CI retains actual app/module XML plus target/conformance/checkpoint-schema/cases.json.
 The report must name the exact product SHA, pinned/proposed source hashes and
-ALL20 unique expected observations. Passing source compilation, generated tests,
+ALL22 unique expected observations. Passing source compilation, generated tests,
 an incomplete report, skipped tests or another product's green CI is not execution
 evidence. Local package -DskipTests compiles the new source and augments the app;
 it does not run PostgreSQL or native Cedar. Required actual results remain open.
@@ -113,3 +115,20 @@ ids and matching migration history; actual cross-state restore/retention/manual
 and current registry/task/PDP/execution/output/central-audit gates remain open.
 Contribution status is PROVISIONAL until actual SQL/compatibility evidence and
 the later reviewed activation gates pass. No package/acceptance promotion.
+
+## Inheritance refusal refinement
+
+Code review found a missing catalog boundary in first proposal651e12a: ordinary
+permanent tables can participate in inheritance while retaining identical visible
+columns/keys/indexes. Saver SELECTs do not use ONLY, so descendants can change the
+visible private history. The refinement rejects pg_inherits at EITHER endpoint
+after the existing target locks. It does not detach a table or repair its rows.
+
+One new method exercises two actual owned fixtures: a checkpoint descendant with
+another retained row (ordinary parent SELECT observes two rows), and a checkpoint
+inheriting a separate ancestor column. Both must refuse23514 with original row/
+constraint snapshots unchanged. Most other cases remain unchanged. App/test
+compilation/JVM augmentation PASS; actual SQL remains pending. Original
+BOTH39525585412 retains its own651e12a SHA/results and cannot prove this refinement.
+The new exact product requires fresh BOTH evidence. No applied migration, runtime
+call, role or Claude source is changed; main513b878/c9ce389 remain frozen.

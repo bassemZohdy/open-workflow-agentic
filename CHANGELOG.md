@@ -1,5 +1,7 @@
 # Changelog
 
+- Refine unversioned checkpoint profile adoption proposal to refuse table inheritance in either direction; add two real JDBC observations to the ten-method/22-case suite. App compilation/JVM augmentation pass; actual SQL/refined strict evidence pending. No applied migration, role, runtime switch or package promotion.
+
 - Prepare an unversioned checkpoint-profile adoption proposal outside Flyway, with strict compatible-history validation, fresh-pair creation and NOWAIT writer refusal. Nine methods/20 expected observations compile, including actual saver compatibility and legacy failures; SQL/Linux proof pending. No runtime switch, role/version allocation, applied migration or package promotion.
 
 - Publish the isolated retained-output fingerprint proposal and local verification (186 contracts/four controls) for the requested Claude consumer; implementation remains queued4e45373. Membership correction e6a873b awaits exact peer/current checks after combined-product SQL16 pass. Separate attribution bridge fix26bdce4 is under fresh CI after a retained CDI discovery failure; no activation or package promotion.

@@ -70,8 +70,10 @@ begin
         end if;
     end loop;
     if exists(select 1 from pg_catalog.pg_trigger where tgrelid in (thread_rel,checkpoint_rel) and not tgisinternal)
+       or exists(select 1 from pg_catalog.pg_inherits where inhrelid in (thread_rel,checkpoint_rel)
+                                                      or inhparent in (thread_rel,checkpoint_rel))
        or exists(select 1 from pg_catalog.pg_constraint where conrelid in (thread_rel,checkpoint_rel) and contype not in ('p','f')) then
-        raise exception 'checkpoint relation has unsupported constraints or triggers' using errcode='check_violation';
+        raise exception 'checkpoint relation has unsupported inheritance, constraints or triggers' using errcode='check_violation';
     end if;
 
     for wanted in select * from (values
