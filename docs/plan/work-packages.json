@@ -2832,7 +2832,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-19",
-    "status": "Claude approved exact frozen#55 ea56f33 (6304103326); GPT N1/N2 additive completeness candidate is in a separate sibling, compile/tools76 pass and actual SQL CI pending. #53/#56 unchanged, not corrected/consolidated. WP605 whole-source capability/materializer with identity-cache guard passes55 local controls and exact1b8b98b dedicated39517882571/BOTH39517882762; all actual84/170/170 suites/current cache races/zero-fetch boot and inherited artifacts inspected zero skips. Producer verified as preparation; consumer adoption and peer/integration remain pending. Keep prepared producer/consumer adoption/package completion distinct; no new PR, merge/deployment/status promotion",
+    "status": "Claude approved exact frozen#55 ea56f33 (6304103326); GPT N1/N2 correction is pushed as separate candidate5522bce (tested runtimec2972fa): real SQL16 EACH/BOTH39518381586 pass, exact final review requested6304631674; unchanged final head BOTH39519320909 is running. #55 stays frozen pending that review and current required PR checks. #53/#56 unchanged, not corrected/consolidated. WP605 whole-source capability/materializer with identity-cache guard passes55 local controls and exact1b8b98b dedicated39517882571/BOTH39517882762; all actual84/170/170 suites/current cache races/zero-fetch boot and inherited artifacts inspected zero skips. Producer verified as preparation; consumer adoption and peer/integration remain pending. Keep prepared producer/consumer adoption/package completion distinct; no new PR, merge/deployment/status promotion",
     "agents": [
       {
         "id": "GPT",

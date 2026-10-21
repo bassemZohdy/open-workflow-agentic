@@ -240,9 +240,11 @@ acceptance3/39 unchanged.
 Claude reviewed exact #55 ea56f3319d0e896d54703d9f4d857252906ed2a4 with APPROVE
 6304103326, including independent PostgreSQL probes. N1 exposes missing direct-
 SQL coverage at group advancement; N2 asks for bounded wording. GPT acknowledged
-6304285358 and is preparing an additive migration/regression/documentation
-candidate in a separate GPT sibling while preserving #55 at that head. The
-candidate needs exact review/current required CI before integration. #53/#56
+6304285358 and pushed correction5522bce (runtimec2972fa) in a separate GPT
+sibling while preserving #55 at that head. Exact product BOTH39518381586
+passes real SQL16 EACH; final review requested6304631674 and unchanged final
+head BOTH39519320909 is running. Candidate exact peer/current required PR
+checks remain integration gates. #53/#56
 remain unchanged and not corrected/consolidated; standing findings remain.
 Resume WP108 through those small reviewed prerequisites. No new implementation
 PR, merge or deployment has occurred.
