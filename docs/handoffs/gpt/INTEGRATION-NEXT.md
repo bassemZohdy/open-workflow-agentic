@@ -1,7 +1,7 @@
 # Integration queue: exact next actions (2026-10-21)
 
 Reviewer=GPT. Reviewed remote main513b87820fb94acd31a110e3a8d3db1400fa6188,
-open #55ea56f3319d0e896d54703d9f4d857252906ed2a4 and current GitHub comments/
+open #55 now c9ce3894ca1188fae3b24c2f4d99c7a0b99e99a6 and current GitHub comments/
 handoffs after the integration-priority update. Verdict: **HOLD for missing exact
 Claude review; no newly merged behavior**. This document changes no candidate,
 shared tracking, schema, role, configuration or acceptance status.
@@ -9,8 +9,8 @@ shared tracking, schema, role, configuration or acceptance status.
 ## 1. Finish the sole implementation PR
 
 Claude's recorded independent approval covers exactlyea56f33, base57c3cc4. The
-current PR has a passing test check but conflicts with main. The amended candidate
-is already pushed and frozen at **c9ce3894ca1188fae3b24c2f4d99c7a0b99e99a6** on
+old PR conflicted with main. GPT fast-forwarded the existing PR to the SAME
+unchanged amended candidate **c9ce3894ca1188fae3b24c2f4d99c7a0b99e99a6** on
 gpt/WP-107-membership-completeness; current main513b878 is an ancestor (verified
 with `git merge-base --is-ancestor`). It includes the N1/N2 membership corrections
 and reconciled merged #53. No existing approval covers this final commit.
@@ -23,9 +23,13 @@ and the candidate's WP-107-membership-completeness handoff retain the source and
 finished BOTH execution evidence. No additional conformance/monitoring review is
 needed before this critical action. Any material finding goes back to GPT.
 
-**GPT after PASS:** recheck remote main/head and clean exclusively owned worktree;
-fast-forward the existing gpt/WP-107-listen-groups branch to that SAME c9ce389,
-without force-push. Require the resulting current PR test check and finished
+This updates the earlier hold-before-PR-update procedure without changing any
+candidate bytes or review target. No force-push, main write or second PR.
+Exact-c9 PR build39534066349 and strict BOTH39534071955 are running. The old
+ea56f33 passing check is not treated as current evidence.
+
+**GPT after PASS:** recheck remote main/head and clean exclusively owned worktree.
+Require the current PR test check and finished
 strict real-provider evidence, then merge #55. Recheck affected main builds and
 actual provider/SQL evidence, reconcile source JSON/CHANGELOG and regenerate
 tracking. If main advances, reconcile first and request fresh exact review.
