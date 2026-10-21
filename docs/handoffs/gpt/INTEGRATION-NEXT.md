@@ -2,10 +2,10 @@
 
 Reviewer=GPT. PR55 exactc9ce389 is merged as mainf840b0672d5e583c90a75fc26c6651ec04f68ae3
 after current Claude approval and CI. Verdict: **PASS for partial membership
-integration; main rechecks running**. The next sole implementation PR is #57,
+integration; main rechecks passed**. The next sole implementation PR is #57,
 exact5bb6a8123dd9ac2cac6bba4dce906679a10dde05. No package/acceptance promotion.
 
-## 1. PR55 finished; complete main verification
+## 1. PR55 and main verification finished
 
 Claude's exact PASS6306699855 coversc9ce389 with independent real SQL16/full
 reactor/tools76 and a trigger-removal mutation control (two intended failures).
@@ -14,8 +14,8 @@ actual logs/provider/core XML/digests/current strict checker reruns. The PR was
 fast-forwarded unchanged to that same candidate, then merged. Formerea56f33
 approval was not transferred. No force-push or second implementation PR.
 
-**GPT next:** finish actual mergef840b06 full39534880880/BOTH39534883157 (both
-running at publication), inspect actual source/reports and record results without
+**GPT finished:** actual mergef840b06 full39534880880/BOTH39534883157 SUCCESS;
+finished logs/actual XML/strict checker reruns/archive hashes inspected, without
 relabelling c9 execution. See [integration result](WP-107-integration-result.md).
 Membership is relative to recorded matched_slots; predicate/callback/full T13
 and complete hostile-writer certification remain open.

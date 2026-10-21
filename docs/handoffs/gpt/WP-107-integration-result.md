@@ -54,10 +54,19 @@ finalized offers. Existing migrations are immutable and historical malformed
 finalized rows are not repaired/certified. Actual predicate evaluation, callbacks,
 complete coordinator/FIFO/until/distributed recovery/event starts/T13 stay open.
 
-Postmerge main build39534880880 and strict BOTH39534883157 were started on the
-actual f840b06 merge and remain running at this publication. Their results are
-not assumed or relabeled from c9ce389. Main verification must finish before its
-postmerge gate is reported as passed.
+Actual mainf840b06 postmerge full39534880880 and strict BOTH39534883157 are
+SUCCESS, attempt1. GPT inspected both full logs and actual provider/core XML:
+SQL16/contracts192/runtime401/testkit196/app295 EACH, inspector24/governed12/rule3/
+physical1, standard3/delegation8/core1, zero failures/errors/skips in strict lanes.
+Both current strict checker reruns and metadata/digest/CRC/safe-path checks pass.
+The complete merge tree equals peer-reviewedc9ce389. No run SHA is relabeled.
+See [actual postmerge verification](evidence/WP-107-membership/postmerge-ci.json).
+
+| Profile/job | Postmerge artifact | Bytes | SHA256 |
+|---|---|---|---|
+| standard119009122929 |12317213153|33645|0d88e549dbffc3dfcc0e3a335da890116a060f193125f1918cfafa361e5992a0|
+| delegation119009122687 |12316789063|33831|1c014b5c176b7bf2109bdfa502493e1e6d8791452eef45cc8790a75fc3cb5ab4|
+
 
 ## Next owner/action
 
