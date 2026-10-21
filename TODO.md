@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-Claude consolidated #53 exacta71fb1f is integrated as main2f10662 after GPT APPROVE6304838496/current CI; postmerge full39520880781/BOTH39520880697 and current c20d37f documentation build39521142788 SUCCESS, actual logs/provider XML/checkers inspected. #56 closed. Frozen GPT#55 remains ea56f33: final current-main correction e6a873b (tested runtime db43b3b/BOTH39521278476 PASS SQL16 EACH) awaits exact Claude review6305035356 and current required checks; final-head BOTH39522334064 running. Queued attribution combinedbe45a08 failed test CDI ambiguity; owned bridge correction26bdce4/BOTH39522134221 live, no success transferred. Tiny shared fingerprint4e45373/product2e2e22c passes186 contracts/four local representation controls; only proposal handoff is on main, API/peer/CI/adoption unmerged. V75 proposal published for Claude preparation; actual activation/appendOnce/protected model/current authority/Flow/recovery/package acceptance stay gated. No second GPT implementation PR or acceptance promotion.
+Keep #55 ea56f33 and exact membership correctionc9ce389/main513b878 stable for Claude review6305069697. Fingerprint454ad4c and checkpoint72da48e/productae25453 have fully inspected current strict execution, peer requests6305499717/6305753924, no activation. WP106 interface intake confirms generic caller/PEP is merged but complete human separation/current-assignment facts and production action mapping are not; explicit cross-owner handoff requests that contract and durable audit/wait gates. WP106/T02 remain not-started; no second implementation PR, migration allocation or package/acceptance promotion.
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-21).
 
@@ -420,9 +420,16 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-03. Shared pat
 - [ ] Separation-of-duties rules; agents cannot self-approve consequential actions
 - [ ] Audit of every transition
 
+Additional closure/integration tasks:
+
+- [ ] Agree Claude-owned human PEP/Cedar scope/action and retained-fact mapping before a mutation adapter: main generic humanTaskAction has scopes but no tenant/initiator/current-assignee/task-version/separation facts; fixture tasks:act permit is not production policy. See WP-106-human-policy-intake.md; no whole WP102/WP103 closure prerequisite is introduced.
+- [ ] Integrate reviewed durable human transition/decision identity/audit acknowledgement and pending wake before Flow resumes, with current caller expiry and locked task/version/assignment/wait rechecks after blocking policy/audit. Current wait/delivery and central append-once interfaces still require their own ordered reviewed integration; no proposed API or generic fixture proves T02.
+
 Acceptance gates:
 
 - [ ] T02: implement, run in CI and record passing evidence
+
+Evidence: [docs/handoffs/gpt/WP-106-human-policy-intake.md](docs/handoffs/gpt/WP-106-human-policy-intake.md)
 
 ### WP-107 Event correlation and idempotent inbox — partial
 

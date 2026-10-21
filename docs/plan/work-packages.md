@@ -403,6 +403,13 @@ Deliverables:
 
 Implementation status: **not-started**.
 
+Remaining gates:
+
+- Agree Claude-owned human PEP/Cedar scope/action and retained-fact mapping before a mutation adapter: main generic humanTaskAction has scopes but no tenant/initiator/current-assignee/task-version/separation facts; fixture tasks:act permit is not production policy. See WP-106-human-policy-intake.md; no whole WP102/WP103 closure prerequisite is introduced.
+- Integrate reviewed durable human transition/decision identity/audit acknowledgement and pending wake before Flow resumes, with current caller expiry and locked task/version/assignment/wait rechecks after blocking policy/audit. Current wait/delivery and central append-once interfaces still require their own ordered reviewed integration; no proposed API or generic fixture proves T02.
+
+Evidence: [docs/handoffs/gpt/WP-106-human-policy-intake.md](../../docs/handoffs/gpt/WP-106-human-policy-intake.md)
+
 Reuse: Flow listen/emit
 
 ### WP-107 Event correlation and idempotent inbox
