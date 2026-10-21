@@ -49,7 +49,7 @@ class PepInstanceOperationTest {
                     pep.instanceOperation(op, OPERATOR, INSPECT, INSTANCE).outcome(), op.name());
         }
         List<AuthorizationRequest> received = engine.received();
-        assertEquals(List.of("operation:inspect", "operation:retry", "operation:recover"),
+        assertEquals(List.of("operation:inspect", "operation:retry", "operation:recover", "operation:resolve-effect"),
                 received.stream().map(AuthorizationRequest::resource).toList());
         assertTrue(received.stream().allMatch(r -> INSTANCE.equals(r.taskId())),
                 "the request names the instance as its task id");
@@ -71,7 +71,7 @@ class PepInstanceOperationTest {
                 .filter(r -> "true".equals(r.attributes().get("policy.recoveryPath"))
                         && "DENY".equals(r.attributes().get("policy.outcome")))
                 .count();
-        assertEquals(3, recoveryRefusals);
+        assertEquals(InstanceOperation.values().length, recoveryRefusals);
     }
 
     @Test
@@ -92,5 +92,22 @@ class PepInstanceOperationTest {
         Decision retry = pep.instanceOperation(InstanceOperation.RETRY, OPERATOR, RECOVERY, INSTANCE);
         assertEquals(DecisionOutcome.DENY, retry.outcome());
         assertEquals("test-engine", retry.decidedBy());
+    }
+
+    @Test
+    void agentInvocationIsAnOperationOnTheAgentResourceAndIsRefusedWhenThePolicyEngineIsDown() {
+        ScriptedEngine allow = new ScriptedEngine(PepTest::allow);
+        assertEquals(DecisionOutcome.ALLOW,
+                pep(allow, new InMemoryAuditSink()).agentInvocation(OPERATOR, Set.of("oa.agent.run")).outcome());
+        AuthorizationRequest received = allow.received().get(0);
+        assertEquals("agent:research:run", received.resource());
+        assertEquals(io.github.bassemzohdy.openworkflow.agentic.contracts.governance.ActionKind.OPERATION,
+                received.action());
+        assertEquals(Set.of("oa.agent.run"), received.context().scopes());
+
+        InMemoryAuditSink audit = new InMemoryAuditSink();
+        Decision down = pep(new ScriptedEngine(PepTest::error), audit)
+                .agentInvocation(OPERATOR, Set.of("oa.agent.run", "oa.recover"));
+        assertEquals(DecisionOutcome.ERROR, down.outcome(), "the safe-recovery rule does not name the agent run");
     }
 }
