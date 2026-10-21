@@ -64,3 +64,20 @@ remain on their separate preparation and are not imported by this tiny increment
 correction is revalidated/reviewed. This queued candidate needs current-main
 reconciliation if prerequisites merge, its OWN exact Claude review and required
 full/strict CI before a later integration. No package or acceptance promotion.
+
+## Current-main reconciliation and inspectable Linux execution
+
+This candidate normally includes main513b878. Runtime/API/test bytes are unchanged
+from product2e2e22c; only shared tracking is reconciled and the already prepared
+two Surefire-retention paths added to the provider workflow. Test selection,
+required real-provider/core checks, pinned images and failure/skip rules remain
+unchanged. Fresh exact current-head Linux/BOTH execution is pending; previous
+local186/four-control results are not relabeled as that run.
+
+This allows actual shared-contract/serializer and inherited inspector/model
+method XML to be inspected rather than relying only on a green workflow or log
+suite counts. After verification, request exact peer review of the documented
+queued candidate, without opening another implementation PR. Current #55 stays
+at ea56f33; its correctionc9ce389 and main tracking remain frozen for Claude's
+separate review. This candidate cannot bypass its own later required PR/adoption
+gates, and no allowing model context or graph/output permission is introduced.

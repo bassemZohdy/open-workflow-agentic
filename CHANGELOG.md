@@ -1,10 +1,14 @@
 # Changelog
 
+- Reconcile the tiny shared output-fingerprint candidate with current main and retain app/module Surefire reports for its fresh exact Linux checks. API/serializer/control bytes remain unchanged; consumer, peer, required PR and package gates remain open.
+
 - Record exact pinned checkpoint-saver v1.1 schema/command hashes and mutable-operation facts for Claude's table-ownership request. Intake and future adoption tests only; no migration, role, version allocation or runtime change.
 
 - Isolate the requested shared retained-output fingerprint helper from existing preparation, byte-identical recipe and actual serializer control, without execution types/ports/schema or consumer activation. Product2e2e22c passes186 contracts/four focused controls/app compilation; independent stored-text golden reproduced. Peer/required CI/inspector adoption and package gates remain open; no second GPT implementation PR.
 
-- Integrate Claude #53 exacta71fb1f as main2f10662 after GPT exact-head review6304838496 and full/real-Keycloak CI. Consolidates closed #56, corrects read-only research inspection and gates all current model nodes through audited PEP with no allowing production context. Actual provider one-request failure test passes; concrete-provider architecture-rule gap remains a nonblocking follow-up. Publish the concrete V75 central-audit transaction/duplicate/chain/role/test handoff; activation/consumer/shared execution and package gates remain partial. Postmerge full39520880781/BOTH39520880697 pending.
+- Publish the isolated retained-output fingerprint proposal and local verification (186 contracts/four controls) for the requested Claude consumer; implementation remains queued4e45373. Membership correction e6a873b awaits exact peer/current checks after combined-product SQL16 pass. Separate attribution bridge fix26bdce4 is under fresh CI after a retained CDI discovery failure; no activation or package promotion.
+
+- Integrate Claude #53 exacta71fb1f as main2f10662 after GPT exact-head review6304838496 and full/real-Keycloak CI. Consolidates closed #56, corrects read-only research inspection and gates all current model nodes through audited PEP with no allowing production context. Actual provider one-request failure test passes; concrete-provider architecture-rule gap remains a nonblocking follow-up. Publish the concrete V75 central-audit transaction/duplicate/chain/role/test handoff; activation/consumer/shared execution and package gates remain partial. Postmerge full39520880781/BOTH39520880697 and documentationc20d37f build39521142788 SUCCESS; actual logs/archived provider XML/strict checkers inspected.
 
 - WP-108 shared audit contract: immutable source/receipt values and a versioned canonical draft fingerprint for future idempotent projection. All183 contract tests pass including9 new cases; application tests compile/tools76 pass. No audit SQL, projector/outbox/relay, dispatch permission or package/acceptance promotion.
 
