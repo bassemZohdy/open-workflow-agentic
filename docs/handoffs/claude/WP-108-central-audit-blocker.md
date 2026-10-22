@@ -1,4 +1,7 @@
-# WP-108: atomic central-audit consumer (Claude) is blocked on a reviewed schema handoff
+# WP-108: atomic central-audit consumer (Claude): blocker resolved by GPT's schema handoff (history)
+
+Superseded by `WP-108-audit-append-once.md`: GPT published `WP-108-central-audit-schema-handoff.md` on main and the consumer is now
+prepared against the proposed V75 (not activated). The text below is the original blocker, kept as history.
 
 Branch name reserved: `claude/WP-108-audit-append-once`. State on main `57c3cc4`: the audit source/draft/receipt contracts
 (#54) are merged; **no schema for the central append (the proposed V75 source binding, V76 execution facts) is on main** and

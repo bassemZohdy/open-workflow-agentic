@@ -2,6 +2,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.agent;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResearchOutputFingerprint;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -30,8 +31,8 @@ import javax.sql.DataSource;
  * when its checkpoints are exactly the first <i>k</i> transitions of {@link #CHAIN}, each once. Anything else is
  * {@link Kind#INCONSISTENT} and no checkpoint is chosen. The stored state is Java-serialized bytes in Base64 text: it is
  * validated (content type, bound, canonical Base64, stream header) and returned exactly as stored, never
- * deserialized and never re-encoded. Fingerprinting that text is deliberately NOT done here; the one shared
- * stored-text helper owned by the contracts area must be used once it is merged.
+ * deserialized and never re-encoded. Its fingerprint is the one shared {@link ResearchOutputFingerprint} over that
+ * exact text ({@link StoredState#fingerprint()}); no second hash exists here.
  *
  * <p>An unavailable, missing or partial checkpoint schema is a dependency failure and is refused with
  * {@link IllegalStateException}; it is never reported as "no checkpoints".
@@ -64,6 +65,14 @@ public class ResearchRunInspector {
         public StoredState {
             Objects.requireNonNull(contentType, "contentType");
             Objects.requireNonNull(base64, "base64");
+        }
+
+        /**
+         * The shared fingerprint of exactly this stored text (the one helper of the contracts area). It is DATA that
+         * identifies the retained representation: not completion, not authorization and not a permission to read.
+         */
+        public String fingerprint() {
+            return ResearchOutputFingerprint.of(contentType, base64);
         }
 
         @Override

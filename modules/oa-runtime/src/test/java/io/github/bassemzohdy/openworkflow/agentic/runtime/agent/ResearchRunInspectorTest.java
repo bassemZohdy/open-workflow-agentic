@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResearchOutputFingerprint;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchRunInspector.Inspection;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchRunInspector.Kind;
 import java.lang.reflect.InvocationTargetException;
@@ -103,6 +104,25 @@ class ResearchRunInspectorTest {
                 first.finalState().base64());
         assertFalse(first.toString().contains(first.finalState().base64()));
         assertEquals(first, inspector.inspect(thread));
+    }
+
+    @Test
+    void theCompletedRunsFingerprintIsTheSharedHelperOverTheExactStoredTextAndOnlyThat() throws Exception {
+        String thread = "fp-" + UUID.randomUUID();
+        String other = "fp-" + UUID.randomUUID();
+        agent(ds, (s, u) -> OK).run(thread, "topic");
+        agent(ds, (s, u) -> "{\"text\":\"1. x 2. y 3. z\",\"actions\":[],\"escalation\":null}").run(other, "topic");
+        ResearchRunInspector inspector = new ResearchRunInspector(ds);
+        Inspection first = inspector.inspect(thread);
+        String stored = single("select state_data from lg4jcheckpoint where checkpoint_id = ?::uuid", first.checkpointId());
+
+        String expected = ResearchOutputFingerprint.of(CT, stored);
+        assertEquals(expected, first.finalState().fingerprint());
+        assertTrue(expected.matches("[0-9a-f]{64}"));
+        assertEquals(expected, inspector.inspect(thread).finalState().fingerprint(), "stable for the same retained text");
+        assertFalse(expected.equals(inspector.inspect(other).finalState().fingerprint()),
+                "a different retained graph state has a different fingerprint");
+        assertFalse(first.toString().contains(expected), "a digest is data and is not part of the diagnostic text");
     }
 
     @Test
