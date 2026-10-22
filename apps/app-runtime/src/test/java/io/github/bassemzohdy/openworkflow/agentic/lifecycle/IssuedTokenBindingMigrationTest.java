@@ -91,7 +91,9 @@ class IssuedTokenBindingMigrationTest {
             c.setAutoCommit(false);
             try (var s = c.createStatement()) {
                 assertEquals("42501", assertThrows(SQLException.class,
-                        () -> s.executeUpdate("truncate identity.issued_token_binding")).getSQLState());
+                        // V73 retains issuing rows through this child FK. Include the child so this still exercises
+                        // the immutable-table trigger, rather than PostgreSQL's earlier FK TRUNCATE refusal.
+                        () -> s.executeUpdate("truncate identity.issued_token_binding, task.resource_call_binding")).getSQLState());
             } finally { c.rollback(); }
         }
         assertEquals(id, boundGrant(issuer, "live"));
