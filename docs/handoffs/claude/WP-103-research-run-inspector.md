@@ -35,3 +35,12 @@ the real checkpoint tables (`ResearchRunInspectorTest`, 24 tests, real PostgreSQ
    then drop `createTables(true)`. Until then tests migrate with Flyway first and only then build a graph; the app's
    `baseline-on-migrate=true` stays as is.
 3. **Manual resolution.** `PARTIAL` and `INCONSISTENT` stay UNKNOWN until the manual-resolution operation GPT defines.
+
+## Shared fingerprint adopted (after #57 merged as 6b4cf0d)
+
+`StoredState.fingerprint()` is `ResearchOutputFingerprint.of(contentType, base64)` over the exact stored text; no second
+hash exists in the runtime. The 1 MiB pre-read, header/profile, physical-run and current-authorization guards are
+unchanged and `createTables(true)` is kept until the reviewed checkpoint migration. A digest is data, not completion
+or permission. Test `theCompletedRunsFingerprintIsTheSharedHelperOverTheExactStoredTextAndOnlyThat` runs a real
+completed graph, reads the stored column independently by SQL and compares. Current totals: ResearchRunInspectorTest 26,
+AuditAppendOnceTest 22, oa-runtime 425/425 (local PostgreSQL 16).

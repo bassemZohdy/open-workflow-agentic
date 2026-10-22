@@ -47,7 +47,8 @@ public final class AuditTrail implements AuditSink {
      * Seals {@code draft} onto the end of its chain and commits it.
      *
      * @return the stored event, with its sequence, previous hash and hash
-     * @throws AuditStoreException when the event could not be committed; nothing was recorded
+     * @throws AuditStoreException when the append failed; a failed commit call can still follow a real commit (the reply
+     *                             can be lost), so the caller must not assume nothing was recorded
      */
     public AuditEvent append(AuditEvent draft) {
         Objects.requireNonNull(draft, "draft");
@@ -70,7 +71,8 @@ public final class AuditTrail implements AuditSink {
         }
     }
 
-    private static AuditEvent appendInTransaction(Connection connection, String chain, AuditEvent draft)
+    /** Seals and inserts one event on the chain head inside the caller's transaction (also used by {@link AuditAppendOnce}). */
+    static AuditEvent appendInTransaction(Connection connection, String chain, AuditEvent draft)
             throws SQLException {
         lock(connection, chain);
         long previousSequence = 0;
