@@ -40,6 +40,7 @@ public final class NodeInterceptor {
     private final Subject actor;
     private final String runId;
     private final int maxSteps;
+    private final RunBudget budget;
     private final AuditSink audit;
     private final Clock clock;
     private final AtomicInteger steps = new AtomicInteger();
@@ -48,13 +49,24 @@ public final class NodeInterceptor {
         this.actor = Objects.requireNonNull(actor, "actor");
         this.runId = Checks.requireText("runId", runId, 128);
         this.maxSteps = (int) Checks.requireInRange("maxSteps", maxSteps, 1L, 10_000L);
+        this.budget = null;
+        this.audit = Objects.requireNonNull(audit, "audit");
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /** As above, but each node attempt is an iteration of {@code budget}, which also enforces wall-clock time. */
+    public NodeInterceptor(Subject actor, String runId, RunBudget budget, AuditSink audit, Clock clock) {
+        this.actor = Objects.requireNonNull(actor, "actor");
+        this.runId = Checks.requireText("runId", runId, 128);
+        this.maxSteps = 0;
+        this.budget = Objects.requireNonNull(budget, "budget");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /** Steps counted so far. Attempts refused at the limit are not counted. */
     public int stepsCounted() {
-        return steps.get();
+        return budget != null ? budget.iterationsUsed() : steps.get();
     }
 
     public <S extends AgentState> NodeAction<S> wrap(String node, NodeAction<S> action) {
@@ -76,6 +88,14 @@ public final class NodeInterceptor {
     }
 
     private int admit(String node) {
+        if (budget != null) {
+            try {
+                return budget.admitIteration();
+            } catch (BudgetExhausted e) {
+                record("agent.node.refused", node, budget.iterationsUsed(), e.limit() + ": " + e.getMessage(), false);
+                throw new NodeRefused(e.getMessage() + " before node " + node);
+            }
+        }
         while (true) {
             int current = steps.get();
             if (current >= maxSteps) {
