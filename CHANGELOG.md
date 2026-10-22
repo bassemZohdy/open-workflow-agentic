@@ -16,11 +16,11 @@
 
 - Integrate PR55 exactc9ce389 as mainf840b06 after Claude6306699855 and current full39534066349/strict BOTH39534071955. Retain pinned groups and add complete recorded-match/finalized-read/replay fences; actual SQL16/provider/core evidence inspected. Actual main postmerge full39534880880/BOTH39534883157 SUCCESS with logs/provider XML/strict checks/digests inspected; full T13 remains partial. Next sole WP108 PR57 reconciles the existing shared fingerprint at5bb6a81, current full39535234967/BOTH39535234969 SUCCESS with154 actual XML EACH/zero skips inspected; exact current review still gates merge.
 
+- Integrate PR55 exactc9ce389 as mainf840b06 after Claude6306699855 and current full/real-Keycloak checks. Retain matched-slot completeness and finalized-read/replay bounds; full T13 remains partial. Postmerge checks running. Reconcile the existing tiny WP108 output fingerprint candidate with merged membership/main; new combined execution and exact peer review pending.
+
 - Reconcile the final serialized main tracking into the held membership candidate, preserving all current proof and queue boundaries. This is documentation only; runtime/test/migration bytes remain at verifieddb43b3b. Hold this final review head and main tracking stable until exact peer/current required PR gates clear.
 
 - Verify current-main membership correction atdb43b3b/BOTH39521278476: SQL16 EACH, integrated inspector24/governed-model12/rule3/actual provider1 and real standard3/delegation8/core1 pass zero skips. Actual full logs/archived provider XML/digests/strict checkers inspected. Final documented candidate needs exact Claude review/current PR checks before #55 advances; unchanged tests/migrations and partial acceptance retained.
-
-- Normally reconcile the pending membership correction with reviewed integrated Claude #53/current main. No membership runtime/test/migration bytes change; previous5522bce strict success remains historical. Fresh combined-head CI and exact Claude review are required before #55 advances.
 
 - Queue a small WP-108 prerequisite integration candidate from existing preparation: V73 immutable resource attribution and V74 canonical occurrence/JDBC store, preserving original call identity across SDK counter changes. Nine selected source/test files retain preparation bytes;193 contracts/nine focused controls/app compile pass,17 SQL cases await fresh exact Linux execution. Retain app/module Surefire XML in strict provider artifacts. No dispatcher/graph/audit-consumer activation, second implementation PR or package promotion.
 

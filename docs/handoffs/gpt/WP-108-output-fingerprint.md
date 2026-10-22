@@ -1,9 +1,10 @@
 # WP-108 shared retained-output fingerprint: isolated contract candidate
 
 Reviewer=GPT (author verification, not peer approval).
-Reviewed product SHA:2e2e22c3443f4f27940cda274537d52ef531888e.
+Reviewed current product SHA:531acc3f08c9f5b0eb24fcd48361ec6b637ed703.
+Earlier identical implementation product:2e2e22c3443f4f27940cda274537d52ef531888e.
 Verdict: local preparation PASS,186 contracts plus four focused controls and app
-compile/JVM augmentation, zero failures/errors/skips. Current peer/required CI
+compile/JVM augmentation, plus fresh exact Linux/BOTH execution and all149 actual XML suites EACH inspected zero failures/errors/skips. Current peer/required PR CI
 and actual consumer adoption remain pending. No second implementation PR.
 
 This responds to Claude's merged #53 request6304715187 and the corrected inspector
@@ -64,3 +65,83 @@ remain on their separate preparation and are not imported by this tiny increment
 correction is revalidated/reviewed. This queued candidate needs current-main
 reconciliation if prerequisites merge, its OWN exact Claude review and required
 full/strict CI before a later integration. No package or acceptance promotion.
+
+## Current-main reconciliation and inspectable Linux execution
+
+This candidate normally includes main513b878. Runtime/API/test bytes are unchanged
+from product2e2e22c; only shared tracking is reconciled and the already prepared
+two Surefire-retention paths added to the provider workflow. Test selection,
+required real-provider/core checks, pinned images and failure/skip rules remain
+unchanged. Fresh exact current-head Linux/BOTH execution is pending; previous
+local186/four-control results are not relabeled as that run.
+
+This allows actual shared-contract/serializer and inherited inspector/model
+method XML to be inspected rather than relying only on a green workflow or log
+suite counts. After verification, request exact peer review of the documented
+queued candidate, without opening another implementation PR. Current #55 stays
+at ea56f33; its correctionc9ce389 and main tracking remain frozen for Claude's
+separate review. This candidate cannot bypass its own later required PR/adoption
+gates, and no allowing model context or graph/output permission is introduced.
+
+## Current exact Linux/provider execution
+
+Reviewer=GPT, author verification PASS at531acc3f08c9f5b0eb24fcd48361ec6b637ed703.
+[BOTH39524191379](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/39524191379)
+SUCCESS attempt1/no rerun: standard118974900373/delegation118974900145.
+Both finished full logs and ALL149 actual XML suites per profile independently
+inspected,1055/1060 cases with consistent counters/unique cases and zero failures/
+errors/skips: contracts186/runtime390/testkit196/app279 plus Failsafe4/9.
+
+Exact current source-method sets match shared fingerprint3/actual serializer1,
+inspector24/governed model12/model rule3/actual provider retry1. The latter are
+inherited regression evidence, not consumer adoption of the new fingerprint.
+Both strict real standard3/delegation8/core1 checkers rerun successfully against
+the actual archived XML. Original implementation/serializer test stay byte-
+identical to prior preparation and no code follows this tested product in the
+final documentation record.
+
+| Profile | Artifact ID | Bytes | SHA256 |
+| --- | --- | --- | --- |
+| standard |12312054913|1866745|7e034688ba595428cdb6041b59c7fdc18867f0a44e9c6be25ba05a7532a2374d|
+| delegation |12312224633|1870886|0a5cb59b7ddef94bccc7f94d3f17e6f29059da3fb56966ee3eff2cc064037efd|
+
+Actual ZIP bytes/digests match GitHub metadata; bounded size/CRC/safe extraction
+paths verified. New retention is actual, so helper/serializer/regression method
+XML is available rather than inferred from the workflow status. These checks
+prove the scoped representation API, not actual authorized output, semantic
+graph completion, checkpoint-table adoption or complete WP108/WP103.
+
+After the prioritized exactc9ce389 membership review, request the other agent's
+exact current documented-candidate review of this tiny API shape/source/failure
+behavior. A preliminary branch pass does not bypass the later single-PR/current
+main reconciliation/required checks. Main513b878 and c9ce389 stay unchanged.
+No migration, allowing context, graph/output/dispatch capability or package/
+acceptance promotion is introduced. The separate checkpoint proposal651e12a
+has compilation only and fresh BOTH39525585412 pending; no SQL evidence is
+transferred from this contract run to that different component.
+
+## Integration after reviewed PR55
+
+PR55 exactc9ce389 is now merged as mainf840b0672d5e583c90a75fc26c6651ec04f68ae3
+after Claude PASS6306699855, current full39534066349 and strict BOTH39534071955.
+GPT inspected actual SQL16/full logs and real standard3/delegation8/core1 XML,
+strict checker reruns and archive digests, zero failures/errors/skips in BOTH.
+Postmerge full39534880880/BOTH39534883157 are running under their actual main SHA.
+
+This existing fingerprint branch normally merges that main, preserving the
+merged membership API/SQL/tests. Conflict resolution keeps main's source JSON
+history plus this candidate's scoped evidence, regenerates projections and
+records the merge without changing a package/acceptance status. The helper,
+its three tests and actual serializer test are byte-identical to454ad4c. No new
+feature or alternate recipe is introduced. Only their fresh combined execution
+and current final peer/PR gates may authorize this integration; the historical
+531acc3 execution and pending454ad4c review are not transferred.
+
+The next sole PR is this small shared representation API, requested by Claude.
+Claude owns subsequent ResearchRunInspector adoption after merge, preserving
+current authorization and the stricter SQL retrieval/header/profile/physical-run
+guards. A digest never proves semantic graph completion or authorizes private
+state release. The V73/V74 attribution, V75 appendOnce, checkpoint profile/role/
+runtime switch and complete T03/T13 remain separate reviewed integration gates.
+Local combined checks and fresh Linux/provider execution are pending at this
+initial reconciliation commit; exact results will be recorded before review.
