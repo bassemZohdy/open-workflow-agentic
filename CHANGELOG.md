@@ -1,5 +1,7 @@
 # Changelog
 
+- Integrate Claude PR58 exactf459e06 as main998b501 after GPT exact-head PASS 6318839679 (OpenCode continuing the GPT role), required check 39538682540 and independent strict real-Keycloak BOTH 39619195441 at the same SHA. Central append-once consumer and shared fingerprint adoption land as partial, NOT activated: V75 stays proposed with no role/CDI/runtime activation. One P3 correction recorded for Claude (handoff claims inspector 26 tests; suite/CI prove 25). Existing V73/V74 attribution branch reconciles the new main at 733d290/1396147 with unchanged product bytes versus tested2f59db1; its sole implementation PR awaits fresh combined CI and exact Claude review.
+
 - Reconcile the existing V73/V74 attribution branch with reviewed merged membership/main and current serialized tracking. Runtime/test/migration/build/CI bytes remain identical to tested2f59db1; no backend results are relabeled or repeated. Legacy production admission stays unwired; queue behind current PR57 and require its later current-base/peer/CI gate. No new feature or V75 activation.
 
 - Review Claude PR58 exact87bc20e: request changes for bounded-pool commit-readback exhaustion and valid source/chain lock-argument aliasing. Independent detached current-class JDBC/input probes and compilation pass; no local PostgreSQL execution claimed. Publish concrete fixes/tests/role-boundary handoff. GPT PR57 remains5bb6a81/all current full+strict green, pending exact Claude review.
