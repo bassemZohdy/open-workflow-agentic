@@ -8,11 +8,13 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Authoriza
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.HumanTask;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.HumanTaskStatus;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyContext;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.FailClosedPolicyDecisionPoint;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.PolicyDecisionPoint;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.SafeRecovery.RecoveryOperation;
@@ -114,6 +116,45 @@ public final class Pep {
         Checks.requireMatching("action", action, AgentTaskContract.TOKEN);
         return decide(actor, ActionKind.HUMAN_TASK_ACTION, "human-task:" + task.id().value() + ":" + action,
                 task.agentTaskId(), new PolicyContext(actorScopes, null, null, null, null, null));
+    }
+
+    /**
+     * Boundary 3, closed vocabulary (WP-106). Deterministic rules run before the policy engine and a failure is a
+     * recorded DENY with zero engine calls: only a {@link SubjectKind#USER} may act; the task must still be open or
+     * in progress; the actor must hold {@link HumanAction#requiredScope()}; and a decision is taken only by the
+     * task's current assignee. Rules that need facts the task does not carry (tenant, initiator, risk) are not
+     * guessed here: they wait for the shared {@code HumanActionFacts} contract and the engine decides the rest.
+     */
+    public Decision humanTaskAction(Subject actor, Set<String> actorScopes, HumanTask task, HumanAction action) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(actorScopes, "actorScopes");
+        Objects.requireNonNull(task, "task");
+        Objects.requireNonNull(action, "action");
+        AuthorizationRequest request = new AuthorizationRequest(actor, ActionKind.HUMAN_TASK_ACTION,
+                "human-task:" + task.id().value() + ":" + action.verb(), task.agentTaskId(),
+                new PolicyContext(actorScopes, null, null, null, null, null));
+        String refusal = humanActionRefusal(actor, actorScopes, task, action);
+        if (refusal != null) {
+            return record(request, new Decision(DECIDED_BY, DecisionOutcome.DENY, refusal,
+                    PolicyRef.FAIL_CLOSED, clock.instant()), false);
+        }
+        return decide(request);
+    }
+
+    private static String humanActionRefusal(Subject actor, Set<String> scopes, HumanTask task, HumanAction action) {
+        if (actor.kind() != SubjectKind.USER) {
+            return "only a person may act on a human task";
+        }
+        if (task.status() != HumanTaskStatus.OPEN && task.status() != HumanTaskStatus.IN_PROGRESS) {
+            return "the task is " + task.status() + " and no longer accepts actions";
+        }
+        if (!scopes.contains(action.requiredScope())) {
+            return "missing scope " + action.requiredScope();
+        }
+        if (action == HumanAction.DECIDE && !actor.equals(task.assignee())) {
+            return "only the task's assignee may decide it";
+        }
+        return null;
     }
 
     /** Boundary 4: a versioned artifact is published or activated. The digest is part of the resource. */
