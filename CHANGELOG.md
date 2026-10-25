@@ -1,5 +1,7 @@
 # Changelog
 
+- Prepare the existing execution entry/outcome/transient-fence contract on current main without importing older schema/budget/gateway changes. Reuse the merged output fingerprint and retain default admission refusal. All200 contracts pass (four new cases with independent Python vectors), plus the actual serializer/outcome compatibility case. ADR0028 stays Proposed; no backend, callback, schema, current authority or package/acceptance activation. Peer review and current CI remain pending.
+
 - Merge V75 PR65 as main2beaeb4 after exact Claude PASS cd15aca/6404200386, an independent six-case PostgreSQL16 rerun and full40239627410 SUCCESS. Actual logs confirm migration6, appendOnce22 and acceptance/dependency/Python88 checks. The unchanged agreed DDL and fresh-role grant procedure are integrated; production credentials, audit CDI/data-source adoption, current authority and effect delivery remain gated. No package or acceptance promotion.
 
 - Prepare additive V75 source-binding activation after the merged fixture prerequisite. Preserve the agreed DDL body and existing audit history; provide a dedicated writer/read grant template without changing application credentials or data-source wiring. Six local PostgreSQL16/Java21 tests pass for fresh/concurrent append, nonempty upgrade, conflicting-schema rollback, retained-reference guards, append-only protection and least-privilege denial. Exact peer review, required CI and integration remain pending; WP-108 and acceptance stay partial.
