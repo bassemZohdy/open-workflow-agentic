@@ -4,7 +4,7 @@
 Prints `mode=<full|modules|docs>` and, for `modules`, `modules=<comma list for mvn -pl>` (GITHUB_OUTPUT format).
 
   docs     only Markdown prose changed outside the generated-doc sources: skip Maven.
-  modules  only source under modules/<m>/ or apps/<a>/ changed: build those modules, what they need (-am) and what
+  modules  only production source under modules/<m>/ or apps/<a>/ changed: build those modules, what they need (-am) and what
            depends on them (-amd). Everything else keeps running as before.
   full     anything else (pom.xml, .github, tools, compose, docs/plan, docs/requirements, unknown paths), no
            changed files, or any doubt. Pushes to main are always full: this script is only used for pull requests.
@@ -35,14 +35,14 @@ def decide(changed):
         if PROSE.match(f):
             continue
         m = MODULE.match(f)
-        if not m or MODULE_BUILD.search(f):
+        if not m or MODULE_BUILD.search(f) or f.startswith(m.group(1) + "/src/test/"):
             return "full", []
         modules.add(m.group(1))
     return "modules", sorted(modules)
 
 
 def changed_files(base):
-    out = subprocess.run(["git", "diff", "--name-only", f"{base}...HEAD"], check=True, capture_output=True,
+    out = subprocess.run(["git", "diff", "--no-renames", "--name-only", f"{base}...HEAD"], check=True, capture_output=True,
                          text=True).stdout
     return out.splitlines()
 
