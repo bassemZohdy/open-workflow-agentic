@@ -55,3 +55,16 @@ Current main includes reviewed central append-once preparation and V73/V74. PR63
 merged as 4f3032a after exact Claude PASS at1396bd4 and full40236424166 SUCCESS.
 The pinned proposal's LF checkout bytes now match its unchanged expected SHA-256.
 No work-package or acceptance status is promoted by fixture or schema preparation.
+
+## Activation candidate
+
+Fixture PR64 is merged as main63291fa after exact GPT PASS at6610bf1, full
+40237862668 and postmerge40238656904. Its parent-specific assertions detect both
+missing-parent-guard controls. GPT's following candidate applies V75 with an
+unchanged DDL body and updated comments only. Six local PostgreSQL16/Java21 cases
+pass against the real Flyway path, including incompatible-schema rollback and
+fresh/nonempty adoption. The exact template at deploy/sql/audit-source-grants.sql
+is exercised with fresh non-owner writer/read identities; deployment instructions
+at deploy/audit-source-roles.md explicitly require distinct roles without earlier
+powers. Review/CI/merge remain pending; no production credentials or audit CDI
+binding are supplied by this increment.
