@@ -2,6 +2,12 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 
 import static org.junit.jupiter.api.Assertions.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResearchOutputFingerprint;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionOutcome;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchState;
 import java.util.*;
 import org.bsc.langgraph4j.serializer.std.ObjectStreamStateSerializer;
@@ -21,5 +27,17 @@ class ResearchOutputEncodingTest {
         String changed=serializer.writeDataAsString(new ResearchState(Map.of(ResearchState.TOPIC,"fixture",ResearchState.PLAN,"second")));
         assertNotEquals(hash,ResearchOutputFingerprint.of(serializer.contentType(),changed));
         assertEquals(hash,ResearchOutputFingerprint.of(serializer.contentType(),stored));
+        var scope=new ResourceCallScope("tenant",Ulid.parse("01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+                new Subject(SubjectKind.USER,"alice"),"app","engine","agentic","research","1.0.0",
+                "/do/0/research",1,"serializer-fixture","research-audience","agent:research:run",
+                "a".repeat(64),"b".repeat(64));
+        var entry=new ResourceExecutionEntry(scope,1);
+        var run=UUID.fromString("19b2ca22-659a-4904-b297-c8ddab7b1de7");
+        var checkpoint=UUID.fromString("4d70a2e6-6ec8-43ab-b7ea-2304966a385b");
+        var outcome=new ResourceExecutionOutcome(entry,ResearchOutputFingerprint.PROFILE,run,checkpoint,
+                serializer.contentType(),hash);
+        outcome.requireMatches(entry,scope.threadId(),run,checkpoint,serializer.contentType(),stored);
+        assertThrows(IllegalStateException.class,()->outcome.requireMatches(entry,scope.threadId(),run,
+                checkpoint,serializer.contentType(),changed));
     }
 }
