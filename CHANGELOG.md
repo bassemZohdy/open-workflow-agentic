@@ -1,5 +1,7 @@
 # Changelog
 
+- Prepare reserved V75_1 checkpoint-profile ownership from the existing proposal, preserving compatible history and refusing unsupported/partial/locked stores. Tighten column-collation validation after a real probe exposed acceptance outside the pinned default profile. Local PostgreSQL16/Java21 passes schema10/24 observations and ordered migration/real-saver/grants4; retain actual XML and case JSON in CI. Runtime DDL removal, data-source/current-authority adoption and package closure remain separate; exact review/current CI/merge are pending.
+
 - Merge execution contract PR66 as main1773a00 after exact Claude PASS de853bb/6404473197 and full40241496066. Independent contracts200/actual serializer1/Python88/generated checks pass; actual CI confirms contract4, serializer1 and negative default admission wiring1. No backend, graph callback, schema or current-authority activation. Reserve additive V75_1 for the following checkpoint-profile migration, preserving existing V76-V80 preparation and all applied versions. Package/acceptance status stays partial.
 
 - Prepare the existing execution entry/outcome/transient-fence contract on current main without importing older schema/budget/gateway changes. Reuse the merged output fingerprint and retain default admission refusal. All200 contracts pass (four new cases with independent Python vectors), plus the actual serializer/outcome compatibility case. ADR0028 stays Proposed; no backend, callback, schema, current authority or package/acceptance activation. Peer review and current CI remain pending.
