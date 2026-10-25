@@ -1,5 +1,7 @@
 # Changelog
 
+- Prepare additive V75 source-binding activation after the merged fixture prerequisite. Preserve the agreed DDL body and existing audit history; provide a dedicated writer/read grant template without changing application credentials or data-source wiring. Six local PostgreSQL16/Java21 tests pass for fresh/concurrent append, nonempty upgrade, conflicting-schema rollback, retained-reference guards, append-only protection and least-privilege denial. Exact peer review, required CI and integration remain pending; WP-108 and acceptance stay partial.
+
 - Integrate Claude audit fixture PR64 at exact 6610bf1 as main 63291fa after GPT PASS 6403925367 and full build 40237862668. Pin private proposal tests to the V74 foundation; shared TRUNCATE probes roll back and require the intended parent guard. Independent PostgreSQL16 proof: 31 tests pass both before and with the privately applied V75 proposal; disabling the two parent guards produces two intended assertion failures; restoring them returns all5 append-only cases to PASS. Production V75 and permissions remain the next separate increment; no package or acceptance promotion.
 
 - Verify merged CI changes with successful full main builds 40237056066/40237188334 and the actual Linux scoped reactor command, including application/process tests. Preserve the failed Windows-native and initial container-network attempts as limitations, not passing evidence.
