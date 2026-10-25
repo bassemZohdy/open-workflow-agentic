@@ -54,3 +54,14 @@ the fixtures in ResourceExecutionContractTest:
 Exact Claude review, required current CI and merge remain pending. ADR0028 stays
 Proposed; checkpoint adoption, V76 backend/current composite authority and later
 producer delivery are separate ordered gates. No package/acceptance promotion.
+
+## Integrated result
+
+PR66 exact de853bbbad53cfb7f24cd8714fb3ff196b963270 merged as main
+1773a00c219024d566453cc3918f24c6ec00aeb3 after Claude PASS6404473197 and full
+40241496066. The independent reviewer reran contracts200, actual serializer1,
+Python88 and generated checks, including independent Python vectors. Actual CI
+logs confirm contract4, serializer1, negative default admission wiring1 and full
+acceptance/dependency checks. Postmerge verification is pending. The next ordered
+profile migration uses reserved additive V75_1; no execution backend or runtime
+DDL/admission permission is activated by this contract integration.

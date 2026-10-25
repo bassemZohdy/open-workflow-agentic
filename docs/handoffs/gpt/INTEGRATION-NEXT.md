@@ -1,6 +1,6 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline: main `2beaeb4a62087da1f02728b7328d815651a9a897`.
+Current implementation baseline: main `1773a00c219024d566453cc3918f24c6ec00aeb3`.
 No open pull request remains. This queue supersedes the former PR55/57/58 pending
 snapshots; their exact evidence remains in the linked historical handoffs and PRs.
 Counts remain 11 completed / 12 partial / 30 not started; acceptance remains 3/39.
@@ -33,34 +33,43 @@ Counts remain 11 completed / 12 partial / 30 not started; acceptance remains 3/3
   inherited powers and supplies no credentials or data-source/CDI adoption.
   Postmerge verification is pending.
 
-## Next sole GPT increment: execution contract handoff
+- Execution contract PR66 merged as `1773a00`, exact `de853bb`. Claude PASS
+  6404473197 independently reran contracts200, actual serializer1, Python88 and
+  generated checks. Full40241496066 passed; actual logs confirm contract4,
+  serializer1, negative default admission wiring1 and acceptance/dependency checks.
+  The three production types retain prepared bytes; the merged fingerprint and
+  existing helper tests are reused. No backend, schema, callback or authority is
+  activated. Postmerge verification is pending.
 
-Integrate the existing framework-free preparation on `gpt/WP-103-execution-contract`
-against current main before activating an execution backend. Extract the intended
-entry/outcome/fence types and tests; do not restore stale helper/schema/runtime
-copies from that older branch. The shared ResearchOutputFingerprint is already
-merged and remains the single retained-output representation.
+## Next sole GPT increment: checkpoint profile migration
 
-1. Reconcile the full contract with the current ResourceCallScope/canonical call
-   identity. Keep entry epochs and outcome ids/fingerprints as DATA, never minted
-   authority. A new credential, epoch or empty checkpoint is not permission to
-   enter or retry a graph.
-2. Publish the explicit transient composite-fence handoff. Actual caller/PDP,
-   registry/full owner/task/target/execution/lease checks must remain bound to the
-   exact entry and refreshed after blocking I/O, before entry, on governed nodes
-   and before private output release. No ambient or serialized permission handle.
-3. Run contracts and actual serializer compatibility checks, exact Claude review,
-   required current CI and serialized tracking. Leave the legacy admission port
-   unsatisfied and introduce no default allowance, graph callback or model call.
-4. Then sequence actual checkpoint ownership/adoption and the reserved V76
-   execution-fact backend against the measured saver profile. Preserve nonempty
-   data and fail closed on incompatible stores. No later number is allocated by
-   this queue. V77 producer/delivery and V78-V80 remain ordered later gates.
+Use the existing executable checkpoint-profile preparation on
+`gpt/WP-108-checkpoint-schema`, after reconciling current main. The observed pinned
+profile and its SQL proposal/real-saver cases are already documented there. Do not
+merge unrelated old branch copies or transfer historical review/CI to a new head.
 
-The merged V75 schema/low-level receipt is not dispatch permission. Audit
-CDI/production data-source adoption belongs to the Claude consumer/WP-304 boundary;
-producer acknowledgement, mandatory receipt-before-dispatch, current authority,
-actual Flow/output and recovery still require their own complete integration.
+1. Activate the reviewed profile as additive **V75_1**, after V75 and before the
+   reserved V76-V80 proposals. This allocation preserves all applied migrations
+   and existing proposal numbers. Own the explicit public checkpoint profile;
+   preserve original physical ids/private text/release flags in compatible stores.
+2. Both tables absent may create the pinned profile. Partial/incompatible tables,
+   columns/keys/indexes/namespace/RLS/inheritance/triggers must refuse without repair,
+   reset, baseline, guessed backfill or private-state deserialization. A live table
+   writer must refuse with NOWAIT rather than being killed or waited on indefinitely.
+3. Prove the actual migration-first path, compatible nonempty adoption, rollback on
+   failure and real pinned saver insert/read/update/release with createTables(false).
+   Provide the owned role/data-source/configuration procedure and least-privilege
+   proof, distinguishing mutable checkpoints from immutable audit receipts.
+4. Require exact Claude review, current CI and serialized integration. Claude owns
+   the later ResearchAgent createTables change, after the reviewed schema prerequisite,
+   and must prove startup/failure ordering before graph/provider work. Do not change
+   its source from the GPT branch or silently alter global baseline-on-migrate.
+
+The actual execution backend/current composite fence, reserved V76 facts and V77
+producer/delivery remain later steps. A schema, constructed entry or stored outcome
+cannot authorize a graph retry or release private output. Keep the legacy production
+admission port unsatisfied until the complete reviewed consumer/authority gate exists.
+No package or acceptance promotion follows from a profile migration alone.
 
 ## Retained later preparation
 
