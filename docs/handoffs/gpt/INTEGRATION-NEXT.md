@@ -1,6 +1,6 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline: main `63291fa432b251d8b2533b6c1488a019fa8cecef`.
+Current implementation baseline: main `2beaeb4a62087da1f02728b7328d815651a9a897`.
 No open pull request remains. This queue supersedes the former PR55/57/58 pending
 snapshots; their exact evidence remains in the linked historical handoffs and PRs.
 Counts remain 11 completed / 12 partial / 30 not started; acceptance remains 3/39.
@@ -22,34 +22,45 @@ Counts remain 11 completed / 12 partial / 30 not started; acceptance remains 3/3
   and with the V75 proposal discoverable/applied in a private review database;
   disabling the parent TRUNCATE guards gives the two intended assertion failures;
   restoring them returns all5 append-only tests to PASS. Temporary generated
-  migration and private review databases were removed. Product V75 is not applied.
+  migration and private review databases were removed. Production migration activation followed in PR65 below.
 
-## Next sole GPT implementation increment: V75 and permissions
+- V75 PR65 merged as `2beaeb4`, exact implementation `cd15aca`. Claude PASS
+  6404200386 independently reran all6 PostgreSQL16 migration/permission cases.
+  Full40239627410 passed; actual logs confirm migration6, appendOnce22, acceptance
+  consistency, dependency policy and Python88. The real migration preserves the
+  agreed DDL body and prior events without backfill. The additive grant template
+  is tested with fresh non-owner writer/read identities; it revokes no earlier or
+  inherited powers and supplies no credentials or data-source/CDI adoption.
+  Postmerge verification is pending.
 
-Follow [the concrete activation handoff](WP-108-v75-activation.md). The Claude-owned
-fixture prerequisite is now merged: private proposal databases stop at target74,
-and shared parent TRUNCATE probes include the retained child, verify the intended
-parent's 42501/append-only error and always roll back.
+## Next sole GPT increment: execution contract handoff
 
-1. Branch from current main. Activate the agreed V75 schema after V73/V74; preserve
-   its source-key calculation, retained event/head references and immutable guards.
-   Update only the applied copy's obsolete proposal comments. Never rewrite an
-   earlier migration or change the pinned proposal fixture/digest.
-2. Add GPT-owned migration-first tests for fresh migration, validation and upgrade
-   from a nonempty V74 audit foundation without changing prior events or inventing
-   source backfill. Exercise the concrete append-once API against actual V75.
-3. Provide and verify dedicated writer/read grants: schema USAGE plus SELECT/INSERT
-   on event/head_log/source_binding for the writer, SELECT only for the reader.
-   Prove denial of protected-table mutation, protected-schema DDL and ledger access
-   with non-owner roles. Do not invent deployed credentials or silently switch the
-   default application data source.
-4. Require exact Claude peer review, current required CI and serialized tracking
-   before merge. Inspect the postmerge check without relabeling earlier evidence.
+Integrate the existing framework-free preparation on `gpt/WP-103-execution-contract`
+against current main before activating an execution backend. Extract the intended
+entry/outcome/fence types and tests; do not restore stale helper/schema/runtime
+copies from that older branch. The shared ResearchOutputFingerprint is already
+merged and remains the single retained-output representation.
 
-CDI/production audit data-source adoption belongs to Claude's audit consumer and
-WP-304 boundary. Current caller/PDP/execution/lease checks, actual Flow output,
-producer delivery/acknowledgement and recovery remain separate implementation
-steps. A stored receipt or a new schema is never dispatch permission.
+1. Reconcile the full contract with the current ResourceCallScope/canonical call
+   identity. Keep entry epochs and outcome ids/fingerprints as DATA, never minted
+   authority. A new credential, epoch or empty checkpoint is not permission to
+   enter or retry a graph.
+2. Publish the explicit transient composite-fence handoff. Actual caller/PDP,
+   registry/full owner/task/target/execution/lease checks must remain bound to the
+   exact entry and refreshed after blocking I/O, before entry, on governed nodes
+   and before private output release. No ambient or serialized permission handle.
+3. Run contracts and actual serializer compatibility checks, exact Claude review,
+   required current CI and serialized tracking. Leave the legacy admission port
+   unsatisfied and introduce no default allowance, graph callback or model call.
+4. Then sequence actual checkpoint ownership/adoption and the reserved V76
+   execution-fact backend against the measured saver profile. Preserve nonempty
+   data and fail closed on incompatible stores. No later number is allocated by
+   this queue. V77 producer/delivery and V78-V80 remain ordered later gates.
+
+The merged V75 schema/low-level receipt is not dispatch permission. Audit
+CDI/production data-source adoption belongs to the Claude consumer/WP-304 boundary;
+producer acknowledgement, mandatory receipt-before-dispatch, current authority,
+actual Flow/output and recovery still require their own complete integration.
 
 ## Retained later preparation
 

@@ -68,3 +68,13 @@ is exercised with fresh non-owner writer/read identities; deployment instruction
 at deploy/audit-source-roles.md explicitly require distinct roles without earlier
 powers. Review/CI/merge remain pending; no production credentials or audit CDI
 binding are supplied by this increment.
+
+## Integrated result
+
+PR65 exact cd15aca73e76240cf30648b373a5dde85a500e3a merged as main
+2beaeb4a62087da1f02728b7328d815651a9a897. Claude PASS6404200386 independently
+reran all6 migration/permission cases. Required full40239627410 passed; actual
+logs confirm migration6, appendOnce22, acceptance consistency, dependency policy
+and Python88. Postmerge verification is pending. No later schema allocation,
+credential/data-source deployment, CDI consumer or current-authority permission
+is implied. The next contract integration retains the unsatisfied legacy gate.
