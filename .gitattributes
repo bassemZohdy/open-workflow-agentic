@@ -1,2 +1,4 @@
 # Policy snapshot hashes cover exact UTF-8 bytes across development platforms.
 *.cedar text eol=lf
+# This proposal fixture is pinned by SHA-256 in AuditSourceTestDatabase.
+modules/oa-runtime/src/test/resources/audit/proposed/V75__audit_source_binding.sql text eol=lf
