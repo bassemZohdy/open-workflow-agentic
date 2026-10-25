@@ -28,7 +28,8 @@ class CiScopeTest(unittest.TestCase):
                          scope.decide(["modules/oa-runtime/src/main/java/A.java", "docs/handoffs/x.md"]))
 
     def test_several_modules_are_listed_once_sorted(self):
-        files = ["modules/oa-runtime/src/A.java", "apps/app-runtime/src/B.java", "modules/oa-runtime/src/C.java"]
+        files = ["modules/oa-runtime/src/main/java/A.java", "apps/app-runtime/src/main/java/B.java",
+                 "modules/oa-runtime/src/main/java/C.java"]
         self.assertEqual(("modules", ["apps/app-runtime", "modules/oa-runtime"]), scope.decide(files))
 
     def test_build_files_force_a_full_build(self):
@@ -53,6 +54,11 @@ class CiScopeTest(unittest.TestCase):
 
     def test_acceptance_test_changes_require_full_build(self):
         self.assertEqual(("full", []), scope.decide(["modules/oa-testkit/src/test/java/AcceptanceTest.java"]))
+
+    def test_acceptance_gate_and_unknown_source_roots_require_full_build(self):
+        for path in ["modules/oa-testkit/src/main/java/acceptance/AcceptanceStatus.java",
+                     "modules/oa-runtime/src/test/java/A.java", "modules/oa-runtime/src/it/java/A.java"]:
+            self.assertEqual(("full", []), scope.decide([path]), path)
 
     def test_failed_diff_falls_back_to_full(self):
         with patch.object(scope, "changed_files", side_effect=subprocess.CalledProcessError(1, "git")):

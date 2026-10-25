@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 
-MODULE = re.compile(r"^((?:modules|apps)/[A-Za-z0-9_-]+)/src/")
+MODULE = re.compile(r"^((?:modules|apps)/[A-Za-z0-9_-]+)/src/main/")
 # Prose that no build step reads. docs/plan and docs/requirements feed the generated-document check, so they are
 # not here. Handoffs are read by no build step.
 PROSE = re.compile(r"^(?:docs/(?!plan(?:/|$)|requirements(?:/|$)).+\.md|[^/]+\.md)$")
@@ -35,7 +35,7 @@ def decide(changed):
         if PROSE.match(f):
             continue
         m = MODULE.match(f)
-        if not m or MODULE_BUILD.search(f) or f.startswith(m.group(1) + "/src/test/"):
+        if not m or MODULE_BUILD.search(f) or m.group(1) == "modules/oa-testkit":
             return "full", []
         modules.add(m.group(1))
     return "modules", sorted(modules)
