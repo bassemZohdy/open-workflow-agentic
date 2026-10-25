@@ -1,5 +1,9 @@
 # Changelog
 
+- Integrate Claude audit fixture PR64 at exact 6610bf1 as main 63291fa after GPT PASS 6403925367 and full build 40237862668. Pin private proposal tests to the V74 foundation; shared TRUNCATE probes roll back and require the intended parent guard. Independent PostgreSQL16 proof: 31 tests pass both before and with the privately applied V75 proposal; disabling the two parent guards produces two intended assertion failures; restoring them returns all5 append-only cases to PASS. Production V75 and permissions remain the next separate increment; no package or acceptance promotion.
+
+- Verify merged CI changes with successful full main builds 40237056066/40237188334 and the actual Linux scoped reactor command, including application/process tests. Preserve the failed Windows-native and initial container-network attempts as limitations, not passing evidence.
+
 - Preserve LF checkout bytes for the SHA-256-pinned V75 proposal fixture. A Linux build from a Windows checkout reproduced a hash mismatch caused by CRLF conversion; the stored proposal and its expected digest are unchanged.
 
 - Integrate the scoped-CI proposal from PR62 with conservative fixes: only Markdown prose skips Maven; unknown module/source paths, test-source changes, the acceptance gate's oa-testkit module and executable documentation fixtures force a full build. Include both sides of renames and fall back to a full build for missing scope output. Run the resolved-dependency policy only with a full reactor because scoped builds lack its required per-module files. Pull requests retain generated-document, compose and Python checks; main always runs the full build and acceptance/dependency checks. Scope selection has 12 regression tests, including an actual Git rename; all 88 Python tests pass locally.

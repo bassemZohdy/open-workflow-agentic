@@ -13,7 +13,7 @@
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
       "date": "2026-10-26",
-      "baseline_commit": "4f3032a3510f484218a259ab482a2173f7f1957c",
+      "baseline_commit": "63291fa432b251d8b2533b6c1488a019fa8cecef",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -2716,7 +2716,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-26",
-    "status": "PR55/57/58/60/61 are integrated on main. CI proposal PR62 is integrated through PR63, merged as main4f3032a after exact Claude PASS at1396bd4 (6403683125) and full build40236424166 SUCCESS: Maven, acceptance consistency, dependency policy and Python88 inspected. Scope selection is conservative for renames, missing output, test sources, oa-testkit and unknown inputs; the pinned V75 proposal fixture now preserves LF bytes across checkouts. Postmerge full main check and local Linux scoped-build completion remain pending. No open PR remains. Next WP108 increment: reviewed V75 migration activation, dedicated writer/read grants and migration-first/least-privilege proof, with Claude-owned audit fixtures updated before activation. Central appendOnce remains unactivated; current authority/execution, Flow/output, recovery and package acceptance remain separately gated. No package or acceptance promotion.",
+    "status": "CI PR62/63 merged as main 4f3032a after exact Claude PASS at 1396bd4 (6403683125) and full build 40236424166. Postmerge main build 40237056066 and tracking build 40237188334 passed; the actual Linux scoped reactor command also passed without test exclusions (6403972943). Claude audit fixture PR64 started at ef35eec; GPT requested changes for child-guard masking, then passed exact corrected 6610bf1 (6403925367): 31 PostgreSQL16 tests pass with V74 and with V75 discoverable/applied only in a private review database, both missing-parent-guard mutations fail as intended, and all5 append-only tests pass after restoration. Required full build 40237862668 passed; PR64 merged as main 63291fa. Postmerge verification is pending. No open PR remains. Next GPT WP108 increment: activate the agreed V75 migration and prove fresh/nonempty upgrade, retained references and dedicated writer/read permissions against the real migration path. Fixture prerequisite is merged; production V75, CDI/datasource adoption, current authority/execution, Flow/output, recovery and package acceptance remain separately gated. No package or acceptance promotion.",
     "agents": [
       {
         "id": "GPT",
