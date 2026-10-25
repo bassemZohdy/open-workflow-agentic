@@ -12,8 +12,9 @@ import org.junit.jupiter.api.Test;
 /**
  * Append-only below the application (M15): plain SQL cannot UPDATE, DELETE or TRUNCATE the audit tables, and the
  * rejection comes from the trigger, not from a missing privilege (the test runs as the table owner). Parent TRUNCATE
- * probes also name audit.source_binding when that retained child table exists (it holds foreign keys to the parents,
- * which would otherwise stop the statement earlier with 0A000), and always run in a transaction that rolls back.
+ * probes list the parent first and then audit.source_binding when that retained child table exists (its foreign keys
+ * would otherwise stop the statement earlier with 0A000). Triggers fire in statement order, so the error must name the
+ * parent: a removed parent guard would surface the child's error instead and fail. They always roll back.
  */
 class AppendOnlyTest {
 
@@ -40,8 +41,9 @@ class AppendOnlyTest {
     @Test
     void truncateOfTheEventTableFails() throws SQLException {
         seedChain();
-        SQLException error = assertThrows(SQLException.class, () -> executeRolledBack(truncate("audit.event")));
+        SQLException error = assertThrows(SQLException.class, () -> executeRolledBack(truncate("event")));
         assertRejected(error);
+        assertNamesTable(error, "event");
     }
 
     @Test
@@ -51,7 +53,9 @@ class AppendOnlyTest {
                 "update audit.head_log set hash = repeat('a', 64) where chain_id = '" + chain + "'")));
         assertRejected(assertThrows(SQLException.class, () -> execute(
                 "delete from audit.head_log where chain_id = '" + chain + "'")));
-        assertRejected(assertThrows(SQLException.class, () -> executeRolledBack(truncate("audit.head_log"))));
+        SQLException truncated = assertThrows(SQLException.class, () -> executeRolledBack(truncate("head_log")));
+        assertRejected(truncated);
+        assertNamesTable(truncated, "head_log");
     }
 
     @Test
@@ -70,9 +74,13 @@ class AppendOnlyTest {
         assertTrue(error.getMessage().contains("append-only"), error.getMessage());
     }
 
-    /** TRUNCATE of the parent, together with audit.source_binding when the shared database has it. */
+    /** TRUNCATE of the parent first, then audit.source_binding when the shared database has it. */
     private static String truncate(String parent) throws SQLException {
-        return sourceBindingExists() ? "truncate audit.source_binding, " + parent : "truncate " + parent;
+        return "truncate audit." + parent + (sourceBindingExists() ? ", audit.source_binding" : "");
+    }
+
+    private static void assertNamesTable(SQLException error, String table) {
+        assertTrue(error.getMessage().contains("audit table " + table + " is append-only"), error.getMessage());
     }
 
     private static boolean sourceBindingExists() throws SQLException {
