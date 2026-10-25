@@ -1,0 +1,86 @@
+{
+  "reviewHead": "a01b8e15cf2e9b214dfca9bd8f66165be073a7b4",
+  "runId": 40245351968,
+  "artifactId": 12617854320,
+  "archiveBytes": 2053700,
+  "archiveSha256": "e31b0752444b4d1adf6904f5ebe4d2ac10827042d7f3b990a05287fa964cd1e5",
+  "actualCheckoutSha": "fb5f20900296c6d8d0235f203f347e0e59a4d610",
+  "testedTree": "b4a2e96c4c1da17c51c00958365270db5fcfd81f",
+  "xmlSuites": 170,
+  "totals": {
+    "tests": 1183,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "requiredMethods": {
+    "ResearchCheckpointSchemaTest": [
+      "freshProfileMatchesPinnedResourcesAndRepeatedAdoptionKeepsIdentity",
+      "partialProfileIsRefusedWithoutCompletingOrResettingIt",
+      "incompatibleColumnsDefaultsAndKeysRefuseWithoutRepairingHistory",
+      "inheritedParentsAndDescendantsCannotExtendTheCheckpointQueryProfile",
+      "shadowedNamespacesAndNonTableRelationsRefuseBeforeAdoption",
+      "actualPinnedSaverStillInsertsReadsUpdatesAndReleasesWithoutCreatingTables",
+      "anActiveWriterMakesAdoptionFailImmediatelyWithoutChangingItsHistory",
+      "compatibleLegacyHistoryRetainsPrivateTextPhysicalIdsAndConstraintObjects",
+      "requiredIndexSemanticsAndAdditionalUniquenessCannotBeSilentlyAdopted",
+      "policyTriggersAndChecksOutsideThePinnedProfileAreNotRemovedOrBypassed"
+    ],
+    "ResearchCheckpointMigrationTest": [
+      "partialLegacyProfileRefusesMigrationWithoutCompletingOrResettingIt",
+      "nonemptyVendorProfileKeepsPhysicalHistoryAndSupportsRealUpdatesAndRelease",
+      "exactGrantTemplateSupportsMutableSaverButRefusesReaderWritesDdlAndOtherStores",
+      "freshFlywayMigrationOwnsTheProfileBeforeTheSaverWrites"
+    ],
+    "ResourceBindingsDefaultWiringTest": [
+      "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired"
+    ],
+    "ResourceExecutionContractTest": [
+      "executionAndOutcomeFingerprintsMatchIndependentPythonVectors",
+      "outcomeChecksFullEntryThreadAndBothPhysicalIdsBeforePrivateDataMatch",
+      "outcomeDoesNotAdmitUnknownProfilesOrMalformedDataAndFingerprintsBindPhysicalIds",
+      "executionEpochDoesNotBecomeANewCallOrThreadAndTheFullContractStillDiffers"
+    ],
+    "ResearchOutputEncodingTest": [
+      "actualObjectStreamStateIsCanonicalStoredBase64AcceptedByTheSharedFingerprint"
+    ],
+    "AuditSourceBindingMigrationTest": [
+      "freshMigrationSupportsConcurrentExactRetriesAndRejectsChangedSource",
+      "exactDeploymentGrantsAllowAppendAndReadButRefuseMutationDdlAndLedgerAccess",
+      "anUnexpectedPreexistingSourceTableFailsMigrationWithoutChangingRetainedData",
+      "upgradingNonemptyV74PreservesEventsWithoutInventingSourceBackfill",
+      "appliedSchemaRefusesForgedIdentityAndReceiptsAndRetainsOneEventPerSource",
+      "appliedSourceGuardsRejectOwnerMutationAndAlwaysRollbackTruncate"
+    ],
+    "AuditAppendOnceTest": [
+      "aSourceWhoseContentIsNotTheDraftsFingerprintOrWhoseTimeIsFinerThanAMicrosecondAppendsNothing",
+      "concurrentLostRepliesThroughASmallPoolAllConfirmWithoutSpareConnections",
+      "retainedReferencesAndAppendOnlyGuardsRefuseChangeDeleteAndTruncate",
+      "sourceLocksAndChainLocksUseSeparateKeyspacesSoCrossedNamesNeverDeadlock",
+      "differentTransitionsAndSequencesOfOneKeyAreDistinctSources",
+      "aFailedCommitThatDidNotHappenIsUncertainNotAbsenceAndTheSameSourceThenSucceedsOnce",
+      "theSelectInsertRoleCanAppendOnceButNotChangeAnythingAndWithoutBindingInsertNothingIsStored",
+      "theSameSourceWithChangedContentIdActorOrChainIsAConflictAndAppendsNothing",
+      "anExactDuplicateReturnsTheOriginalReceiptWithoutANewEventTimeIdSequenceOrHead",
+      "aNewSourceStoresEventHeadAndBindingTogetherAndReturnsAMatchingReceipt",
+      "sameSourceContendedAcrossChainsHasExactlyOneWinnerAndNothingOnTheLosersChains",
+      "aLostReplyWhoseReadbackAlsoFailsIsUncertainEvenThoughTheEventWasCommitted",
+      "sixteenConcurrentIdenticalCallsStoreOneEventAndEveryCallerGetsTheSameReceipt",
+      "aMissingBindingSchemaIsAStoreFailureAndAppendsNoEvent",
+      "aLostCommitReplyAfterARealCommitIsConfirmedByReadbackAndReturnsTheReceipt",
+      "ordinaryAppendsAndAppendOnceOnOneChainStayGapFreeAndLinked",
+      "corruptRetainedHistoryIsAStoreFailureNotAReceiptNotAConflictAndNotAbsence",
+      "aForgedEventResealedConsistentlyWithItsHeadAndBindingStillFailsTheContentCheck",
+      "aFailureAtAnyStepRollsBackTheEventTheHeadAndTheBinding",
+      "anEventIdAlreadyUsedByAnotherSourceOrByAnOrdinaryAppendIsAConflict",
+      "anUnreachableDatabaseIsAStoreFailure",
+      "aLostReplyIsConfirmedThroughAPoolOfOneBecauseTheFailedConnectionIsReleasedFirst"
+    ],
+    "EffectCrashRecoveryIT": [
+      "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+    ]
+  },
+  "caseCount": 24,
+  "migrationSha256": "7e1632c7f6fc25ba59eb4c07fbc02e348a0dd24a6b71d73f26981bd720a396f3",
+  "pinnedDdlSha256": "f25ce808c4bf2dcca9bd23be68fcdbc374068721a0901477c886ba85e116552d"
+}

@@ -74,3 +74,22 @@ After this migration has exact peer review, current CI and merged evidence:
 V76 entry/backend/current composite fence and later producer delivery are not
 activated here. Exact Claude review, current CI and integration are pending.
 WP-108 and acceptance remain partial.
+
+## Integrated result and consumer handoff ready
+
+PR67 exact a01b8e15cf2e9b214dfca9bd8f66165be073a7b4 merged as main
+b02875f6d00f28d2d837505b56160db70c2dec48. Claude PASS6405038545 independently
+reran all14 focused methods and inspected the24-case report. Full40245351968
+passed. GPT inspected actual artifact12617854320 (2053700 bytes, SHA256
+e31b0752444b4d1adf6904f5ebe4d2ac10827042d7f3b990a05287fa964cd1e5), all170
+XML suites/1183 cases with zero failures/errors/skips, required method sets and
+24-case report. Actual checkout fb5f20900296c6d8d0235f203f347e0e59a4d610 has the
+same tested tree as the reviewed head and the merge; no execution is relabeled.
+See evidence/WP-108-checkpoint-profile/current-ci.json. Postmerge check is pending.
+
+The owned consumer steps above are now unblocked. Claude must not call Flyway or
+execute adoption/creation DDL from ResearchAgent as a startup workaround: current
+profile checks are read-only and must refuse missing/incompatible storage even
+when migration history already exists. Request any shared lifecycle/configuration
+support through GPT. Keep graph entry/current authority and data-source deployment
+gated. No package/acceptance promotion.
