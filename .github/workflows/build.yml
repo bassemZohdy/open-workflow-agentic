@@ -2,6 +2,10 @@ name: build
 on:
   push: { branches: [main] }
   pull_request:
+# A newer commit on the same pull request supersedes the running build. Pushes to main are never cancelled.
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -14,6 +18,17 @@ jobs:
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Decide how much of the build this change needs (pushes to main always build everything)
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            python3 tools/ci_scope.py "origin/${{ github.base_ref }}" | tee -a "$GITHUB_OUTPUT"
+          else
+            echo mode=full | tee -a "$GITHUB_OUTPUT"
+          fi
       - name: Generated requirement documents are up to date
         run: python3 tools/render_requirements.py --check
       - name: Dev compose file is valid
@@ -21,12 +36,19 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '21', cache: maven }
       - name: Build and test all modules (module boundaries and API conventions are checked here)
+        if: steps.scope.outputs.mode != 'modules' && steps.scope.outputs.mode != 'docs'
         run: mvn -B verify
+      - name: Build and test only the changed modules, what they need and what depends on them
+        if: steps.scope.outputs.mode == 'modules'
+        run: mvn -B verify -pl "${{ steps.scope.outputs.modules }}" -am -amd
       - name: Acceptance status matches the build (no automated test regressed)
+        if: steps.scope.outputs.mode != 'modules' && steps.scope.outputs.mode != 'docs'
         run: >-
           java -cp "modules/oa-testkit/target/classes:$(cat modules/oa-testkit/target/classpath.txt)"
           io.github.bassemzohdy.openworkflow.agentic.testkit.acceptance.AcceptanceStatus --check
       - name: Dependency policy (module boundaries, licence allow-list)
+        # Scoped changes cannot alter dependency declarations. This checker needs every module's resolved list.
+        if: steps.scope.outputs.mode != 'modules' && steps.scope.outputs.mode != 'docs'
         run: python3 tools/check_dependency_policy.py
       - name: Dependency policy tests
         run: python3 -m unittest discover -s tools -p 'test_*.py' -v

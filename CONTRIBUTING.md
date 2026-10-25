@@ -34,6 +34,14 @@ java -cp "modules/oa-testkit/target/classes:$(cat modules/oa-testkit/target/clas
 
 CI runs the same checks (see `.github/workflows/build.yml`); the policy check needs the output of `mvn verify`.
 
+Pull requests that change only Markdown prose outside `docs/plan` and `docs/requirements` skip Maven.
+Changes confined to module `src/main/` trees build the selected modules and their Maven prerequisites and dependants.
+Test-source changes, unknown source roots and all changes to the acceptance gate's host module (`oa-testkit`)
+run the full build, including the acceptance-status check, before merge.
+Build files, executable documentation fixtures, tracking sources and unknown paths select the full build.
+Generated-document, compose and Python checks always run. Acceptance-status and resolved-dependency checks
+require all module outputs and run only with the full build; every push to main runs that full build.
+
 To run the application locally:
 
 ```bash
