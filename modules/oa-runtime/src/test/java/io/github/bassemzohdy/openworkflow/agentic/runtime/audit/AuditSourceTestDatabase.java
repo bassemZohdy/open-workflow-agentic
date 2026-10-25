@@ -15,15 +15,20 @@ import org.postgresql.ds.PGSimpleDataSource;
 
 /**
  * A private, throwaway PostgreSQL database for the central append-once tests. It is migrated with the module's real
- * Flyway scripts and then, when asked, with GPT's PROPOSED {@code V75__audit_source_binding.sql} (an exact copy of
- * the file at commit 4a45515d7910e77f604fec1b151631531f13ec7c, pinned by SHA-256 below). The proposal is not in
- * {@code db/migration}, so it never reaches the shared test database, and no migration number is allocated here.
+ * Flyway scripts up to the explicit pre-V75 foundation (target {@value #FOUNDATION_TARGET}) and then, when asked, with
+ * GPT's PROPOSED {@code V75__audit_source_binding.sql} (an exact copy of the file at commit
+ * 4a45515d7910e77f604fec1b151631531f13ec7c, pinned by SHA-256 below). Pinning the target keeps the proposal applied
+ * exactly once and keeps the missing-schema database genuinely without {@code audit.source_binding} even after a
+ * production V75 exists in {@code db/migration}. No migration number is allocated here.
  * The database is dropped when the JVM exits. Needs a role that may create databases (the CI and local {@code postgres}).
  */
 final class AuditSourceTestDatabase implements AutoCloseable {
 
     static final String PROPOSAL_RESOURCE = "/audit/proposed/V75__audit_source_binding.sql";
     static final String PROPOSAL_SHA256 = "e9fc5598d64a0496d23001c6c4b381fd1f483d420839e6344efad9743f53d471";
+
+    /** The last migration before the audit source binding; later production migrations are not applied here. */
+    static final String FOUNDATION_TARGET = "74";
 
     private final String name = "oa_audit_src_" + UUID.randomUUID().toString().replace("-", "");
     private final DataSource data;
@@ -36,7 +41,7 @@ final class AuditSourceTestDatabase implements AutoCloseable {
         }
         Runtime.getRuntime().addShutdownHook(new Thread(this::dropQuietly));
         PGSimpleDataSource ds = plain(name);
-        Flyway.configure().dataSource(ds).locations("classpath:db/migration").load().migrate();
+        Flyway.configure().dataSource(ds).locations("classpath:db/migration").target(FOUNDATION_TARGET).load().migrate();
         if (withProposal) {
             try (Connection c = ds.getConnection(); Statement s = c.createStatement()) {
                 s.execute(proposal());
@@ -51,7 +56,7 @@ final class AuditSourceTestDatabase implements AutoCloseable {
         return new AuditSourceTestDatabase(true);
     }
 
-    /** The migrated schema only: no {@code audit.source_binding}. */
+    /** The pre-V75 foundation only (target 74): no {@code audit.source_binding}, even once production V75 exists. */
     static AuditSourceTestDatabase withoutProposedV75() {
         return new AuditSourceTestDatabase(false);
     }
