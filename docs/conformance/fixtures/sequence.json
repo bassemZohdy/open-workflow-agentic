@@ -1,0 +1,24 @@
+{
+  "document": {
+    "dsl": "1.0.3",
+    "namespace": "portable",
+    "name": "sequence",
+    "version": "0.1.0"
+  },
+  "do": [
+    {
+      "begin": {
+        "set": {
+          "status": "started"
+        }
+      }
+    },
+    {
+      "finish": {
+        "set": {
+          "status": "completed"
+        }
+      }
+    }
+  ]
+}

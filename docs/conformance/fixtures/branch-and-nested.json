@@ -1,0 +1,55 @@
+{
+  "document": {
+    "dsl": "1.0.3",
+    "namespace": "portable",
+    "name": "branch-and-nested",
+    "version": "0.1.0"
+  },
+  "do": [
+    {
+      "choose": {
+        "switch": [
+          {
+            "positive": {
+              "when": ".value > 0",
+              "then": "positiveBranch"
+            }
+          },
+          {
+            "otherwise": {
+              "then": "negativeBranch"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "positiveBranch": {
+        "do": [
+          {
+            "positiveValue": {
+              "set": {
+                "sign": "positive"
+              }
+            }
+          }
+        ],
+        "then": "exit"
+      }
+    },
+    {
+      "negativeBranch": {
+        "do": [
+          {
+            "negativeValue": {
+              "set": {
+                "sign": "non-positive"
+              }
+            }
+          }
+        ],
+        "then": "exit"
+      }
+    }
+  ]
+}

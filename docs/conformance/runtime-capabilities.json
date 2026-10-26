@@ -1,0 +1,14 @@
+{
+  "quarkus-flow": {
+    "supported": [],
+    "unsupported": []
+  },
+  "langgraph": {
+    "supported": [],
+    "unsupported": []
+  },
+  "google-adk": {
+    "supported": [],
+    "unsupported": []
+  }
+}

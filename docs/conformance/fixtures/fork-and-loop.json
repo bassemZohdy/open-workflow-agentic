@@ -1,0 +1,54 @@
+{
+  "document": {
+    "dsl": "1.0.3",
+    "namespace": "portable",
+    "name": "fork-and-loop",
+    "version": "0.1.0"
+  },
+  "do": [
+    {
+      "check": {
+        "fork": {
+          "compete": true,
+          "branches": [
+            {
+              "branchA": {
+                "set": {
+                  "selected": "a"
+                }
+              }
+            },
+            {
+              "branchB": {
+                "set": {
+                  "selected": "b"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "loop": {
+        "for": {
+          "each": "item",
+          "in": [
+            1,
+            2,
+            3
+          ]
+        },
+        "do": [
+          {
+            "mark": {
+              "set": {
+                "visited": "true"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
