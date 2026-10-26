@@ -1,5 +1,9 @@
 # Changelog
 
+- Merge grant-expiry81 (3ba7f77), governed Running/JDBC bounds82 (40d8d7c) and zero-model-budget83 (8727e71) after exact reciprocal reviews and verified current CI. Combined main8727e71 passes1331 cases, including enabled native model-policy checks. Retain source/receipt data and callback uncertainty; production root, approved reservations, actual Flow/async/recovery and acceptance remain partial.
+
+- Canonical DATA lookup80 merged891442d after exact Claude review and full1297; combined main1304 verified. Audit child fixture84 is independently reviewed with34 passing; V77 facts candidate has41 private schema checks and pending Claude review. Neither is merged yet.
+
 - Merge exact credential-pairing PR79 as34e2fbb after GPT PASSf06ebee, independent49 and inspected full1298 plus real-provider CI. A derived rb1 fingerprint remains historical data; production pairing requires the full private binding match. Canonical DATA lookup80 is reviewed at1cf1862 with independent42; current CI is pending. Planning prose now reflects actual merged components and open production/preview/recovery gates; no package or acceptance promotion.
 
 - Merge callback gate PR78 asaf9d7e2 after exact Claude PASS04c55a1/independent67 and inspected full40351776875:1291 cases with no failures/errors/skips. Preserve exact fresh-ack callback, retained/unknown refusal, bounded synchronous close/worker behavior and actual ambient JTA proof. No production graph/composite activation; next exact-credential pairing/data lookup and full producer/node/output/async/current-authority gates remain open.

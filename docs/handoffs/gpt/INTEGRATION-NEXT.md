@@ -1,11 +1,12 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline: main `891442d5de294f2d4c4cdd730392b303dac2229d` (2026-10-26).
-V76 facts #74, live identity #77, JDBC fresh-entry gate #78, credential pairing #79 and canonical DATA lookup #80
-are merged after exact peer review and inspected current CI. Combined main run40358554282 passed179 suites/1304 cases
-with zero failures/errors/skips; retained archive SHA-256 and CRC verified. Grant-expiry #81 has GPT exact PASS0026a96
-and independent88; current CI is pending. GPT governed Running control/JDBC bounds/root restrictions are in progress.
-These are partial internal components; production composition remains absent. Counts remain
+Current implementation baseline: main `8727e7169f0633ec59d13ed8258faab7f852f99e` (2026-10-26).
+V76 facts #74, identity #77, gate #78, pairing #79, canonical lookup #80, grant-expiry #81,
+governed Running/JDBC bounds #82 and zero-budget refusal #83 are merged after exact peer review and inspected CI.
+Combined main40372935209 passed183 suites/1331 cases with no failures/errors/skips; archive digest/CRC and actual
+checkout verified. Audit child fixture #84 has GPT exacte2b2911 PASS/independent34 and pending CI.
+GPT V77 audit-facts candidate2dbba71 has private schema41 passing and Claude review pending; it must wait for84.
+These remain internal partial components; production composition is absent. Counts remain
 11 completed/12 partial/30 not started, acceptance3/39. Packaged identity recovery remains open as [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75),
 and the supported-versus-preview identity profile decision is [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76).
 This is the integration queue, not proof of work-package closure.
@@ -92,7 +93,7 @@ component callback tests are not graph or package closure.
 ## Following ordered gates
 
 The checkpoint consumer/schema boundary and data-only V76 are merged; production composition is still absent.
-V77 producer/delivery, V78 allocation, V79 model reservations and V80 manual decisions remain
+V77 facts are an unmerged candidate; producer/delivery, V78 allocation, V79 model reservations and V80 manual decisions remain
 later preparations, not active main features.
 
 Canonical original scope/full owner, one irreversible fresh entry acknowledgement,
@@ -103,3 +104,15 @@ cannot permit another graph run or private output release.
 
 Existing WP112 and WP605 preparation stays parked behind this integration queue.
 No package is promoted merely because preparation or a component test exists.
+
+### Latest implementation evidence
+
+- Grant-expiry81: [exact review/current CI](evidence/WP-102-grant-expiry-after-io/current-ci.json),
+  post-blocking expiry only, not atomic revocation.
+- Governed Running82: [exact review/current CI](evidence/WP-108-governed-running-control/current-ci.json),
+  [combined main1329](evidence/WP-108-governed-running-control/combined-main.json). Construction rule covers app-runtime
+  and its production dependencies; any additional app depending on runtime needs its own guard. Review the future
+  root and its allowlist together. Static-call rules are not reflection security boundaries.
+- Zero-budget83: [exact review/current CI](evidence/WP-103-zero-model-budget/current-ci.json),
+  [combined main1331](evidence/WP-103-zero-model-budget/combined-main.json). Positive counters are not reservations;
+  default approved context is still empty.

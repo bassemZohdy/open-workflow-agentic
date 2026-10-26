@@ -13,7 +13,7 @@
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
       "date": "2026-10-26",
-      "baseline_commit": "34e2fbbdad487ebc2ae83badb0683c0695d7bf83",
+      "baseline_commit": "8727e7169f0633ec59d13ed8258faab7f852f99e",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -2744,7 +2744,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-26",
-    "status": "Merged V76 facts74/561c691, synchronous identity77/53eb019 and JDBC callback gate78/af9d7e2 remain evidenced partial components. Credential pairing79 merged34e2fbb after exact GPT PASSf06ebee/6420748281, independent49 and inspected full40355128259 (178 suites/1298 cases), real-provider40355128393 (standard3/delegation8 plus pairing7/gate17, no failures/errors/skips). Raw digests/CRC and exact identity source paths verified. Canonical DATA lookup80 merged891442d: Claude exact PASS1cf1862/6421037124 and independent42; inspected full40356684083 passed1297. Combined main40358554282 passed179 suites/1304 cases, zero failures/errors/skips, artifact12668061135 digest/CRC verified. Grant-expiry81 exact0026a96 has GPT PASS/independent88 and pending CI. GPT governed Running control/JDBC bounds/root restriction tests are in progress, not merged. No hash or returned binding is permission: production root must compare FULL row with SAME private admitted credential through the 4-arg live check. Server-trusted workload/target/task mapping, current registry/full owner/task/lease/PDP/central audit, JDBC timeouts/root restrictions, actual Flow/graph/node/output/terminal association and private async/recovery remain gates. Default admission/model allowance remains absent, V77..V80 reserved, issues75/76 open; WP108/WP102 and acceptance stay partial",
+    "status": "V76 facts74 and internal identity77/gate78/pairing79/canonical DATA lookup80 are merged with exact peer/current CI evidence. Grant-expiry81 merged3ba7f77 after GPT exact0026a96 PASS/independent88 and inspected full1311 plus real-provider profiles. Governed Running/JDBC bounds82 merged40d8d7c after Claude exact6c66474 PASS/independent60 and inspected full1322 plus provider profiles; its earlier application scan finding is fixed. Zero-model-budget83 merged8727e71 after GPT exacta8698d8 PASS/independent33 non-native and inspected Linux full1313, including all14 model tests and enabled native case. Combined main40372935209 at8727e71 passed183 XML suites/1331 cases, zero failures/errors/skips; archive SHA/CRC and actual checkout verified. Audit child fixture84 exacte2b2911 has GPT PASS/independent34 and pending full CI. GPT V77 audit-facts candidate2dbba71 has private schema41 passing and Claude review pending; it must wait for84 before activation. Retained binding/source/receipt data never grants authority. Production root, trusted workload/target/task mapping, coherent current registry/full owner/task/lease/PDP/central audit, approved reservation source, actual Flow/node/output/terminal association and async/recovery remain gates. Defaults still refuse, V77 is unmerged and V78..V80 remain reserved; issues75/76 stay open. WP108/WP102 and acceptance remain partial.",
     "agents": [
       {
         "id": "GPT",
