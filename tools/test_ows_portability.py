@@ -31,6 +31,20 @@ class InventoryTests(unittest.TestCase):
         obj = mod.load_json(FIXTURES / "fork-and-loop.json")
         self.assertEqual(["for", "fork", "fork:compete", "set"], mod.inventory(obj))
 
+    def test_official_1_0_3_for_expression_and_extension_list_shapes(self):
+        doc = mod.load_json(FIXTURES / "fork-and-loop.json")
+        self.assertEqual(".items", doc["do"][1]["loop"]["for"]["in"])
+        doc["do"][1]["loop"]["for"]["in"] = [1, 2, 3]
+        with self.assertRaises(mod.FixtureError):
+            mod.inventory(doc)
+        doc = mod.load_json(FIXTURES / "sequence.json")
+        doc["use"] = {"extensions": [{"custom-step": {"description": "pass"}}]}
+        self.assertIn("extension:custom-step", mod.inventory(doc))
+        for invalid in ({"custom-step": {}}, [{"x": {}, "y": {}}], [{"x": {}}, {"x": {}}]):
+            doc["use"]["extensions"] = invalid
+            with self.assertRaises(mod.FixtureError):
+                mod.inventory(doc)
+
     def test_unknown_task_and_mixed_task_kinds_fail_closed(self):
         doc = mod.load_json(FIXTURES / "sequence.json")
         doc["do"][0]["begin"] = {"javascript": "println()"}

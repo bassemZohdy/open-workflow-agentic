@@ -80,8 +80,8 @@ def _task_list(items, path, features):
             _task_list(body["do"], where + "/do", features)
         elif kind == "for":
             iterator = _object(body["for"], where + "/for")
-            if "in" not in iterator or not isinstance(body.get("do"), list):
-                raise FixtureError(f"{where}: for task needs in and ordered do")
+            if not isinstance(iterator.get("in"), str) or not iterator["in"].strip() or not isinstance(body.get("do"), list):
+                raise FixtureError(f"{where}: for.in must be an OWS expression string, and do an ordered task list")
             _task_list(body["do"], where + "/do", features)
             if "while" in body:
                 features.add("for:while")
@@ -148,8 +148,19 @@ def inventory(document):
     if "use" in document:
         use = _object(document["use"], "use")
         if "extensions" in use:
-            extensions = _object(use["extensions"], "use.extensions")
-            features.update("extension:" + name for name in extensions)
+            extensions = use["extensions"]
+            if not isinstance(extensions, list):
+                raise FixtureError("use.extensions: expected a list of one-name objects")
+            names = set()
+            for index, entry in enumerate(extensions):
+                entry = _object(entry, f"use.extensions[{index}]")
+                if len(entry) != 1:
+                    raise FixtureError(f"use.extensions[{index}]: expected one named extension")
+                name = next(iter(entry))
+                if not name or name in names:
+                    raise FixtureError("use.extensions: empty or duplicate name")
+                names.add(name)
+                features.add("extension:" + name)
     return sorted(features)
 
 
