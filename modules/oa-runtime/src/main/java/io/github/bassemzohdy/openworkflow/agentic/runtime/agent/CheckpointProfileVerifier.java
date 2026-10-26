@@ -62,6 +62,8 @@ public final class CheckpointProfileVerifier {
         }
     }
 
+    private static final String SUPPORTED_NAMESPACE = "public";
+
     private static final int QUERY_TIMEOUT_SECONDS = 5;
 
     private record Col(String type, boolean notNull, String defaultValue) { }
@@ -139,16 +141,33 @@ public final class CheckpointProfileVerifier {
         }
     }
 
+    /**
+     * Refuses a configured checkpoint namespace other than {@code public} (the only supported profile), before any
+     * connection is taken. There is no fallback to another schema and no data-source derived substitute.
+     *
+     * @throws CheckpointProfileException {@link Reason#NAMESPACE} for null, blank or any value but {@code public}
+     */
+    public static void requireSupportedNamespace(String configured) {
+        if (!SUPPORTED_NAMESPACE.equals(configured)) {
+            throw new CheckpointProfileException(Reason.NAMESPACE, null);
+        }
+    }
+
     private static void check(Connection c) throws SQLException {
         lock(c);
         long thread;
         long checkpoint;
         long namespace;
-        try (PreparedStatement s = statement(c, "select to_regclass('public.lg4jthread')::oid,"
-                + " to_regclass('public.lg4jcheckpoint')::oid, to_regnamespace('public')::oid,"
-                + " current_schema() is not distinct from 'public',"
-                + " to_regclass('lg4jthread') is not distinct from to_regclass('public.lg4jthread'),"
-                + " to_regclass('lg4jcheckpoint') is not distinct from to_regclass('public.lg4jcheckpoint')");
+        // every function and type is schema-qualified: the search path ends in pg_catalog, so a function or type of
+        // an earlier schema must not be able to answer in place of the catalog's
+        try (PreparedStatement s = statement(c, "select pg_catalog.to_regclass('public.lg4jthread')::pg_catalog.oid,"
+                + " pg_catalog.to_regclass('public.lg4jcheckpoint')::pg_catalog.oid,"
+                + " pg_catalog.to_regnamespace('public')::pg_catalog.oid,"
+                + " pg_catalog.current_schema() is not distinct from 'public',"
+                + " pg_catalog.to_regclass('lg4jthread')"
+                + "   is not distinct from pg_catalog.to_regclass('public.lg4jthread'),"
+                + " pg_catalog.to_regclass('lg4jcheckpoint')"
+                + "   is not distinct from pg_catalog.to_regclass('public.lg4jcheckpoint')");
                 ResultSet rs = s.executeQuery()) {
             rs.next();
             thread = rs.getLong(1);
@@ -195,7 +214,7 @@ public final class CheckpointProfileVerifier {
     }
 
     private static void relations(Connection c, long thread, long checkpoint, long namespace) throws SQLException {
-        try (PreparedStatement s = statement(c, "select count(*) from pg_catalog.pg_class where oid in (?,?)"
+        try (PreparedStatement s = statement(c, "select pg_catalog.count(*) from pg_catalog.pg_class where oid in (?,?)"
                 + " and relkind = 'r' and relpersistence = 'p' and relnamespace = ? and not relrowsecurity"
                 + " and not relforcerowsecurity and not relhasrules")) {
             s.setLong(1, thread);
@@ -233,8 +252,8 @@ public final class CheckpointProfileVerifier {
     private static Map<String, Short> columns(Connection c, long thread, long checkpoint) throws SQLException {
         Map<String, Short> attnums = new HashMap<>();
         try (PreparedStatement s = statement(c, "select r.relname || '.' || a.attname, a.attnum,"
-                + " pg_catalog.format_type(a.atttypid, a.atttypmod), a.attnotnull, a.attgenerated::text,"
-                + " a.attidentity::text, a.attcollation = t.typcollation,"
+                + " pg_catalog.format_type(a.atttypid, a.atttypmod), a.attnotnull, a.attgenerated::pg_catalog.text,"
+                + " a.attidentity::pg_catalog.text, a.attcollation = t.typcollation,"
                 + " pg_catalog.pg_get_expr(d.adbin, d.adrelid)"
                 + " from pg_catalog.pg_attribute a join pg_catalog.pg_class r on r.oid = a.attrelid"
                 + " join pg_catalog.pg_type t on t.oid = a.atttypid"
@@ -269,8 +288,8 @@ public final class CheckpointProfileVerifier {
         boolean primaryCheckpoint = false;
         int foreign = 0;
         boolean foreignOk = false;
-        try (PreparedStatement s = statement(c, "select conrelid, contype::text, conkey::text, confrelid,"
-                + " confkey::text, confdeltype::text, confupdtype::text, confmatchtype::text,"
+        try (PreparedStatement s = statement(c, "select conrelid, contype::pg_catalog.text, conkey::pg_catalog.text, confrelid,"
+                + " confkey::pg_catalog.text, confdeltype::pg_catalog.text, confupdtype::pg_catalog.text, confmatchtype::pg_catalog.text,"
                 + " not condeferrable and not condeferred and convalidated"
                 + " from pg_catalog.pg_constraint where conrelid in (?,?)")) {
             s.setLong(1, thread);
@@ -318,12 +337,12 @@ public final class CheckpointProfileVerifier {
         int checkpointUnique = 0;
         try (PreparedStatement s = statement(c, "select x.relname, i.indrelid, x.relnamespace, am.amname,"
                 + " i.indisvalid and i.indisready and i.indimmediate and not i.indisprimary,"
-                + " i.indisunique, i.indnullsnotdistinct, i.indnkeyatts, i.indnatts, i.indkey::text,"
-                + " i.indoption::text, i.indexprs is not null, pg_catalog.pg_get_expr(i.indpred, i.indrelid),"
+                + " i.indisunique, i.indnullsnotdistinct, i.indnkeyatts, i.indnatts, i.indkey::pg_catalog.text,"
+                + " i.indoption::pg_catalog.text, i.indexprs is not null, pg_catalog.pg_get_expr(i.indpred, i.indrelid),"
                 + " (select o.opcname from pg_catalog.pg_opclass o where o.oid = i.indclass[0]"
-                + "   and o.opcnamespace = 'pg_catalog'::regnamespace and o.opcmethod = am.oid),"
+                + "   and o.opcnamespace = 'pg_catalog'::pg_catalog.regnamespace and o.opcmethod = am.oid),"
                 + " (select o.opcname from pg_catalog.pg_opclass o where o.oid = i.indclass[1]"
-                + "   and o.opcnamespace = 'pg_catalog'::regnamespace and o.opcmethod = am.oid),"
+                + "   and o.opcnamespace = 'pg_catalog'::pg_catalog.regnamespace and o.opcmethod = am.oid),"
                 + " i.indcollation[0] is not distinct from (select a.attcollation from pg_catalog.pg_attribute a"
                 + "   where a.attrelid = i.indrelid and a.attnum = i.indkey[0]),"
                 + " i.indnkeyatts < 2 or i.indcollation[1] = 0"

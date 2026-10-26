@@ -24,6 +24,27 @@ GPT must still review all evidence, and run `40246336207` stays unresolved.
   not run`. No SQL, catalog value or database message is shown. The default legacy admission, DS/credentials and
   authority/producer/backend gates are untouched.
 
+## Review round 2 (GPT exact-head review of 5cc93b4)
+
+- Configured namespace: `ResearchAgent` now reads the existing `agentic.agent.checkpoint-schema` key
+  (`@ConfigProperty`, no default, no `application.properties` change). `CheckpointProfileVerifier.requireSupportedNamespace`
+  accepts only the exact string `public` and refuses anything else (null, blank, case or whitespace variants, other
+  schemas) as `namespace` at startup, `build()` and `run()`, before any connection is taken. No data-source fallback.
+  Manual unit fixtures set `agent.checkpointSchema = "public"` explicitly; there is no production bypass.
+- Catalog qualification: every function and type reference in the catalog SQL is now `pg_catalog`-qualified
+  (`pg_catalog.current_schema`, `to_regclass`, `to_regnamespace`, `count`, `::pg_catalog.oid/text/regnamespace`). Not
+  covered: operators (`=`, `||`, `in`) are still resolved through the search path; qualifying them with
+  `OPERATOR(pg_catalog.=)` was not requested and not done.
+- Negative control `shadowedCatalogFunctionsCannotMakeAShadowSchemaPassAsPublic` (private PG16 database): valid public
+  profile, owned `shadow` schema with wrong `lg4jthread`/`lg4jcheckpoint`, `shadow.current_schema()` returning `public`
+  and `shadow.to_regclass(text)` forwarding to `pg_catalog.to_regclass` of the public names, `search_path=shadow,public,
+  pg_catalog`. With the unqualified calls restored temporarily, this test failed ("nothing was thrown", i.e. the old
+  check accepted the store); with the qualified calls it is refused as namespace/shadow.
+- Also added: unsupported configured values refused at start/build/run with zero provider calls and no run entered, and
+  refusal before any connection is taken.
+- Java: the Java 21 path from the earlier message was not available to me in this session. I compiled and ran with the
+  installed JDK 25.0.2 (`maven.compiler.release=21`), so these results are not a Java 21 runtime result.
+
 ## Lock semantics
 
 The first statement of the check is `LOCK TABLE public.lg4jthread, public.lg4jcheckpoint IN ACCESS SHARE MODE NOWAIT`
@@ -48,14 +69,21 @@ The V75.1 writer-refusal rule is not carried over.
 - `AgentResourceAuthorityTest` +1 (503 with only the fixed code, zero graph runs). `AgentTestDatabase` gains a private
   database helper (`privateDatabase`); no oa-testkit dependency. `ResearchRunInspectorTest` no longer relies on the
   saver creating tables (the existing 25 tests are otherwise unchanged and pass).
-- Results: `CheckpointProfileConsumerTest` 26/26; `ResearchAgentCheckpointProfileTest` 7/7; `ResearchRunInspectorTest`
-  25/25; `AgentResource*Test` all pass. Whole `oa-runtime` plain run: 454 run, 42 errors, all Windows-environment:
-  39 Cedar native (`CedarPolicyDecisionPoint` init), 1 Cedar `UnsatisfiedLinkError`, 2 symlink-privilege
-  `FileSystemException` in `FileSecretProviderTest`. No failure involves this change.
+- Results of the earlier run (Windows, Java 21.0.12.1): `CheckpointProfileConsumerTest` 26/26;
+  `ResearchAgentCheckpointProfileTest` 7/7; `ResearchRunInspectorTest` 25/25; `AgentResource*Test` pass. The whole
+  `oa-runtime` suite was also attempted then: 454 run, 42 errors (39 Cedar native `CedarPolicyDecisionPoint` init, 1 Cedar
+  `UnsatisfiedLinkError`, 2 symlink-privilege `FileSystemException` in `FileSecretProviderTest`). Those 42 are attempted
+  tests that failed in the Windows environment, not passes, and the suite is not to be rerun on Windows. No error
+  involves this change, but nativeCedar-dependent tests were attempted and did not pass.
+- Results after round 2 (JDK 25.0.2, `--release 21`, PG16 on localhost; focused classes only):
+  `ResearchAgentCheckpointProfileTest` 10/10, `ResearchRunInspectorTest` 25/25, `GovernedLlmClientTest` 11/12 (the one error is
+  `theShippedDefaultsRefuseEverything`, the Cedar native `UnsatisfiedLinkError`, an environment failure that is not
+  a pass), `AgentResourceAuthorityTest` 4/4, `AgentResourceUserFreshnessTest` 3/3, `CheckpointProfileConsumerTest` 26/26.
 
 ## Not run / not claimed
 
-- No Quarkus (`@QuarkusTest`) or process tests, nativeCedar or full build on Windows. Existing app tests that boot the
+- No Quarkus (`@QuarkusTest`) or process tests or full build on Windows. Cedar-native tests were attempted in the
+  whole-suite run and errored (above); they are not passing evidence. Existing app tests that boot the
   application (for example `AgentResourceCallerTest`) now rely on a migrated database at startup; they are unrun here.
 - Real boot ordering (Flyway before the `StartupEvent` observer) is expected from Quarkus but not proven by me; GPT's
   packaged-process migration-first and current-history refusal proof owns that.
@@ -68,7 +96,8 @@ The V75.1 writer-refusal rule is not carried over.
 2. Verification is bounded to its own transaction and connection. It cannot certify other pooled connections' search
    paths or stop later administrator DDL, and the check-to-run gap is not closed (the lock is released before the graph
    runs). `run()` verifies, then `AgentResource.current()` has already judged authority just before.
-3. Each run adds one short read-only round trip (a lock plus six catalog queries).
+3. Each run adds several round trips in one short read-only transaction: the `LOCK` statement plus six separately
+   executed catalog queries (seven statements), not one round trip.
 4. The expected-reason table in the test must be extended deliberately when `mutations.json` gains an entry (the test
    fails otherwise).
 5. The query checks need PostgreSQL 15 or later (`indnullsnotdistinct`); the pinned database is 16.

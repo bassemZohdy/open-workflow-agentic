@@ -17,6 +17,7 @@ import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.checkpoint.PostgresSaver;
 import org.bsc.langgraph4j.serializer.std.ObjectStreamStateSerializer;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * Plan -> draft -> review agent as a LangGraph4j graph, embedded in the Quarkus application.
@@ -35,7 +36,19 @@ public class ResearchAgent {
     @Inject
     AgentOutputValidator outputValidator;
 
+    /**
+     * The configured checkpoint namespace. Only {@code public} is supported; any other value, or none, is refused
+     * before the store is touched. It selects nothing: the saver always uses the unqualified public tables.
+     */
+    @ConfigProperty(name = "agentic.agent.checkpoint-schema")
+    String checkpointSchema;
+
     private CompiledGraph<ResearchState> graph;
+
+    private void verifyStore() {
+        CheckpointProfileVerifier.requireSupportedNamespace(checkpointSchema);
+        CheckpointProfileVerifier.verify(dataSource);
+    }
 
     /**
      * Startup check, after the migrations of the application have run: a lazily created {@code @ApplicationScoped}
@@ -43,7 +56,7 @@ public class ResearchAgent {
      * the start; nothing is created or repaired here.
      */
     void onStart(@Observes StartupEvent event) {
-        CheckpointProfileVerifier.verify(dataSource);
+        verifyStore();
     }
 
     /**
@@ -52,7 +65,7 @@ public class ResearchAgent {
      */
     @PostConstruct
     void build() throws Exception {
-        CheckpointProfileVerifier.verify(dataSource);
+        verifyStore();
         var serializer = new ObjectStreamStateSerializer<>(ResearchState::new);
         var builder = PostgresSaver.builder();
         builder.stateSerializer(serializer).datasource(dataSource).createTables(false);
@@ -80,7 +93,7 @@ public class ResearchAgent {
     /** Runs the graph for a thread (one thread per business case) and returns the final state. */
     public ResearchState run(String threadId, String topic) {
         // before any node (and so any provider call): the store may have drifted since the graph was built
-        CheckpointProfileVerifier.verify(dataSource);
+        verifyStore();
         var config = RunnableConfig.builder().threadId(threadId).build();
         return graph.invoke(Map.of(ResearchState.TOPIC, topic), config)
                 .orElseThrow(() -> new IllegalStateException("Agent graph produced no state"));

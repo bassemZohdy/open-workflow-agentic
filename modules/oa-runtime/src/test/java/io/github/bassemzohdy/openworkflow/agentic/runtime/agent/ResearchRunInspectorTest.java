@@ -53,6 +53,7 @@ class ResearchRunInspectorTest {
     private static ResearchAgent agent(DataSource dataSource, LlmClient llm) throws Exception {
         ResearchAgent agent = new ResearchAgent();
         agent.llm = GovernedFixtures.allowing(llm);
+        agent.checkpointSchema = "public"; // manual fixture: what the configuration injects in production
         agent.dataSource = dataSource;
         agent.outputValidator = new AgentOutputValidator(new ObjectMapper(), target -> false);
         agent.build();
