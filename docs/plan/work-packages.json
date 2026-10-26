@@ -13,7 +13,7 @@
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
       "date": "2026-10-26",
-      "baseline_commit": "af9d7e2cfe8c298fc438878a4c5b38fc2bedf9aa",
+      "baseline_commit": "34e2fbbdad487ebc2ae83badb0683c0695d7bf83",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -2744,7 +2744,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-26",
-    "status": "V76 facts74 merged561c691; live identity77 merged53eb019 with inspected full1273 and real-provider evidence. JDBC fresh-callback gate78 mergedaf9d7e2 after exact Claude PASS04c55a1/6420317407, independent67 and full40351776875:177 suites/1291 cases, failures/errors/skips0. Actual archive digest/CRC and exact tree verified; gate17, real ambient JTA/call18, migration20, identity11, default denial1, startup4/recovery1. Retained or uncertain commits never become fresh callbacks; cancelled running synchronous attempts hold capacity until actual exit. Production wiring remains absent. Next owned credential-pairing check and canonical DATA lookup must tie the exact private admitted credential to the JDBC binding, not just equal scope/entry. Server-trusted workload/target/task mapping, current registry/full-owner/task/lease/PDP/central audit, bounded JDBC composition, private async context, actual Flow/graph/node/output/terminal-association and recovery proof remain gates. V77..V80 reserved; issue75 intermittent recovery remains open. WP108/WP102 and acceptance remain partial",
+    "status": "Merged V76 facts74/561c691, synchronous identity77/53eb019 and JDBC callback gate78/af9d7e2 remain evidenced partial components. Credential pairing79 merged34e2fbb after exact GPT PASSf06ebee/6420748281, independent49 and inspected full40355128259 (178 suites/1298 cases), real-provider40355128393 (standard3/delegation8 plus pairing7/gate17, no failures/errors/skips). Raw digests/CRC and exact identity source paths verified. Canonical DATA lookup80 exact1cf1862 is open: Claude PASS/independent42, author42/final6; current full CI pending. No hash or returned binding is permission: production root must compare FULL row with SAME private admitted credential through the 4-arg live check. Server-trusted workload/target/task mapping, current registry/full owner/task/lease/PDP/central audit, JDBC timeouts/root restrictions, actual Flow/graph/node/output/terminal association and private async/recovery remain gates. Default admission/model allowance remains absent, V77..V80 reserved, issues75/76 open; WP108/WP102 and acceptance stay partial",
     "agents": [
       {
         "id": "GPT",

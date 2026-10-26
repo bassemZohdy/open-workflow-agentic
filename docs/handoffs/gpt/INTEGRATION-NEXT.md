@@ -2,8 +2,8 @@
 
 Current implementation baseline: main `af9d7e2cfe8c298fc438878a4c5b38fc2bedf9aa` (2026-10-26).
 V76 facts #74, live identity #77 and the internal JDBC fresh-entry callback gate #78 are merged after exact peer review
-and inspected current CI. Credential-pairing #79 is the open Claude implementation PR; GPT's canonical DATA lookup by
-the derived binding key is being prepared. Neither supplies production composition by itself. Counts remain
+and inspected current CI. Credential-pairing #79 is merged as34e2fbb with exact GPT review, independent49 and full1298 plus real-provider proof.
+GPT canonical DATA lookup #80 is open at1cf1862 with Claude exact PASS/independent42; current full CI is pending. Neither supplies production composition by itself. Counts remain
 11 completed/12 partial/30 not started, acceptance3/39. Packaged identity recovery remains open as [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75),
 and the supported-versus-preview identity profile decision is [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76).
 This is the integration queue, not proof of work-package closure.
@@ -73,8 +73,7 @@ This is the integration queue, not proof of work-package closure.
 
 Next, pair the gate binding with the SAME private admitted credential (full record, not merely equal entry/hash), then
 build the bounded concrete composite and trusted production composition root. #79 supplies the pairing-aware identity
-check and a historical derived binding fingerprint; GPT supplies canonical DATA lookup. Both still require review/CI
-of their final heads. No CDI admission/model/graph default is enabled.
+check and a historical derived binding fingerprint; GPT supplies canonical DATA lookup. Pairing79 is reviewed and merged; lookup80 still requires its current full CI gate. No CDI admission/model/graph default is enabled.
 
 The root must source the expected workload, approved target and task from server-trusted pinned facts; missing mapping
 refuses. Compose current registry/full owner/definition/actual task/target/lease with current identity/grant/scope/PDP,

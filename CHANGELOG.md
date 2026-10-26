@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge exact credential-pairing PR79 as34e2fbb after GPT PASSf06ebee, independent49 and inspected full1298 plus real-provider CI. A derived rb1 fingerprint remains historical data; production pairing requires the full private binding match. Canonical DATA lookup80 is reviewed at1cf1862 with independent42; current CI is pending. Planning prose now reflects actual merged components and open production/preview/recovery gates; no package or acceptance promotion.
+
 - Merge callback gate PR78 asaf9d7e2 after exact Claude PASS04c55a1/independent67 and inspected full40351776875:1291 cases with no failures/errors/skips. Preserve exact fresh-ack callback, retained/unknown refusal, bounded synchronous close/worker behavior and actual ambient JTA proof. No production graph/composite activation; next exact-credential pairing/data lookup and full producer/node/output/async/current-authority gates remain open.
 
 - Merge live identity PR77 as53eb019 after GPT exact PASS7e2a9fc, independent53/final11 and inspected full1273 plus real-provider CI. Current typed-workload/binding/grant checks remain a synchronous identity component; no production bridge/model/graph allowance. Open separate JDBC callback gate78 with stable17/combined55 and two intended negative controls; exact final peer review/current CI remain pending. No package or acceptance promotion.

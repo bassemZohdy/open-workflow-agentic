@@ -23,7 +23,7 @@ Execution now uses [two backlogs in TODO.md](../../TODO.md#two-agent-delivery-pl
 packages** across execution/platform/evaluation; **Claude owns 21** across identity/policy/agents/governance.
 Each reviews the other's implementation PRs at the current commit. GPT continues WP-108's durable execution backend
 independently of whole-WP-102 closure; Claude continues the live identity/policy consumers and the recovery investigation.
-As of 2026-10-26, V76 facts #74, synchronous identity checks #77 and the internal JDBC callback gate #78 are merged after exact peer review and inspected CI. Exact-credential pairing #79 is under review; canonical binding-key DATA lookup is being prepared. Production composite/producer/graph activation remains absent.
+As of 2026-10-26, V76 facts #74, synchronous identity checks #77 and the internal JDBC callback gate #78 are merged after exact peer review and inspected CI. Exact-credential pairing #79 is merged; canonical binding-key DATA lookup #80 has peer PASS and is running current CI. Production composite/producer/graph activation remains absent.
 Consumers gate on their required merged interface, not an entire unfinished package. Claude review of each exact
 implementation head and passing CI remain mandatory before merge.
 Both queues specify merged prerequisite handoffs and outcomes, while the detailed package checklists retain

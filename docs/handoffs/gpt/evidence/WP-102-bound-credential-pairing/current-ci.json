@@ -1,0 +1,323 @@
+{
+  "core": {
+    "artifactId": 12666965087,
+    "archiveSha256": "3b90e389c9e8362a40e22db89af3bcc770ed3640caf7923883cd9951f15cb6e3",
+    "archiveBytes": 2222556,
+    "archiveDigestAndCrcVerified": true,
+    "xmlSuites": 178,
+    "totals": {
+      "tests": 1298,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": {
+      "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityPairingTest": {
+        "totals": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "theFingerprintStaysHistoricalDataAfterCloseAndRevivesNothing",
+          "aMissingCandidateRefusesBeforeAnyStoreIsRead",
+          "twoCredentialsOfTheSameScopeAndEntryHaveDifferentFingerprintsAndCannotBeSwapped",
+          "aForgedRecordWithTheSameKeyButAnyOtherFieldRefuses",
+          "revocationDuringTheLookupStillRefusesAfterAPassingPairing",
+          "theExistingIdentityRefusalsStillApplyWithAnExactRecord",
+          "theExactAdmittedRecordPassesAndRemainsRepeatable"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.identity.IdentityRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "identitySurvivesAKillARevokedGrantHoldsTheInstanceAndNoCredentialIsPersisted"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT": {
+        "totals": {
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": []
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT": {
+        "totals": {
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": []
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceBindingsDefaultWiringTest": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionGateTest": {
+        "totals": {
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "interruptedClosedWorkerKeepsItsSlotWhileAnActualCommittedReplyIsStillBlocked",
+          "freshAcknowledgedEntryCallsOnceAndRetainedDataNeverCallsAgain",
+          "forgedBindingMetadataAndSameKeyDifferentFullScopeNeverReachTheCallback",
+          "cancellationAndNewEpochCannotEraseOrReplaceTheOriginalEntry",
+          "revocationAfterCommitAndAfterCallbackWithholdsWorkOrPrivateOutput",
+          "eightConcurrentCredentialsAndExecutorsHaveOnlyOneCallback",
+          "closeDuringARealRegistryLockWaitKeepsItsSlotUntilActualTermination",
+          "closedUnstartedHandlesReleaseCapacityAndBeanCloseRefusesNewOnes",
+          "anAlreadyTransactionalConnectionIsRefusedWithoutCommittingOrRollingBackItsOwner",
+          "callbackFailureRetainsEntryAndPreexistingInterruptIsPreserved",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[1]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[2]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[3]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[4]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[5]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[6]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[7]"
+        ]
+      }
+    }
+  },
+  "standard": {
+    "artifactId": 12666540410,
+    "archiveSha256": "c3b6ab792db2d6c85a79d1e23f0e2a06e13a57546ee6e88bbed4372abfabd02a",
+    "archiveBytes": 2183675,
+    "archiveDigestAndCrcVerified": true,
+    "xmlSuites": 171,
+    "totals": {
+      "tests": 1290,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": {
+      "io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT": {
+        "totals": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "realIssuerSignatureAndAudienceAreVerified",
+          "theServerStillRefusesWhatItCanSee",
+          "actorlessExchangeIsRejected"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceBindingsDefaultWiringTest": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionGateTest": {
+        "totals": {
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "interruptedClosedWorkerKeepsItsSlotWhileAnActualCommittedReplyIsStillBlocked",
+          "freshAcknowledgedEntryCallsOnceAndRetainedDataNeverCallsAgain",
+          "forgedBindingMetadataAndSameKeyDifferentFullScopeNeverReachTheCallback",
+          "cancellationAndNewEpochCannotEraseOrReplaceTheOriginalEntry",
+          "revocationAfterCommitAndAfterCallbackWithholdsWorkOrPrivateOutput",
+          "eightConcurrentCredentialsAndExecutorsHaveOnlyOneCallback",
+          "closeDuringARealRegistryLockWaitKeepsItsSlotUntilActualTermination",
+          "closedUnstartedHandlesReleaseCapacityAndBeanCloseRefusesNewOnes",
+          "anAlreadyTransactionalConnectionIsRefusedWithoutCommittingOrRollingBackItsOwner",
+          "callbackFailureRetainsEntryAndPreexistingInterruptIsPreserved",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[1]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[2]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[3]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[4]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[5]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[6]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[7]"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityPairingTest": {
+        "totals": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "theFingerprintStaysHistoricalDataAfterCloseAndRevivesNothing",
+          "aMissingCandidateRefusesBeforeAnyStoreIsRead",
+          "twoCredentialsOfTheSameScopeAndEntryHaveDifferentFingerprintsAndCannotBeSwapped",
+          "aForgedRecordWithTheSameKeyButAnyOtherFieldRefuses",
+          "revocationDuringTheLookupStillRefusesAfterAPassingPairing",
+          "theExistingIdentityRefusalsStillApplyWithAnExactRecord",
+          "theExactAdmittedRecordPassesAndRemainsRepeatable"
+        ]
+      }
+    }
+  },
+  "delegation": {
+    "artifactId": 12664569407,
+    "archiveSha256": "37b257bcd94fed7123924aa8c13b5cf7fe3fb2233af95a17dabd23aabea747b2",
+    "archiveBytes": 2193067,
+    "archiveDigestAndCrcVerified": true,
+    "xmlSuites": 171,
+    "totals": {
+      "tests": 1295,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": {
+      "io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT": {
+        "totals": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "nativeDelegationPreservesAuthorityBounds",
+          "delegationRequiresPermissionAndConsent",
+          "anActorTokenOlderThanSixtySecondsIsRefusedBeforeAnythingIsSent",
+          "issuerKeyRotationIsHandled",
+          "subjectExpiryBoundsIssuedCredential",
+          "revokedOrExpiredGrantIsRejected",
+          "invalidActorIsRejected",
+          "aFreshActorYieldsACredentialThatOutlivesTheActorTokenWithinTheStatedContract"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceBindingsDefaultWiringTest": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionGateTest": {
+        "totals": {
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "interruptedClosedWorkerKeepsItsSlotWhileAnActualCommittedReplyIsStillBlocked",
+          "freshAcknowledgedEntryCallsOnceAndRetainedDataNeverCallsAgain",
+          "forgedBindingMetadataAndSameKeyDifferentFullScopeNeverReachTheCallback",
+          "cancellationAndNewEpochCannotEraseOrReplaceTheOriginalEntry",
+          "revocationAfterCommitAndAfterCallbackWithholdsWorkOrPrivateOutput",
+          "eightConcurrentCredentialsAndExecutorsHaveOnlyOneCallback",
+          "closeDuringARealRegistryLockWaitKeepsItsSlotUntilActualTermination",
+          "closedUnstartedHandlesReleaseCapacityAndBeanCloseRefusesNewOnes",
+          "anAlreadyTransactionalConnectionIsRefusedWithoutCommittingOrRollingBackItsOwner",
+          "callbackFailureRetainsEntryAndPreexistingInterruptIsPreserved",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[1]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[2]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[3]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[4]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[5]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[6]",
+          "storageAndAmbientReplyFailuresNeverCallTheCallback()[7]"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityPairingTest": {
+        "totals": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "theFingerprintStaysHistoricalDataAfterCloseAndRevivesNothing",
+          "aMissingCandidateRefusesBeforeAnyStoreIsRead",
+          "twoCredentialsOfTheSameScopeAndEntryHaveDifferentFingerprintsAndCannotBeSwapped",
+          "aForgedRecordWithTheSameKeyButAnyOtherFieldRefuses",
+          "revocationDuringTheLookupStillRefusesAfterAPassingPairing",
+          "theExistingIdentityRefusalsStillApplyWithAnExactRecord",
+          "theExactAdmittedRecordPassesAndRemainsRepeatable"
+        ]
+      }
+    }
+  },
+  "reviewHead": "f06ebee7874687a2c22738df012b9f1f51269e9f",
+  "actualCheckout": "d33945b2d4ff2c63f5a2391a39444e1731af85e6",
+  "identitySourcePathsMatch": true,
+  "testedContext": "Synthetic merge into0e3ce00 includes independently reviewed gate78; identity source/test paths identical to reviewed head",
+  "sourceReviewComment": 6420748281,
+  "ciReviewComment": 6421033555,
+  "mergeCommit": "34e2fbbdad487ebc2ae83badb0683c0695d7bf83",
+  "coreRunId": 40355128259,
+  "providerRunId": 40355128393,
+  "localIndependent": {
+    "tests": 49,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "java": "21.0.12.1",
+    "postgres": "16.15"
+  },
+  "scope": "derived fingerprint/full private credential pairing identity component only; no production composite/graph activation"
+}
