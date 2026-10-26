@@ -347,8 +347,11 @@ class IdentityRecoveryIT {
     private static void decideUntilCompleted(ManagedProcess process, String id, String engineId, String bearer)
             throws Exception {
         long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
+        String lastRegistryStatus = "unavailable"; // last value this loop observed; no extra request on failure
         while (System.nanoTime() < deadline) {
-            if ("COMPLETED".equals(status(process, id, bearer))) {
+            String observed = status(process, id, bearer);
+            lastRegistryStatus = observed;
+            if ("COMPLETED".equals(observed)) {
                 return;
             }
             post(process, "/dev/lifecycle/events", null, null, "{\"type\":\"" + EVENT + "\"}");
@@ -356,13 +359,7 @@ class IdentityRecoveryIT {
         }
         // CI keeps the failsafe XML but not target/process-logs, so the evidence has to travel in the message.
         // The snapshot is evidence only: a diagnostic failure must never replace this failure (no claim about the cause).
-        String registryStatus;
-        try {
-            registryStatus = status(process, id, bearer);
-        } catch (Throwable unavailable) {
-            registryStatus = "unavailable";
-        }
-        fail("instance " + id + " did not complete; status " + registryStatus
+        fail("instance " + id + " did not complete; status " + lastRegistryStatus
                 + "; engine instance " + engineId + "; "
                 + RecoveryEngineSnapshot.describe(process.baseUrl(), DEFINITION, "0.1.0", engineId)
                 + "\n" + logTail(process.logFile(), 60));

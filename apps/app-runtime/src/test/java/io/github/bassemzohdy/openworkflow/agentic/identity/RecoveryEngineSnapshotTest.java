@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpServer;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.EngineStatus;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -86,6 +87,12 @@ class RecoveryEngineSnapshotTest {
                 {"200", "not json " + PRIVATE},
                 {"200", "{\"present\":\"yes\",\"status\":\"WAITING\"}"},
                 {"200", "{\"present\":true,\"status\":\"" + PRIVATE + "\"}"},
+                {"200", "{\"present\":true,\"status\":\"PRIVATECANARY\"}"},
+                {"200", "{\"present\":true,\"status\":\"WAITING_CANARY\"}"},
+                {"200", "{\"present\":true,\"status\":\"ABSENT\"}"},
+                {"200", "{\"present\":false,\"status\":\"COMPLETED\"}"},
+                {"200", "{\"present\":false,\"status\":\"WAITING\"}"},
+                {"200", "{\"present\":false,\"status\":\"PRIVATECANARY\"}"},
                 {"200", "{\"present\":true}"},
                 {"200", ""},
         };
@@ -105,6 +112,64 @@ class RecoveryEngineSnapshotTest {
         long elapsedMillis = Duration.ofNanos(System.nanoTime() - start).toMillis();
         assertEquals(RecoveryEngineSnapshot.UNAVAILABLE, text);
         assertTrue(elapsedMillis < 3_000, "took " + elapsedMillis + " ms");
+    }
+
+    @Test
+    void everyRealEngineStatusIsReportedWhenPresent() throws Exception {
+        for (EngineStatus each : EngineStatus.values()) {
+            stop();
+            String base = serve(200, "{\"present\":true,\"status\":\"" + each + "\"}", 0, null);
+            assertEquals("engine snapshot: present=true status=" + each, describe(base));
+        }
+    }
+
+    /** Headers arrive at once, then the body stalls: only a whole-exchange deadline can bound this. */
+    private String serveStalledBody() throws IOException {
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/", exchange -> {
+            try {
+                exchange.sendResponseHeaders(200, 64);
+                exchange.getResponseBody().write('{');
+                exchange.getResponseBody().flush();
+                Thread.sleep(5_000);
+            } catch (IOException | InterruptedException clientGone) {
+                // the caller gave up first
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        return "http://127.0.0.1:" + server.getAddress().getPort();
+    }
+
+    @Test
+    void aStalledBodyAfterImmediateHeadersIsAbandonedAtTheWholeSnapshotDeadline() throws Exception {
+        String base = serveStalledBody();
+        long start = System.nanoTime();
+        String text = describe(base);
+        long elapsedMillis = Duration.ofNanos(System.nanoTime() - start).toMillis();
+        assertEquals(RecoveryEngineSnapshot.UNAVAILABLE, text);
+        assertTrue(elapsedMillis < 2_000, "took " + elapsedMillis + " ms");
+    }
+
+    @Test
+    void anInterruptedCallerGetsTheMarkerPromptlyAndKeepsItsInterruptFlag() throws Exception {
+        String base = serveStalledBody();
+        AtomicReference<String> text = new AtomicReference<>();
+        AtomicReference<Boolean> flag = new AtomicReference<>();
+        Thread caller = new Thread(() -> {
+            text.set(RecoveryEngineSnapshot.describe(base, "d", "v", "e", Duration.ofSeconds(30)));
+            flag.set(Thread.currentThread().isInterrupted());
+        });
+        caller.start();
+        Thread.sleep(300);
+        long start = System.nanoTime();
+        caller.interrupt();
+        caller.join(3_000);
+        assertFalse(caller.isAlive(), "caller still blocked");
+        assertTrue(Duration.ofNanos(System.nanoTime() - start).toMillis() < 2_000);
+        assertEquals(RecoveryEngineSnapshot.UNAVAILABLE, text.get());
+        assertEquals(Boolean.TRUE, flag.get());
     }
 
     @Test
