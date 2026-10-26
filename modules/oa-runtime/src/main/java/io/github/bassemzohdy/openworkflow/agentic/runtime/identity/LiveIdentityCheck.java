@@ -1,6 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.identity;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AgentResourceAdmission.BoundCall;
 import java.util.Objects;
@@ -43,5 +44,21 @@ public final class LiveIdentityCheck {
      */
     public void requireLive(BoundCall bound, ResourceExecutionEntry expectedEntry, Subject actingWorkload) {
         admission.requireLiveIdentity(bound, expectedEntry, actingWorkload);
+    }
+
+    /**
+     * The PAIRING-AWARE check production composition must use: everything {@link #requireLive(BoundCall,
+     * ResourceExecutionEntry, Subject)} does, and additionally the exact candidate binding, read as DATA from a canonical
+     * store (looked up by {@link BoundCall#bindingKey()}, never by HTTP metadata), must equal the bound call's PRIVATE
+     * admitted binding in every field (issuer, jti, issuing grant, full scope, issued and expiry). An equal entry or an
+     * equal fingerprint alone does not establish that the same credential is meant. A null or different candidate
+     * refuses before any store is read. The candidate is not authority and is never retained.
+     *
+     * @throws AgentResourceAdmission.WitnessRefusedException the candidate is missing or differs, plus every refusal of
+     *                                                        the identity-only overload
+     */
+    public void requireLive(BoundCall bound, ResourceExecutionEntry expectedEntry, Subject actingWorkload,
+                            ResourceCallBinding expectedBinding) {
+        admission.requireLiveIdentity(bound, expectedEntry, actingWorkload, expectedBinding);
     }
 }

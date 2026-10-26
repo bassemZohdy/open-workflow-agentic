@@ -82,6 +82,17 @@ public class AgentResourceAdmission {
         }
 
         /**
+         * Derived fingerprint of the exact admitted credential binding (issuer+jti, domain separated; {@code
+         * ResourceCallBinding.key()}). Historical attribution DATA like {@link #callKey}: it holds no issuer, token id,
+         * claim or bearer, is not authority, and cannot mint, bind or revive a handle. Two credentials for the same call
+         * scope have different fingerprints. A lookup by it must still compare the FULL candidate binding through
+         * {@link LiveIdentityCheck}; equality of this fingerprint alone proves nothing.
+         */
+        public String bindingKey() {
+            return call.key();
+        }
+
+        /**
          * PER-CALL close: retires only this witness (and the {@link BoundCall} made from it). Idempotent; other
          * witnesses of the same admission are untouched. A closed witness refuses {@link #bind} and
          * {@link BoundCall#requireEntry}. It releases nothing else (no worker or context accounting exists here).
@@ -113,6 +124,11 @@ public class AgentResourceAdmission {
         /** The exact retained entry (data). */
         public ResourceExecutionEntry entry() {
             return entry;
+        }
+
+        /** The admitted credential's derived binding fingerprint (data, see {@link AdmittedCall#bindingKey}). */
+        public String bindingKey() {
+            return admitted.bindingKey();
         }
 
         /** PER-CALL close of the originating {@link AdmittedCall}; idempotent, other calls are untouched. */
@@ -304,10 +320,32 @@ public class AgentResourceAdmission {
      * re-reads and refuses on any doubt; callers invoke it again after later blocking work.
      */
     void requireLiveIdentity(BoundCall bound, ResourceExecutionEntry expected, Subject actingWorkload) {
+        requireLiveIdentity(bound, expected, actingWorkload, null, false);
+    }
+
+    /**
+     * Same as the identity-only check, and additionally requires {@code expectedBinding} (DATA from a canonical store) to
+     * equal the PRIVATE admitted binding in full, before any read. A missing or different candidate refuses.
+     */
+    void requireLiveIdentity(BoundCall bound, ResourceExecutionEntry expected, Subject actingWorkload,
+                             ResourceCallBinding expectedBinding) {
+        requireLiveIdentity(bound, expected, actingWorkload, expectedBinding, true);
+    }
+
+    private void requireLiveIdentity(BoundCall bound, ResourceExecutionEntry expected, Subject actingWorkload,
+                                     ResourceCallBinding expectedBinding, boolean paired) {
         Objects.requireNonNull(bound, "bound");
         Objects.requireNonNull(expected, "expected");
         requireNotInterrupted();
         requireOpen(bound.admitted);
+        if (paired) {
+            if (expectedBinding == null) {
+                throw new WitnessRefusedException("expected credential binding missing");
+            }
+            if (!expectedBinding.equals(bound.admitted.call)) {
+                throw new WitnessRefusedException("credential binding differs from the admitted one");
+            }
+        }
         if (actingWorkload == null) {
             throw new WitnessRefusedException("expected acting workload missing");
         }
