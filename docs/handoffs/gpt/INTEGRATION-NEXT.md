@@ -1,11 +1,12 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline: main `e5890ad7ce683cd4a679008658a3cd569e9f4757` (2026-10-26).
-Internal prerequisites #74/#77/#78/#79/#80/#81/#82/#83 and audit fixture #84 are merged after exact peer/current CI.
-V77 retained audit DATA #85 merged after Claude exact2e4cb97 PASS/independent88 and inspected full1365; actual
-postmerge40378802214 also passes185 suites/1365 cases with no failures/errors/skips, archive/checkout verified.
-Atomic producer #86 is open at66571db with author59 green plus final1; exact Claude/current CI pending.
-The migration activates no producer/relay/permission/model/graph path; production composition remains absent. Counts remain
+Current implementation baseline: main `4f41a60c8d086b443d05013480656fdd8bf1f5d0` (2026-10-26).
+Prerequisites #74/#77/#78/#79/#80/#81/#82/#83/#84 and V77 DATA #85 are merged with exact peer/current CI.
+Atomic producer #86 merged after Claude exactdfb8030 PASS/independent61 and full1386. Actual postmerge40385699565
+passes187 suites/1386 cases, zero failures/errors/skips, archive/checkout verified. It is opt-in DATA, not permission.
+Audit delivery #87 is open atc2a7860 (author52/restored1, exact peer/current CI pending). Claude's controlled model API
+has initial GPT independent63 and test/evidence follow-up pending; it supplies no approved source or ResearchAgent adoption.
+No production writer/relay/guarded root is registered. Counts remain
 11 completed/12 partial/30 not started, acceptance3/39. Packaged identity recovery remains open as [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75),
 and the supported-versus-preview identity profile decision is [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76).
 This is the integration queue, not proof of work-package closure.
@@ -92,7 +93,7 @@ component callback tests are not graph or package closure.
 ## Following ordered gates
 
 The checkpoint consumer/schema boundary and data-only V76 are merged; production composition is still absent.
-V77 DATA is merged; producer86 is unmerged. Delivery, V78 allocation, V79 model reservations and V80 manual decisions remain
+V77 DATA and the opt-in producer86 are merged. Delivery87 is unmerged; V78 allocation, V79 model reservations and V80 manual decisions remain
 later preparations, not active main features.
 
 Canonical original scope/full owner, one irreversible fresh entry acknowledgement,
@@ -121,3 +122,9 @@ No package is promoted merely because preparation or a component test exists.
 - V77 facts85: [exact/current CI](evidence/WP-108-v77-audit-facts/current-ci.json),
   [combined main1365](evidence/WP-108-v77-audit-facts/combined-main.json). No invented legacy provenance, producer,
   causal relay or receipt/current-authority permission follows. Source writer/relay adoption remains reviewed work.
+
+- Atomic producer86: [exact/current CI](evidence/WP-108-atomic-audit-producer/current-ci.json),
+  [combined main1386](evidence/WP-108-atomic-audit-producer/combined-main.json),
+  [earlier66571db proof](evidence/WP-108-atomic-audit-producer/prior-head.json).
+  Known fresh INSERT only establishes provenance; legacy data is not upgraded, source pages are not full history,
+  and registry checks before retries are structural. Default producer path remains absent; no target follows DATA.

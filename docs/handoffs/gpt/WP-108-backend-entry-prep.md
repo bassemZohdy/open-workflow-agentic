@@ -2,7 +2,7 @@
 
 **Prepared:** 2026-10-26  
 **Producer/writer:** GPT (lifecycle, contracts, SQL and integration); **peer reviewer:** Claude  
-**Current implementation base:** `e5890ad7ce683cd4a679008658a3cd569e9f4757`
+**Current implementation base:** `4f41a60c8d086b443d05013480656fdd8bf1f5d0`
 
 **Implementation state:** Internal V76 schema, synchronous identity and JDBC callback components are merged. **Production composite, actual dispatch and async integration are NOT STARTED.** This matrix defines remaining end-state checks; it is not an authority grant or package acceptance.
 
@@ -74,5 +74,5 @@ The merged gate covers storage acknowledgement/concurrency/close with real Postg
 ## Retained audit prerequisite
 
 V77 audit DATA85 is merged with exact Claude review/independent88 and inspected full1365; postmerge1365 also passes.
-Atomic producer86 is unmerged and no relay/central receipt adapter is active. Data/ACK guards do not establish original
+Atomic producer86 is merged as an explicit data component after independent61/full1386. Delivery87 is unmerged, and no production relay/central receipt target adapter is active. Data/ACK guards do not establish original
 historical authority, causal central append or current permission. V78..V80 and production mapping remain later gates.

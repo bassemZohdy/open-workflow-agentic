@@ -13,7 +13,7 @@
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
       "date": "2026-10-26",
-      "baseline_commit": "e5890ad7ce683cd4a679008658a3cd569e9f4757",
+      "baseline_commit": "4f41a60c8d086b443d05013480656fdd8bf1f5d0",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -2744,7 +2744,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-26",
-    "status": "Internal V76 facts74, identity77/gate78/pairing79/canonical DATA lookup80, grant-expiry81, governed Running/JDBC bounds82 and zero-budget83 are merged with exact reciprocal reviews and inspected CI. Audit child fixture84 mergedc91831d after GPT exacte2b2911 PASS/independent34 and full1338. V77 retained audit DATA85 mergede5890ad after Claude exact2e4cb97 PASS/independent88 and full40377195360:185 XML suites/1365 cases. Postmerge40378802214 atactuale5890ad also passes1365; raw archive SHA/CRC and actual checkout verified. Scoped atomic producer86 is open at66571db with author59 focused green plus final absence/orphan1; red13 had one intended orphan-read failure, corrected LEFT JOIN refuses broken anchors. Exact Claude/current CI pending. Retained rows, sources, receipts and prepared records never grant authority. No producer or relay is active on main; production root, trusted workload/target/task mapping, coherent current registry/full owner/task/lease/PDP/central audit, approved reservations, actual Flow/node/output/terminal association and async/recovery remain gates. Defaults still refuse; V78..V80 reserved and issues75/76 open. WP108/WP102 and acceptance remain partial.",
+    "status": "Internal prerequisites74/77/78/79/80/81/82/83/84 and V77 audit DATA85 are merged after exact peer/current CI. Explicit atomic producer86 merged4f41a60 after Claude exactdfb8030 PASS/independent61 and inspected full40383583782:187 XML suites/1386 cases. Actual postmerge40385699565 also passes1386, zero failures/errors/skips; archive SHA/CRC and actual checkout verified. Initial66571db full1384 remains earlier-head evidence only. Producer is opt-in DATA with no default registration, target callback or authority. Audit delivery87 is open atc2a7860 with author52 green and a predecessor guard-removal control failing the intended zero-central-calls assertion, then restored1 pass; exact Claude/current CI pending. Claude controlled model API has initial GPT independent63; test/evidence follow-up and final review/CI pending, with no ResearchAgent or approved-context source adoption. Stored rows/receipts/prepared data never grant authority. Production root, trusted workload/target/task mapping, coherent current registry/full owner/task/lease/PDP/audit, approved reservations, actual Flow/node/output/terminal association and async/recovery remain gates. Defaults still refuse; V78..V80 reserved, issues75/76 open. WP108/WP102 and acceptance remain partial.",
     "agents": [
       {
         "id": "GPT",
