@@ -43,7 +43,7 @@ minter/entry/epoch, missing or different workload, and interrupt.
 dropped by the test), controlled slow lookup. Covered: pass for the correct workload, repeatable; revocation during the
 call-binding lookup refuses after it (data still readable, still refused); signed expiry during that lookup and during the
 grant-binding work; revoked ancestor; binding removed, retargeted to another scope, to another grant, issued time/expiry
-mismatch, grant-binding changed or missing; unavailable store; same id with wrong kind, other kind/id, user, null workload;
+mismatch (issuedAt +1s keeps the lifetime valid; expiry -1s), grant-binding changed or missing; unavailable store; same id with wrong kind, other kind/id, user, null workload;
 wrong epoch, wrong scope, other minter, per-call close (sibling unaffected), bean close, close during lookup; interrupt before
 and during the lookup with the flag preserved. No reflection or method-list tests.
 

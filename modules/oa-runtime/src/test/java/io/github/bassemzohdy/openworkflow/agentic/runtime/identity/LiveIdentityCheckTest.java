@@ -277,6 +277,11 @@ class LiveIdentityCheckTest {
                 real.scope(), real.issuedAt(), real.expiresAt().minusSeconds(1)));
         assertEquals(Reason.BINDING_MISMATCH, reason(() -> check.requireLive(bound, entry(scope, 1), WORKFLOW)));
 
+        // a later issued time keeps the lifetime valid, so only the equality with the admitted binding can refuse it
+        callOverride = () -> Optional.of(new ResourceCallBinding(real.issuer(), real.tokenId(), real.issuingGrantId(),
+                real.scope(), real.issuedAt().plusSeconds(1), real.expiresAt()));
+        assertEquals(Reason.BINDING_MISMATCH, reason(() -> check.requireLive(bound, entry(scope, 1), WORKFLOW)));
+
         callOverride = null;
         grantBindingOverride = () -> Optional.of(new IssuedTokenBindings.Binding(another.id(), tenant,
                 lastToken.expiresAt()));
