@@ -98,7 +98,9 @@ public class AuditResource {
         PageRequest paging = badRequestOnInvalid(() -> PageRequest.of(cursor, limit));
         current(who);
         AuditQuery.Page page = badRequestOnInvalid(() -> query.find(filter, paging));
-        return new EventPage(page.items().stream().map(EventView::of).toList(), page.nextCursor());
+        EventPage output = new EventPage(page.items().stream().map(EventView::of).toList(), page.nextCursor());
+        current(who); // read by blocking I/O and materialized; private output is withheld if the identity expired meanwhile
+        return output;
     }
 
     @GET
@@ -108,8 +110,9 @@ public class AuditResource {
         access.require(AuditAccess.READ, who.caller());
         Ulid id = badRequestOnInvalid(() -> Ulid.parse(eventId));
         current(who);
-        return query.byId(id).map(EventView::of)
-                .orElseThrow(() -> new NotFoundException("no audit event with that id"));
+        java.util.Optional<EventView> found = query.byId(id).map(EventView::of);
+        current(who); // as for the page: no event, and no existence signal, leaves after the identity expired
+        return found.orElseThrow(() -> new NotFoundException("no audit event with that id"));
     }
 
     @POST
@@ -120,12 +123,15 @@ public class AuditResource {
         String chain = chainId == null ? null : badRequestOnInvalid(() -> AuditKeys.requireChainId(chainId));
         current(who);
         List<ChainReport> reports = chain == null ? verifier.verifyAll() : List.of(verifier.verify(chain));
-        return new VerifyResult(reports.stream().allMatch(ChainReport::intact), reports);
+        VerifyResult output = new VerifyResult(reports.stream().allMatch(ChainReport::intact), reports);
+        current(who); // verification outcomes are private output too
+        return output;
     }
 
     /**
      * The signed expiry of a verified token is judged again after policy, audit and parsing, immediately before any
-     * query or verification I/O: 401 when it has passed or the authority is gone, 503 when that cannot be decided. The
+     * query or verification I/O, and once more immediately before each materialized result is returned, so that blocking
+     * reads that outlive the token do not leak: 401 when it has passed or the authority is gone, 503 when that cannot be decided. The
      * development header seam has no signed expiry and is not rechecked (it exists only in dev and test profiles).
      */
     private static void current(CallerAuthority who) {
