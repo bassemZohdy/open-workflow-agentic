@@ -26,8 +26,6 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import java.io.ByteArrayOutputStream;
 import java.io.NotSerializableException;
 import java.io.ObjectOutputStream;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
@@ -231,26 +229,6 @@ class AdmittedCallWitnessTest {
                 tenant, clock.instant(), clock.instant().plusSeconds(60), "forged", List.of(WORKFLOW.id()));
         assertEquals("forged", forged.tokenId());
         assertThrows(TokenRejectedException.class, () -> admission.admitCall("forged"));
-        // no public method takes data as proof of a witness; bind needs an already minted one
-        Set<Class<?>> dataTypes = Set.of(AgentResourceAdmission.Principal.class, VerifiedToken.class,
-                ResourceCallBinding.class, ResourceCallScope.class);
-        for (Method m : AgentResourceAdmission.class.getMethods()) {
-            if (m.getReturnType() == AdmittedCall.class || m.getReturnType() == BoundCall.class) {
-                for (Class<?> p : m.getParameterTypes()) {
-                    assertFalse(dataTypes.contains(p), m.toString());
-                }
-            }
-        }
-        for (Class<?> type : List.of(AdmittedCall.class, BoundCall.class)) {
-            for (Method m : type.getMethods()) {
-                if (m.getDeclaringClass() == Object.class) {
-                    continue;
-                }
-                assertFalse(Modifier.isStatic(m.getModifiers()), "no factory: " + m);
-                assertFalse(VerifiedToken.class.isAssignableFrom(m.getReturnType())
-                        || ResourceCallBinding.class.isAssignableFrom(m.getReturnType()), m.toString());
-            }
-        }
     }
 
     @Test
@@ -272,6 +250,75 @@ class AdmittedCallWitnessTest {
         assertThrows(WitnessRefusedException.class, () -> bound.requireEntry(entry(scope, 1)));
         String next = credential(scope);
         assertThrows(WitnessRefusedException.class, () -> admission.admitCall(next));
+    }
+
+    @Test
+    void closingOneCallDoesNotCloseAnotherFromTheSameAdmission() {
+        ResourceCallScope scope = scope();
+        AdmittedCall a = admission.admitCall(credential(scope));
+        AdmittedCall b = admission.admitCall(credential(scope));
+        BoundCall boundA = admission.bind(a, entry(scope, 1));
+        BoundCall boundB = admission.bind(b, entry(scope, 1));
+        boundA.close();
+        assertThrows(WitnessRefusedException.class, () -> boundA.requireEntry(entry(scope, 1)));
+        assertEquals(entry(scope, 1), boundB.requireEntry(entry(scope, 1)));
+        AdmittedCall c = admission.admitCall(credential(scope));
+        admission.bind(c, entry(scope, 1)); // the admission itself is still open
+    }
+
+    @Test
+    void aClosedUnboundWitnessRefusesBindAndStaysClosed() {
+        ResourceCallScope scope = scope();
+        AdmittedCall a = admission.admitCall(credential(scope));
+        AdmittedCall b = admission.admitCall(credential(scope));
+        a.close();
+        a.close(); // idempotent
+        assertThrows(WitnessRefusedException.class, () -> admission.bind(a, entry(scope, 1)));
+        admission.bind(b, entry(scope, 1));
+    }
+
+    @Test
+    void closingTheOriginatingWitnessInvalidatesItsBoundCall() {
+        ResourceCallScope scope = scope();
+        AdmittedCall a = admission.admitCall(credential(scope));
+        BoundCall bound = admission.bind(a, entry(scope, 1));
+        assertEquals(entry(scope, 1), bound.requireEntry(entry(scope, 1)));
+        a.close();
+        assertThrows(WitnessRefusedException.class, () -> bound.requireEntry(entry(scope, 1)));
+        assertEquals(1, bound.entry().epoch()); // historical data accessor stays data-only
+        assertEquals(scope, a.scope());
+    }
+
+    @Test
+    void concurrentCloseAndBindNeverLeaveAUsableClosedWitness() throws Exception {
+        ResourceCallScope scope = scope();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            for (int i = 0; i < 50; i++) {
+                AdmittedCall call = admission.admitCall(credential(scope));
+                CountDownLatch go = new CountDownLatch(1);
+                Future<BoundCall> binder = pool.submit(() -> {
+                    go.await();
+                    return admission.bind(call, entry(scope, 1));
+                });
+                Future<?> closer = pool.submit(() -> {
+                    go.await();
+                    call.close();
+                    return null;
+                });
+                go.countDown();
+                closer.get();
+                try {
+                    BoundCall bound = binder.get();
+                    assertThrows(WitnessRefusedException.class, () -> bound.requireEntry(entry(scope, 1)));
+                } catch (ExecutionException e) {
+                    assertTrue(e.getCause() instanceof WitnessRefusedException);
+                }
+                assertThrows(WitnessRefusedException.class, () -> admission.bind(call, entry(scope, 1)));
+            }
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     @Test

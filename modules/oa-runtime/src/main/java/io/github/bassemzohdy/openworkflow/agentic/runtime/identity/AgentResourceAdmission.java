@@ -64,6 +64,7 @@ public class AgentResourceAdmission {
         private final VerifiedToken token;
         private final ResourceCallBinding call;
         private final AtomicBoolean bound = new AtomicBoolean();
+        private final AtomicBoolean closed = new AtomicBoolean();
 
         private AdmittedCall(AgentResourceAdmission minter, VerifiedToken token, ResourceCallBinding call) {
             this.minter = minter;
@@ -78,6 +79,15 @@ public class AgentResourceAdmission {
 
         public String callKey() {
             return call.scope().key();
+        }
+
+        /**
+         * PER-CALL close: retires only this witness (and the {@link BoundCall} made from it). Idempotent; other
+         * witnesses of the same admission are untouched. A closed witness refuses {@link #bind} and
+         * {@link BoundCall#requireEntry}. It releases nothing else (no worker or context accounting exists here).
+         */
+        public void close() {
+            closed.set(true);
         }
 
         @Override
@@ -103,6 +113,11 @@ public class AgentResourceAdmission {
         /** The exact retained entry (data). */
         public ResourceExecutionEntry entry() {
             return entry;
+        }
+
+        /** PER-CALL close of the originating {@link AdmittedCall}; idempotent, other calls are untouched. */
+        public void close() {
+            admitted.close();
         }
 
         /**
@@ -214,7 +229,10 @@ public class AgentResourceAdmission {
         return new BoundCall(admitted, entry);
     }
 
-    /** Invalidates every witness of this admission at once. */
+    /**
+     * BEAN-LIFETIME close (also {@code @PreDestroy}): invalidates every witness of this admission at once and refuses
+     * new ones. Retiring a single call is {@link AdmittedCall#close()} / {@link BoundCall#close()} instead.
+     */
     @PreDestroy
     public void close() {
         closed = true;
@@ -231,6 +249,9 @@ public class AgentResourceAdmission {
             throw new WitnessRefusedException("minted by another admission");
         }
         requireNotClosed();
+        if (admitted.closed.get()) {
+            throw new WitnessRefusedException("witness closed");
+        }
         if (!admitted.token.expiresAt().isAfter(clock.instant())) {
             throw new WitnessRefusedException("credential expired");
         }
