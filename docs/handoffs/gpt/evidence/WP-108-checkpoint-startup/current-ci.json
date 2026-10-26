@@ -1,0 +1,81 @@
+{
+  "reviewHead": "031beee34d370a9f8a58c6bd61152e091f164faf",
+  "runId": 40255084555,
+  "artifactId": 12622700785,
+  "archiveSha256": "7f8317841f21d43f16ccd8b893a7e775fbf64e77da9ed5591d727f20e4c5e186",
+  "archiveBytes": 2141632,
+  "xmlSuites": 173,
+  "totals": {
+    "tests": 1224,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "startupMethods": [
+    "currentHistoryWithMissingTablesRefusesWithoutRuntimeCreation",
+    "currentMigrationHistoryDoesNotPermitDriftOrDecodeRetainedPrivateStateAtStartup",
+    "freshProcessMigratesBeforeStartupProfileVerificationWithoutRunningTheGraph",
+    "unsupportedConfiguredNamespaceRefusesAtStartupWithoutFallback"
+  ],
+  "actualCheckout": "3b39fd8fad91598d9fc60acc22eb7793c8dd7251",
+  "testedTree": "c7022eeeb081350635278cc98c6dd1ce310ec300",
+  "reviewTreeMatches": true,
+  "profileObservations": 24,
+  "migrationSha256": "7e1632c7f6fc25ba59eb4c07fbc02e348a0dd24a6b71d73f26981bd720a396f3",
+  "pullRequest": 72,
+  "mergeCommit": "9734347747092b1297136fac168624ae27b61df8",
+  "peerSourceReviewComment": 6406298991,
+  "ciInspectionComment": 6406502030,
+  "localPositive": {
+    "sourceCommit": "031beee34d370a9f8a58c6bd61152e091f164faf",
+    "java": "21.0.9 Linux",
+    "postgres": "16.15",
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "archiveSha256": "63cd3601a914e6e832c7acf6ffa8040ca9c0830770c769212930898b3de43252",
+    "localArchive": "C:\\Users\\Bassem\\Code\\open-workflow-agentic\\target\\evidence\\checkpoint-profile\\passed-startup-evidence.tar.gz"
+  },
+  "baselineControl": {
+    "testCommit": "72636a5",
+    "runtimeSourceCommit": "5eb7d1a5ef7eb9e5b8e5a2c197431df959f7da09",
+    "runtimeMainSourceTreesMatch": "79da38e6638f1f374bce882ea73652512ead91b2",
+    "purpose": "Negative control: existing runtime becomes ready with missing, drifted or unsupported profile; expected3 assertion failures before consumer implementation. Not a failing main CI run.",
+    "xmlSha256": "eda49c14bd688fe37d084b38bf5de82c451a513eb9503ee28e21cd5cfe62a17f",
+    "cases": [
+      {
+        "method": "unsupportedConfiguredNamespaceRefusesAtStartupWithoutFallback",
+        "result": "expected-refusal-control-failed"
+      },
+      {
+        "method": "freshProcessMigratesBeforeStartupProfileVerificationWithoutRunningTheGraph",
+        "result": "pass"
+      },
+      {
+        "method": "currentMigrationHistoryDoesNotPermitDriftOrDecodeRetainedPrivateStateAtStartup",
+        "result": "expected-refusal-control-failed"
+      },
+      {
+        "method": "currentHistoryWithMissingTablesRefusesWithoutRuntimeCreation",
+        "result": "expected-refusal-control-failed"
+      }
+    ]
+  },
+  "earlierFailedLocalFullAttempt": {
+    "sourceCommit": "031beee34d370a9f8a58c6bd61152e091f164faf",
+    "applicationUnitTests": 359,
+    "failures": 6,
+    "errors": 1,
+    "classification": "Reused shared test-state failure, retained as failed. Startup proof had not run.",
+    "observed": "121 STARTING rows predating the run preceded a100-row stale scan before tenant filtering; pinned-engine existed since2026-10-25T21:55:13Z and violated a fixed-id test insert.",
+    "archiveSha256": "68dcc63d0a919ff218921afe721de238555e399fb07c7b268a8c6862fb8e8ea8",
+    "localArchive": "C:\\Users\\Bassem\\Code\\open-workflow-agentic\\target\\evidence\\checkpoint-profile\\failed-full-evidence.tar.gz",
+    "subsequentEvidence": "Fresh isolated startup4 passed; required clean CI executed all1224 cases without failures/errors/skips. The failed attempt is not relabelled as passing."
+  },
+  "scope": "Bounded process startup order/current-history drift/missing/unsupported-configuration refusal with no model calls. No authority/backend/producer or original intermittent-recovery closure.",
+  "postMergeRun": {
+    "runId": 40256568737,
+    "conclusion": "success"
+  }
+}

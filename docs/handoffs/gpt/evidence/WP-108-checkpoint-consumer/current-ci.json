@@ -1,0 +1,132 @@
+{
+  "reviewHead": "6e02b0ebbda36733cd41c6b5442997048e5dcbf3",
+  "pullRequest": 71,
+  "mergeCommit": "694dc326564c86939d6b0c9522dc17b6bed82892",
+  "reviewComment": 6406283085,
+  "coreRun": 40253621994,
+  "providerRun": 40253622052,
+  "artifacts": [
+    {
+      "artifactId": 12621662072,
+      "archiveSha256": "7e4ea3a35406c1160bf8f3b5dcbfe0f9305dd0d13c12f55639356b12e78f11ea",
+      "xmlSuites": 172,
+      "totals": {
+        "tests": 1220,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "required": {
+        "ResearchAgentCheckpointProfileTest": {
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "CheckpointProfileConsumerTest": {
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "ResourceBindingsDefaultWiringTest": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "IdentityRecoveryIT": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "actualCheckout": "ef722c55adea597219cf572f9739660c9e402bba",
+      "migrationSha256": "7e1632c7f6fc25ba59eb4c07fbc02e348a0dd24a6b71d73f26981bd720a396f3",
+      "profileObservations": 24,
+      "testedTree": "76de050f0ce2bc2735f46a532d67764f02ec8eae",
+      "reviewHeadTreeMatches": true
+    },
+    {
+      "artifactId": 12621796727,
+      "archiveSha256": "e16b0434f05a58bcf32cc59ee83b86271abe51b461075e2b25b424a48dfc3615",
+      "xmlSuites": 166,
+      "totals": {
+        "tests": 1221,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "required": {
+        "KeycloakDelegationIT": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "EffectCrashRecoveryIT": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "artifactId": 12621363850,
+      "archiveSha256": "ad4268ebf8f1bfd1f478a7c25907978c19553488dd29e1ff549773c9d3dfb4d2",
+      "xmlSuites": 166,
+      "totals": {
+        "tests": 1216,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "required": {
+        "KeycloakStandardIT": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "EffectCrashRecoveryIT": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    }
+  ],
+  "independentFocusedVerification": {
+    "java": "21.0.12.1",
+    "postgres": "16.15",
+    "tests": 68,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "classes": {
+      "ResearchAgentCheckpointProfileTest": 10,
+      "ResearchRunInspectorTest": 25,
+      "AgentResourceAuthorityTest": 4,
+      "AgentResourceUserFreshnessTest": 3,
+      "CheckpointProfileConsumerTest": 26
+    }
+  },
+  "resolvedReviewFindings": [
+    "Unsupported configured namespace had been ignored; it now refuses before taking a connection.",
+    "Unqualified catalog functions could lie under a shadowing search path; catalog functions/types are qualified and the old behavior fails the negative control."
+  ],
+  "scope": "Runtime DDL removal and actual current public-profile verification at startup/build/run/inspection. Not graph-entry authority, deployment of dedicated credentials or whole WP108 acceptance.",
+  "postMergeRuns": {
+    "core": {
+      "runId": 40254990550,
+      "conclusion": "success"
+    },
+    "realProviderMatrix": {
+      "runId": 40254990868,
+      "conclusion": "success"
+    }
+  }
+}

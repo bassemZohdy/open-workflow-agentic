@@ -11,7 +11,7 @@
   "skipped": 0,
   "archiveSha256": "5b54875f2659a6519997baf84659c7410e301b1aef35d0d93e5e831b9d85f436",
   "archiveBytes": 702049,
-  "localArchive": "C:\\Users\\Bassem\\.codex\\worktrees\\checkpoint-consumer\\open-workflow-agentic\\apps\\app-runtime\\target\\conformance\\identity-recovery-20-repeats.zip",
+  "localArchive": "C:\\Users\\Bassem\\Code\\open-workflow-agentic\\target\\evidence\\checkpoint-profile\\identity-recovery-20-repeats.zip",
   "initialReactorVerify": {
     "tests": 1,
     "failures": 0,
@@ -202,5 +202,6 @@
       "seconds": 34.675,
       "xmlSha256": "d0896da4ecaf6cd33c1e805a90b47e733f39c4075db870e69c766ba07f0c1324"
     }
-  ]
+  ],
+  "originalArchiveLocation": "C:\\Users\\Bassem\\.codex\\worktrees\\checkpoint-consumer\\open-workflow-agentic\\apps\\app-runtime\\target\\conformance\\identity-recovery-20-repeats.zip"
 }

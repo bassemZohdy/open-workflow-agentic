@@ -1,7 +1,7 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline: main `79da38e6638f1f374bce882ea73652512ead91b2`.
-No open PR remains; the owned current-profile consumer is being prepared. Counts stay11 completed/12 partial/30 not started; acceptance
+Current implementation baseline: main `9734347747092b1297136fac168624ae27b61df8`.
+No open PR remains; the current-profile consumer and startup proof are integrated. Counts stay11 completed/12 partial/30 not started; acceptance
 stays3/39. These increments do not close WP-108 or authorize graph entry.
 
 ## Integrated prerequisites and evidence
@@ -45,37 +45,49 @@ stays3/39. These increments do not close WP-108 or authorize graph entry.
   recovery1/default-admission1 passed and migration hash is unchanged.
   Latest main40250625309 passed. See [consumer support](WP-108-checkpoint-consumer-support.md).
 
-## Current owned consumer: Claude stops runtime checkpoint DDL
+- Consumer71 merged as694dc326 after GPT PASS6e02b0e/6406283085 and full
+  40253621994; actual172 suites/1220 cases pass. Real-Keycloak40253622052
+  standard3/delegation8 and effect-recovery1 each are non-skipped. Ignored
+  namespace and function-shadow findings are fixed; independent Java21/PG16
+  focused68 pass. Startup proof72 merged as97343477 after Claude
+  PASS031beee/6406298991 and full40255084555:173 suites/1224 cases pass, including
+  four actual packaged startup scenarios. Postmerge consumer core/provider
+  40254990550/40254990868 and startup40256568737 pass. Source trees/archive hashes and methods
+  verified. See [integration evidence](WP-108-checkpoint-consumer-integration.md).
 
-Follow [the exact handoff](WP-108-checkpoint-profile-activation.md) and current
-consumer-support note. Its schema and shared fixture prerequisites are merged.
-Claude is implementing in a separate worktree; GPT prepares separate packaged
-startup proof. Baseline fresh boot passes while all three intended refusal
-controls fail before the consumer: existing history plus drift, missing tables
-and unsupported configuration currently still become ready. These are expected
-negative-control failures, not a failing main CI run. No consumer is integrated yet.
+## Next ordered gate: V76 entry/backend and composite live fence
 
-1. Stop ResearchAgent.createTables(true). Do not call Flyway or execute adoption/
-   creation DDL from the agent as a workaround. GPT owns migrations/configuration.
-2. Add read-only verification of the actual configured store/current profile before
-   graph/provider work, including startup and an existing migration history. Missing,
-   incompatible or unsupported/shadowed namespaces must refuse; no repair, fallback,
-   fake empty store or private-state deserialization. Request any shared lifecycle
-   or configuration interface from GPT through a concrete owned handoff.
-3. Prove migration-first startup/class-order correctness and refusal before graph/
-   provider effects. Preserve the default unsatisfied legacy admission port.
-4. Keep dedicated credentials/data-source/role deployment as the reviewed consumer/
-   WP-304 boundary. A schema match alone is neither least privilege nor authority.
+Use the older V76 proposal as intake only. Its cloned-metadata test is not an
+actual ordered migration, backend or callback proof. Reconcile against current
+immutable call/binding schema and the actual pinned checkpoint consumer first.
 
-GPT independently reviews the exact head, verifies the relevant tests, inspects
-current required CI and serializes integration after material findings are resolved.
-No second GPT feature family is started while this prerequisite is integrated.
+1. One irreversible entry per original call key, not per credential/owner/epoch.
+   Keep immutable facts and exact target/run/checkpoint outcome references after
+   cancellation or expiry. Use real migration/role/constraint/race tests.
+2. Only the newly acknowledged fresh entry callback may run work. Duplicate or
+   uncertain commits, new credentials/epochs, empty history and UNKNOWN refuse
+   another graph run. Prove actual commit-reply loss and process/owner races.
+3. Compose current registry/full owner/definition/task/approved target/execution
+   ownership with Claude's live identity/grant/scope/PDP hook after blocking I/O,
+   immediately before entry, each model/tool node and output release.
+4. Mint an opaque nonserializable admission witness in the verified path; the
+   public Principal and stored entry/scope are data. Pass private async control
+   context explicitly outside graph state/config/checkpoint metadata; no ambient
+   ThreadLocal. Invalidate cancellation promptly but retire contexts/worker slots
+   only after actual termination. Bound all active/pending live-check work.
+5. Obtain expected acting workload from a server-trusted pinned definition/task/
+   deployment binding, never the token/grant/request/owner. Missing mapping and
+   approved-model context refuse. No default admission allowance is activated.
+
+Claude is preparing the minimal owned identity/PEP hook contract. GPT owns V76
+schema/backend, registry/lease/target composition and actual Flow dispatch. Review
+that handoff before implementation; keep scopes and ownership explicit. The
+original intermittent identity recovery failure remains open, separately tracked.
 
 ## Following ordered gates
 
-After the owned consumer/schema boundary is reviewed and merged, sequence the
-reserved V76 execution-fact/backend and composite live fence against the actual
-pinned store. V77 producer/delivery, V78 allocation, V79 model reservations and
+The owned consumer/schema boundary is merged. Sequence reserved V76 against the
+actual pinned store as above. V77 producer/delivery, V78 allocation, V79 model reservations and
 V80 manual decisions remain later preparations, not active main features.
 
 Canonical original scope/full owner, one irreversible fresh entry acknowledgement,
