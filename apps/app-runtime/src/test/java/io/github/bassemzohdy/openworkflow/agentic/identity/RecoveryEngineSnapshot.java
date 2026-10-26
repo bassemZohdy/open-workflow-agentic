@@ -3,16 +3,22 @@ package io.github.bassemzohdy.openworkflow.agentic.identity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.EngineStatus;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -35,7 +41,7 @@ final class RecoveryEngineSnapshot {
             .map(Enum::name).collect(Collectors.toUnmodifiableSet());
     private static final HttpResponse.BodyHandler<String> BOUNDED_BODY = info ->
             info.statusCode() == 200 && info.headers().firstValueAsLong("content-length").orElse(0) <= MAX_BODY_BYTES
-                    ? HttpResponse.BodySubscribers.ofString(StandardCharsets.UTF_8)
+                    ? new BoundedBodySubscriber()
                     : HttpResponse.BodySubscribers.replacing(null);
 
     private RecoveryEngineSnapshot() { }
@@ -77,6 +83,60 @@ final class RecoveryEngineSnapshot {
             }
             if (client != null) {
                 client.shutdownNow(); // not close(): that waits for the very exchange that just missed its deadline
+            }
+        }
+    }
+
+    /**
+     * Declared length is only a hint (chunked responses declare none), so the bytes actually received are counted: past
+     * {@link #MAX_BODY_BYTES} the stream is cancelled and the body completes exceptionally, with no text of the response.
+     */
+    private static final class BoundedBodySubscriber implements HttpResponse.BodySubscriber<String> {
+        private final CompletableFuture<String> result = new CompletableFuture<>();
+        private final ByteArrayOutputStream received = new ByteArrayOutputStream();
+        private Flow.Subscription subscription;
+        private boolean finished;
+
+        @Override
+        public CompletionStage<String> getBody() {
+            return result;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.subscription = subscription;
+            subscription.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> buffers) {
+            if (finished) {
+                return;
+            }
+            for (ByteBuffer buffer : buffers) {
+                if (received.size() + (long) buffer.remaining() > MAX_BODY_BYTES) {
+                    finished = true;
+                    subscription.cancel();
+                    result.completeExceptionally(new IOException("snapshot body over limit"));
+                    return;
+                }
+                byte[] chunk = new byte[buffer.remaining()];
+                buffer.get(chunk);
+                received.writeBytes(chunk);
+            }
+        }
+
+        @Override
+        public void onError(Throwable ignored) {
+            finished = true;
+            result.completeExceptionally(new IOException("snapshot body failed"));
+        }
+
+        @Override
+        public void onComplete() {
+            if (!finished) {
+                finished = true;
+                result.complete(received.toString(StandardCharsets.UTF_8));
             }
         }
     }

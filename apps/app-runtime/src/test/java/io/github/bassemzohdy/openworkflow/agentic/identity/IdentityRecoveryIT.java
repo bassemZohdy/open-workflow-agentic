@@ -357,7 +357,7 @@ class IdentityRecoveryIT {
             post(process, "/dev/lifecycle/events", null, null, "{\"type\":\"" + EVENT + "\"}");
             Thread.sleep(500);
         }
-        // CI keeps the failsafe XML but not target/process-logs, so the evidence has to travel in the message.
+        // CI now retains target/process-logs (PR68); the snapshot also travels in this message, so it is in the failsafe XML too.
         // The snapshot is evidence only: a diagnostic failure must never replace this failure (no claim about the cause).
         fail("instance " + id + " did not complete; status " + lastRegistryStatus
                 + "; engine instance " + engineId + "; "

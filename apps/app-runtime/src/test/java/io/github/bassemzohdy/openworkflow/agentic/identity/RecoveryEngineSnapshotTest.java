@@ -152,6 +152,43 @@ class RecoveryEngineSnapshotTest {
         assertTrue(elapsedMillis < 2_000, "took " + elapsedMillis + " ms");
     }
 
+    private static final String VALID = "{\"present\":true,\"status\":\"WAITING\"}";
+
+    /** Chunked (no Content-Length) body of exactly {@code size} bytes: a valid answer padded with spaces. */
+    private String serveChunked(int size) throws IOException {
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/", exchange -> {
+            try {
+                exchange.sendResponseHeaders(200, 0);
+                exchange.getResponseBody().write((VALID + " ".repeat(size - VALID.length())).getBytes(StandardCharsets.UTF_8));
+            } catch (IOException clientGone) {
+                // the caller cancelled the oversized stream
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        return "http://127.0.0.1:" + server.getAddress().getPort();
+    }
+
+    @Test
+    void anOversizedChunkedBodyWithoutContentLengthIsRejectedByActualBytes() throws Exception {
+        assertEquals(RecoveryEngineSnapshot.UNAVAILABLE, describe(serveChunked(64 * 1024)));
+        stop();
+        assertEquals(RecoveryEngineSnapshot.UNAVAILABLE, describe(serveChunked(4097)));
+    }
+
+    @Test
+    void aChunkedBodyAtTheLimitIsStillAccepted() throws Exception {
+        assertEquals("engine snapshot: present=true status=WAITING", describe(serveChunked(4096)));
+    }
+
+    @Test
+    void aDeclaredOverLimitBodyIsRejected() throws Exception {
+        String padded = VALID + " ".repeat(5000);
+        assertEquals(RecoveryEngineSnapshot.UNAVAILABLE, describe(serve(200, padded, 0, null)));
+    }
+
     @Test
     void anInterruptedCallerGetsTheMarkerPromptlyAndKeepsItsInterruptFlag() throws Exception {
         String base = serveStalledBody();
