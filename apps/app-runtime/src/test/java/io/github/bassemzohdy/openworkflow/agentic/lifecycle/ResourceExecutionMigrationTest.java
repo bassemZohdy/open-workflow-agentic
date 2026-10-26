@@ -29,7 +29,7 @@ class ResourceExecutionMigrationTest {
     private static final Subject WORKLOAD=new Subject(SubjectKind.WORKFLOW,"execution-schema-fixture");
     private static final String PROFILE=ResearchOutputFingerprint.PROFILE,MEDIA=ResearchOutputFingerprint.CONTENT_TYPE;
     private static Instant now(){return Instant.now().truncatedTo(ChronoUnit.MICROS);}
-    private record Fixture(InstanceRecord row,ResourceCallBinding binding) {
+    record Fixture(InstanceRecord row,ResourceCallBinding binding) {
         ResourceExecutionEntry entry(long epoch){return new ResourceExecutionEntry(binding.scope(),epoch);}
     }
 
@@ -245,7 +245,7 @@ class ResourceExecutionMigrationTest {
         }
     }
 
-    private static Fixture fixture(Database db,String target) throws SQLException {
+    static Fixture fixture(Database db,String target) throws SQLException {
         var registry=new JdbcInstanceStore(db.owner);var ids=UlidGenerator.shared();String tenant="execution-"+UUID.randomUUID();
         var request=new StartRequest(tenant,USER,new DefinitionRef("agentic/execution-schema-test","1"),Map.of(),"start-"+UUID.randomUUID());
         var row=registry.insertIfAbsent(InstanceRecord.starting(ids.next(),request,now()),"test.start").record();
@@ -260,7 +260,7 @@ class ResourceExecutionMigrationTest {
         var binding=new ResourceCallBinding(issuer,jti,grant.id(),scope,issued,expires);
         new JdbcResourceCallBindings(db.owner).bind(binding);return new Fixture(row,binding);
     }
-    private static ResourceCallBinding credential(Database db,Fixture f,Instant issued,Instant expires) {
+    static ResourceCallBinding credential(Database db,Fixture f,Instant issued,Instant expires) {
         var old=f.binding();String jti=UUID.randomUUID().toString();
         new JdbcIssuedTokenBindings(db.owner).bind(old.issuer(),jti,new IssuedTokenBindings.Binding(old.issuingGrantId(),old.scope().tenant(),expires));
         return new JdbcResourceCallBindings(db.owner).bind(new ResourceCallBinding(old.issuer(),jti,old.issuingGrantId(),old.scope(),issued,expires));
@@ -294,11 +294,11 @@ class ResourceExecutionMigrationTest {
     }
     @FunctionalInterface private interface Sql {void run() throws Exception;}
     private static void refused(String state,Sql work){assertEquals(state,assertThrows(SQLException.class,work::run).getSQLState());}
-    private static void execute(DataSource data,String sql) throws SQLException {try(var c=data.getConnection();var q=c.createStatement()){q.setQueryTimeout(10);q.execute(sql);}}
+    static void execute(DataSource data,String sql) throws SQLException {try(var c=data.getConnection();var q=c.createStatement()){q.setQueryTimeout(10);q.execute(sql);}}
     private static long scalar(Connection c,String sql) throws SQLException {try(var q=c.createStatement()){q.setQueryTimeout(5);try(var r=q.executeQuery(sql)){assertTrue(r.next());return r.getLong(1);}}}
-    private static long count(DataSource data,String sql) throws SQLException {try(var c=data.getConnection()){return scalar(c,sql);}}
+    static long count(DataSource data,String sql) throws SQLException {try(var c=data.getConnection()){return scalar(c,sql);}}
     private static String text(DataSource data,String sql) throws SQLException {try(var c=data.getConnection();var q=c.createStatement()){q.setQueryTimeout(5);try(var r=q.executeQuery(sql)){assertTrue(r.next());return r.getString(1);}}}
-    private static Instant databaseNow(DataSource data) throws SQLException {
+    static Instant databaseNow(DataSource data) throws SQLException {
         try(var c=data.getConnection();var q=c.createStatement()) {
             q.setQueryTimeout(5);try(var r=q.executeQuery("select pg_catalog.clock_timestamp()")){assertTrue(r.next());return r.getTimestamp(1).toInstant();}
         }
@@ -312,7 +312,7 @@ class ResourceExecutionMigrationTest {
     private static void await(Condition condition) throws Exception {
         long deadline=System.nanoTime()+Duration.ofSeconds(8).toNanos();while(System.nanoTime()<deadline){if(condition.get())return;Thread.sleep(20);}fail("owned SQL condition was not reached before the bound");
     }
-    private static final class Database implements AutoCloseable {
+    static final class Database implements AutoCloseable {
         final String name="oa_re_facts_"+UUID.randomUUID().toString().replace("-","");final PGSimpleDataSource owner;
         Database() throws SQLException {assertTrue(name.matches("oa_re_facts_[0-9a-f]{32}"));execute(data("postgres"),"create database "+name);owner=data();}
         PGSimpleDataSource data(){return data(name);}

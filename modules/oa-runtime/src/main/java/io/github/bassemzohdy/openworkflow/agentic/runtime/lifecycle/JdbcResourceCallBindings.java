@@ -165,7 +165,7 @@ public class JdbcResourceCallBindings implements ResourceInvocations {
         s.setInt(13,v.iteration()); s.setString(14,v.logicalOccurrence()); s.setString(15,v.audience());
         s.setString(16,v.operation()); s.setString(17,v.targetFingerprint()); s.setString(18,v.requestFingerprint());
     }
-    private static ResourceCallScope scope(ResultSet r) throws SQLException {
+    static ResourceCallScope scope(ResultSet r) throws SQLException {
         var value=new ResourceCallScope(r.getString("tenant"),Ulid.parse(r.getString("instance_id")),
                 new Subject(SubjectKind.valueOf(r.getString("owner_kind")),r.getString("owner_id")),
                 r.getString("application_id"),r.getString("engine_instance_id"),r.getString("namespace"),
@@ -176,7 +176,7 @@ public class JdbcResourceCallBindings implements ResourceInvocations {
                 || !value.occurrenceKey().equals(r.getString("occurrence_key"))) throw conflict();
         return value;
     }
-    private static Optional<ResourceCallBinding> read(Connection c, String issuer, String tokenId) throws SQLException {
+    static Optional<ResourceCallBinding> read(Connection c, String issuer, String tokenId) throws SQLException {
         try(var s=c.prepareStatement("""
                 select c.*,o.occurrence_key,b.binding_key,b.issuer,b.token_id,b.grant_id,b.issued_at,b.expires_at
                 from task.resource_call_binding b join task.resource_call c on c.call_key=b.call_key
