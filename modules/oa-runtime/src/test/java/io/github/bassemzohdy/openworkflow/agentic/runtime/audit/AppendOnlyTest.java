@@ -12,9 +12,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Append-only below the application (M15): plain SQL cannot UPDATE, DELETE or TRUNCATE the audit tables, and the
  * rejection comes from the trigger, not from a missing privilege (the test runs as the table owner). Parent TRUNCATE
- * probes list the parent first and then audit.source_binding when that retained child table exists (its foreign keys
- * would otherwise stop the statement earlier with 0A000). Triggers fire in statement order, so the error must name the
- * parent: a removed parent guard would surface the child's error instead and fail. They always roll back.
+ * probes use TRUNCATE ... CASCADE so every table with an incoming foreign key (audit.source_binding today, any later
+ * child) is part of the statement; without it PostgreSQL stops with 0A000 before any guard runs. The parent is the
+ * explicit relation and its BEFORE TRUNCATE guard fires first, so the error must name the parent: a removed parent
+ * guard would surface a descendant's error instead and fail. They always roll back.
  */
 class AppendOnlyTest {
 
@@ -69,38 +70,34 @@ class AppendOnlyTest {
         return chain;
     }
 
-    private static void assertRejected(SQLException error) {
+    static void assertRejected(SQLException error) {
         assertEquals("42501", error.getSQLState(), error.getMessage());
         assertTrue(error.getMessage().contains("append-only"), error.getMessage());
     }
 
-    /** TRUNCATE of the parent first, then audit.source_binding when the shared database has it. */
-    private static String truncate(String parent) throws SQLException {
-        return "truncate audit." + parent + (sourceBindingExists() ? ", audit.source_binding" : "");
+    /** TRUNCATE of the parent that also takes every table holding a foreign key to it, so no child stops it early. */
+    static String truncate(String parent) {
+        return "truncate audit." + parent + " cascade";
     }
 
-    private static void assertNamesTable(SQLException error, String table) {
+    static void assertNamesTable(SQLException error, String table) {
         assertTrue(error.getMessage().contains("audit table " + table + " is append-only"), error.getMessage());
-    }
-
-    private static boolean sourceBindingExists() throws SQLException {
-        try (Connection connection = AuditTestDatabase.connection();
-             Statement statement = connection.createStatement();
-             var rs = statement.executeQuery("select to_regclass('audit.source_binding') is not null")) {
-            rs.next();
-            return rs.getBoolean(1);
-        }
     }
 
     /** Runs the statement in a transaction that is rolled back whether it fails or unexpectedly succeeds. */
     private static void executeRolledBack(String sql) throws SQLException {
         try (Connection connection = AuditTestDatabase.connection()) {
-            connection.setAutoCommit(false);
-            try (Statement statement = connection.createStatement()) {
-                statement.execute(sql);
-            } finally {
-                connection.rollback();
-            }
+            executeRolledBack(connection, sql);
+        }
+    }
+
+    /** The same probe on a caller-supplied connection (a private database); the connection is left open. */
+    static void executeRolledBack(Connection connection, String sql) throws SQLException {
+        connection.setAutoCommit(false);
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+        } finally {
+            connection.rollback();
         }
     }
 
