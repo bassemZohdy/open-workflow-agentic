@@ -1,7 +1,7 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline: main `b02875f6d00f28d2d837505b56160db70c2dec48`.
-Diagnostic PR69 is open; recovery investigation precedes the consumer. Counts stay11 completed/12 partial/30 not started; acceptance
+Current implementation baseline: main `79da38e6638f1f374bce882ea73652512ead91b2`.
+No open PR remains; the owned current-profile consumer is being prepared. Counts stay11 completed/12 partial/30 not started; acceptance
 stays3/39. These increments do not close WP-108 or authorize graph entry.
 
 ## Integrated prerequisites and evidence
@@ -32,16 +32,28 @@ stays3/39. These increments do not close WP-108 or authorize graph entry.
   Main40246884344 later passed; this is an unresolved intermittent defect. See
   [failure metadata](evidence/WP-108-checkpoint-profile/postmerge-recovery-failure.json).
   Diagnostics68 merged as2bba3a5 after exact Claude PASS1a1adf0 and full40248132488;
-  process logs are retained. Claude69 adds unchanged-assertion timeout diagnostics.
-  Linux repeat verification is underway; runtime consumer work is paused.
+  process logs are retained. Claude69 merged asc8dabf6 after exact GPT PASS5eb7d1a
+  and full40248398566 plus real-Keycloak40248398613 standard3/delegation8.
+  One initial Linux run plus20 recorded repeats pass; the original defect stays open.
+  See [local repeat evidence](evidence/WP-108-checkpoint-profile/identity-recovery-local-repeats.json).
   V75_1 preserves compatible private history,
   refuses unsupported/partial/active stores and adds the observed collation gap
   regression. Runtime DDL removal and data-source adoption are not activated.
 
-## Following recovery investigation: Claude stops runtime checkpoint DDL
+- Shared checkpoint mutation fixtures70 merged as79da38e after exact Claude
+  PASSb9db578/6405603074 and full40249904765; actual schema10/24 observations,
+  recovery1/default-admission1 passed and migration hash is unchanged.
+  Latest main40250625309 passed. See [consumer support](WP-108-checkpoint-consumer-support.md).
 
-Follow [the exact handoff](WP-108-checkpoint-profile-activation.md). Its schema
-prerequisite is merged. Use a separate Claude branch/worktree from current main.
+## Current owned consumer: Claude stops runtime checkpoint DDL
+
+Follow [the exact handoff](WP-108-checkpoint-profile-activation.md) and current
+consumer-support note. Its schema and shared fixture prerequisites are merged.
+Claude is implementing in a separate worktree; GPT prepares separate packaged
+startup proof. Baseline fresh boot passes while all three intended refusal
+controls fail before the consumer: existing history plus drift, missing tables
+and unsupported configuration currently still become ready. These are expected
+negative-control failures, not a failing main CI run. No consumer is integrated yet.
 
 1. Stop ResearchAgent.createTables(true). Do not call Flyway or execute adoption/
    creation DDL from the agent as a workaround. GPT owns migrations/configuration.

@@ -1,0 +1,206 @@
+{
+  "scope": "Local repeated packaged-process identity recovery; not a product fix or full acceptance closure.",
+  "sourceCommit": "5eb7d1a5ef7eb9e5b8e5a2c197431df959f7da09",
+  "java": "Temurin21.0.9+10 Linux",
+  "postgres": "16.15",
+  "mavenImageId": "sha256:6fdc855a6ed81d288ca7ca37ac6ff5e9308b612485c0801d70b25a858c83d237",
+  "command": "mvn -B -o -pl apps/app-runtime org.apache.maven.plugins:maven-failsafe-plugin:3.5.3:integration-test org.apache.maven.plugins:maven-failsafe-plugin:3.5.3:verify -Dit.test=IdentityRecoveryIT -Dfailsafe.failIfNoSpecifiedTests=false",
+  "tests": 20,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "archiveSha256": "5b54875f2659a6519997baf84659c7410e301b1aef35d0d93e5e831b9d85f436",
+  "archiveBytes": 702049,
+  "localArchive": "C:\\Users\\Bassem\\.codex\\worktrees\\checkpoint-consumer\\open-workflow-agentic\\apps\\app-runtime\\target\\conformance\\identity-recovery-20-repeats.zip",
+  "initialReactorVerify": {
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 38.14
+  },
+  "excludedHarnessSetupAttempts": "Two earlier harness attempts ran no tests (offline plugin metadata, then missing locally installed reactor jars). They are excluded from these counts.",
+  "limitation": "Run40246336207 remains an unresolved timing-dependent failure. Twenty non-reproducing repeats and later CI passes do not establish a fix.",
+  "runs": [
+    {
+      "run": 1,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 37.873,
+      "xmlSha256": "d012d6ecb7757c6c6973a64c0111416774ed66ddf2b8b257719398e9ffcce6f1"
+    },
+    {
+      "run": 2,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 35.519,
+      "xmlSha256": "d8b8ce60c07702df5440d25bc60c68c2ac3858950346324fe35371b60a236093"
+    },
+    {
+      "run": 3,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 40.076,
+      "xmlSha256": "937e0fa9e73338ce20b95618b1103af48825659f2161aab3e3517c4e9de77536"
+    },
+    {
+      "run": 4,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 36.21,
+      "xmlSha256": "e0e547b23412c9e2bd1b1b86406667cab29a7e5f136418b0d8444e508a184b93"
+    },
+    {
+      "run": 5,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 40.415,
+      "xmlSha256": "a0a9a9fbc91ecf7b78c78ff846f3377d059b2eae949072e96c37c0ecd6ef569e"
+    },
+    {
+      "run": 6,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 38.856,
+      "xmlSha256": "c9429031318f29f201cc84336a78de9c029896b1966855930617faec2cd7011e"
+    },
+    {
+      "run": 7,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 42.153,
+      "xmlSha256": "ebf908eec7fbdf3358469aef661c0ea9aa499369a5d13e2489f0f4e79ac2f4d5"
+    },
+    {
+      "run": 8,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 44.653,
+      "xmlSha256": "de941fcfb867c1641f3c2e9f66fae0c0eb8aef218b23ae409b234e4f495a9628"
+    },
+    {
+      "run": 9,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 41.197,
+      "xmlSha256": "b62c7bbf562dfb15e634aac2a807f35c18ca98c29a03ba9acd097aec360e5e97"
+    },
+    {
+      "run": 10,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 38.502,
+      "xmlSha256": "9dfeec59520549009453789523ba9f05954cd32dfa2fc20dbe8fac77f74c08f6"
+    },
+    {
+      "run": 11,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 37.189,
+      "xmlSha256": "c3b896e79d99eae6e32b1c435fb8cd9609384dd522acc251b557c0c5b0dd8472"
+    },
+    {
+      "run": 12,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 36.783,
+      "xmlSha256": "2f6e1b92682656ecb6ccee411fc60ad8a283280132310a57f5ec33b5ab0434c0"
+    },
+    {
+      "run": 13,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 36.042,
+      "xmlSha256": "c26a4c62d752df16f78cbbf123c3565a89742e606856b9d79938b531e81eb091"
+    },
+    {
+      "run": 14,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 36.361,
+      "xmlSha256": "07f7be7b1d0ff10cd10b6286d8d829c363cc9535ddacfb46b67910b9e4100a24"
+    },
+    {
+      "run": 15,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 36.141,
+      "xmlSha256": "51666bc5b7fb3527c89e088586509215ee1e59a4d0c4616e80c53add0c092e00"
+    },
+    {
+      "run": 16,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 44.39,
+      "xmlSha256": "b988f8c5565c56335d4cfad10ca6043a5bcd3825793c828fb87083aede520aad"
+    },
+    {
+      "run": 17,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 42.512,
+      "xmlSha256": "cbcbd74671d2633d889a933922d398a50e554cbf4decee041b659c7afc4697dd"
+    },
+    {
+      "run": 18,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 40.815,
+      "xmlSha256": "f879cb3ad016d4a18423fb4de958b15f6051de22dd1fd9f6b5ebe653b5872a4a"
+    },
+    {
+      "run": 19,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 41.299,
+      "xmlSha256": "e304dedb00ec3256ceee9daf02df67f1e246bb036bcd8baf0f93d033ee6c8fae"
+    },
+    {
+      "run": 20,
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 34.675,
+      "xmlSha256": "d0896da4ecaf6cd33c1e805a90b47e733f39c4075db870e69c766ba07f0c1324"
+    }
+  ]
+}
