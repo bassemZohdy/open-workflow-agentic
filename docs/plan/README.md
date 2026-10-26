@@ -6,20 +6,26 @@ This plan turns the 64 requirements and 39 acceptance tests ([requirements](../r
 
 ## Current progress and next work
 
-The plan contains **53 work packages**: **11 completed**, **10 partial**, and **32 not started**. Five completed
-packages are research outcomes; their prototype code is removed. Only **T01 and T07 (2 of 39 acceptance cases)**
+The plan contains **53 work packages**: **11 completed**, **12 partial**, and **30 not started**. Five completed
+packages are research outcomes; their prototype code is removed. Only **T01, T03 and T07 (3 of 39 acceptance cases)**
 are recorded as automated. [TODO.md](../../TODO.md) is the complete generated checklist;
 [CHANGELOG.md](../../CHANGELOG.md) records shipped scope and requirement evidence.
 
 The merged code includes foundation/testkit work, contracts, policy and audit components, workflow/output validation,
 lifecycle registry/outbox/recovery/operator APIs and identity/delegation. Full requirement coverage remains partial.
-WP-102 cannot close until the real Keycloak integration in identity.md section 9 is run and recorded; the passing
-T07 suite uses in-process stand-ins. Audit caller/PDP wiring also remains open.
+Strict real-Keycloak interop evidence is recorded for the selected native-delegation preview profile and the standard
+actorless-rejection profile; T07 also retains in-process acceptance fixtures. WP-102 remains partial because the real
+asynchronous Flow dispatch/resume consumer is not complete. A previously observed packaged-process identity recovery
+failure is unresolved (issue #75), despite subsequent passing runs. API audit-caller binding is integrated, while
+model/tool and end-to-end execution policy/audit gates remain open.
 
 Execution now uses [two backlogs in TODO.md](../../TODO.md#two-agent-delivery-plan): **GPT owns 21 unfinished
 packages** across execution/platform/evaluation; **Claude owns 21** across identity/policy/agents/governance.
-Each reviews the other's implementation PRs at the current commit. GPT starts with WP-108's durable effect
-ledger independently of a WP-102 design handoff; Claude starts with WP-102's audit-caller binding and real-IdP evidence. Consumers gate on their required merged interface, not whole WP-102 closure. Claude review of each exact implementation head and passing CI remain mandatory before merge.
+Each reviews the other's implementation PRs at the current commit. GPT continues WP-108's durable execution backend
+independently of whole-WP-102 closure; Claude continues the live identity/policy consumers and the recovery investigation.
+As of 2026-10-26, data-only V76 PR #74 has passing full CI but still requires exact-head Claude review before merge.
+Consumers gate on their required merged interface, not an entire unfinished package. Claude review of each exact
+implementation head and passing CI remain mandatory before merge.
 Both queues specify merged prerequisite handoffs and outcomes, while the detailed package checklists retain
 all closure gates. WP-105's existing core can support new work; its full T16 recovery proof follows ledger,
 inbox and timer integration. T23 stays with WP-305 for cross-task emergency revocation.
