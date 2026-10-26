@@ -151,10 +151,21 @@
       ]
     }
   },
-  "peerReview": "pending Claude session reset 2026-10-26 09:50 Asia/Dubai",
+  "peerReview": "Claude PASS exact3f37b3ba2a37981f2a99ad497227dab198719531",
   "scope": "schema DATA only; no backend/current authority",
   "actualCheckout": "2f5a91d86ce3f72bd164d87c18ff22a9384547fd",
   "testedTree": "bc26193877ec3bfe71307d516c553025f111797a",
   "headTreeMatches": true,
-  "mergeState": "not merged; exact Claude review pending"
+  "mergeState": "merged",
+  "peerReviewComment": 6419457964,
+  "peerIndependent": {
+    "java": "21.0.12.1",
+    "postgres": "16",
+    "tests": 60,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "manualMutationControlsRerun": false
+  },
+  "mergeCommit": "561c6915bd34799b248de30ac33f5b144ce04998"
 }

@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge V76 facts PR74 as561c691 after exact Claude PASS3f37b3b/6419457964 and an independent60-case Java21/PG16 rerun. Full40265793674 remains verified at1262 cases with zero failures/errors/skips. V76 retains data only; next separate owned JDBC entry gate and live identity check do not yet enable production dispatch. V77-V80, composite current authority, Flow/recovery and package acceptance remain gated.
+
 - Verify V76 candidate74 exact3f37b3b with full40265793674:175 XML suites/1262 cases, zero failures/errors/skips. Inspect actual schema20, older parent22, witness18, startup4, default-denial1 and recovery1 plus archive digest/CRC and matching tested tree. Preserve initial failed CI and local missing-guard evidence. Claude exact review remains blocked by its session limit until09:50 Dubai; do not merge or activate V76 before that gate. Admission73 postmerge full/provider checks pass; no package/acceptance promotion.
 
 - Merge admission-witness73 asa87fc292 after exact GPT review9ce4279 and inspected full1242-case plus real-provider CI. Retain per-call isolated closure and default-denying wiring; live identity fence/graph adoption remain future gates. V76 PR74 corrects two earlier parent TRUNCATE probes for new FK descendants and passes combined60 locally; current CI and exact Claude review are pending after a recorded failed run.
