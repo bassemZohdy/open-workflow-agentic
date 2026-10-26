@@ -151,11 +151,15 @@ public final class JdbcResourceModelCalls implements ResourceModelCalls {
         return Transactions.inTransaction(data,c->{
             try(var limits=c.createStatement()) {
                 limits.execute("set local search_path = pg_catalog, pg_temp");
+                String isolation;
+                try(var r=limits.executeQuery("show transaction_isolation")){r.next();isolation=r.getString(1);}
                 if(snapshot) {
-                    String isolation;
-                    try(var r=limits.executeQuery("show transaction_isolation")){r.next();isolation=r.getString(1);}
                     limits.execute(isolation.equals("serializable")?"set transaction read only":
                             "set transaction isolation level repeatable read read only");
+                } else if(!isolation.equals("read committed")) {
+                    // An unchanged row lock does not refresh a REPEATABLE READ snapshot of sibling holds.
+                    // Refuse unsupported writer profiles rather than silently weakening configured isolation.
+                    throw new IllegalStateException("model reservation writes require READ COMMITTED");
                 }
                 limits.execute("""
                     do $$ begin

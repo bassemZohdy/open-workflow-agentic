@@ -195,7 +195,7 @@ class ModelCallReservationStoreTest {
         support.entry(f);assertThrows(StoreUnavailableException.class,()->answer(calls,node("graph/plan"),effects));
         assertEquals(0,effects.get());assertEquals(0,count("model_budget_account"));
     }
-    @Test void inheritSerializableAndStricterTimeoutsForWritesAndHistoricalSnapshotsWithoutJdbcSetters() throws Exception {
+    @Test void serializableWritesRefuseWithoutDowngradeAndHistoricalSnapshotsRetainStricterSettings() throws Exception {
         enter();var commits=new ArrayList<String>();var strict=wrapping(data,c->{c.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
             try(var s=c.createStatement()){s.execute("set lock_timeout='100ms';set statement_timeout='500ms'");}
             return (Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class[]{Connection.class},(p,m,args)->{
@@ -203,7 +203,9 @@ class ModelCallReservationStoreTest {
                 if(m.getName().equals("commit"))commits.add(ResourceTaskAllocationMigrationTest.scalar(c,"select current_setting('transaction_isolation')||':'||current_setting('lock_timeout')||':'||current_setting('statement_timeout')"));
                 return invoke(m,c,args);
             });});
-        var gate=new JdbcResourceModelCalls(strict,manager);var n=node("graph/plan");answer(gate,n,new AtomicInteger());assertTrue(gate.find(n).isPresent());
+        var gate=new JdbcResourceModelCalls(strict,manager);var n=node("graph/plan");var effects=new AtomicInteger();
+        assertThrows(IllegalStateException.class,()->answer(gate,n,effects));assertEquals(0,effects.get());assertEquals(0,held());
+        answer(calls,n,effects);assertTrue(gate.find(n).isPresent());
         assertFalse(commits.isEmpty());assertTrue(commits.stream().allMatch("serializable:100ms:500ms"::equals));
     }
     @Test void siblingsShareOneActualParentCapRatherThanReceivingFreshIndependentSourceBudgets() throws Exception {
@@ -305,5 +307,103 @@ class ModelCallReservationStoreTest {
         }));
         assertEquals(1,effects.get());assertEquals(1000,held());assertTrue(calls.find(n).isPresent());
         assertThrows(ModelCallAlreadyReservedException.class,()->answer(calls,n,effects));assertEquals(1,effects.get());
+    }
+    void parentWithCap(long cap) throws Exception {
+        var old=a.contract();var child=new AgentTaskContract(old.id(),old.goal(),old.permittedTools(),old.permittedDataScopes(),old.riskTier(),
+            new ExecutionLimits(5,Duration.ofSeconds(120),1000),old.requestingSubject(),old.delegationGrantId());
+        var p=new AgentTaskContract(UlidGenerator.shared().next(),"concurrent parent cap",old.permittedTools(),old.permittedDataScopes(),RiskTier.MEDIUM,
+            new ExecutionLimits(10,Duration.ofSeconds(600),cap),old.requestingSubject(),f.binding().issuingGrantId());
+        var pending=new AgentTaskRecord(p.id(),a.scope().tenant(),a.scope().owner(),a.scope().instanceId().value(),
+            ThreadId.derive(a.scope().tenant(),a.scope().owner().id(),a.scope().instanceId().value()),p,AgentTaskStatus.PENDING,0);
+        var running=new AgentTaskRecord(pending.taskId(),pending.tenant(),pending.owner(),pending.workflowInstance(),pending.threadId(),p,AgentTaskStatus.RUNNING,1);
+        var tasks=new JdbcTaskStore(data);tasks.insert(pending);tasks.replace(running,0);
+        enter(new ResourceTaskAllocation(a.scope(),p.id(),child,a.modelProfile()),f);
+    }
+    ResourceModelCall siblingNode(int occurrence) throws Exception {
+        var scope=a.scope();var sibling=new ResourceCallScope(scope.tenant(),scope.instanceId(),scope.owner(),scope.applicationId(),scope.engineInstanceId(),
+            scope.namespace(),scope.definition(),scope.version(),scope.taskPosition(),occurrence,"root/sibling/"+occurrence,
+            scope.audience(),scope.operation(),scope.targetFingerprint(),scope.requestFingerprint());
+        var expires=databaseNow(data).plusSeconds(120);var jti=UUID.randomUUID().toString();
+        new JdbcIssuedTokenBindings(data).bind(f.binding().issuer(),jti,new IssuedTokenBindings.Binding(f.binding().issuingGrantId(),scope.tenant(),expires));
+        var binding=new ResourceCallBinding(f.binding().issuer(),jti,f.binding().issuingGrantId(),sibling,expires.minusSeconds(121),expires);
+        new JdbcResourceCallBindings(data).bind(binding);var old=a.contract();
+        var child=new AgentTaskContract(UlidGenerator.shared().next(),old.goal(),old.permittedTools(),old.permittedDataScopes(),old.riskTier(),
+            old.limits(),old.requestingSubject(),old.delegationGrantId());
+        enter(new ResourceTaskAllocation(sibling,a.parentTaskId(),child,a.modelProfile()),new Fixture(f.row(),binding));return node("graph/plan");
+    }
+    void concurrentParentRace(int isolation) throws Exception {
+        parentWithCap(2500);answer(calls,node("graph/seed"),new AtomicInteger());
+        var first=siblingNode(2);var second=siblingNode(3);var effects=new AtomicInteger();
+        var pids=new CopyOnWriteArrayList<Integer>();var begun=new CountDownLatch(2);var pool=Executors.newFixedThreadPool(2);
+        var configured=wrapping(data,c->{c.setTransactionIsolation(isolation);
+            pids.add(Integer.valueOf(ResourceTaskAllocationMigrationTest.scalar(c,"select pg_backend_pid()")));begun.countDown();return c;});
+        try(var held=data.getConnection()) {
+            held.setAutoCommit(false);try(var q=held.prepareStatement("select id from task.instance where id=? for update")){
+                q.setString(1,a.scope().instanceId().value());q.executeQuery().close();}
+            var results=new ArrayList<Future<String>>();for(var n:List.of(first,second))results.add(pool.submit(()->{
+                try{answer(new JdbcResourceModelCalls(configured,manager),n,effects);return "CALLED";}
+                catch(ModelBudgetExhaustedException expected){return "BUDGET";}
+                catch(IllegalStateException refused){return "REFUSED";}
+            }));
+            assertTrue(begun.await(3,TimeUnit.SECONDS));long bound=System.nanoTime()+Duration.ofSeconds(2).toNanos();
+            while(!results.stream().allMatch(Future::isDone)) {
+                String ids=pids.get(0)+","+pids.get(1);
+                if(ResourceExecutionMigrationTest.count(data,"select count(distinct pid) from pg_locks where pid in ("+ids+") and not granted")==2)break;
+                if(System.nanoTime()>bound)fail("writers neither refused before I/O nor reached the real registry lock wait");Thread.sleep(10);
+            }
+            held.commit();var outcomes=new ArrayList<String>();for(var result:results)outcomes.add(result.get(10,TimeUnit.SECONDS));
+            if(isolation==Connection.TRANSACTION_READ_COMMITTED) {
+                assertEquals(1,Collections.frequency(outcomes,"CALLED"));assertEquals(1,Collections.frequency(outcomes,"BUDGET"));
+                assertEquals(1,effects.get());assertEquals(2000,held());
+            } else {
+                assertEquals(1000,held(),"unsupported writer snapshots must not mint sibling holds beyond the original2500 cap");
+                assertEquals(0,effects.get());assertEquals(List.of("REFUSED","REFUSED"),outcomes);
+            }
+            assertEquals(1,count("model_budget_account"));
+        } finally {pool.shutdownNow();assertTrue(pool.awaitTermination(5,TimeUnit.SECONDS));}
+    }
+    @Test void readCommittedConcurrentSiblingsShareTheActualParentCapAfterTheLockWait() throws Exception {
+        concurrentParentRace(Connection.TRANSACTION_READ_COMMITTED);
+    }
+    @Test void repeatableReadWritersCannotMintSiblingHoldsFromAStaleSnapshot() throws Exception {
+        concurrentParentRace(Connection.TRANSACTION_REPEATABLE_READ);
+    }
+    @Test void serializableConcurrentWritersRefuseWithoutDowngradingTheirConfiguredIsolation() throws Exception {
+        concurrentParentRace(Connection.TRANSACTION_SERIALIZABLE);
+    }
+    @Test void directSqlCannotBypassTheWriterIsolationGate() throws Exception {
+        enter();for(int isolation:List.of(Connection.TRANSACTION_REPEATABLE_READ,Connection.TRANSACTION_SERIALIZABLE)) {
+            try(var c=data.getConnection();var q=c.prepareStatement("""
+                insert into task.model_budget_account(account_key,tenant,instance_id,owner_kind,owner_id,anchor_kind,anchor_id)
+                values(?,?,?,?,?,'ALLOCATION',?)
+                """)) {
+                c.setTransactionIsolation(isolation);c.setAutoCommit(false);q.setString(1,ModelBudgetAccount.keyFor(a));q.setString(2,a.scope().tenant());
+                q.setString(3,a.scope().instanceId().value());q.setString(4,a.scope().owner().kind().name());q.setString(5,a.scope().owner().id());q.setString(6,a.key());
+                assertEquals("25001",assertThrows(SQLException.class,q::executeUpdate).getSQLState());c.rollback();
+            }
+        }
+        assertEquals(0,count("model_budget_account"));assertEquals(0,held());var positive=node("graph/positive");
+        answer(calls,positive,new AtomicInteger());assertEquals(1000,held());var retained=calls.find(positive).orElseThrow();
+        for(int isolation:List.of(Connection.TRANSACTION_REPEATABLE_READ,Connection.TRANSACTION_SERIALIZABLE)) {
+            var n=node("graph/direct-sql");try(var c=data.getConnection()) {
+                c.setTransactionIsolation(isolation);c.setAutoCommit(false);
+                try(var q=c.prepareStatement("""
+                    insert into task.model_call_reservation(reservation_key,call_key,entry_key,executor,node_occurrence,
+                        request_fingerprint,max_output_tokens,intent_fingerprint,allocation_key,allocation_fingerprint,account_key)
+                    values(?,?,?,?,?,?,?,?,?,?,?)
+                    """)) {
+                    q.setString(1,n.key());q.setString(2,n.entry().callKey());q.setString(3,n.entry().fingerprint());q.setObject(4,n.executor());
+                    q.setString(5,n.nodeOccurrence());q.setString(6,n.requestFingerprint());q.setInt(7,n.maxOutputTokens());q.setString(8,n.fingerprint());
+                    q.setString(9,a.key());q.setString(10,a.fingerprint());q.setString(11,retained.account().key());
+                    assertEquals("25001",assertThrows(SQLException.class,q::executeUpdate).getSQLState());c.rollback();
+                }
+                try(var q=c.prepareStatement("select task.model_call_current_v1(?,?,?,?,?)")) {
+                    q.setString(1,n.entry().callKey());q.setString(2,a.fingerprint());q.setString(3,n.entry().fingerprint());
+                    q.setObject(4,n.executor());q.setString(5,retained.account().key());
+                    assertEquals("25001",assertThrows(SQLException.class,q::executeQuery).getSQLState());c.rollback();
+                }
+            }
+        }
+        assertEquals(1,count("model_call_reservation"));assertEquals(1000,held());
     }
 }

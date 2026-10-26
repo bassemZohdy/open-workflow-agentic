@@ -94,6 +94,9 @@ create function task.model_budget_account_guard() returns trigger language plpgs
 declare registry task.instance%rowtype; parent task.agent_task%rowtype; a task.resource_task_allocation%rowtype;
         invocation task.resource_call%rowtype; source jsonb; source_deadline timestamptz; clock_value timestamptz;
 begin
+    if current_setting('transaction_isolation') <> 'read committed' then
+        raise exception 'model accounting writes require READ COMMITTED' using errcode='25001';
+    end if;
     select * into registry from task.instance where id=new.instance_id for update;
     if not found or registry.tenant is distinct from new.tenant or registry.owner_kind is distinct from new.owner_kind
        or registry.owner_id is distinct from new.owner_id or registry.status not in ('RUNNING','WAITING') then
@@ -155,6 +158,9 @@ declare invocation task.resource_call%rowtype; registry task.instance%rowtype; a
         clock_value timestamptz; expected_anchor text; expected_kind text; contract_hash text; profile_hash text;
         root_contract jsonb; root_deadline timestamptz;
 begin
+    if current_setting('transaction_isolation') <> 'read committed' then
+        raise exception 'model accounting writes require READ COMMITTED' using errcode='25001';
+    end if;
     select * into invocation from task.resource_call where call_key=call_identity;
     if not found then raise exception 'model call source missing' using errcode='foreign_key_violation';end if;
     select * into registry from task.instance where id=invocation.instance_id for update;
@@ -250,6 +256,9 @@ declare a task.resource_task_allocation%rowtype; b task.model_budget_account%row
         clock_value timestamptz; leaf_held bigint; root_held bigint; used_calls integer; ceiling bigint; calls integer;
         timeout_micros bigint;
 begin
+    if current_setting('transaction_isolation') <> 'read committed' then
+        raise exception 'model accounting writes require READ COMMITTED' using errcode='25001';
+    end if;
     if new.account_fingerprint is not null or new.held_micros is not null or new.allocation_remaining_after is not null
        or new.account_remaining_after is not null or new.ordinal is not null or new.calls_remaining is not null
        or new.reserved_at is not null or new.call_deadline is not null or new.fingerprint is not null then

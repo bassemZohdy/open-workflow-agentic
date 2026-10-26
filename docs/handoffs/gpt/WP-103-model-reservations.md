@@ -42,7 +42,7 @@ approval, lease ownership, physical timeout and single provider attempt.
 
 The JDBC constructor requires a transaction manager. Failure to resume refuses an
 otherwise successful return; simultaneous primary/resume failures preserve the
-primary with the resume failure suppressed. Writes preserve inherited isolation;
+primary with the resume failure suppressed. Reservation/current-check writes require READ COMMITTED and refuse every other configured isolation without downgrading it;
 historical snapshots use at least REPEATABLE READ and retain SERIALIZABLE. Owned
 transaction-local namespace pins and 2s lock/5s statement bounds preserve stricter
 nonzero settings. They are not an acquisition/network/whole-call timeout guarantee.
@@ -57,7 +57,7 @@ to applied migration history. This is not deployed executor/writer-role proof.
 
 ## Verification
 
-Actual Temurin21.0.12.1+1 / Maven3.9.11 / PostgreSQL16.15: restored full allocation/reservation family116 passes (contracts15/runtime4/app97), zero failures/errors/skips. Two final test-only additions pass in a separate named delta2 run; no production change followed the116 run. The final peer selection is118 (contracts15/runtime4/app99: model store22/migration5 plus prior allocation72). Exact peer and current required CI remain pending. Logs: target/model-reservations-{fence-negative,restored-final,final-delta}.log. Initial six contract plus sixteen store cases had
+Actual Temurin21.0.12.1+1 / Maven3.9.11 / PostgreSQL16.15: restored full allocation/reservation family116 passes (contracts15/runtime4/app97), zero failures/errors/skips. Two final test-only additions pass in a separate named delta2 run; no production change followed the116 run. The final peer selection is118 (contracts15/runtime4/app99: model store22/migration5 plus prior allocation72). That initial head subsequently received Claude REQUEST_CHANGES for inherited REPEATABLE READ sibling accounting; those earlier passes are not current-head approval. Logs: target/model-reservations-{fence-negative,restored-final,final-delta}.log. Initial six contract plus sixteen store cases had
 one fixture error: a parent was inserted RUNNING despite the existing PENDING insert
 contract. The fixture now uses real pending insertion and running transition; the
 expanded six-contract/eighteen-store run passes24.
@@ -86,3 +86,33 @@ categories, actual Flow terminal/recovery and physical async termination remain 
 The shipped approved-model context and canonical admission still refuse by default.
 Issues75/76 and the allocation migration plan remain open; no historical backfill,
 parent thread remapping or permission from a receipt/hash/readback is introduced.
+
+
+## Peer correction: stale writer snapshots
+
+Claude found that an unchanged registry-row lock cannot refresh an inherited
+REPEATABLE READ view of sibling holds. Root reproduced the ACTUAL old component:
+seed1000 plus two sibling1000 holds committed against one original2500 parent cap,
+for actual total3000. The new regression failed expected retained1000/actual3000.
+This is not just a separate psql demonstration. No real provider was called.
+
+The corrected protocol requires READ COMMITTED for mutation/current-check transactions
+in Java and in all three proposed SQL guard paths. Unsupported settings are refused,
+never silently weakened. Historical snapshots still retain SERIALIZABLE and stricter
+100ms/500ms settings. New true concurrent sibling cases cover read committed (exactly
+one new1000 hold/callback after an observed registry-lock wait) and repeatable read /
+serializable (both refuse, seed hold unchanged), plus direct SQL isolation refusal.
+Five focused fixed-isolation cases pass. The old Java/SQL bytes were used only for the
+negative control, then the corrected bytes restored for the full122-case rerun.
+Current full122, exact new-head peer review and required CI remain pending.
+
+The initial independent118 run had one private database teardown timeout while another
+broad test run was creating/dropping databases; all bodies passed, and independent
+store22 rerun passed. No clean single118 peer pass is claimed. Cleanup used no FORCE.
+
+Additional limits: this account protocol aggregates only an immediate parent task or
+root allocation, not a grandparent hierarchy. Privileged deletion of a reservation
+TAIL with triggers bypassed is not detectable here; normal immutable guards and the
+future restricted production-role boundary are required. Hashes do not prove database
+owner honesty or restore/rollback authenticity. These limits do not authorize reentry
+from historical data or relax the default denial / actual producer gates.
