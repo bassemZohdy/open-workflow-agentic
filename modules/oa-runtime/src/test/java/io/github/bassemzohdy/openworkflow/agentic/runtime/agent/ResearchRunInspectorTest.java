@@ -46,9 +46,8 @@ class ResearchRunInspectorTest {
     private static DataSource ds;
 
     @BeforeAll
-    static void migratedDatabaseWithSaverTables() throws Exception {
+    static void migratedDatabase() throws Exception {
         ds = AgentTestDatabase.dataSource();
-        agent(ds, (s, u) -> OK); // the saver creates its tables here, after Flyway
     }
 
     private static ResearchAgent agent(DataSource dataSource, LlmClient llm) throws Exception {

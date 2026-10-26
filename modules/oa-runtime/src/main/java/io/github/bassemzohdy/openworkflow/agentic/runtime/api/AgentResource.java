@@ -8,6 +8,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.CheckpointProfileException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ModelCallRefused;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchAgent;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AgentResourceAdmission;
@@ -125,6 +126,10 @@ public class AgentResource {
         ResearchState state;
         try {
             state = agent.run(thread.value(), request.topic());
+        } catch (CheckpointProfileException notReady) {
+            // checked before any node: no model call was made. Only the fixed reason code is shown, never database text
+            throw new ProblemException(Response.Status.SERVICE_UNAVAILABLE,
+                    "the checkpoint store is not ready (" + notReady.reason().code() + "); the agent was not run");
         } catch (RuntimeException failure) {
             // the graph wraps a node's exception; a refusal of the model boundary is found in the cause chain
             for (Throwable t = failure; t != null && t.getCause() != t; t = t.getCause()) {
