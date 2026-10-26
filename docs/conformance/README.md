@@ -2,6 +2,13 @@
 
 **Status: static test fixtures only. No engine conformance has been proven.**
 
+## Pinned source-shape correction — 2026-10-26
+
+Checked the [official OWS 1.0.3 JSON Schema](https://open-workflow-specification.org/schemas/1.0.3/workflow.json): `for.in` is a **runtime expression string**, not a literal JSON array; `use.extensions` is an **array of single-name objects**, not a mapping. The original draft static inventory allowed invalid shapes. The corrected inventory now rejects these and the fixture uses `.items`; a targeted negative test covers both. This is an exact-shape correction only, **not** full schema validation.
+
+Validated independently with Python 3 locally: `python -m unittest discover -s tools -p 'test_ows_portability.py' -v` — **9 passed** (no skips); no Maven/Quarkus/Google ADK engine or GitHub CI run is claimed.
+
+
 This is a deliberately isolated increment: no runtime, identity, CI, migration, shared contract, or active work-package changes.
 
 - Fixture inputs: docs/conformance/fixtures/*.json — OWS 1.0.3 JSON examples of sequence, conditional/nested tasks, fork and iteration.
