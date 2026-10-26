@@ -1,0 +1,25 @@
+**Claude verdict: PASS** for exact HEAD `5503932626710b16d57e95379d6ed32a09321e56` (PR90, `gpt/WP-105-recovery-diagnostics`). The tree was clean and I made no edits, commits or external comments.
+
+**Test run.** I ran the Java 21.0.12.1 JDK with Maven 3.9.11 from the repository root, using `-B -pl apps/app-runtime -am test -Dtest=DevLifecycleResourceTest -Dsurefire.failIfNoSpecifiedTests=false`.
+- Result: `Tests run: 5, Failures: 0, Errors: 0, Skipped: 0`. `BUILD SUCCESS` across all 5 reactor modules.
+- This covers the unit test only. It does not exercise a running Quarkus app or Linux CI, and the handoff lists CI as still pending.
+
+**What I checked**
+- **Disabled-probe guard:** `/engine` returns 404 on `if (!enabled)` before it reads any parameter or touches the engine. This matches the existing `/effects`, `/secret-probe` and `/events` endpoints. The test covers both `engine` and `publish`.
+- **Snapshot semantics:**
+  - A held instance reports its real `EngineStatus` as `present=true`. The test loops over every enum value.
+  - An empty result reports `present=false, status="ABSENT"`. The `WorkflowEngine.activeInstance` javadoc says empty means never restored, finished, or cancelled, and the code comment and handoff state ABSENT is not completion. The code never maps ABSENT to COMPLETED.
+  - An unpinned or undeployed definition also reads as ABSENT. That is consistent with "unknown", but it can't be told apart from a finished instance.
+  - A `RuntimeException` gives 503 `UNAVAILABLE` with no entity text.
+  - A bad definition, version or instance id (blank or over 256 characters) gives 400 before the engine is touched.
+- **No state change or authority:** the only engine call is `activeInstance`. In `FlowWorkflowEngine` that is a read-only lookup followed by a status mapping. The test engine throws `AssertionError` on `prepare` and `hasDefinition`. The endpoint reads no authority and no secrets, and it is covered by the existing `enabled` flag.
+- **Private-data logging:** the new log line has only the generated event id and the exception class name. The test completes the future with `IllegalStateException("PRIVATE-CANARY")` and a request type of `PRIVATE-EVENT-TYPE`, and asserts neither appears in log messages. The 503 path doesn't log the exception at all. The test asserts the entity equals the fixed `EngineProbe`, so the canary can't reach the response either.
+- **Asynchronous publish:** the 202 is still returned immediately. The test asserts the future is not done at 202 time, then fails it and checks that the log line appears. The code adds `whenComplete` only, with no await, retry or catch, so behavior is unchanged.
+- **CDI wiring:** `FlowWorkflowEngine` is `@ApplicationScoped`, so the new `@Inject WorkflowEngine` should resolve. The unit test doesn't prove that, but the first packaged or Quarkus run will.
+
+**Non-blocking notes**
+- `DefinitionRef` and `WorkflowEngine` are imported out of alphabetical order after `RegistryScan`.
+- A synchronous throw from `publisher.publish` still gives a 500, and a publisher that returns null still gives an NPE. Both were already the case before this PR, and the handoff states them as out of scope.
+- The log assertion depends on the `java.util.logging` handler seeing the JBoss logger output. It passes here.
+
+The handoff makes no claim that issue75 is fixed or that the original cause is known. It describes the change as diagnostic evidence only. I make no such claim either.

@@ -1,10 +1,11 @@
 # Integration queue: next actions (2026-10-27)
 
 Current implementation baseline: main `4b747001b5257ca9abc0ddad5bc112693ae97465`.
-Audit delivery87 and controlled model88 are merged after exact peer reviews and independently inspected current CI.
-See evidence/WP-108-audit-delivery/current-ci.json (1395 tests) and evidence/WP-103-running-model-boundary/current-ci.json (1409 tests).
-These runs precede combination; combined-main verification is pending. Neither installs production authority or an approved model context.
-Allocation DATA contracts89 merged4b74700 after Claude exact41ba16c PASS/independent209 and inspected1427 current CI. That run tests delivery/model/contracts together; actual postmerge remains separate. Next independent recovery diagnostics do not claim a fix for75.
+Audit delivery87/model88 actual combined main5864898 passes1418; archive and checkout verified.
+Allocation DATA contracts89 merged4b74700 after Claude exact41ba16c PASS/independent209 and inspected1427 PR CI.
+That tested merge includes87/88/89; actual postmerge89 verification remains pending.
+Recovery diagnostics90 open5503932, Claude exact PASS/independent5, current CI pending. Claude-owned bounded timeout consumer follows after merge.
+No issue75 cause/fix, production authority, approved model source or graph adoption is claimed.
 Next: [staged allocation migration](WP-103-allocation-migration-plan.md), preserving historical unallocated entries and reserved V78..V80.
 Counts remain11 completed/12 partial/30 not started; acceptance3/39. Issues75/76 remain open.
 

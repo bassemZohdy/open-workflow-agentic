@@ -1,0 +1,78 @@
+# Issue #75 read-only investigation: cross-owner handoff
+
+Issue #75 stays open. I changed nothing, ran nothing, and posted nothing externally. I read `IdentityRecoveryIT`, `lifecycle-probe.yaml`, `DevLifecycleResource`, `InstanceAuthorities`, `FlowWorkflowEngine`, `FlowEngineObserver`, `EngineStatusSync`, `Reconciler`, and `RegistryScan`/`RepairStore`. I also read `InboxRestoreCheckpointGate`, `InstanceResource.reauthorize`, and the existing `WP-102-identity-recovery-regression.md`. This adds to that report; it doesn't replace it. The root cause is still unproven. Nothing here comes from the original process logs, which don't exist.
+
+All paths below are under `modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/`, unless prefixed with `apps/`.
+
+## What the failure rules out
+
+- **What the epoch=1 line proves:** the line appears at the start of `DevLifecycleResource.effect`, before the handler returns. It shows y's effect was entered with the renewed grant and epoch 1. It doesn't show the effect finished or that the `listen` task registered.
+- **What the registry status implies:** the registry shows WAITING, but the reconciler polls every 2 s. `repairRegistryRow` (`Reconciler.java:450`) calls `sync.observe(engineId, status, "polled")`, and `EngineStatusSync.steps` maps engine RUNNING to registry RUNNING. So a y that was alive and running in the engine would not stay WAITING for 90 s. At the final sample, one of two things was true:
+  - **Engine WAITING:** the engine was waiting in `listen` and never got an event it accepted.
+  - **Engine terminal or absent:** the engine was terminal or absent, and nothing recorded it (see candidate C).
+- **Outbox is not on this path.** `GET /instances/{id}` reads `task.instance` directly. The outbox only mirrors history rows, per the `RepairStore.incrementResumeEpoch` javadoc. `EventIngress` and `JdbcListenGroups` are not wired to the probe either. The probe's `listen` is plain in-memory Flow, fed only by `DevLifecycleResource.publish` (`application.eventPublishers()`).
+- **Authority and the reauthorization gate look correct for this failure.** The reauthorize path (`InstanceAuthorities.reauthorize` → `store.rebind`) and the gate (`recheck`) fail closed, and the held phase passed. The reauthorize-to-resume sequence is serialised per instance by the advisory lock (`withInstance`, `Reconciler.java:651`). A "busy" skip only defers the resume to the next 2 s pass. No identity-side change is indicated.
+
+## Candidate races, with distinguishing faults
+
+**A. Events delivered to the wrong or broken registration (engine WAITING, never completes)**
+- **Evidence:**
+  - x and y use the same event type, and x registers first.
+  - `decideUntilCompleted(x)` runs before y's loop starts.
+  - The SDK's `CloudEventConsumer.accept` has no per-registration try/catch, per the prior `javap` finding.
+  - `InMemoryEvents.publish` is `runAsync`, and `DevLifecycleResource.publish` ignores the future (line 143).
+- **What this would need:** a stale or throwing x registration surviving x's completion.
+- **Distinguishing fault:** an in-process test with real Flow where x's registration throws on accept, or is left registered after x completes. Then publish repeatedly and assert y completes.
+  - If y never completes, A is real.
+  - If y completes, A is excluded, and the registration-leak half is excluded if the test checks registrations after x completes.
+- **Cheaper check:** in a loop run, log the future from `publish()` (`whenComplete` with the exception) and count registrations per type before and after x completes. This needs no behaviour change.
+
+**B. y restored and started on a different thread than x (listen never registers or never fires)**
+- **Evidence:**
+  - x is resumed by the periodic pass on the `agentic-reconciler` thread.
+  - y is resumed by `InstanceResource.reauthorize` → `Reconciler.recover` → `repairRegistryRow` → `FlowWorkflowEngine.startRestored` (`FlowWorkflowEngine.java:94-102`) on a request thread.
+  - This is the only structural difference between the two paths.
+- **Unknown:** whether a restored-then-started instance depends on the starting thread, or on a Flow executor/context captured at restore. I could not see Flow's source. It's unverified.
+- **Distinguishing fault:** a real-Flow, real-persistence restore test that calls `startRestored` once from the reconciler thread and once from an arbitrary thread. Each runs an `effect → listen` definition, with a few events published after the `listen` registers. The two paths should behave identically.
+  - Variant: force `reauthorize`'s `recover` to hit "busy" so the periodic pass resumes y. If the failure disappears, thread/path is implicated.
+
+**C. Terminal engine outcome never recorded (engine absent, registry WAITING forever)**
+- **Evidence:**
+  - `FlowEngineObserver.report` swallows every exception.
+  - `observe` throws after 5 stale-version retries (`EngineStatusSync.java:38`).
+  - The only backstop is the poll. When `engine.activeInstance` is empty, the poll only calls `auditOnce("instance.absent", …)` (`Reconciler.java:461`). That is once per hour, and the row is not moved.
+- **Consequence:** if the engine drops a completed or faulted instance from its active set and the observer's report was lost, the row stays WAITING permanently with no repair. This is a design hole independent of the original cause.
+- **Distinguishing fault:** a unit test with a fake engine that reports COMPLETED once while `EngineStatusSync.observe` throws (a store that fails the update), then removes the instance from `activeInstances`. Assert the row stays WAITING across passes. This test needs no Flow and no timing, and it's deterministic.
+- **Process-level discriminator:** the `reconciler_repair` record for `instance.absent` on y. It's in the database, not only in the logs.
+
+**D. Late `observe(RUNNING, "reauthorized")` after Flow's own report (transient, not stuck)**
+- **Evidence:** `Reconciler.java:476` runs after `startRestored`, while the Flow observer reports concurrently with no lock. The order WAITING (observer), then RUNNING (late reconciler), then the poll corrects it is possible.
+- **Assessment:** it self-heals on the next poll, so it is a mislabel, not a stuck state. I list it only so nobody chases it as the cause. A fake-engine test with interleaved callbacks would confirm it converges.
+
+**E. Effect response path for y**
+- **Idea:** y's effect started (epoch=1 line) but its response never reached the Flow HTTP client, and the retry default keeps it in RUNNING or a retry.
+- **Assessment:** weak. The poll would show RUNNING, not WAITING, as above. Check whether the log has `probe-effect instance=<y> epoch=1 … status=200` after the authority line. The original run didn't retain this.
+
+## What to run to distinguish them (all existing evidence, no weakened timeouts)
+
+1. **Keep process logs.**
+   - `.github/workflows/build.yml` should upload `apps/*/target/process-logs/`, at least on failure. This was already handed to GPT in the previous report.
+   - Also keep a database dump of `task.instance`, `task.instance_event` and `task.reconciler_repair`.
+2. **Run the IT in a loop (20–30 runs) from the packaged jar.** Add temporary logging, with no behaviour or timeout change: the publish future's exception, registration counts for the probe event type, and the engine status that `repairRegistryRow` reads for y at each poll.
+3. **Read the failed run's evidence in this order:**
+   - The engine status the poll saw for y (WAITING vs absent) separates A/B from C.
+   - Whether y logged the `status=200` effect line.
+   - Any exception around `publish`.
+   - Whether y's row ever moved after the first event.
+4. **Run the deterministic in-process tests for A, B and C** (above) in the test source set with real Flow. C needs only fakes. If any of the three fails, that is a defect. If all three pass, the cause is something not yet identified, and it should be said so rather than guessed.
+
+## Ownership
+
+| Item | Owner |
+|---|---|
+| CI workflow, loop execution, log retention | GPT |
+| Flow listen/registration, `startRestored`, `DevLifecycleResource` publish future, `lifecycle-probe.yaml` | GPT (lifecycle/dev-probe/flow) |
+| Review of any resulting change, incl. the C backstop (terminal-or-absent engine with a non-terminal row) | Claude |
+| Identity (`InstanceAuthorities`, gate) | No change indicated |
+
+Don't make y and x use separate event types, or serialise their publishing, until A/B/C are tested. That could hide the defect instead of exposing it.

@@ -1,0 +1,13 @@
+{
+  "scope": "Read-only hypotheses, not original failure cause or a behavioral fix",
+  "issue": 75,
+  "owner": "GPT lifecycle / Claude identity peer",
+  "observedOriginalEvidence": "Registry WAITING after renewed epoch1 authority assertion. Original child process logs are missing.",
+  "candidates": [
+    "Actual SDK listener/publish failure",
+    "Different restored-start thread/path",
+    "Absent engine with unrecorded terminal status"
+  ],
+  "gptDisposition": "Absent engine remains an unknown outcome. Conservative refusal is intentional; never infer completion or repair to terminal without authoritative durable evidence. Candidate C is not by itself proof of a lifecycle defect.",
+  "next": "PR90 diagnostic-only engine snapshot and asynchronous publish failure; Claude-owned bounded IT timeout consumer after merge. Preserve existing conditions/timeouts/event ordering and leave issue75 open."
+}
