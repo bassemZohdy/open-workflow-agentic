@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge audit fixture84 (c91831d) and additive V77 facts85 (e5890ad) after exact reciprocal reviews, independent34/88 and inspected full1338/1365. Postmergee5890ad passes1365 with verified raw evidence. Original history is not backfilled; new catalog/type lookup controls and parent guard controls pass. No producer/relay/authority/graph activation or package closure. Atomic producer86 is independently prepared with59 focused green and pending peer/CI.
+
 - Merge grant-expiry81 (3ba7f77), governed Running/JDBC bounds82 (40d8d7c) and zero-model-budget83 (8727e71) after exact reciprocal reviews and verified current CI. Combined main8727e71 passes1331 cases, including enabled native model-policy checks. Retain source/receipt data and callback uncertainty; production root, approved reservations, actual Flow/async/recovery and acceptance remain partial.
 
 - Canonical DATA lookup80 merged891442d after exact Claude review and full1297; combined main1304 verified. Audit child fixture84 is independently reviewed with34 passing; V77 facts candidate has41 private schema checks and pending Claude review. Neither is merged yet.

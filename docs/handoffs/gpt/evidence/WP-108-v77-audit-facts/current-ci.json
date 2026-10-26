@@ -1,0 +1,460 @@
+{
+  "reviewedHead": "2e4cb9711ff73df2c89c45501072f1ed3c26c59b",
+  "mergeCommit": "e5890ad7ce683cd4a679008658a3cd569e9f4757",
+  "reviewComment": 6424110625,
+  "ciInspectionComment": 6424234531,
+  "core": {
+    "runId": 40377195360,
+    "artifacts": [
+      {
+        "id": 12678340073,
+        "name": "build-evidence-40377195360-1",
+        "archiveBytes": 2355686,
+        "archiveSha256": "bc4bef1dcda9d1c82b5dcc756fbb791507d87a999a360a53caed06ab04b21b45",
+        "archiveDigestAndCrcVerified": true,
+        "xmlSuites": 185,
+        "totals": {
+          "tests": 1365,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "selected": [
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedLlmClientTest",
+            "totals": {
+              "tests": 14,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "aPositiveRemainingBudgetStillReachesThePolicyAndTheProvider",
+              "anEngineThatThrowsMakesNoProviderCall",
+              "aZeroRemainingBudgetRefusesBeforeTheProviderEvenWhenThePolicyWouldAllow",
+              "anAllowedGraphRunMakesOneAuditedProviderCallPerNode",
+              "noApprovedContextMakesNoProviderCallAndAsksNoPolicyQuestion",
+              "aDeniedGraphRunMakesNoProviderCallAndLeavesNoCompletedRun",
+              "anErrorDecisionMakesNoProviderCall",
+              "aModelIdThePepCannotFormMakesNoProviderCall",
+              "anAuditedAllowReachesTheProviderExactlyOnce",
+              "theShippedDefaultsRefuseEverything",
+              "anEngineThatAnswersNullMakesNoProviderCall",
+              "oneAllowAdmitsOneCallAndAProviderFailureIsNotRetried",
+              "anAllowThatCannotBeAuditedMakesNoProviderCall",
+              "denyMakesNoProviderCallAndIsAudited"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ModelBoundaryArchitectureTest",
+            "totals": {
+              "tests": 3,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "noProductionClassBypassesTheGovernedClient",
+              "theRuleSeesTheGovernedClientItselfCallingTheProvider",
+              "theRuleFailsOnABypassingFixture"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AppendOnlyTest",
+            "totals": {
+              "tests": 5,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "truncateOfTheEventTableFails",
+              "plainUpdateOfAnEventFails",
+              "plainDeleteOfAnEventFails",
+              "eventsCanStillBeInserted",
+              "theHeadLogIsAppendOnlyToo"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnceTest",
+            "totals": {
+              "tests": 22,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "aSourceWhoseContentIsNotTheDraftsFingerprintOrWhoseTimeIsFinerThanAMicrosecondAppendsNothing",
+              "concurrentLostRepliesThroughASmallPoolAllConfirmWithoutSpareConnections",
+              "retainedReferencesAndAppendOnlyGuardsRefuseChangeDeleteAndTruncate",
+              "sourceLocksAndChainLocksUseSeparateKeyspacesSoCrossedNamesNeverDeadlock",
+              "differentTransitionsAndSequencesOfOneKeyAreDistinctSources",
+              "aFailedCommitThatDidNotHappenIsUncertainNotAbsenceAndTheSameSourceThenSucceedsOnce",
+              "theSelectInsertRoleCanAppendOnceButNotChangeAnythingAndWithoutBindingInsertNothingIsStored",
+              "theSameSourceWithChangedContentIdActorOrChainIsAConflictAndAppendsNothing",
+              "anExactDuplicateReturnsTheOriginalReceiptWithoutANewEventTimeIdSequenceOrHead",
+              "aNewSourceStoresEventHeadAndBindingTogetherAndReturnsAMatchingReceipt",
+              "sameSourceContendedAcrossChainsHasExactlyOneWinnerAndNothingOnTheLosersChains",
+              "aLostReplyWhoseReadbackAlsoFailsIsUncertainEvenThoughTheEventWasCommitted",
+              "sixteenConcurrentIdenticalCallsStoreOneEventAndEveryCallerGetsTheSameReceipt",
+              "aMissingBindingSchemaIsAStoreFailureAndAppendsNoEvent",
+              "aLostCommitReplyAfterARealCommitIsConfirmedByReadbackAndReturnsTheReceipt",
+              "ordinaryAppendsAndAppendOnceOnOneChainStayGapFreeAndLinked",
+              "corruptRetainedHistoryIsAStoreFailureNotAReceiptNotAConflictAndNotAbsence",
+              "aForgedEventResealedConsistentlyWithItsHeadAndBindingStillFailsTheContentCheck",
+              "aFailureAtAnyStepRollsBackTheEventTheHeadAndTheBinding",
+              "anEventIdAlreadyUsedByAnotherSourceOrByAnOrdinaryAppendIsAConflict",
+              "anUnreachableDatabaseIsAStoreFailure",
+              "aLostReplyIsConfirmedThroughAPoolOfOneBecauseTheFailedConnectionIsReleasedFirst"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditChildFixtureTest",
+            "totals": {
+              "tests": 7,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "everyGuardIsEnabledAgainAfterTheControls",
+              "withoutTheHeadLogParentGuardNoChildGuardSatisfiesTheParentAssertion",
+              "theCascadingProbeReachesTheEventParentGuard",
+              "theOriginalListedProbeStopsEarlyOnceAnIncomingChildExists",
+              "withoutParentAndSourceBindingGuardsTheCascadeStillReachesTheFixtureChild",
+              "theCascadingProbeReachesTheHeadLogParentGuard",
+              "withoutTheEventParentGuardNoChildGuardSatisfiesTheParentAssertion"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.DelegationGrantExpiryAfterIoTest",
+            "totals": {
+              "tests": 4,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "typedOutcomesForUnknownAndExpiredAtStartAreUnchanged",
+              "aChildThatExpiresWhileTheAncestorIsReadIsExpired",
+              "aGrantThatExpiresDuringItsOwnReadIsExpired",
+              "anActiveChainOneMicrosecondBeforeExpiryAfterTheReadsIsActive"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityCheckTest",
+            "totals": {
+              "tests": 14,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "theActingWorkloadMustBeTheIssuingGrantTypedAgent",
+              "closeDuringTheSlowLookupRefuses",
+              "signedExpiryDuringTheSlowBindingLookupRefusesAfterTheLookup",
+              "anUnavailableBindingStoreRefuses",
+              "missingRetargetedOrMismatchedBindingsRefuse",
+              "aChildThatExpiresExactlyWhileTheAncestorIsReadRefuses",
+              "revocationDuringTheSlowBindingLookupRefusesAfterTheLookup",
+              "revokedAncestorRefuses",
+              "signedExpiryDuringTheGrantBindingWorkRefusesAfterIt",
+              "wrongEntryEpochMinterOrClosedHandlesRefuse",
+              "aGrantShorterThanItsTokenThatExpiresDuringItsReadRefuses",
+              "aLiveRealCredentialForTheExpectedWorkloadPassesAndNothingIsConsumedOrWritten",
+              "anUnchangedActiveChainStillPassesOneMicrosecondBeforeExpiry",
+              "anInterruptRefusesAndTheFlagIsPreserved"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityPairingTest",
+            "totals": {
+              "tests": 7,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "theFingerprintStaysHistoricalDataAfterCloseAndRevivesNothing",
+              "aMissingCandidateRefusesBeforeAnyStoreIsRead",
+              "twoCredentialsOfTheSameScopeAndEntryHaveDifferentFingerprintsAndCannotBeSwapped",
+              "aForgedRecordWithTheSameKeyButAnyOtherFieldRefuses",
+              "revocationDuringTheLookupStillRefusesAfterAPassingPairing",
+              "theExistingIdentityRefusalsStillApplyWithAnExactRecord",
+              "theExactAdmittedRecordPassesAndRemainsRepeatable"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PepTest",
+            "totals": {
+              "tests": 17,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "aToolOutsideTheAllowListIsMarkedNotPermittedForThePolicy",
+              "guardNeverRunsTheCallOnDenyOrError",
+              "everyDecisionIsAuditedIncludingRefusals",
+              "aHumanTaskActionIsAttributedToTheWaitingAgentTask",
+              "aDecisionThatCannotBeRecordedIsRefusedEvenWhenItWasAnAllow",
+              "operationsAreBuiltFromTheOperatorAndTheTask",
+              "guardRunsTheCallOnlyOnAllow",
+              "anEngineThatIsSlowerThanTheTimeoutIsARefusal",
+              "aPublicationCarriesTheArtifactDigestInTheResource",
+              "aHumanTaskActionVerbMustBeAToken",
+              "aModelCallHasNoContractAllowListSoPermissionIsUnknown",
+              "toolCallBuildsTheRequestFromTheApprovedContractAndTheCall",
+              "anEngineThatThrowsIsARefusalAndTheCallDoesNotRun",
+              "anEngineThatReturnsNothingIsARefusal",
+              "thePepUsesItsExplicitBulkheadBound",
+              "decisionsAreAttributedToThePolicyThatDecidedThem",
+              "theRecoveryRuleIsNeverConsultedForAnOrdinaryCall"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT",
+            "totals": {
+              "tests": 1,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.identity.IdentityRecoveryIT",
+            "totals": {
+              "tests": 1,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "identitySurvivesAKillARevokedGrantHoldsTheInstanceAndNoCredentialIsPersisted"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT",
+            "totals": {
+              "tests": 0,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": []
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT",
+            "totals": {
+              "tests": 0,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": []
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.AuditSourceBindingMigrationTest",
+            "totals": {
+              "tests": 6,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "freshMigrationSupportsConcurrentExactRetriesAndRejectsChangedSource",
+              "exactDeploymentGrantsAllowAppendAndReadButRefuseMutationDdlAndLedgerAccess",
+              "anUnexpectedPreexistingSourceTableFailsMigrationWithoutChangingRetainedData",
+              "upgradingNonemptyV74PreservesEventsWithoutInventingSourceBackfill",
+              "appliedSchemaRefusesForgedIdentityAndReceiptsAndRetainsOneEventPerSource",
+              "appliedSourceGuardsRejectOwnerMutationAndAlwaysRollbackTruncate"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.EffectAuditFactsMigrationTest",
+            "totals": {
+              "tests": 27,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "queueFailureCannotLeaveAJournalOrScopeWithoutItsDelivery",
+              "anAcknowledgmentCannotOvertakeAnEarlierPendingSource",
+              "fullOwnerKindCannotBeReplacedByTheSameIdentifier",
+              "maliciousSessionFunctionShadowsCannotChangeThePinnedCanonicalEncoding",
+              "aTemporaryTypeShadowCannotChangeThePinnedFunctionLocalTypes",
+              "missingSourceAtCommitRollsBackTheEntireScopedIntent",
+              "freshMigrationInstallsEmptyDataAndPinnedFunctionSearchPaths",
+              "wrongSourceKeyRefusesAndOnlyItsOwnDisabledGuardMakesTheSameProbePass",
+              "compensationKeepsOriginalProvenanceAfterRegistryEndWithoutInheritingPermission",
+              "aCompensationLinkWithoutMatchingRetainedProvenanceCannotCommit",
+              "immutableScopeAndSourceUpdatesRefuseEvenNoOpAssignments()[1]",
+              "immutableScopeAndSourceUpdatesRefuseEvenNoOpAssignments()[2]",
+              "aRegistryChangeOrExpiryWhileItsRealRowLockBlocksTheWriterRefusesAfterWait()[1]",
+              "aRegistryChangeOrExpiryWhileItsRealRowLockBlocksTheWriterRefusesAfterWait()[2]",
+              "firstSourceAndPendingDeliveryCommitWithCanonicalJavaDraftIdentity",
+              "finiteJournalSourcesRetainOriginalScopeAndMandatoryDelivery",
+              "conflictingTableStopsMigrationWithoutRepairOrPartialFunctions",
+              "nonemptySeventySixUpgradeDoesNotInventScopesSourcesOrReceipts",
+              "aLaterScopedJournalWithoutItsSourceCannotCommit",
+              "retainedScopeSourceAndDeliveryCannotBeDeletedOrTruncated()[1]",
+              "retainedScopeSourceAndDeliveryCannotBeDeletedOrTruncated()[2]",
+              "retainedScopeSourceAndDeliveryCannotBeDeletedOrTruncated()[3]",
+              "retainedScopeSourceAndDeliveryCannotBeDeletedOrTruncated()[4]",
+              "retainedScopeSourceAndDeliveryCannotBeDeletedOrTruncated()[5]",
+              "retainedScopeSourceAndDeliveryCannotBeDeletedOrTruncated()[6]",
+              "anotherActuallyStoredCentralReceiptCannotAcknowledgeThisSource",
+              "onlyAnExactStoredCentralReceiptCanAcknowledgeAndItCannotBeReset"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceBindingsDefaultWiringTest",
+            "totals": {
+              "tests": 1,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceCredentialLookupTest",
+            "totals": {
+              "tests": 6,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "aCorruptRetainedCredentialKeyRefusesItsRecomputedIdentity",
+              "anUnavailableSchemaIsNotReportedAsAMissingCredential",
+              "malformedFingerprintsRefuseBeforeAnyDatabaseAcquisition",
+              "aMissingCanonicalOccurrenceRefusesInsteadOfReturningAbsentOrAnAlternateCredential",
+              "exactCredentialsAreSeparateEvenForTheSameCallOrSameJtiAndRemainHistoricalAfterCompletion",
+              "anOrphanedBindingIsNotHiddenByAnInnerJoin"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionConstructionArchitectureTest",
+            "totals": {
+              "tests": 7,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "eachIndependentBypassFixtureIsRejected()[1]",
+              "eachIndependentBypassFixtureIsRejected()[2]",
+              "eachIndependentBypassFixtureIsRejected()[3]",
+              "eachIndependentBypassFixtureIsRejected()[4]",
+              "eachIndependentBypassFixtureIsRejected()[5]",
+              "anAllowlistEntryMatchesTheExactOwnerAndDoesNotAuthorizeLegacyEntry",
+              "productionHasNoUnreviewedConstructionOrLegacyEntryPath"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionGateTest",
+            "totals": {
+              "tests": 17,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "interruptedClosedWorkerKeepsItsSlotWhileAnActualCommittedReplyIsStillBlocked",
+              "freshAcknowledgedEntryCallsOnceAndRetainedDataNeverCallsAgain",
+              "forgedBindingMetadataAndSameKeyDifferentFullScopeNeverReachTheCallback",
+              "cancellationAndNewEpochCannotEraseOrReplaceTheOriginalEntry",
+              "revocationAfterCommitAndAfterCallbackWithholdsWorkOrPrivateOutput",
+              "eightConcurrentCredentialsAndExecutorsHaveOnlyOneCallback",
+              "closeDuringARealRegistryLockWaitKeepsItsSlotUntilActualTermination",
+              "closedUnstartedHandlesReleaseCapacityAndBeanCloseRefusesNewOnes",
+              "anAlreadyTransactionalConnectionIsRefusedWithoutCommittingOrRollingBackItsOwner",
+              "callbackFailureRetainsEntryAndPreexistingInterruptIsPreserved",
+              "storageAndAmbientReplyFailuresNeverCallTheCallback()[1]",
+              "storageAndAmbientReplyFailuresNeverCallTheCallback()[2]",
+              "storageAndAmbientReplyFailuresNeverCallTheCallback()[3]",
+              "storageAndAmbientReplyFailuresNeverCallTheCallback()[4]",
+              "storageAndAmbientReplyFailuresNeverCallTheCallback()[5]",
+              "storageAndAmbientReplyFailuresNeverCallTheCallback()[6]",
+              "storageAndAmbientReplyFailuresNeverCallTheCallback()[7]"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionIoBoundsTest",
+            "totals": {
+              "tests": 7,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "invalidOrAmbiguousBoundsHaveNoUnboundedFallback",
+              "aRealStatementTimeoutCancelsExpensiveValidationBeforeAnyAcknowledgedEntry",
+              "aRealRegistryLockTimeoutRollsBackWithoutCallbackOrInventingAnEntry",
+              "resetFailureAfterActualCommitAbortsTheConnectionAndNeverCallsBack",
+              "stricterSessionLimitsAreNotWidenedAndStateIsRestoredBeforeCallbackAndLogicalClose",
+              "unsupportedNetworkBoundsRefuseInsteadOfSilentlyUsingUnboundedIo",
+              "failedRollbackNeverSwitchesPendingWritesToAutoCommitAndAbortsInstead"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionMigrationTest",
+            "totals": {
+              "tests": 20,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "newForeignKeysDoNotMaskEarlierParentTruncateGuards",
+              "waitDeadlineIsRecheckedAfterExpensiveCanonicalValidation",
+              "freshOrderedMigrationInstallsEmptyRetainedFactsAndRestoresTheConfiguredNamespace",
+              "nonemptySeventyFivePointOneUpgradePreservesAttributionWithoutInventingEntries",
+              "canonicalOccurrenceAnchorIsRequiredEvenIfCallMetadataAndCredentialStillExist",
+              "changedRegistryAttributionCannotCreateAnEntry()[1]",
+              "changedRegistryAttributionCannotCreateAnEntry()[2]",
+              "changedRegistryAttributionCannotCreateAnEntry()[3]",
+              "changedRegistryAttributionCannotCreateAnEntry()[4]",
+              "changedRegistryAttributionCannotCreateAnEntry()[5]",
+              "changedRegistryAttributionCannotCreateAnEntry()[6]",
+              "changedRegistryAttributionCannotCreateAnEntry()[7]",
+              "entryAndOutcomeFactsRefuseOwnerMutationAndStatementTruncation",
+              "databaseCanonicalFingerprintsMatchTheSharedJdkContractIncludingUnicode",
+              "expiredOrFutureBindingAndChangedContractEpochOrBindingAreRefusedIndependentlyOfJavaValidation",
+              "databaseClockAfterARegistryLockWaitRefusesTheNowExpiredBinding",
+              "oneFactPerOriginalCallSurvivesConcurrentEpochCredentialAndExecutorChanges",
+              "callerSearchPathCannotReplaceTheDatabaseClockForExpiredEntryMetadata",
+              "outcomeReferencesAreExactTargetScopedImmutableDataAndMayOutliveCancellation",
+              "conflictingPreexistingFactTableRollsBackWithoutRepairOrPartialFunctions"
+            ]
+          },
+          {
+            "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceRunningControlTest",
+            "totals": {
+              "tests": 4,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "methods": [
+              "realOpaquePairingAndCanonicalLookupFeedTheGateWithoutCredentialSwapping",
+              "aNodeOnAnotherThreadObservesCloseAndCapacityWaitsForItsActualTermination",
+              "wrongCredentialAssociationAndWrongCallbackModeRefuseWithoutEntry",
+              "onlyAFreshGovernedCallbackReceivesControlAndItCannotOutliveItsAttempt"
+            ]
+          }
+        ]
+      }
+    ],
+    "checkoutObservations": [
+      "HEAD is now at 97c481a Merge 2e4cb9711ff73df2c89c45501072f1ed3c26c59b into c91831ddddf4b157d0bf12e5011b460e10a6fc58"
+    ]
+  }
+}

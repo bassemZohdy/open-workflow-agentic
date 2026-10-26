@@ -1,12 +1,11 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline: main `8727e7169f0633ec59d13ed8258faab7f852f99e` (2026-10-26).
-V76 facts #74, identity #77, gate #78, pairing #79, canonical lookup #80, grant-expiry #81,
-governed Running/JDBC bounds #82 and zero-budget refusal #83 are merged after exact peer review and inspected CI.
-Combined main40372935209 passed183 suites/1331 cases with no failures/errors/skips; archive digest/CRC and actual
-checkout verified. Audit child fixture #84 has GPT exacte2b2911 PASS/independent34 and pending CI.
-GPT V77 audit-facts candidate2dbba71 has private schema41 passing and Claude review pending; it must wait for84.
-These remain internal partial components; production composition is absent. Counts remain
+Current implementation baseline: main `e5890ad7ce683cd4a679008658a3cd569e9f4757` (2026-10-26).
+Internal prerequisites #74/#77/#78/#79/#80/#81/#82/#83 and audit fixture #84 are merged after exact peer/current CI.
+V77 retained audit DATA #85 merged after Claude exact2e4cb97 PASS/independent88 and inspected full1365; actual
+postmerge40378802214 also passes185 suites/1365 cases with no failures/errors/skips, archive/checkout verified.
+Atomic producer #86 is open at66571db with author59 green plus final1; exact Claude/current CI pending.
+The migration activates no producer/relay/permission/model/graph path; production composition remains absent. Counts remain
 11 completed/12 partial/30 not started, acceptance3/39. Packaged identity recovery remains open as [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75),
 and the supported-versus-preview identity profile decision is [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76).
 This is the integration queue, not proof of work-package closure.
@@ -93,7 +92,7 @@ component callback tests are not graph or package closure.
 ## Following ordered gates
 
 The checkpoint consumer/schema boundary and data-only V76 are merged; production composition is still absent.
-V77 facts are an unmerged candidate; producer/delivery, V78 allocation, V79 model reservations and V80 manual decisions remain
+V77 DATA is merged; producer86 is unmerged. Delivery, V78 allocation, V79 model reservations and V80 manual decisions remain
 later preparations, not active main features.
 
 Canonical original scope/full owner, one irreversible fresh entry acknowledgement,
@@ -116,3 +115,9 @@ No package is promoted merely because preparation or a component test exists.
 - Zero-budget83: [exact review/current CI](evidence/WP-103-zero-model-budget/current-ci.json),
   [combined main1331](evidence/WP-103-zero-model-budget/combined-main.json). Positive counters are not reservations;
   default approved context is still empty.
+
+- Audit child84: [exact/current CI](evidence/WP-108-audit-child-fixtures/current-ci.json),
+  [combined main1338](evidence/WP-108-audit-child-fixtures/combined-main.json); child errors cannot mask parent guards.
+- V77 facts85: [exact/current CI](evidence/WP-108-v77-audit-facts/current-ci.json),
+  [combined main1365](evidence/WP-108-v77-audit-facts/combined-main.json). No invented legacy provenance, producer,
+  causal relay or receipt/current-authority permission follows. Source writer/relay adoption remains reviewed work.
