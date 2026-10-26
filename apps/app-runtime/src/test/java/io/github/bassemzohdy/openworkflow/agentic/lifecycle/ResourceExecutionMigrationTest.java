@@ -139,6 +139,39 @@ class ResourceExecutionMigrationTest {
         }
     }
 
+    @Test void newForeignKeysDoNotMaskEarlierParentTruncateGuards() throws Exception {
+        try(var db=new Database()) {
+            db.migrate(null);
+            String[][] parents={
+                {"identity.issued_token_binding","issued_token_binding_no_truncate",
+                    "issued_token_binding is append-only: TRUNCATE is refused"},
+                {"task.resource_occurrence","resource_occurrence_no_truncate",
+                    "resource occurrence is immutable and retained"}
+            };
+            for(var parent:parents) {
+                try(var c=db.owner.getConnection()) {
+                    c.setAutoCommit(false);
+                    try(var st=c.createStatement()) {
+                        var refused=assertThrows(SQLException.class,()->st.execute("truncate "+parent[0]+" cascade"));
+                        assertEquals("42501",refused.getSQLState());
+                        assertTrue(refused.getMessage().contains(parent[2]),refused.getMessage());
+                    } finally {c.rollback();}
+                }
+                // Deliberately remove only the intended parent guard in this private database. A child can still
+                // refuse, but its 42501 must never satisfy the strengthened parent-specific probes above.
+                try(var c=db.owner.getConnection()) {
+                    c.setAutoCommit(false);
+                    try(var st=c.createStatement()) {
+                        st.execute("alter table "+parent[0]+" disable trigger "+parent[1]);
+                        var refused=assertThrows(SQLException.class,()->st.execute("truncate "+parent[0]+" cascade"));
+                        assertEquals("42501",refused.getSQLState());
+                        assertFalse(refused.getMessage().contains(parent[2]),refused.getMessage());
+                    } finally {c.rollback();}
+                }
+            }
+        }
+    }
+
     @Test void entryAndOutcomeFactsRefuseOwnerMutationAndStatementTruncation() throws Exception {
         try(var db=new Database()) {
             db.migrate(null);var f=fixture(db,"a".repeat(64));insert(db.owner,f,1);

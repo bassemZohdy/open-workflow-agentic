@@ -90,10 +90,12 @@ class IssuedTokenBindingMigrationTest {
         try (var c = dataSource.getConnection()) {
             c.setAutoCommit(false);
             try (var s = c.createStatement()) {
-                assertEquals("42501", assertThrows(SQLException.class,
-                        // V73 retains issuing rows through this child FK. Include the child so this still exercises
-                        // the immutable-table trigger, rather than PostgreSQL's earlier FK TRUNCATE refusal.
-                        () -> s.executeUpdate("truncate identity.issued_token_binding, task.resource_call_binding")).getSQLState());
+                // Include every new FK descendant; require THIS parent's guard, never an FK or child refusal.
+                SQLException refused = assertThrows(SQLException.class,
+                        () -> s.executeUpdate("truncate identity.issued_token_binding cascade"));
+                assertEquals("42501", refused.getSQLState());
+                org.junit.jupiter.api.Assertions.assertTrue(refused.getMessage().contains(
+                        "issued_token_binding is append-only: TRUNCATE is refused"), refused.getMessage());
             } finally { c.rollback(); }
         }
         assertEquals(id, boundGrant(issuer, "live"));

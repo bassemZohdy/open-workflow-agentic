@@ -281,7 +281,12 @@ class ResourceCallBindingStoreTest {
         }
         try(var c=data.getConnection()) {
             c.setAutoCommit(false);
-            try(var s=c.createStatement()){assertEquals("42501",assertThrows(SQLException.class,()->s.execute("truncate task.resource_occurrence")).getSQLState());}
+            try(var s=c.createStatement()) {
+                // V76 references the occurrence; cascade reaches the intended parent guard before its descendants.
+                var refused=assertThrows(SQLException.class,()->s.execute("truncate task.resource_occurrence cascade"));
+                assertEquals("42501",refused.getSQLState());
+                assertTrue(refused.getMessage().contains("resource occurrence is immutable and retained"),refused.getMessage());
+            }
             finally {c.rollback();}
         }
         assertEquals(1,count(f,"task.resource_call"));assertEquals(b.scope(),bindings.findInvocation(b.scope()).orElseThrow());
