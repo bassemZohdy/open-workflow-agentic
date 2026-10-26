@@ -1,6 +1,6 @@
 # ADR-0028: Bind resource entry and retained graph outcomes
 
-Status: Proposed contract foundation; durable gate and consumer not implemented
+Status: Proposed production integration; contracts, retained schema and internal callback gate implemented; concrete production fence/dispatch consumer not implemented
 
 Date: 2026-10-20
 
@@ -55,3 +55,6 @@ Durable one-entry/association storage, current composite fence, exact read-only
 inspection, one-entry races, actual commit-reply loss/process/owner cancellation,
 stable governed UNKNOWN decisions, full occurrence production and real workflow
 HTTP/recovery tests remain adoption gates. Package and acceptance status stay partial.
+
+
+Current component evidence (2026-10-26): V76 facts74, synchronous identity77 and internal JDBC gate78 are merged with exact peer/current CI evidence linked from [the integration queue](../handoffs/gpt/INTEGRATION-NEXT.md). The original increment description above is historical. These components do not activate a production admission bridge, model context, actual graph/Flow adapter or composite current fence. Pair the exact private credential, supply trusted workload/task/target/lease facts and mandatory PDP/audit, configure bounded JDBC/control contexts and prove actual node/output/recovery behavior before production adoption. This ADR remains Proposed for that integration; package/acceptance status is not promoted.

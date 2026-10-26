@@ -1,13 +1,12 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline (checked 2026-10-26): main `15bcdc8026fe03f14122378e27d994f540cf08be`.
-**One implementation PR is open: #74, V76 execution facts** at `3f37b3ba2a37981f2a99ad497227dab198719531`.
-Current full CI `40265793674` passed (175 suites/1262 cases, zero failed/errored/skipped), but **exact Claude peer review
-has not occurred**. Do not merge #74 or infer graph execution permission from this result. PR #73 (opaque admission
-witness) merged at `a87fc292ef8843d3a7501b981dbda9d18adb0d1b`. The current-profile consumer and startup proof
-remain merged. Counts stay 11 completed/12 partial/30 not started; acceptance stays 3/39. Flaky packaged identity
-recovery remains open as [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75).
-This file tracks the **integration queue**, not proof of work-package closure.
+Current implementation baseline: main `af9d7e2cfe8c298fc438878a4c5b38fc2bedf9aa` (2026-10-26).
+V76 facts #74, live identity #77 and the internal JDBC fresh-entry callback gate #78 are merged after exact peer review
+and inspected current CI. Credential-pairing #79 is the open Claude implementation PR; GPT's canonical DATA lookup by
+the derived binding key is being prepared. Neither supplies production composition by itself. Counts remain
+11 completed/12 partial/30 not started, acceptance3/39. Packaged identity recovery remains open as [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75),
+and the supported-versus-preview identity profile decision is [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76).
+This is the integration queue, not proof of work-package closure.
 
 ## Integrated prerequisites and evidence
 
@@ -43,7 +42,7 @@ This file tracks the **integration queue**, not proof of work-package closure.
   See [local repeat evidence](evidence/WP-108-checkpoint-profile/identity-recovery-local-repeats.json).
   V75_1 preserves compatible private history,
   refuses unsupported/partial/active stores and adds the observed collation gap
-  regression. Runtime DDL removal and data-source adoption are not activated.
+  regression. Runtime DDL removal was pending at that increment (consumer71 below subsequently supplied it); dedicated credential/data-source adoption remains unactivated.
 
 - Shared checkpoint mutation fixtures70 merged as79da38e after exact Claude
   PASSb9db578/6405603074 and full40249904765; actual schema10/24 observations,
@@ -60,41 +59,38 @@ This file tracks the **integration queue**, not proof of work-package closure.
   40254990550/40254990868 and startup40256568737 pass. Source trees/archive hashes and methods
   verified. See [integration evidence](WP-108-checkpoint-consumer-integration.md).
 
-## Next ordered gate: independent V76 review, then backend and composite live fence
+## Current merged entry components and next composition gate
 
-PR #74 already provides the **actual ordered V76 schema candidate** and verifies its immutable
-entry/outcome data constraints. It remains unmerged pending independent exact-head Claude PASS; the current
-full CI PASS alone cannot satisfy that gate. See [V76 handoff](WP-108-v76-facts.md).
-After a reviewed merge, start the **separate JDBC entry backend and callback proof**, then composite
-live authority, actual workflow/agent dispatch, and output release. Follow the exact
-[backend preparation and failure matrix](WP-108-backend-entry-prep.md).
+- Admission73 merged asa87fc292: private verified admission witness and per-call close. Full1242 plus real-provider CI
+  passed; historical scope/entry data is never current permission.
+- V76 facts74 merged as561c691 after exact Claude PASS3f37b3b/6419457964, independent60 and full1262.
+  [Actual CI and failed-probe evidence](evidence/WP-108-v76-facts/current-ci.json) retains the corrected parent guards.
+- Live identity77 merged as53eb019 after exact GPT PASS7e2a9fc/6419940971, independent53/final11,
+  full1273 and standard3/delegation8. [Evidence](evidence/WP-102-live-identity/current-ci.json).
+- Internal callback gate78 merged asaf9d7e2 after exact Claude PASS04c55a1/6420317407, independent67 and full1291.
+  Only fresh INSERT plus acknowledged commit/close/ambient resume reaches its callback. Duplicate/readback/unknown
+  never do; cancelled running synchronous workers retain capacity until actual termination. [Evidence](evidence/WP-108-execution-gate/current-ci.json).
 
-1. One irreversible entry per original call key, not per credential/owner/epoch.
-   Keep immutable facts and exact target/run/checkpoint outcome references after
-   cancellation or expiry. Use real migration/role/constraint/race tests.
-2. Only the newly acknowledged fresh entry callback may run work. Duplicate or
-   uncertain commits, new credentials/epochs, empty history and UNKNOWN refuse
-   another graph run. Prove actual commit-reply loss and process/owner races.
-3. Compose current registry/full owner/definition/task/approved target/execution
-   ownership with Claude's live identity/grant/scope/PDP hook after blocking I/O,
-   immediately before entry, each model/tool node and output release.
-4. Mint an opaque nonserializable admission witness in the verified path; the
-   public Principal and stored entry/scope are data. Pass private async control
-   context explicitly outside graph state/config/checkpoint metadata; no ambient
-   ThreadLocal. Invalidate cancellation promptly but retire contexts/worker slots
-   only after actual termination. Bound all active/pending live-check work.
-5. Obtain expected acting workload from a server-trusted pinned definition/task/
-   deployment binding, never the token/grant/request/owner. Missing mapping and
-   approved-model context refuse. No default admission allowance is activated.
+Next, pair the gate binding with the SAME private admitted credential (full record, not merely equal entry/hash), then
+build the bounded concrete composite and trusted production composition root. #79 supplies the pairing-aware identity
+check and a historical derived binding fingerprint; GPT supplies canonical DATA lookup. Both still require review/CI
+of their final heads. No CDI admission/model/graph default is enabled.
 
-Claude is preparing the minimal owned identity/PEP hook contract. GPT owns V76
-schema/backend, registry/lease/target composition and actual Flow dispatch. Review
-that handoff before implementation; keep scopes and ownership explicit. The
-original intermittent identity recovery failure remains open, separately tracked.
+The root must source the expected workload, approved target and task from server-trusted pinned facts; missing mapping
+refuses. Compose current registry/full owner/definition/actual task/target/lease with current identity/grant/scope/PDP,
+mandatory central audit and rechecks after blocking I/O. It must invoke the pairing-aware check on the exact same binding,
+restrict gate construction to that root and configure bounded JDBC lock/statement/network timeouts. Public data values
+and arbitrary fence lambdas cannot become an endpoint/workflow capability.
+
+Actual Flow/agent dispatch, per-node and output release, exact immutable terminal-checkpoint association, private async
+propagation and process/owner/unknown-outcome recovery remain unproven. No handles, credentials or authority flags belong
+in graph state, RunnableConfig metadata, checkpoints or ThreadLocal. Use an explicit private control context and retire it
+only after actual work termination. The full [failure matrix](WP-108-backend-entry-prep.md) remains the acceptance target;
+component callback tests are not graph or package closure.
 
 ## Following ordered gates
 
-The owned checkpoint consumer/schema boundary is merged; data-only V76 is still under review at PR #74.
+The checkpoint consumer/schema boundary and data-only V76 are merged; production composition is still absent.
 V77 producer/delivery, V78 allocation, V79 model reservations and V80 manual decisions remain
 later preparations, not active main features.
 

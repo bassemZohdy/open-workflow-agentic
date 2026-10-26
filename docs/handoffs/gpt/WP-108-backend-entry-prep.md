@@ -2,13 +2,16 @@
 
 **Prepared:** 2026-10-26  
 **Producer/writer:** GPT (lifecycle, contracts, SQL and integration); **peer reviewer:** Claude  
-**Current base:** `15bcdc8026fe03f14122378e27d994f540cf08be`  
-**Implementation state:** **NOT STARTED**. This document stages the next reviewed slice; it is not code, passing tests, an authority grant, or package acceptance.
+**Current implementation base:** `af9d7e2cfe8c298fc438878a4c5b38fc2bedf9aa`  
+**Implementation state:** Internal V76 schema, synchronous identity and JDBC callback components are merged. **Production composite, actual dispatch and async integration are NOT STARTED.** This matrix defines remaining end-state checks; it is not an authority grant or package acceptance.
 
 ## 1. Prerequisite and authoritative evidence
 
 - PR [#73](https://github.com/bassemZohdy/open-workflow-agentic/pull/73) is merged: the verified identity path mints an opaque one-call admission witness. This witness alone never starts a graph.
-- PR [#74](https://github.com/bassemZohdy/open-workflow-agentic/pull/74) is the sole open implementation PR, providing **V76 immutable data only**. Current head `3f37b3ba2a37981f2a99ad497227dab198719531`: full CI run `40265793674` passed 175 suites / 1262 cases, zero failures/errors/skips. **Claude exact-head review is still pending. No merge or backend activation until that review passes.**
+- PR [#74](https://github.com/bassemZohdy/open-workflow-agentic/pull/74) merged as `561c691` after exact Claude PASS `3f37b3b` and full1262. V76 retains immutable DATA only.
+- Synchronous identity [#77](https://github.com/bassemZohdy/open-workflow-agentic/pull/77) merged as `53eb019` after GPT exact PASS and full1273 plus real-provider evidence. Its required workload argument has no server-trusted mapping yet.
+- Internal JDBC gate [#78](https://github.com/bassemZohdy/open-workflow-agentic/pull/78) merged as `af9d7e2` after Claude exact PASS `04c55a1`, independent67 and inspected full1291. It proves fresh callback acknowledgement/duplicate/unknown/close behavior, not actual graph entry or a concrete current fence.
+- Exact credential-pairing [#79](https://github.com/bassemZohdy/open-workflow-agentic/pull/79) and GPT canonical DATA lookup are pending. Production composition must compare the whole binding to the private admitted credential, not just entry or hash.
 - V73/V74 call/binding/occurrence storage, V75 central audit source receipts, V75.1 checkpoint profile ownership and startup verifier have already merged. Their existence does not authorize execution or private output release.
 - Intermittent packaged-process identity recovery remains unresolved: [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75).
 - **Production identity-profile decision remains open:** Keycloak 26.8.1 actor-bearing delegation is a documented **preview** feature, while fully supported standard token exchange does not by itself establish the same `act` chain. Confirm the standard-only production requirement or explicitly accept the preview profile before claiming enterprise readiness: [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76), [Keycloak official release notes](https://www.keycloak.org/docs/26.8.1/release_notes/).
@@ -26,13 +29,13 @@ This next slice must **not**:
 
 ## 3. Implementation order and write ownership
 
-1. **DATA backend (GPT, after #74 merge):** introduce a narrowly scoped JDBC operation against `task.resource_execution`, using a short owned transaction, no network I/O under its DB lock, and the exact original V74 occurrence. Surface **retained fact / definitely new committed row / indeterminate reply** separately; API return types must not be publicly convertible to graph-run permission. Conflict with another epoch/binding/target must not allocate a new logical call.
-2. **Live authority (Claude-owned caller/identity/PEP):** provide the exact producer hook for a verified signed caller, immutable full owner/tenant/target and task/lease/registry snapshot; recheck signed expiration, grant chain/revocation, requested scopes and PDP decision after every blocking boundary. Missing or expired authority is denied. GPT requests this through the existing cross-area handoff rather than editing identity/policy code.
+1. **Internal backend merged; production adoption remains (GPT):** the reviewed JDBC gate uses `task.resource_execution`, using a short owned transaction, no network I/O under its DB lock, and the exact original V74 occurrence. Surface **retained fact / definitely new committed row / indeterminate reply** separately; API return types must not be publicly convertible to graph-run permission. Conflict with another epoch/binding/target must not allocate a new logical call.
+2. **Live authority (Claude-owned caller/identity/PEP):** compose the merged synchronous identity hook with the exact producer hook for a verified signed caller, immutable full owner/tenant/target and task/lease/registry snapshot; recheck signed expiration, grant chain/revocation, requested scopes and PDP decision after every blocking boundary. Missing or expired authority is denied. GPT requests this through the existing cross-area handoff rather than editing identity/policy code.
 3. **Dispatch bridge (GPT lifecycle, Claude agent):** a private non-serializable, single-call context binds the verified witness, server-trusted pinned workload target, original V74 call, executing task/owner lease and mandatory central audit receipt. Only the *newly acknowledged* committed-entry callback, and only after a fresh post-commit live fence, may invoke a graph. No ambient ThreadLocal, mutable workflow input or agent checkpoint stores the context. Enforce queue/worker bounds, cancellation and close-on-termination.
 4. **Terminal outcome (GPT association, Claude read-only inspector):** check exact physical run and checkpoint UUIDs, pinned serializer/profile, terminal structure and unchanged stored representation in one consistent read; then associate an immutable V76 outcome. Recheck current authority before **any** private output release. Persist historical facts after cancellation but withhold output.
 5. **Reconciliation (GPT lifecycle):** after an unknown database commit reply or process death, read same original call and its audit/physical checkpoint evidence. Never call a fresh graph merely because the caller did not receive a reply. Unsupported or uncertain cases move to explicit recovery/manual investigation; no automatic second entry.
 
-## 4. Deterministic acceptance matrix for the first backend/dispatch PR
+## 4. Deterministic acceptance matrix for backend and actual dispatch
 
 | Failure injection or race | Required assertion |
 |---|---|
@@ -49,7 +52,7 @@ This next slice must **not**:
 | Outcome association races with cancellation | Retain historical immutable outcome; deny current private release |
 | JVM/process kill after graph target effect before acknowledgement | Same effect idempotency key and manual UNKNOWN pathway, no duplicated business effect |
 
-Every test must use real PostgreSQL locks/faults where appropriate and the **actual** Flow/agent SDK path for dispatch claims. Mutation/negative controls must demonstrate that removing the intended guard fails at the intended assertion; a child FK or an unrelated denial is not a sufficient proof.
+The merged gate covers storage acknowledgement/concurrency/close with real PostgreSQL and synchronous fixture callbacks. Identity/current-policy/actual graph/async rows remain future integration checks. Every relevant test must use real PostgreSQL locks/faults where appropriate and the **actual** Flow/agent SDK path for dispatch claims. Mutation/negative controls must demonstrate that removing the intended guard fails at the intended assertion; a child FK or an unrelated denial is not a sufficient proof.
 
 ## 5. Evidence, merge and reporting rules
 
