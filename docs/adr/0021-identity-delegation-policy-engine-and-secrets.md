@@ -277,3 +277,24 @@ WP-102/M11 remains partial for its original asynchronous live-Flow dispatch and
 identity/correlation propagation consumer deliverable; the presence of the
 exchanger bean and context wrappers alone does not prove that end-to-end path.
 Mounted secrets remain selected; conditional Vault integration is not claimed.
+
+### H5: production uses supported features only (2026-10-27)
+
+The project owner selected **supported Keycloak features only** in the explicit
+production-profile question for issue #76. Production must not enable or depend on
+preview delegation features. This supersedes any interpretation of H1/H3's pinned
+preview compatibility adoption as production eligibility; the historical tests and
+their compatibility results remain valid for that explicitly experimental profile.
+
+Standard actorless exchange remains refused. This decision does not weaken the
+verified subject/workload/tenant/actor binding, immutable delegation grants, current
+scope/audience/expiry/revocation checks, or no-bearer-persistence requirements. It does
+not approve an alternative broker, issuer, extension, or application actor-binding
+protocol merely because standard exchange is supported. The supported-only path
+still needs a reviewed threat model, exact interoperability contract and real
+end-to-end denial/recovery evidence before production delegation can be enabled.
+
+Keep the preview lane labeled as compatibility research, not a production acceptance
+pass. Issue #76's preference question is answered; its implementation and verification
+work remains open, alongside the distinct recovery issue #75. No WP-102/M11 or
+acceptance gate is promoted by this decision alone.
