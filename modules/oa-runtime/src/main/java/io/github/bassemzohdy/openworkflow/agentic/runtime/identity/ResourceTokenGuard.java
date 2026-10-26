@@ -121,6 +121,20 @@ public final class ResourceTokenGuard {
         checkTime(token);
     }
 
+    /**
+     * Same checks as {@link #revalidate} (signed expiry, exact issuing grant, ancestors, tenant, user, chain, scopes), but
+     * hands the exactly matched, currently active issuing grant to a same-package caller that must compare its typed
+     * agent. The grant is data read now, never cached permission; the caller must not retain it. Does not use the
+     * replay counter.
+     */
+    DelegationGrant revalidateGrant(VerifiedToken token, Set<String> requiredScopes) {
+        Objects.requireNonNull(token, "token");
+        checkTime(token);
+        DelegationGrant grant = checkGrant(token, requiredScopes);
+        checkTime(token);
+        return grant;
+    }
+
     /** Fail closed at {@code exp} (exp must be strictly after now) and refuse an issue time beyond a small clock skew. */
     private Instant checkTime(VerifiedToken token) {
         Instant now = clock.instant();
@@ -133,7 +147,7 @@ public final class ResourceTokenGuard {
         return now;
     }
 
-    private void checkGrant(VerifiedToken token, Set<String> requiredScopes) {
+    private DelegationGrant checkGrant(VerifiedToken token, Set<String> requiredScopes) {
         if (token.tenant() == null) {
             throw new TokenRejectedException(TokenRejectedException.Reason.MISSING_CLAIM);
         }
@@ -166,5 +180,6 @@ public final class ResourceTokenGuard {
         if (!matches) {
             throw new TokenRejectedException(TokenRejectedException.Reason.GRANT_INACTIVE);
         }
+        return bound;
     }
 }
