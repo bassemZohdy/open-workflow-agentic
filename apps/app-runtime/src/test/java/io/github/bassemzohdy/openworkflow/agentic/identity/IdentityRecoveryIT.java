@@ -222,8 +222,8 @@ class IdentityRecoveryIT {
                 () -> read(second.logFile()).contains("probe-effect authority instance=" + engineY
                         + " subject=alice grant=" + renewed.id().value() + " correlation=" + corrY
                         + " state=AUTHORIZED epoch=1"));
-        decideUntilCompleted(second, x, bearer);
-        decideUntilCompleted(second, y, bearer);
+        decideUntilCompleted(second, x, engineX, bearer);
+        decideUntilCompleted(second, y, engineY, bearer);
 
         // ---- no credential in any stored state ---------------------------------------------------------------------------
         List<String> needles = needles(canary1, canary2);
@@ -344,7 +344,8 @@ class IdentityRecoveryIT {
         }
     }
 
-    private static void decideUntilCompleted(ManagedProcess process, String id, String bearer) throws Exception {
+    private static void decideUntilCompleted(ManagedProcess process, String id, String engineId, String bearer)
+            throws Exception {
         long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
         while (System.nanoTime() < deadline) {
             if ("COMPLETED".equals(status(process, id, bearer))) {
@@ -354,8 +355,17 @@ class IdentityRecoveryIT {
             Thread.sleep(500);
         }
         // CI keeps the failsafe XML but not target/process-logs, so the evidence has to travel in the message.
-        fail("instance " + id + " did not complete; status " + status(process, id, bearer)
-                + "; engine instance " + engineId(process, id, bearer) + "\n" + logTail(process.logFile(), 60));
+        // The snapshot is evidence only: a diagnostic failure must never replace this failure (no claim about the cause).
+        String registryStatus;
+        try {
+            registryStatus = status(process, id, bearer);
+        } catch (Throwable unavailable) {
+            registryStatus = "unavailable";
+        }
+        fail("instance " + id + " did not complete; status " + registryStatus
+                + "; engine instance " + engineId + "; "
+                + RecoveryEngineSnapshot.describe(process.baseUrl(), DEFINITION, "0.1.0", engineId)
+                + "\n" + logTail(process.logFile(), 60));
     }
 
     private static String logTail(Path log, int lines) {
