@@ -10,7 +10,7 @@ import java.util.Objects;
  * the call is read and {@link Pep#modelCall} decides; the PEP records the decision through the audit sink before
  * returning, and an audit failure turns the decision into ERROR. The provider is called only for ALLOW.
  *
- * <p>Zero physical provider calls happen when: there is no approved context ({@link ModelCallRefused}); the policy
+ * <p>Zero physical provider calls happen when: there is no approved context, or its remaining budget is zero ({@link ModelCallRefused}); the policy
  * says DENY or ERROR, or its engine or the audit record fails ({@link
  * io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PolicyDenied}); or the request to the PEP cannot be built.
  * Nothing here retries: one allowed decision admits exactly one call to {@link LlmClient#complete}. A provider that
@@ -47,6 +47,10 @@ public class GovernedLlmClient {
         Objects.requireNonNull(user, "user");
         var approved = context.current()
                 .orElseThrow(() -> new ModelCallRefused("no approved context for this model call"));
+        if (approved.budgetRemainingMicros() == 0L) {
+            // refused here, not by policy: a permissive policy may ignore the budget it is shown
+            throw new ModelCallRefused("no model budget remaining for this model call");
+        }
         var decision = pep.modelCall(approved.agent(), approved.task(), approved.modelId(),
                 approved.budgetRemainingMicros());
         return Pep.guard(decision, () -> provider.complete(system, user));
