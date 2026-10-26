@@ -41,8 +41,7 @@ are still `PolicyDenied`.
 `apps/app-runtime/.../agent/GovernedModelRunningControlTest` (new, 21 cases): a fresh private `oa_gm_run_<uuid>`
 PostgreSQL DB is created/migrated, Running is minted by a REAL fresh committed `executeGoverned` callback (own small
 fixture on public APIs; GPT lifecycle helpers not edited). Fence, approved context, policy engine, audit sink and provider
-are labelled fixture mechanics, not production admission/reservations. Covers: positive (1 provider call, exactly 4
-control checks, 1 before lookup, 3 before provider), ended control, closed-in-callback, interrupted caller, fence refusal
+are labelled fixture mechanics, not production admission/reservations. Covers: positive (exactly 1 provider call, the expected output released, the ALLOW audited; no fence-count assertions), ended control, closed-in-callback, interrupted caller, fence refusal
 before; close and fence loss during lookup (no policy question); close during PEP decision and during audit record (audited
 ALLOW but zero provider); close, fence loss and interrupt during the provider (output withheld, provider ran once);
 exact-entry mismatch (control still usable for the true entry); null control/entry; default context; zero budget with
@@ -52,29 +51,35 @@ from the callback thread while a worker is blocked in lookup or provider (worker
 `GovernedLlmClientTest` (+2): absent control/entry refused with zero lookups/policy/audit/provider; legacy path unchanged.
 A real `Running` cannot be forged outside a gate callback, so the rest is only testable in the integration test.
 
-### Red controls (guard removal, production file restored after each)
+### Red controls (guard removal, production file restored byte-identical after each)
 
-Removing one `control.requireCurrent(expected)` at a time and rerunning the integration test (21 cases + 7 architecture):
+Removing one `control.requireCurrent(expected)` at a time (lines 85/88/98/100 of `GovernedLlmClient`) and rerunning
+`GovernedModelRunningControlTest` (21 cases). Every failure is an intended refusal/output assertion; the positive test
+no longer fails by design (it does not count checks):
 
-| Removed check | Failures |
-|---|---|
-| 1 before lookup | 6 (ended control, closed in callback, interrupted, fence-before, mismatch, positive) |
-| 2 after lookup | 4 (close during lookup, fence loss during lookup, worker blocked in lookup, positive) |
-| 3 before provider | 3 (close during PEP, close during audit, positive) |
-| 4 after provider | 5 (close/fence/interrupt during provider, worker blocked in provider, positive) |
+| Removed check | Failures | Failing assertions |
+|---|---|---|
+| 1 before lookup | 5 | ended control, interrupted caller, fence refusing before, exact-entry mismatch: "no approved-context lookup" expected 0 was 1; control closed in callback: expected `RefusedException` |
+| 2 after lookup | 3 | close during lookup and worker blocked in lookup: expected `RefusedException`; fence lost during lookup: policy question expected 0 was 1 |
+| 3 before provider | 2 | close during PEP decision / during audit record: expected `RefusedException` (provider reached) |
+| 4 after provider | 4 | interrupt, fence loss and close during provider, and worker blocked in provider: output not withheld (expected exception not thrown) |
 
-Each check is killed by a distinct negative test. Plus baseline `baselineTheLegacyPathIgnoresAClosedControl...` shows the
-unguarded path does reach the provider with a closed control.
+Plus baseline `baselineTheLegacyPathIgnoresAClosedControl...` shows the unguarded path does reach the provider with a closed
+control.
 
-## Evidence (Windows, Java 21.0.12, Maven 3.9.11 offline, PG 16.15 on localhost:5432 via `DB_URL`)
+## Evidence (Windows, Maven 3.9.11 offline, PG on localhost:5432 via `DB_URL` defaults)
 
-- Unit: `-pl modules/oa-runtime -am -Dtest='GovernedLlmClientTest#!theShippedDefaultsRefuseEverything,PepTest,ModelBoundaryArchitectureTest'`:
-  13 + 17 + 3 = 33 run, 0 failures/errors/skips. The native-Cedar case `theShippedDefaultsRefuseEverything` stays
-  enabled and was deliberately NOT selected here (cannot load native on Windows): it is unverified locally; this is NOT a
-  full-suite or green-suite claim. Linux CI must run it.
-- Integration: `-pl apps/app-runtime -am -Dtest='GovernedModelRunningControlTest,ResourceExecutionConstructionArchitectureTest'`:
-  21 + 7 = 28 run, 0 failures. The test's own `oa_gm_run_<uuid>` DB was dropped without FORCE (0 remain). No Quarkus boot,
-  no shared DB migration/reset. No full or native Windows suite run.
+Corrected counts: `GovernedLlmClientTest` has 16 `@Test` methods, 1 native-Cedar (`theShippedDefaultsRefuseEverything`)
+left enabled in source but not selected locally, so 15 run. The earlier "13 / total 33" figure came from a command that
+did not cover the 2 new unit cases; it is superseded.
+
+- Unit (runtime): `GovernedLlmClientTest` 15 (explicit source-derived list in `target/running-model-gpt-selection.txt`,
+  no `#!` shortcut) + `PepTest` 17 + `ModelBoundaryArchitectureTest` 3 = 35.
+- Integration (app): `GovernedModelRunningControlTest` 21 + `ResourceExecutionConstructionArchitectureTest` 7 = 28.
+- Total 63, 0 failures/errors/skips (`target/running-model-claude-63.log`). Re-run here on JDK 25.0.2 (compiling
+  `--release 21`); no JDK 21 is installed on this machine, GPT's independent run was 21.0.12. The native case is
+  unverified locally; Linux CI must run it. Not a full-suite claim. No Quarkus boot, shared DB or native Windows suite;
+  the test's own `oa_gm_run_<uuid>` DB is dropped.
 
 ## Remaining gates
 

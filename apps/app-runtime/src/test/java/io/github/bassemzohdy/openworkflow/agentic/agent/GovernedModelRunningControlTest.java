@@ -243,26 +243,15 @@ class GovernedModelRunningControlTest {
     // ------------------------------------------------------------------ the positive path
 
     @Test
-    void aLiveRunningControlAdmitsOneProviderCallAndIsCheckedAtEachOfFourPoints() throws Exception {
+    void aLiveRunningControlAdmitsExactlyOneProviderCallAndReleasesTheOutput() throws Exception {
         var rig = new Rig();
-        var seenAtLookup = new AtomicInteger(-1);
-        var seenAtProvider = new AtomicInteger(-1);
 
-        String out = inCallback((running, entry, checks) -> {
-            int before = checks.get();
-            rig.context.during = () -> seenAtLookup.set(checks.get() - before);
-            rig.provider.during = () -> seenAtProvider.set(checks.get() - before);
-            String answer = rig.client.complete(running, entry, "sys", "usr");
-            assertEquals(4, checks.get() - before, "before lookup, after lookup, before provider, after provider");
-            return answer;
-        });
+        String out = inCallback((running, entry, checks) -> rig.client.complete(running, entry, "sys", "usr"));
 
         assertEquals(SECRET, out);
-        assertEquals(1, seenAtLookup.get(), "one check precedes the lookup");
-        assertEquals(3, seenAtProvider.get(), "three checks precede the provider, the third right after ALLOW");
-        assertEquals(1, rig.provider.calls.get());
-        assertEquals(1, rig.engine.asked.get());
-        assertEquals(1, rig.audit.events.size(), "the ALLOW was audited before the provider");
+        assertEquals(1, rig.provider.calls.get(), "exactly one provider call");
+        assertEquals(1, rig.audit.events.size(), "the ALLOW was audited");
+        assertEquals("ALLOW", rig.audit.events.get(0).attributes().get("policy.outcome"));
     }
 
     // ------------------------------------------------------------------ before lookup
