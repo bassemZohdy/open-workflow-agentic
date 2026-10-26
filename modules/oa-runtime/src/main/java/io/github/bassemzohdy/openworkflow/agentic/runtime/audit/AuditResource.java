@@ -98,8 +98,9 @@ public class AuditResource {
         PageRequest paging = badRequestOnInvalid(() -> PageRequest.of(cursor, limit));
         current(who);
         AuditQuery.Page page = badRequestOnInvalid(() -> query.find(filter, paging));
-        current(who); // the page was read by blocking I/O; private output is withheld if the identity expired meanwhile
-        return new EventPage(page.items().stream().map(EventView::of).toList(), page.nextCursor());
+        EventPage output = new EventPage(page.items().stream().map(EventView::of).toList(), page.nextCursor());
+        current(who); // read by blocking I/O and materialized; private output is withheld if the identity expired meanwhile
+        return output;
     }
 
     @GET
@@ -109,9 +110,9 @@ public class AuditResource {
         access.require(AuditAccess.READ, who.caller());
         Ulid id = badRequestOnInvalid(() -> Ulid.parse(eventId));
         current(who);
-        java.util.Optional<AuditEvent> found = query.byId(id);
+        java.util.Optional<EventView> found = query.byId(id).map(EventView::of);
         current(who); // as for the page: no event, and no existence signal, leaves after the identity expired
-        return found.map(EventView::of).orElseThrow(() -> new NotFoundException("no audit event with that id"));
+        return found.orElseThrow(() -> new NotFoundException("no audit event with that id"));
     }
 
     @POST
@@ -122,8 +123,9 @@ public class AuditResource {
         String chain = chainId == null ? null : badRequestOnInvalid(() -> AuditKeys.requireChainId(chainId));
         current(who);
         List<ChainReport> reports = chain == null ? verifier.verifyAll() : List.of(verifier.verify(chain));
+        VerifyResult output = new VerifyResult(reports.stream().allMatch(ChainReport::intact), reports);
         current(who); // verification outcomes are private output too
-        return new VerifyResult(reports.stream().allMatch(ChainReport::intact), reports);
+        return output;
     }
 
     /**

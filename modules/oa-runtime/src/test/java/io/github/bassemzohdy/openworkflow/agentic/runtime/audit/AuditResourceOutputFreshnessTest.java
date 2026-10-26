@@ -53,6 +53,7 @@ class AuditResourceOutputFreshnessTest {
     private static final Subject ALICE = new Subject(SubjectKind.USER, "alice");
     private static final String DATABASE = "oa_audit_fresh_" + UUID.randomUUID().toString().replace("-", "");
     private static PGSimpleDataSource real;
+    private static boolean created;
 
     private static final class TestClock extends Clock {
         private final AtomicReference<Instant> now = new AtomicReference<>(Instant.parse("2026-10-20T10:00:00Z"));
@@ -83,17 +84,31 @@ class AuditResourceOutputFreshnessTest {
 
     @BeforeAll
     static void createPrivateDatabase() throws Exception {
+        if (!DATABASE.matches("oa_audit_fresh_[0-9a-f]{32}")) {
+            throw new IllegalStateException("unexpected private database name");
+        }
         try (Connection c = source("postgres").getConnection(); Statement s = c.createStatement()) {
             s.execute("create database " + DATABASE);
+            created = true;
         }
         real = source(DATABASE);
+        try (Connection c = real.getConnection(); Statement s = c.createStatement();
+                java.sql.ResultSet r = s.executeQuery("select current_database()")) {
+            if (!r.next() || !DATABASE.equals(r.getString(1))) {
+                throw new IllegalStateException("not connected to the private database; refusing to migrate or append");
+            }
+        }
         Flyway.configure().dataSource(real).locations("classpath:db/migration").load().migrate();
     }
 
     @AfterAll
     static void dropPrivateDatabase() throws Exception {
+        if (!created || !DATABASE.matches("oa_audit_fresh_[0-9a-f]{32}")) {
+            return;
+        }
+        // every connection of the tests was closed by its try-with-resources; no FORCE, so a leak fails loudly
         try (Connection c = source("postgres").getConnection(); Statement s = c.createStatement()) {
-            s.execute("drop database " + DATABASE + " with (force)");
+            s.execute("drop database " + DATABASE);
         }
     }
 

@@ -12,16 +12,18 @@ protected the output if the token expired while the query or verification ran, s
 ## Change (production, `AuditResource` only)
 
 `current(who)` (unchanged helper: 401 on expiry or authority loss, 503 when it cannot be decided, dev header seam not
-rechecked) is now also called immediately before returning each materialized result: events page, single event
-(including the not-found outcome, so there is no existence signal), and both verification forms. The before-I/O checks,
+rechecked) is now also called as the LAST step, after DTO materialization/aggregation (`EventPage`, `EventView`
+optional, `VerifyResult` are fully built first), immediately before returning the prepared result: events page, single
+event (including before the not-found result, so there is no existence signal), and both verification forms. The before-I/O checks,
 the policy then audit order, defaults and 401/503 mapping are unchanged. No callbacks, no ThreadLocal.
 
 ## Tests (Claude audit reserved path)
 
 `modules/oa-runtime/src/test/.../runtime/audit/AuditResourceOutputFreshnessTest.java` (9 cases). Real resolver, access, PEP,
 resource, `AuditQuery`, `ChainVerifier`, `AuditTrail` on real PostgreSQL in a private throwaway database
-(`oa_audit_fresh_<uuid>`, created and force-dropped by the test, Flyway migrated; the shared database is never touched or
-reset). The one double: a `DataSource` wrapper that advances the test clock past the token expiry when a connection is
+(`oa_audit_fresh_<32 hex>`; the name pattern is validated, `select current_database()` must equal it BEFORE Flyway
+migration and any append, a `created` flag is kept, and only a database this test actually created is dropped, without
+FORCE, after its connections are closed; the shared database is never touched or reset). The one double: a `DataSource` wrapper that advances the test clock past the token expiry when a connection is
 closed, i.e. after the data was read and before the resource returns.
 
 Cases: events page, one event, unknown event, one-chain verify, all-chains verify each read across expiry (expect 401 and
@@ -39,11 +41,13 @@ Java 21 `C:\Users\Bassem\AppData\Local\Codex\runtimes\java21\jdk-21.0.12.1+1`, M
 - BEFORE (production unchanged, new test present): 30 run, 5 failures. Page, event, one-chain and all-chains verify
   returned 200 and the unknown event returned 404 after expiry (leak); the 4 positive/before-I/O cases passed.
 - AFTER: 30 run, 0 failures (new 9, existing AuditResourceFreshnessTest 5, AuditQueryTest 6, ChainVerifierTest 10).
+  Re-run after the review corrections: 30 run, 0 failures; AuditVerifiedCallerApiTest 7/7.
 - App level: `-pl apps/app-runtime -am -Dtest=AuditVerifiedCallerApiTest,AuditCallerDefaultDenyTest`:
   AuditVerifiedCallerApiTest 7/7 pass. AuditCallerDefaultDenyTest 2 of 3 fail with 500 from
   `UnsatisfiedLinkError ... com.cedarpolicy.value.EntityTypeName.parseEntityTypeName` (Cedar native library does not
-  load on this Windows host, raised in policy evaluation before any audit read). Environmental and not caused by this
-  change; I did not run it at baseline. The Linux native/HTTP tests are kept unchanged and must run in Linux CI.
+  load on this Windows host, raised in policy evaluation before any audit read). Observed loader failure; baseline not
+  run, so it is not established that this change is unrelated. Linux CI is required. Known unsupported native tests
+  were not rerun here.
 
 ## Scope limits and residual gates
 
