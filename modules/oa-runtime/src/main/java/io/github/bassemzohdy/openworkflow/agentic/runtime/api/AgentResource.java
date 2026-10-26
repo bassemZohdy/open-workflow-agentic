@@ -52,6 +52,9 @@ import java.util.regex.Pattern;
  *       A delegated (workflow) call may not name a thread: it gets a fresh one in a separate namespace.</li>
  *   <li>For a delegated token the signed expiry and the exact issuing grant chain are checked again immediately before
  *       the agent runs, because policy and audit before it can block (the single use is not consumed twice).</li>
+ *   <li>The same check is made once more after the blocking run, once the private output is built and immediately
+ *       before it is returned. A caller whose authority ended during the run gets 401 (503 when it cannot be decided)
+ *       and no plan, draft or review; the work itself may already have happened.</li>
  * </ol>
  */
 @Path("/agents/research")
@@ -122,7 +125,7 @@ public class AgentResource {
             thread = call.scope().threadId();
         }
         // policy and audit above can block: the authority is judged again immediately before anything runs
-        current(admitted.who());
+        current(admitted.who(), "the agent was not run");
         ResearchState state;
         try {
             state = agent.run(thread.value(), request.topic());
@@ -146,12 +149,16 @@ public class AgentResource {
             }
             throw failure;
         }
-        return Map.of(
+        Map<String, Object> output = Map.of(
                 "threadId", threadId,
                 "topic", request.topic(),
                 "plan", state.text(ResearchState.PLAN).orElse(""),
                 "draft", state.text(ResearchState.DRAFT).orElse(""),
                 "review", state.text(ResearchState.REVIEW).orElse(""));
+        // the run blocked and its output is private: the authority is judged once more, immediately before it leaves.
+        // A refusal here may follow real agent and model work (it was done and is not undone); only the output is withheld
+        current(admitted.who(), "the output was withheld");
+        return output;
     }
 
     /**
@@ -215,7 +222,7 @@ public class AgentResource {
      * development-header caller has no signed expiry and keeps its explicit dev and test seam; it is never production
      * permission because the resolver refuses that seam outside dev and test profiles.
      */
-    private static void current(CallerAuthority who) {
+    private static void current(CallerAuthority who, String consequence) {
         if (!who.caller().verified()) {
             return;
         }
@@ -224,7 +231,7 @@ public class AgentResource {
         } catch (AuthorityLostException gone) {
             if (gone.reason() == AuthorityLostException.Reason.UNAVAILABLE) {
                 throw new ProblemException(Response.Status.SERVICE_UNAVAILABLE,
-                        "the authority could not be checked; the agent was not run");
+                        "the authority could not be checked; " + consequence);
             }
             throw new WebApplicationException("the caller's authority is no longer valid", Response
                     .status(Response.Status.UNAUTHORIZED)
