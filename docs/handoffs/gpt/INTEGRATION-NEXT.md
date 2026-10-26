@@ -4,6 +4,7 @@ Current implementation baseline: main `2284d106db01548c2b620c5ad8744aa25fe692f1`
 Audit delivery87 and controlled model88 are merged after exact peer reviews and independently inspected current CI.
 See evidence/WP-108-audit-delivery/current-ci.json (1395 tests) and evidence/WP-103-running-model-boundary/current-ci.json (1409 tests).
 These runs precede combination; combined-main verification is pending. Neither installs production authority or an approved model context.
+Allocation DATA contracts89 are open at41ba16c, Claude exact PASS/independent209; current CI pending.
 Next: [staged allocation migration](WP-103-allocation-migration-plan.md), preserving historical unallocated entries and reserved V78..V80.
 Counts remain11 completed/12 partial/30 not started; acceptance3/39. Issues75/76 remain open.
 

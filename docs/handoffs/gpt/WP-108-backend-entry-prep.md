@@ -1,8 +1,8 @@
 # WP-108: V76 entry backend and governed dispatch — implementation intake
 
-**Prepared:** 2026-10-26  
+**Prepared:** 2026-10-27
 **Producer/writer:** GPT (lifecycle, contracts, SQL and integration); **peer reviewer:** Claude  
-**Current implementation base:** `4f41a60c8d086b443d05013480656fdd8bf1f5d0`
+**Current implementation base:** `2284d106db01548c2b620c5ad8744aa25fe692f1`
 
 **Implementation state:** Internal V76 schema, synchronous identity and JDBC callback components are merged. **Production composite, actual dispatch and async integration are NOT STARTED.** This matrix defines remaining end-state checks; it is not an authority grant or package acceptance.
 
@@ -16,6 +16,9 @@
 - V73/V74 call/binding/occurrence storage, V75 central audit source receipts, V75.1 checkpoint profile ownership and startup verifier have already merged. Their existence does not authorize execution or private output release.
 - Intermittent packaged-process identity recovery remains unresolved: [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75).
 - **Production identity-profile decision remains open:** Keycloak 26.8.1 actor-bearing delegation is a documented **preview** feature, while fully supported standard token exchange does not by itself establish the same `act` chain. Confirm the standard-only production requirement or explicitly accept the preview profile before claiming enterprise readiness: [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76), [Keycloak official release notes](https://www.keycloak.org/docs/26.8.1/release_notes/).
+
+- Audit delivery #87 merged2570bea after Claude exactb7ddc72 PASS/independent53 and inspected1395; controlled model #88 merged2284d10 after GPT exact912b41a PASS/independent63 and inspected1409. These separate CI runs precede combination. Neither installs a production relay, approved-context source or actual graph adoption.
+- The [allocation migration proposal](WP-103-allocation-migration-plan.md) passed Claude text review. V78..V80 remain unapplied; historical preservation, new-write enforcement and restricted writer/profile provenance need executed evidence before activation.
 
 ## 2. Invariant and non-goals
 

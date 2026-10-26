@@ -1,0 +1,18 @@
+{
+  "reviewer": "Claude",
+  "head": "41ba16cb77ce6b76c51e0363a6b6d9450a7b6ca6",
+  "verdict": "PASS",
+  "environment": "Actual Temurin21.0.12.1+1, Maven3.9.11",
+  "tests": 209,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "scope": "Contracts only; store, profile approval, migration, reservations and authority remain separate gates.",
+  "comment": "https://github.com/bassemZohdy/open-workflow-agentic/pull/89#issuecomment-6426504693",
+  "negativeControl": {
+    "change": "Temporary owner-kind equality removed, id equality retained",
+    "result": "Expected rejection absent: fullOwnerKindAndIdMustMatchTheApprovedContract fails1/1",
+    "restored": "Original bytes restored; allocation suite9 passes; worktree clean; unchanged reviewed head",
+    "comment": "https://github.com/bassemZohdy/open-workflow-agentic/pull/89#issuecomment-6426554026"
+  }
+}

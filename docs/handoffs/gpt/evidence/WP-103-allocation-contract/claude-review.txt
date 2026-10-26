@@ -1,0 +1,38 @@
+**Reviewer Claude verdict: PASS**
+
+The adoption is contracts-only and I found nothing blocking. The findings below are non-blocking nits and limits.
+
+**Exact SHA:** `41ba16cb77ce6b76c51e0363a6b6d9450a7b6ca6` on `gpt/WP-103-allocation-contract`. The worktree was clean before and after the run. It is one commit ahead of `main`, adding 7 files and 325 lines. These are the handoff doc, 4 main classes (`AgentTaskContractFingerprint`, `AllocatedResourceTask`, `ApprovedModelProfile`, `ResourceTaskAllocation`), the `ResourceTaskAllocations` port, and `ResourceTaskAllocationTest`. There are no migrations, stores, beans or schema changes.
+
+**Commands run:**
+- `JAVA_HOME=C:\Users\Bassem\AppData\Local\Codex\runtimes\java21\jdk-21.0.12.1+1`. `java -version` reported Temurin 21.0.12.1+1.
+- `mvn.cmd -v` reported Maven 3.9.11 on that JDK, at `C:\ProgramData\chocolatey\lib\maven\apache-maven-3.9.11\bin\mvn.cmd`.
+- `mvn.cmd -B -f modules/oa-contracts/pom.xml test`. My first attempt used `-pl modules/oa-contracts` and failed with a reactor error. That was a wrong invocation, not a code problem.
+- **Result:** BUILD SUCCESS, **209 tests, 0 failures, 0 errors, 0 skipped**.
+- **Counts:** `ResourceTaskAllocationTest` ran 9 and `AgentTaskContractTest` ran 17, matching the handoff. `ArchitectureTest` (2) and `SchemaContractTest` (14) also passed.
+
+**What I checked:**
+- **Fingerprint framing and collisions:**
+  - `CanonicalEncoder` writes a domain tag, 4-byte length-prefixed strict UTF-8, 8-byte numbers and a presence byte for optional text, so framing is injective.
+  - The tool and scope sets are count-prefixed and sorted. The tests confirm order independence.
+  - The task digest binds id, goal, both sets, risk tier, all three limits, owner kind and id, and grant.
+  - The profile digest binds all 9 fields. The allocation digest binds scope key and fingerprint, parent, task digest and profile digest. The domain tags are distinct per purpose.
+  - Unpaired surrogates are rejected for goal, profile text and agent id.
+- **Identity and conflict:**
+  - `key()` hashes only `scope.key()`. Target, request, task, profile and parent changes therefore conflict at the same identity through `fingerprint()`. The tests cover this.
+  - Full typed owner equality (kind and id) is enforced against `contract.requestingSubject()`.
+  - Reusing the parent as the child id is refused.
+- **Limits:**
+  - The profile requires a positive call count of at most 10,000, a positive per-call ceiling, call time between 1 second and 24 hours, and output tokens within `ModelCall`'s maximum.
+  - Per-call cost and time must fit the task. The aggregate `maxModelCalls × ceiling` is deliberately not checked, and the test and handoff say so. `maxModelCalls` is also kept separate from agent iterations.
+- **Lifetime:** `AllocatedResourceTask` requires microsecond-exact timestamps and `createdAt < deadline ≤ createdAt + maxWallClock`. It does not renew, round or extend.
+
+**Non-blocking findings and limits:**
+1. **The "returns the original record" and no-renewal behaviour is only in the port's javadoc and handoff.** There is no implementation or fake in this PR, so a future store PR must test exact repeat, conflict and expired-repeat behaviour. A repeat after expiry returns historical data and must not be read as current permission.
+2. **Nothing here checks that the profile's `agent` relates to the grant or owner.** A store must check the registry, the grant's ancestry and agent, and the parent's existence, ownership and narrowing. That is documented, and an unverified parent is unavoidable at the value level.
+3. **`AllocatedResourceTask` does not bind its deadline to the profile.** A deadline of 1µs after creation is valid even though `maxCallTime` could be larger. That is safe, because it only tightens.
+4. **`fingerprint()` hashes both `scope.key()` and `scope.fingerprint()`.** The second already embeds the first, so it is redundant but harmless.
+5. **`find(ResourceCallScope)` takes a full scope.** The store must compare target and request and treat a mismatch as a conflict, not a miss. The javadoc implies this but doesn't say it outright.
+6. **Handoff typos:** "main2284d10…", "passes209", "including9". It also pins the baseline to `2284d10`, while the branch's merge base on `main` is later. I did not verify that.
+7. **Unicode is not normalized.** Different NFC and NFD forms give different fingerprints. This is conservative and safe.
+8. **Not verified:** `Checks.requireText` trimming and control-character behaviour, and required CI. Both are outside this diff. I did not touch GitHub, edit files or commit. Maven wrote only to `target/`.
