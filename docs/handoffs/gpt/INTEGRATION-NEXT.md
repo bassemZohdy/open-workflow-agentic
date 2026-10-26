@@ -1,9 +1,11 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline: main `af9d7e2cfe8c298fc438878a4c5b38fc2bedf9aa` (2026-10-26).
-V76 facts #74, live identity #77 and the internal JDBC fresh-entry callback gate #78 are merged after exact peer review
-and inspected current CI. Credential-pairing #79 is merged as34e2fbb with exact GPT review, independent49 and full1298 plus real-provider proof.
-GPT canonical DATA lookup #80 is open at1cf1862 with Claude exact PASS/independent42; current full CI is pending. Neither supplies production composition by itself. Counts remain
+Current implementation baseline: main `891442d5de294f2d4c4cdd730392b303dac2229d` (2026-10-26).
+V76 facts #74, live identity #77, JDBC fresh-entry gate #78, credential pairing #79 and canonical DATA lookup #80
+are merged after exact peer review and inspected current CI. Combined main run40358554282 passed179 suites/1304 cases
+with zero failures/errors/skips; retained archive SHA-256 and CRC verified. Grant-expiry #81 has GPT exact PASS0026a96
+and independent88; current CI is pending. GPT governed Running control/JDBC bounds/root restrictions are in progress.
+These are partial internal components; production composition remains absent. Counts remain
 11 completed/12 partial/30 not started, acceptance3/39. Packaged identity recovery remains open as [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75),
 and the supported-versus-preview identity profile decision is [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76).
 This is the integration queue, not proof of work-package closure.

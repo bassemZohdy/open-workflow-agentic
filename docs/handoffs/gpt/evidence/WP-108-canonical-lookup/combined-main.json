@@ -1,0 +1,20 @@
+{
+  "head": "891442d5de294f2d4c4cdd730392b303dac2229d",
+  "runId": 40358554282,
+  "artifactId": 12668061135,
+  "archiveSha256": "5fe1d72d3e9da4626f7039b8caac4552ec025852b9d4a896d18b907a61394ef1",
+  "archiveDigestAndCrcVerified": true,
+  "xmlSuites": 179,
+  "totals": {
+    "tests": 1304,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "selectedTests": {
+    "LiveIdentityPairingTest": 7,
+    "ResourceCredentialLookupTest": 6,
+    "ResourceExecutionGateTest": 17,
+    "ResourceBindingsDefaultWiringTest": 1
+  }
+}
