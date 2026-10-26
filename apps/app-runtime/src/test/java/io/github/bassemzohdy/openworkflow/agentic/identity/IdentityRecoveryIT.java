@@ -353,7 +353,14 @@ class IdentityRecoveryIT {
             post(process, "/dev/lifecycle/events", null, null, "{\"type\":\"" + EVENT + "\"}");
             Thread.sleep(500);
         }
-        fail("instance " + id + " did not complete; status " + status(process, id, bearer));
+        // CI keeps the failsafe XML but not target/process-logs, so the evidence has to travel in the message.
+        fail("instance " + id + " did not complete; status " + status(process, id, bearer)
+                + "; engine instance " + engineId(process, id, bearer) + "\n" + logTail(process.logFile(), 60));
+    }
+
+    private static String logTail(Path log, int lines) {
+        String[] all = read(log).split("\n");
+        return String.join("\n", java.util.Arrays.copyOfRange(all, Math.max(0, all.length - lines), all.length));
     }
 
     private static void await(String what, Duration timeout, BooleanSupplier condition) throws InterruptedException {
