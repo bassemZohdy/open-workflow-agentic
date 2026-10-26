@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge observed audit history91 (3610fca) and private bounded recovery snapshot92 (5f5a229) after exact reciprocal reviews, independent73/11 and inspected full1452/1443 plus provider1435/1440. Receipts remain observed snapshot DATA; later writes, target permission and whole-call bounds are not inferred. Timeout/status/chunked-body probes exposed real diagnostic defects before correction; issue75 cause/fix and production profile76 remain open.
+
 - Merge recovery diagnostics90 as99631cc after Claude exact5503932 PASS/independent5 and inspected full1432. Observe asynchronous dev-publish failures and expose disabled-by-default engine snapshots without inferring completion from absence. Actual postmerge allocation contracts main0856d92 passes1427; issue75 remains unresolved, with bounded timeout consumer follow-up in review.
 
 - Merge allocation DATA contracts89 as4b74700 after Claude exact41ba16c PASS/independent209 and verified full1427 current CI (including combined delivery/model controls). No store, migration, approved source or reservation is activated; original-call identity and immutable full contract/profile/lifetime remain data. Issue75 diagnostic intake leaves its cause unresolved.
