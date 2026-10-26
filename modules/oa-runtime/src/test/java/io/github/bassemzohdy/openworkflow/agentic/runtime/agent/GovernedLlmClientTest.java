@@ -245,6 +245,7 @@ class GovernedLlmClientTest {
     private static ResearchAgent agent(DataSource ds, GovernedLlmClient llm) throws Exception {
         ResearchAgent agent = new ResearchAgent();
         agent.llm = llm;
+        agent.checkpointSchema = "public"; // manual fixture: what the configuration injects in production
         agent.dataSource = ds;
         agent.outputValidator = new AgentOutputValidator(new ObjectMapper(), target -> false);
         agent.build();

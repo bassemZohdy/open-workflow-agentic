@@ -11,6 +11,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.CheckpointProfileVerifier;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchAgent;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchState;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.AgentResource;
@@ -53,6 +54,7 @@ class AgentResourceAuthorityTest {
     private AgentResource resource;
     private io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope callScope;
     private String ranThread;
+    private Runnable storeCheck;
 
     @BeforeEach
     void setUp() {
@@ -76,9 +78,11 @@ class AgentResourceAuthorityTest {
         calls.bind(ResourceCallFixtures.binding(token, grant.id(), callScope));
         graphRuns = new AtomicInteger();
         duringAudit = () -> { };
+        storeCheck = () -> { };
         ResearchAgent agent = new ResearchAgent() {
             @Override
             public ResearchState run(String threadId, String topic) {
+                storeCheck.run(); // a real agent verifies the store here, before any node
                 graphRuns.incrementAndGet();
                 ranThread = threadId;
                 return new ResearchState(Map.of(ResearchState.TOPIC, topic));
@@ -133,6 +137,22 @@ class AgentResourceAuthorityTest {
     void aGrantRevokedWhileThePolicyAuditBlocksRunsNoGraph() {
         duringAudit = () -> grants.revoke(grant.id(), ALICE, "revoked during audit", null);
         assertEquals(401, assertThrows(WebApplicationException.class, this::call).getResponse().getStatus());
+        assertEquals(0, graphRuns.get());
+    }
+
+    @Test
+    void aStoreThatIsNotThePinnedProfileIs503WithOnlyAFixedReasonCode() {
+        var base = (org.postgresql.ds.PGSimpleDataSource) IdentityTestSupport.dataSource();
+        var elsewhere = new org.postgresql.ds.PGSimpleDataSource();
+        elsewhere.setUrl(base.getUrl());
+        elsewhere.setUser(base.getUser());
+        elsewhere.setPassword(base.getPassword());
+        elsewhere.setCurrentSchema("no_such_schema_" + UUID.randomUUID().toString().replace('-', '_'));
+        storeCheck = () -> CheckpointProfileVerifier.verify(elsewhere);
+        var refused = assertThrows(WebApplicationException.class, this::call);
+        assertEquals(503, refused.getResponse().getStatus());
+        String detail = refused.getMessage();
+        assertEquals("the checkpoint store is not ready (namespace); the agent was not run", detail);
         assertEquals(0, graphRuns.get());
     }
 }

@@ -34,8 +34,9 @@ import javax.sql.DataSource;
  * deserialized and never re-encoded. Its fingerprint is the one shared {@link ResearchOutputFingerprint} over that
  * exact text ({@link StoredState#fingerprint()}); no second hash exists here.
  *
- * <p>An unavailable, missing or partial checkpoint schema is a dependency failure and is refused with
- * {@link IllegalStateException}; it is never reported as "no checkpoints".
+ * <p>Every inspection first verifies the actual public checkpoint profile ({@link CheckpointProfileVerifier}) inside the
+ * same read transaction. An unavailable, missing, partial or drifted store is a dependency failure and is refused with
+ * {@link CheckpointProfileException} (an {@link IllegalStateException}); it is never reported as "no checkpoints".
  *
  * <p>This is data, not authority: the caller must still hold a current execution permission, and the result says
  * nothing about who may see the output.
@@ -108,14 +109,6 @@ public class ResearchRunInspector {
     static final int MAX_THREAD_NAME = 255;
     private static final int QUERY_TIMEOUT_SECONDS = 5;
 
-    /** Columns the inspector reads, with the exact types the pinned saver creates. */
-    private static final Map<String, String> THREAD_COLUMNS = Map.of(
-            "thread_id", "uuid", "thread_name", "character varying(255)", "is_released", "boolean");
-    private static final Map<String, String> CHECKPOINT_COLUMNS = Map.of(
-            "checkpoint_id", "uuid", "thread_id", "uuid", "node_id", "character varying(255)",
-            "next_node_id", "character varying(255)", "state_data", "text",
-            "state_content_type", "character varying(100)");
-
     private final DataSource dataSource;
 
     @Inject
@@ -141,7 +134,8 @@ public class ResearchRunInspector {
                 connection.setAutoCommit(false);
                 connection.setReadOnly(true);
                 connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
-                requireSchema(connection);
+                // the lock is the first statement, so it precedes the snapshot; the check shares this transaction
+                CheckpointProfileVerifier.verify(connection);
                 Inspection result = read(connection, threadName);
                 connection.rollback();
                 return result;
@@ -288,31 +282,6 @@ public class ResearchRunInspector {
 
     private static Inspection inconsistent(String runId, boolean released, int count, String reason) {
         return new Inspection(Kind.INCONSISTENT, 1, runId, null, null, null, count, released, null, reason);
-    }
-
-    /** Both tables must resolve like the saver's own unqualified names, with every column the inspector reads. */
-    private static void requireSchema(Connection connection) throws SQLException {
-        Map<String, String> thread = columns(connection, "lg4jthread");
-        Map<String, String> checkpoint = columns(connection, "lg4jcheckpoint");
-        if (!thread.entrySet().containsAll(THREAD_COLUMNS.entrySet())
-                || !checkpoint.entrySet().containsAll(CHECKPOINT_COLUMNS.entrySet())) {
-            throw new IllegalStateException("the checkpoint schema is missing or does not match the saver profile");
-        }
-    }
-
-    private static Map<String, String> columns(Connection connection, String table) throws SQLException {
-        Map<String, String> columns = new HashMap<>();
-        try (PreparedStatement select = statement(connection,
-                "select a.attname, format_type(a.atttypid, a.atttypmod) from pg_attribute a"
-                        + " where a.attrelid = to_regclass(?) and a.attnum > 0 and not a.attisdropped")) {
-            select.setString(1, table);
-            try (ResultSet rs = select.executeQuery()) {
-                while (rs.next()) {
-                    columns.put(rs.getString(1), rs.getString(2));
-                }
-            }
-        }
-        return columns;
     }
 
     private static PreparedStatement statement(Connection connection, String sql) throws SQLException {

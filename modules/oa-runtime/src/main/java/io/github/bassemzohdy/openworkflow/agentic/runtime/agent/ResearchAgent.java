@@ -4,8 +4,10 @@ import static org.bsc.langgraph4j.StateGraph.END;
 import static org.bsc.langgraph4j.StateGraph.START;
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
+import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import java.util.Map;
 import javax.sql.DataSource;
@@ -15,6 +17,7 @@ import org.bsc.langgraph4j.RunnableConfig;
 import org.bsc.langgraph4j.StateGraph;
 import org.bsc.langgraph4j.checkpoint.PostgresSaver;
 import org.bsc.langgraph4j.serializer.std.ObjectStreamStateSerializer;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * Plan -> draft -> review agent as a LangGraph4j graph, embedded in the Quarkus application.
@@ -33,13 +36,39 @@ public class ResearchAgent {
     @Inject
     AgentOutputValidator outputValidator;
 
+    /**
+     * The configured checkpoint namespace. Only {@code public} is supported; any other value, or none, is refused
+     * before the store is touched. It selects nothing: the saver always uses the unqualified public tables.
+     */
+    @ConfigProperty(name = "agentic.agent.checkpoint-schema")
+    String checkpointSchema;
+
     private CompiledGraph<ResearchState> graph;
 
+    private void verifyStore() {
+        CheckpointProfileVerifier.requireSupportedNamespace(checkpointSchema);
+        CheckpointProfileVerifier.verify(dataSource);
+    }
+
+    /**
+     * Startup check, after the migrations of the application have run: a lazily created {@code @ApplicationScoped}
+     * bean would otherwise not look at the store until its first request. A store that is not the pinned profile stops
+     * the start; nothing is created or repaired here.
+     */
+    void onStart(@Observes StartupEvent event) {
+        verifyStore();
+    }
+
+    /**
+     * Builds the graph on the checkpoint tables that migration V75.1 owns. The saver never creates tables: the actual
+     * public profile is verified (read-only, no row decoded) before the saver exists, and again before every run.
+     */
     @PostConstruct
     void build() throws Exception {
+        verifyStore();
         var serializer = new ObjectStreamStateSerializer<>(ResearchState::new);
         var builder = PostgresSaver.builder();
-        builder.stateSerializer(serializer).datasource(dataSource).createTables(true);
+        builder.stateSerializer(serializer).datasource(dataSource).createTables(false);
         var saver = builder.build();
 
         var g = new StateGraph<>(serializer)
@@ -63,6 +92,8 @@ public class ResearchAgent {
 
     /** Runs the graph for a thread (one thread per business case) and returns the final state. */
     public ResearchState run(String threadId, String topic) {
+        // before any node (and so any provider call): the store may have drifted since the graph was built
+        verifyStore();
         var config = RunnableConfig.builder().threadId(threadId).build();
         return graph.invoke(Map.of(ResearchState.TOPIC, topic), config)
                 .orElseThrow(() -> new IllegalStateException("Agent graph produced no state"));
