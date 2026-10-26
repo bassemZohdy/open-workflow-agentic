@@ -79,7 +79,7 @@ class EffectAuditFactsMigrationTest {
             for(String table:List.of("audit_scope","audit_source","audit_delivery"))assertEquals(0,count(db.owner,"select count(*) from effect."+table));
             try(var c=db.owner.getConnection()) {
                 for(String fn:List.of("audit_scope_insert_guard()","audit_source_insert_guard()","audit_delivery_guard()","enqueue_audit_source()","audit_fingerprint(text,text[])"))
-                    assertEquals("search_path=pg_catalog",value(c,"select array_to_string(proconfig,',') from pg_proc where oid=pg_catalog.to_regprocedure(?)","effect."+fn));
+                    assertEquals("search_path=pg_catalog, pg_temp",value(c,"select array_to_string(proconfig,',') from pg_proc where oid=pg_catalog.to_regprocedure(?)","effect."+fn));
             }
         }
     }
@@ -93,6 +93,17 @@ class EffectAuditFactsMigrationTest {
                 initial(c,scope(f),true);
                 sql(c,"alter function effect.audit_fingerprint(text,text[]) reset search_path");
                 assertNotEquals(expected,value(c,"select effect.audit_fingerprint('test-domain','value')"),"removing only the pin must expose the same shadow");
+            }finally{c.rollback();}}
+        }
+    }
+    @Test void aTemporaryTypeShadowCannotChangeThePinnedFunctionLocalTypes() throws Exception {
+        try(var db=new Database()) {
+            db.migrate(null);
+            try(var c=db.owner.getConnection()){c.setAutoCommit(false);try {
+                sql(c,"create temp table namespace_init(x integer);create domain pg_temp.text as pg_catalog.text check(value <> 'test-domain')");
+                assertEquals(hash("test-domain","value"),value(c,"select effect.audit_fingerprint('test-domain','value')"));
+                sql(c,"alter function effect.audit_fingerprint(pg_catalog.text,pg_catalog.text[]) set search_path=pg_catalog");
+                var error=assertThrows(SQLException.class,()->value(c,"select effect.audit_fingerprint('test-domain','value')"));assertEquals("23514",error.getSQLState());
             }finally{c.rollback();}}
         }
     }
@@ -223,6 +234,42 @@ class EffectAuditFactsMigrationTest {
             try(var c=db.owner.getConnection()){sql(c,"update effect.audit_delivery set ack_source_key=?,acked_at=clock_timestamp() where source_event_id=?",earlier.source().key(),first.id());sql(c,"update effect.audit_delivery set ack_source_key=?,acked_at=clock_timestamp() where source_event_id=?",later.source().key(),second.id());}
             assertEquals(2,count(db.owner,"select count(*) from effect.audit_delivery where ack_source_key is not null"));
         }
+    }
+    @Test void aLaterScopedJournalWithoutItsSourceCannotCommit() throws Exception {
+        try(var db=new Database()) {
+            db.migrate(null);var root=seed(db);var k=root.command().key();
+            try(var c=db.owner.getConnection()){c.setAutoCommit(false);try {
+                sql(c,"insert into effect.event(thread_name,node_id,idempotency_key,from_state,to_state,reason) values(?,?,?,'INTENDED','INTENDED','effect.dispatch')",k.threadId().value(),k.nodeId(),k.idempotencyKey());
+                var error=assertThrows(SQLException.class,c::commit);assertEquals("23514",error.getSQLState());assertTrue(error.getMessage().contains("scoped journal fact requires atomic retained audit source"));
+            }finally{c.rollback();}}
+            assertEquals(1,count(db.owner,"select count(*) from effect.event"));
+        }
+    }
+    @Test void aCompensationLinkWithoutMatchingRetainedProvenanceCannotCommit() throws Exception {
+        try(var db=new Database()) {
+            db.migrate(null);var root=seed(db);var k=root.command().key();
+            try(var c=db.owner.getConnection()){c.setAutoCommit(false);try {
+                sql(c,"insert into effect.ledger(thread_name,node_id,idempotency_key,target,state,recorded_at,purpose) values(?,'refund','undo','approved-refund','INTENDED',clock_timestamp(),'COMPENSATION')",k.threadId().value());
+                sql(c,"insert into effect.compensation(thread_name,node_id,idempotency_key,compensation_node,compensation_key) values(?,?,?,'refund','undo')",k.threadId().value(),k.nodeId(),k.idempotencyKey());
+                var error=assertThrows(SQLException.class,c::commit);assertEquals("23514",error.getSQLState());assertTrue(error.getMessage().contains("scoped compensation requires matching retained provenance"));
+            }finally{c.rollback();}}
+            assertEquals(1,count(db.owner,"select count(*) from effect.ledger"));assertEquals(0,count(db.owner,"select count(*) from effect.compensation"));
+        }
+    }
+    @Test void anotherActuallyStoredCentralReceiptCannotAcknowledgeThisSource() throws Exception {
+        try(var db=new Database()) {
+            db.migrate(null);var first=seed(db);var other=seed(db);var wrong=new AuditAppendOnce(db.owner).appendOnce(other.source(),other.draft());
+            try(var c=db.owner.getConnection()){c.setAutoCommit(false);try {
+                var error=assertThrows(SQLException.class,()->sql(c,"update effect.audit_delivery set ack_source_key=?,acked_at=clock_timestamp() where source_event_id=?",wrong.source().key(),first.id()));
+                assertEquals("23514",error.getSQLState());assertTrue(error.getMessage().contains("exact retained central binding"));
+            }finally{c.rollback();}}
+            assertEquals(2,count(db.owner,"select count(*) from effect.audit_delivery where ack_source_key is null"));
+        }
+    }
+    @TestFactory Stream<DynamicTest> immutableScopeAndSourceUpdatesRefuseEvenNoOpAssignments() {
+        return Stream.of("update effect.audit_scope set tenant=tenant","update effect.audit_source set source_key=source_key").map(probe->DynamicTest.dynamicTest(probe,()->{
+            try(var db=new Database()) {db.migrate(null);seed(db);try(var c=db.owner.getConnection()){c.setAutoCommit(false);try{var error=assertThrows(SQLException.class,()->sql(c,probe));assertEquals("42501",error.getSQLState());}finally{c.rollback();}}}
+        }));
     }
     @TestFactory Stream<DynamicTest> aRegistryChangeOrExpiryWhileItsRealRowLockBlocksTheWriterRefusesAfterWait() {
         return Stream.of("cancel","expiry").map(change->DynamicTest.dynamicTest(change,()->{

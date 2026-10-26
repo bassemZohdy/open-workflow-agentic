@@ -141,7 +141,7 @@ class AuditSourceBindingMigrationTest {
             try (Connection c = db.owner.getConnection()) {
                 c.setAutoCommit(false);
                 try {
-                    SQLException error = assertThrows(SQLException.class, () -> { try (var s = c.createStatement()) { s.execute("truncate audit.source_binding"); } });
+                    SQLException error = assertThrows(SQLException.class, () -> { try (var s = c.createStatement()) { s.execute("truncate audit.source_binding cascade"); } });
                     assertEquals("42501", error.getSQLState());
                     assertTrue(error.getMessage().contains("audit table source_binding is append-only"));
                 } finally { c.rollback(); }

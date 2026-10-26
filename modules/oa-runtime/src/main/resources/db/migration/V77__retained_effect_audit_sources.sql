@@ -1,7 +1,7 @@
 -- V77: retained effect-audit source/delivery DATA. No producer, relay, authority or governed dispatch activation.
 -- Uses V75's PURE as1 encoding function locally; no central audit append/network call occurs in these transactions.
 create function effect.audit_fingerprint(domain text, variadic parts text[]) returns text
-    language plpgsql immutable strict set search_path = pg_catalog as $$
+    language plpgsql immutable strict set search_path = pg_catalog, pg_temp as $$
 declare encoded bytea = ''::bytea; item text; bytes bytea;
 begin
     foreach item in array (array[domain] || parts) loop
@@ -28,7 +28,7 @@ create table effect.audit_scope (
     foreign key (thread_name,node_id,idempotency_key) references effect.ledger(thread_name,node_id,idempotency_key),
     foreign key (tenant,registry_instance_id) references task.instance(tenant,id)
 );
-create function effect.audit_scope_insert_guard() returns trigger language plpgsql set search_path = pg_catalog as $$
+create function effect.audit_scope_insert_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 declare l effect.ledger%rowtype; e effect.event%rowtype; r task.instance%rowtype; parent effect.audit_scope%rowtype;
 begin
     select * into l from effect.ledger where thread_name=new.thread_name and node_id=new.node_id and idempotency_key=new.idempotency_key;
@@ -67,7 +67,7 @@ $$;
 create trigger audit_scope_insert_guard before insert on effect.audit_scope for each row execute function effect.audit_scope_insert_guard();
 
 create function effect.audit_transition(reason text, from_state text, to_state text) returns text
-    language plpgsql immutable set search_path = pg_catalog as $$
+    language plpgsql immutable set search_path = pg_catalog, pg_temp as $$
 begin
     if reason='effect.intended' and from_state is null and to_state='INTENDED' then return 'INTENT';
     elsif reason='effect.dispatch' and from_state='INTENDED' and to_state='INTENDED' then return 'DISPATCH';
@@ -100,7 +100,7 @@ create table effect.audit_source (
     content_fingerprint text not null check (content_fingerprint ~ '^[0-9a-f]{64}$'),
     created_at timestamptz not null default clock_timestamp()
 );
-create function effect.audit_source_insert_guard() returns trigger language plpgsql set search_path = pg_catalog as $$
+create function effect.audit_source_insert_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 declare e effect.event%rowtype; s effect.audit_scope%rowtype; l effect.ledger%rowtype; transition text; key_fp text; attrs jsonb;
 begin
     select * into e from effect.event where id=new.source_event_id;
@@ -132,7 +132,7 @@ end;
 $$;
 create trigger audit_source_insert_guard before insert on effect.audit_source for each row execute function effect.audit_source_insert_guard();
 
-create function effect.require_audit_source() returns trigger language plpgsql set search_path = pg_catalog as $$
+create function effect.require_audit_source() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 begin
     if exists(select 1 from effect.audit_scope s where s.thread_name=new.thread_name and s.node_id=new.node_id and s.idempotency_key=new.idempotency_key)
         and not exists(select 1 from effect.audit_source a where a.source_event_id=new.id) then
@@ -143,7 +143,7 @@ end;
 $$;
 create constraint trigger event_requires_audit_source after insert on effect.event deferrable initially deferred
     for each row execute function effect.require_audit_source();
-create function effect.require_scope_sources() returns trigger language plpgsql set search_path = pg_catalog as $$
+create function effect.require_scope_sources() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 begin
     if exists(select 1 from effect.event e where e.thread_name=new.thread_name and e.node_id=new.node_id and e.idempotency_key=new.idempotency_key
         and not exists(select 1 from effect.audit_source a where a.source_event_id=e.id)) then
@@ -154,7 +154,7 @@ end;
 $$;
 create constraint trigger scope_requires_sources after insert on effect.audit_scope deferrable initially deferred
     for each row execute function effect.require_scope_sources();
-create function effect.require_compensation_scope() returns trigger language plpgsql set search_path = pg_catalog as $$
+create function effect.require_compensation_scope() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 declare original effect.audit_scope%rowtype; undo effect.audit_scope%rowtype;
 begin
     select * into original from effect.audit_scope where thread_name=new.thread_name and node_id=new.node_id and idempotency_key=new.idempotency_key;
@@ -169,7 +169,7 @@ end;
 $$;
 create constraint trigger compensation_requires_scope after insert on effect.compensation deferrable initially deferred
     for each row execute function effect.require_compensation_scope();
-create function effect.audit_no_change() returns trigger language plpgsql set search_path = pg_catalog as $$
+create function effect.audit_no_change() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 begin
     raise exception 'effect audit provenance and source are immutable and retained' using errcode = 'insufficient_privilege';
 end;
@@ -194,7 +194,7 @@ create table effect.audit_delivery (
 create index audit_delivery_pending on effect.audit_delivery(source_event_id) where ack_source_key is null;
 create index audit_delivery_key_pending on effect.audit_delivery(thread_name,node_id,idempotency_key,source_event_id)
     where ack_source_key is null;
-create function effect.audit_delivery_guard() returns trigger language plpgsql set search_path = pg_catalog as $$
+create function effect.audit_delivery_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 declare s effect.audit_source%rowtype; e effect.event%rowtype; b audit.source_binding%rowtype;
 begin
     select * into s from effect.audit_source where source_event_id=new.source_event_id;
@@ -238,7 +238,7 @@ $$;
 create trigger audit_delivery_guard before insert or update on effect.audit_delivery for each row execute function effect.audit_delivery_guard();
 create trigger audit_delivery_no_change before delete on effect.audit_delivery for each row execute function effect.audit_no_change();
 create trigger audit_delivery_no_truncate before truncate on effect.audit_delivery for each statement execute function effect.audit_no_change();
-create function effect.enqueue_audit_source() returns trigger language plpgsql set search_path = pg_catalog as $$
+create function effect.enqueue_audit_source() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 begin
     insert into effect.audit_delivery(source_event_id,thread_name,node_id,idempotency_key)
         select new.source_event_id,e.thread_name,e.node_id,e.idempotency_key from effect.event e where e.id=new.source_event_id;
