@@ -12,8 +12,8 @@
     },
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
-      "date": "2026-10-26",
-      "baseline_commit": "4f41a60c8d086b443d05013480656fdd8bf1f5d0",
+      "date": "2026-10-27",
+      "baseline_commit": "2284d106db01548c2b620c5ad8744aa25fe692f1",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -2744,7 +2744,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-26",
-    "status": "Internal prerequisites74/77/78/79/80/81/82/83/84 and V77 audit DATA85 are merged after exact peer/current CI. Explicit atomic producer86 merged4f41a60 after Claude exactdfb8030 PASS/independent61 and inspected full40383583782:187 XML suites/1386 cases. Actual postmerge40385699565 also passes1386, zero failures/errors/skips; archive SHA/CRC and actual checkout verified. Initial66571db full1384 remains earlier-head evidence only. Producer is opt-in DATA with no default registration, target callback or authority. Audit delivery87 is open atc2a7860 with author52 green and a predecessor guard-removal control failing the intended zero-central-calls assertion, then restored1 pass; exact Claude/current CI pending. Claude controlled model API has initial GPT independent63; test/evidence follow-up and final review/CI pending, with no ResearchAgent or approved-context source adoption. Stored rows/receipts/prepared data never grant authority. Production root, trusted workload/target/task mapping, coherent current registry/full owner/task/lease/PDP/audit, approved reservations, actual Flow/node/output/terminal association and async/recovery remain gates. Defaults still refuse; V78..V80 reserved, issues75/76 open. WP108/WP102 and acceptance remain partial.",
+    "status": "Prerequisites74/77/78/79/80/81/82/83/84/85/86/87/88 are merged after exact reciprocal reviews and current CI. Audit delivery87 merged2570bea after Claude exactb7ddc72 PASS/independent53 and inspected40392167371:188 suites/1395 tests. Controlled model88 merged2284d10 after GPT exact912b41a PASS/independent63 and inspected40392401896:188 suites/1409 tests, including native default refusal. Both archives passed SHA/CRC verification; these are separate pre-combination runs, with combined-main CI pending. Producer/delivery remain explicit opt-in DATA components; controlled calls have no approved-context source or ResearchAgent adoption. Stored facts and receipts never grant authority. Next task-allocation migration must preserve historical unallocated entries; see WP-103-allocation-migration-plan.md. Production root, trusted workload/target/task mapping, current authority/lease/PDP/audit, approved reservations, actual Flow/node/output/terminal association and async/recovery remain gates. Defaults refuse; V78..V80 reserved, issues75/76 open. Counts and acceptance remain unchanged.",
     "agents": [
       {
         "id": "GPT",

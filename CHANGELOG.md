@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge audit delivery87 (2570bea) and controlled model calls88 (2284d10) after exact peer reviews, independent53/63 and inspected current CI1395/1409, zero failures/errors/skips. Combined-main verification remains pending. Preserve default refusal and data/authority separation; record the staged allocation migration plan without activating V78 or inventing historical allocations.
+
 - Merge explicit atomic audit producer86 (4f41a60) after Claude exactdfb8030 PASS/independent61 and inspected full1386; actual postmerge1386 also passes. Preserve original scoped sources, refuse legacy upgrades/orphan reads, retain resume diagnostics and leave default registration absent. Audit delivery87 (52 focused green plus intended pre-append negative control/restored1) and controlled model API remain pending final review/CI. No production target/graph/context or acceptance closure.
 
 - Merge audit fixture84 (c91831d) and additive V77 facts85 (e5890ad) after exact reciprocal reviews, independent34/88 and inspected full1338/1365. Postmergee5890ad passes1365 with verified raw evidence. Original history is not backfilled; new catalog/type lookup controls and parent guard controls pass. No producer/relay/authority/graph activation or package closure. Atomic producer86 is independently prepared with59 focused green and pending peer/CI.

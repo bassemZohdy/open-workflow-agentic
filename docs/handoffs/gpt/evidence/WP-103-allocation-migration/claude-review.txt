@@ -1,0 +1,22 @@
+**Reviewer Claude: PASS.** This covers the revised proposal text only. It is not an implementation, activation or approval-source review. I made no edits, commits or external comments. I read the revised plan and checked it against my prior findings in `target/allocation-migration-plan-claude-review.txt`. I did not re-read V76, V77 or the preparation branch in this pass.
+
+**Prior findings**
+
+| Prior finding | Status | Where it is addressed |
+|---|---|---|
+| 1. Enforcement mechanism and history exemption | Resolved | Phase 1 selects a `NOT VALID` FK, so existing unallocated rows are retained and new writes are enforced. Concurrent execution inserts are blocked while the exact exempt `call_key` inventory is taken and the constraint is added in the same transaction. The inventory is guarded against update, delete and truncate. The plan says not to validate the FK while exemptions remain. Dropping the FK or reopening unallocated writes is a stop condition, not routine rollback. Lock duration is measured in rehearsal and the deployment must fail rather than take an unbounded lock. A9 and A13 test this. |
+| 2. Stale branch | Resolved | The preparation branch must not be merged wholesale. The needed files are reworked onto current main and run against V76/V77 and A1–A7. |
+| 3. Reserved versions, Flyway exclusion, checksums | Resolved | V78, V79 and V80 are reserved, and V79 depends on the revised V78. `db/proposed/**` stays outside Flyway locations (A12). V76/V77 checksum equality is an activation requirement (A7). |
+| 4. Roles, approved source, `search_path` | Resolved for a proposal | Allocation and reservation writer roles are separate. Executor and PUBLIC get no mutation rights and cannot assume those roles (A11). The text states that a matching hash or writer role proves neither approval nor live authority. The approved-source interface and role/grant procedure are named as an owned handoff needed before activation. New function search paths are pinned, resolved consistently with V76/V77, and tested against hostile search paths (A12). |
+| 5. Freshness | Resolved | The text says the FK gives existence only. It requires an unexpired allocation and a current grant before admission. A10 covers an expired allocation with a valid FK, a revoked grant and a historical V79 reservation. A4 and A5 cover the other cases. |
+| Thread and owner mismatch | Resolved | The parent keeps its stored legacy thread and full owner, and a parent whose thread differs from its own stored-task derivation is refused. Owner kind and id are always compared, which covers the `ws1` omission of owner kind. There is no remap or reinterpretation as a checkpoint or effect thread, and A8 tests it. |
+| Missing verification rows | Resolved | A8–A13 cover all of them. |
+
+**Non-blocking notes for the activation PR**
+
+- The `ws1` owner-kind omission is handled by comparing full owner kind and id. The plan could also record it as an accepted limitation, to be fixed only in a new thread version.
+- The inventory table is itself an authority-adjacent fact. Its writer, owner and grants should be listed under the A11 role matrix.
+- Rehearsal should confirm that the `NOT VALID` FK does not break `UPDATE`s that touch only unrelated columns of exempt rows. It should also confirm the read-only guard rejects updates cleanly. A1 and A9 can carry this.
+- The approved-source handoff and the Issue #75/#76 decisions remain hard blockers for activation. The plan states this, so it is not a plan defect.
+
+No material changes are requested.

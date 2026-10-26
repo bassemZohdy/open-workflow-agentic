@@ -1,15 +1,11 @@
-# Integration queue: next actions (2026-10-26)
+# Integration queue: next actions (2026-10-27)
 
-Current implementation baseline: main `4f41a60c8d086b443d05013480656fdd8bf1f5d0` (2026-10-26).
-Prerequisites #74/#77/#78/#79/#80/#81/#82/#83/#84 and V77 DATA #85 are merged with exact peer/current CI.
-Atomic producer #86 merged after Claude exactdfb8030 PASS/independent61 and full1386. Actual postmerge40385699565
-passes187 suites/1386 cases, zero failures/errors/skips, archive/checkout verified. It is opt-in DATA, not permission.
-Audit delivery #87 is open atc2a7860 (author52/restored1, exact peer/current CI pending). Claude's controlled model API
-has initial GPT independent63 and test/evidence follow-up pending; it supplies no approved source or ResearchAgent adoption.
-No production writer/relay/guarded root is registered. Counts remain
-11 completed/12 partial/30 not started, acceptance3/39. Packaged identity recovery remains open as [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75),
-and the supported-versus-preview identity profile decision is [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76).
-This is the integration queue, not proof of work-package closure.
+Current implementation baseline: main `2284d106db01548c2b620c5ad8744aa25fe692f1`.
+Audit delivery87 and controlled model88 are merged after exact peer reviews and independently inspected current CI.
+See evidence/WP-108-audit-delivery/current-ci.json (1395 tests) and evidence/WP-103-running-model-boundary/current-ci.json (1409 tests).
+These runs precede combination; combined-main verification is pending. Neither installs production authority or an approved model context.
+Next: [staged allocation migration](WP-103-allocation-migration-plan.md), preserving historical unallocated entries and reserved V78..V80.
+Counts remain11 completed/12 partial/30 not started; acceptance3/39. Issues75/76 remain open.
 
 ## Integrated prerequisites and evidence
 
