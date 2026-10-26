@@ -163,7 +163,7 @@ def compare_roundtrip(original, exported):
     """Semantic JSON equality only; never a runtime execution parity assertion."""
     inventory(original)
     inventory(exported)
-    return original == exported
+    return canonical_bytes(original) == canonical_bytes(exported)
 
 
 def evaluate(features, capabilities):
@@ -197,6 +197,8 @@ def main(argv=None):
     parser.add_argument("--capabilities", type=Path, help="explicit support matrix; omission = unverified")
     parser.add_argument("--require-verified", action="store_true", help="fail on any unsupported or unverified feature")
     args = parser.parse_args(argv)
+    if args.require_verified and not args.capabilities:
+        parser.error("--require-verified requires --capabilities")
     try:
         original = load_json(args.fixture)
         features = inventory(original)
@@ -211,8 +213,10 @@ def main(argv=None):
         if args.capabilities:
             result["runtimes"] = evaluate(features, load_json(args.capabilities))
             if args.require_verified:
-                success = success and all(not (v["unsupported"] or v["unverified"])
-                                          for v in result["runtimes"].values())
+                required = {"quarkus-flow", "langgraph", "google-adk"}
+                success = success and required.issubset(result["runtimes"]) and all(
+                    not (v["unsupported"] or v["unverified"])
+                    for v in result["runtimes"].values())
         print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
         return 0 if success else 1
     except (FixtureError, OSError, ValueError) as exc:
