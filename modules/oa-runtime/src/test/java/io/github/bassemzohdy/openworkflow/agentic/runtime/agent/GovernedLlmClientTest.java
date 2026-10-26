@@ -215,6 +215,35 @@ class GovernedLlmClientTest {
     }
 
     @Test
+    void aZeroRemainingBudgetRefusesBeforeTheProviderEvenWhenThePolicyWouldAllow() {
+        var provider = new CountingProvider();
+        var engine = new Engine(DecisionOutcome.ALLOW); // a permissive policy that ignores the budget
+        var audit = new Audit();
+        ApprovedModelContext exhausted = () -> Optional.of(
+                new ApprovedModelContext.Approved(AGENT, TASK, "gpt-test", 0L));
+        var client = new GovernedLlmClient(provider, pep(engine, audit), exhausted);
+
+        assertThrows(ModelCallRefused.class, () -> client.complete("sys", "usr"));
+
+        assertEquals(0, provider.calls.get());
+        assertEquals(0, engine.asked.size(), "the budget refusal precedes the policy question");
+        assertEquals(0, audit.events.size());
+    }
+
+    @Test
+    void aPositiveRemainingBudgetStillReachesThePolicyAndTheProvider() {
+        var provider = new CountingProvider();
+        var engine = new Engine(DecisionOutcome.ALLOW);
+        ApprovedModelContext oneMicro = () -> Optional.of(
+                new ApprovedModelContext.Approved(AGENT, TASK, "gpt-test", 1L));
+
+        assertEquals(OK, new GovernedLlmClient(provider, pep(engine, new Audit()), oneMicro).complete("s", "u"));
+
+        assertEquals(1, provider.calls.get());
+        assertEquals(1, engine.asked.size());
+    }
+
+    @Test
     void aModelIdThePepCannotFormMakesNoProviderCall() {
         var provider = new CountingProvider();
         ApprovedModelContext blank = () -> Optional.of(
