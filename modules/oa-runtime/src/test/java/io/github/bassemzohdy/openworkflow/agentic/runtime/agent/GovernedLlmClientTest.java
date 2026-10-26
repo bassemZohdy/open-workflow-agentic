@@ -269,6 +269,42 @@ class GovernedLlmClientTest {
         assertEquals(0, provider.calls.get());
     }
 
+    // ------------------------------------------------------------------ controlled overload (absent control)
+    // A real Running can only be minted inside a committed gate callback; those cases are in app-runtime's
+    // GovernedModelRunningControlTest. A caller cannot forge one here, so only the absent forms are unit-testable.
+
+    @Test
+    void aControlledCallWithoutAControlOrExpectedEntryIsRefusedBeforeLookupPolicyAndProvider() {
+        var provider = new CountingProvider();
+        var engine = new Engine(DecisionOutcome.ALLOW);
+        var audit = new Audit();
+        var lookups = new AtomicInteger();
+        ApprovedModelContext counting = () -> {
+            lookups.incrementAndGet();
+            return APPROVED.current();
+        };
+        var client = new GovernedLlmClient(provider, pep(engine, audit), counting);
+
+        assertThrows(ModelCallRefused.class, () -> client.complete(null, null, "sys", "usr"));
+
+        assertEquals(0, lookups.get());
+        assertEquals(0, engine.asked.size());
+        assertEquals(0, audit.events.size());
+        assertEquals(0, provider.calls.get());
+    }
+
+    @Test
+    void theLegacyTwoArgumentPathIsUnchangedByTheControlledOverload() {
+        var provider = new CountingProvider();
+        var client = new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.ALLOW), new Audit()), APPROVED);
+
+        assertEquals(OK, client.complete("sys", "usr"));
+        assertEquals(1, provider.calls.get());
+        assertThrows(ModelCallRefused.class,
+                () -> new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.ALLOW), new Audit()), NONE)
+                        .complete("sys", "usr"));
+    }
+
     // ------------------------------------------------------------------ through the real graph
 
     private static ResearchAgent agent(DataSource ds, GovernedLlmClient llm) throws Exception {
