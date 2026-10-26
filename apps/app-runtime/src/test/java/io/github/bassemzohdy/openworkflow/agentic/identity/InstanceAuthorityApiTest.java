@@ -107,7 +107,7 @@ class InstanceAuthorityApiTest {
         String tenant = newTenant();
         DelegationGrant grant = grantOf(tenant, "alice", Duration.ofHours(1));
 
-        String id = start(token("alice", tenant, "profile"), grant.id().value()).statusCode(202).extract().path("id");
+        String id = start(token("alice", tenant, "oa.operate"), grant.id().value()).statusCode(202).extract().path("id");
 
         assertEquals("alice", scalar("select subject_id from identity.instance_authority where instance_id = ?", id));
         assertEquals(grant.id().value(), scalar("select grant_id from identity.instance_authority where instance_id = ?", id));
@@ -125,7 +125,7 @@ class InstanceAuthorityApiTest {
     void anInstanceWithoutAGrantHasAnAuthorityRowWithoutOne() throws Exception {
         String tenant = newTenant();
 
-        String id = start(token("alice", tenant, "profile"), null).statusCode(202).extract().path("id");
+        String id = start(token("alice", tenant, "oa.operate"), null).statusCode(202).extract().path("id");
 
         assertEquals("alice", scalar("select subject_id from identity.instance_authority where instance_id = ?", id));
         assertEquals(null, scalar("select grant_id from identity.instance_authority where instance_id = ?", id));
@@ -137,7 +137,7 @@ class InstanceAuthorityApiTest {
         DelegationGrant others = grantOf(tenant, "bob", Duration.ofHours(1));
         DelegationGrant revoked = grantOf(tenant, "alice", Duration.ofHours(1));
         grants.revoke(revoked.id(), new Subject(SubjectKind.USER, "alice"), "no", null);
-        String alice = token("alice", tenant, "profile");
+        String alice = token("alice", tenant, "oa.operate");
 
         start(alice, others.id().value()).statusCode(404);
         start(alice, revoked.id().value()).statusCode(409);
@@ -151,15 +151,15 @@ class InstanceAuthorityApiTest {
     void onlyTheUserWhoStartedTheInstanceRenewsItWithAGrantThatIsTheirOwn() throws Exception {
         String tenant = newTenant();
         DelegationGrant old = grantOf(tenant, "alice", Duration.ofHours(1));
-        String alice = token("alice", tenant, "profile");
+        String alice = token("alice", tenant, "oa.operate");
         String id = start(alice, old.id().value()).statusCode(202).extract().path("id");
         DelegationGrant fresh = grantOf(tenant, "alice", Duration.ofHours(2));
 
         reauthorize(alice, id, fresh.id().value()).statusCode(409);        // it does not wait for re-authorization
         grants.revoke(old.id(), new Subject(SubjectKind.USER, "alice"), "withdrawn", null);
         assertTrue(authorityStore.markReauthorizationRequired(Ulid.parse(id), "grant.revoked", Instant.now()));
-        reauthorize(token("bob", tenant, "profile"), id, fresh.id().value()).statusCode(403);
-        reauthorize(token("alice", newTenant(), "profile"), id, fresh.id().value()).statusCode(404);
+        reauthorize(token("bob", tenant, "oa.operate"), id, fresh.id().value()).statusCode(403);
+        reauthorize(token("alice", newTenant(), "oa.operate"), id, fresh.id().value()).statusCode(404);
         reauthorize(alice, id, null).statusCode(400);
         reauthorize(alice, "01ARZ3NDEKTSV4RRFFQ69G5FAV", fresh.id().value()).statusCode(404);
         reauthorize(alice, id, old.id().value()).statusCode(409);          // the revoked grant is not usable

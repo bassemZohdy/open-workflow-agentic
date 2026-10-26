@@ -233,6 +233,39 @@ public final class Pep {
                 new PolicyContext(callerScopes, null, null, null, null, null));
     }
 
+    /**
+     * The instance API (WP-103): the HTTP routes that start, read and re-authorize a registry instance. Each has its own
+     * resource, distinct from the operator operations on the same instance, so a rule for one cannot allow another.
+     * None is named by {@link SafeRecovery}, so when the policy engine or the audit sink is unavailable the decision is
+     * ERROR and nothing is started, read or renewed.
+     */
+    public enum InstanceApi {
+        START("instance:start"),
+        GET("instance:get"),
+        REAUTHORIZE("instance:reauthorize");
+
+        private final String resource;
+
+        InstanceApi(String resource) {
+            this.resource = resource;
+        }
+
+        /** The resource string a request for this route carries. */
+        public String resource() {
+            return resource;
+        }
+    }
+
+    /**
+     * A verified caller uses the instance API. {@code instanceId} is the instance in the path (the request's task id);
+     * it is null for a start, and for a path segment that is not an instance id at all.
+     */
+    public Decision instanceApi(InstanceApi route, Subject caller, Set<String> callerScopes, Ulid instanceId) {
+        Objects.requireNonNull(route, "route");
+        return decide(caller, ActionKind.OPERATION, route.resource(), instanceId,
+                new PolicyContext(callerScopes, null, null, null, null, null));
+    }
+
     /** Decides any request through the full path: engine, audit, and the recovery rule when the engine is unavailable. */
     public Decision decide(AuthorizationRequest request) {
         Objects.requireNonNull(request, "request");

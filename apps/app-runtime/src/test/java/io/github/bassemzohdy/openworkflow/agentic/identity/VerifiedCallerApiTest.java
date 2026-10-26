@@ -136,13 +136,13 @@ class VerifiedCallerApiTest {
     @Test
     void theTokenScopesDecideWhatTheOperationsApiAllows() throws Exception {
         String tenant = newTenant();
-        String owner = token("alice", tenant, "profile");
+        String owner = token("alice", tenant, "oa.operate oa.inspect");
         String id = start(owner).statusCode(202).extract().path("id");
 
         // The instance belongs to the token's tenant, whatever X-Tenant says.
         given().header("Authorization", "Bearer " + owner).header("X-Tenant", "someone-else")
                 .when().get("/instances/" + id).then().statusCode(200).body("id", equalTo(id));
-        given().header("Authorization", "Bearer " + token("alice", newTenant(), "profile"))
+        given().header("Authorization", "Bearer " + token("alice", newTenant(), "oa.inspect"))
                 .when().get("/instances/" + id).then().statusCode(404);
 
         String inspector = token("ops-1", tenant, "oa.inspect");
