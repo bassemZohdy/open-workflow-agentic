@@ -191,19 +191,26 @@ class ResourceCallBindingStoreTest {
         assertEquals(f.binding,new JdbcResourceCallBindings(data).find(f.binding.issuer(),f.binding.tokenId()).orElseThrow());
     }
     @Test void executionEntryCommitsOutsideCallerTransactionAndResumesItBeforeCallback() throws Exception {
-        var f=fixture();bindings.bind(f.binding);
-        var entry=new io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry(f.binding.scope(),1);
+        var f=fixture();Instant serverNow;
+        try(var c=data.getConnection();var q=c.createStatement();var r=q.executeQuery("select pg_catalog.clock_timestamp()")) {
+            assertTrue(r.next());serverNow=r.getTimestamp(1).toInstant();
+        }
+        // This positive fixture must not depend on the Windows/JVM clock leading PostgreSQL. Production still
+        // refuses future-issued metadata; derive a safely past issue time from the SAME server used by V76.
+        var b=credential(f.binding.scope(),f.binding.issuingGrantId(),f.binding.issuer(),UUID.randomUUID().toString(),serverNow.plusSeconds(119));
+        bindings.bind(b);
+        var entry=new io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry(b.scope(),1);
         try(var gate=new JdbcResourceExecutionGate(data,transactionManager,1)) {
             transaction.begin();
             try {
-                var result=gate.open(f.binding,entry,UUID.randomUUID(),ignored->{ }).execute(ignored->{
+                var result=gate.open(b,entry,UUID.randomUUID(),ignored->{ }).execute(ignored->{
                     assertDoesNotThrow(()->assertEquals(jakarta.transaction.Status.STATUS_ACTIVE,transactionManager.getStatus()));
                     return "synchronous-fixture-callback";
                 });
                 assertEquals(JdbcResourceExecutionGate.Kind.CALLED,result.kind());
                 assertEquals(jakarta.transaction.Status.STATUS_ACTIVE,transaction.getStatus());
             } finally {transaction.rollback();}
-            assertEquals(entry,gate.find(f.binding.scope()).orElseThrow().entry());
+            assertEquals(entry,gate.find(b.scope()).orElseThrow().entry());
         }
     }
     @Test void directSqlCannotBypassRegistryOrExactIssuingMetadataChecks() throws Exception {
