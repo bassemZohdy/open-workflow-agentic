@@ -72,3 +72,12 @@ new exact-head peer review are required after the PR84 prerequisite merge.
 The SQL phrase fresh initial intent means its INTENDED/unattempted shape, not proof that its journal row was made
 in the same transaction or that a historical owner supplied it. Only the future reviewed atomic producer can establish
 that provenance; it must refuse legacy upgrades. The migration does not automatically upgrade any legacy effect.
+
+## Final integrated author verification
+
+After rebasing onto merged PR84 (mainc91831d), a newly created/verified oa_v77_suite_<UUID> database was selected via
+DB_URL, then dropped without FORCE after Maven exited. Java21/PG16.15:88 cases pass, zero failures/errors/skips:
+V77 facts27, existing V76 schema20, existing V75 schema/grants6, append-once22, parent append-only5, incoming-child7,
+and default canonical admission refusal1. Runtime parent probes actually migrated their selected private DB through77;
+foundation-specific append-once/incoming-child cases retain their declared private74+V75 fixture. Log:
+`target/v77-integrated-final.log`. New exact peer review/current full CI remain required.
