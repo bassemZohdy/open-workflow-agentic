@@ -1,0 +1,28 @@
+{
+  "profile": "langgraph4j-postgres-saver-1.9.5-v1.1",
+  "targetPlaceholder": "%1$s",
+  "scope": "Synthetic malformed-profile DDL, applied only in private test fixtures. Not production validation or repair SQL.",
+  "groups": {
+    "columns-and-keys": {
+      "column-collation": "alter table %1$s.lg4jthread alter column thread_name type varchar(255) collate \"C\"",
+      "type": "alter table %1$s.lg4jthread alter column thread_name type text",
+      "nullability": "alter table %1$s.lg4jcheckpoint alter column state_data drop not null",
+      "default": "alter table %1$s.lg4jthread alter column is_released set default true",
+      "primary-key": "alter table %1$s.lg4jcheckpoint drop constraint lg4jcheckpoint_pkey",
+      "foreign-key": "alter table %1$s.lg4jcheckpoint drop constraint fk_thread; alter table %1$s.lg4jcheckpoint add constraint fk_thread foreign key(thread_id) references %1$s.lg4jthread(thread_id) on delete restrict",
+      "extra-column": "alter table %1$s.lg4jthread add column unknown_extension text"
+    },
+    "indexes": {
+      "missing-index": "drop index %1$s.idx_lg4jcheckpoint_thread_id",
+      "predicate": "drop index %1$s.idx_unique_lg4jthread_thread_name_unreleased; create unique index idx_unique_lg4jthread_thread_name_unreleased on %1$s.lg4jthread(thread_name) where is_released=true",
+      "sort-order": "drop index %1$s.idx_lg4jcheckpoint_thread_id_saved_at_desc; create index idx_lg4jcheckpoint_thread_id_saved_at_desc on %1$s.lg4jcheckpoint(thread_id,saved_at asc)",
+      "nulls-not-distinct": "drop index %1$s.idx_unique_lg4jthread_thread_name_unreleased; create unique index idx_unique_lg4jthread_thread_name_unreleased on %1$s.lg4jthread(thread_name) nulls not distinct where is_released=false",
+      "extra-unique": "create unique index no_released_duplicates on %1$s.lg4jthread(thread_name)"
+    },
+    "policies": {
+      "row-security": "alter table %1$s.lg4jthread enable row level security",
+      "check": "alter table %1$s.lg4jthread add constraint unknown_business_rule check(thread_name<>'never')",
+      "trigger": "create function %1$s.must_not_run() returns trigger language plpgsql as $$ begin raise exception 'unexpected fixture trigger invocation'; end; $$; create trigger unknown_profile_hook before update on %1$s.lg4jthread for each row execute function %1$s.must_not_run()"
+    }
+  }
+}

@@ -49,6 +49,19 @@ class ResearchCheckpointSchemaTest {
     static String sha(String value) throws Exception {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
     }
+    /** Shared fixture bytes also drive the read-only current-profile verifier's parity cases. */
+    static Map<String,String> mutations(String group) throws Exception {
+        var root=new ObjectMapper().readTree(resource("checkpoint-profile/mutations.json"));
+        var node=root.path("groups").path(group);
+        assertTrue(node.isObject() && !node.isEmpty(),"missing checkpoint mutation group: "+group);
+        var cases=new LinkedHashMap<String,String>();
+        var fields=node.fields();
+        while(fields.hasNext()) {
+            var entry=fields.next();assertTrue(entry.getValue().isTextual());
+            cases.put(entry.getKey(),entry.getValue().textValue());
+        }
+        return cases;
+    }
     static void sql(Connection c,String text) throws SQLException {try(var s=c.createStatement()){s.setQueryTimeout(10);s.execute(text);}}
     static String name() {return "gpt_ck_"+UUID.randomUUID().toString().replace("-","");}
     static void target(Connection c,String schema) throws SQLException {
@@ -129,23 +142,11 @@ class ResearchCheckpointSchemaTest {
             refused(c,s,"23514","partial-pair");});
     }
     @Test void incompatibleColumnsDefaultsAndKeysRefuseWithoutRepairingHistory() throws Exception {
-        Map<String,String> cases=new LinkedHashMap<>();
-        cases.put("column-collation","alter table %1$s.lg4jthread alter column thread_name type varchar(255) collate \"C\"");
-        cases.put("type","alter table %1$s.lg4jthread alter column thread_name type text");
-        cases.put("nullability","alter table %1$s.lg4jcheckpoint alter column state_data drop not null");
-        cases.put("default","alter table %1$s.lg4jthread alter column is_released set default true");
-        cases.put("primary-key","alter table %1$s.lg4jcheckpoint drop constraint lg4jcheckpoint_pkey");
-        cases.put("foreign-key","alter table %1$s.lg4jcheckpoint drop constraint fk_thread; alter table %1$s.lg4jcheckpoint add constraint fk_thread foreign key(thread_id) references %1$s.lg4jthread(thread_id) on delete restrict");
-        cases.put("extra-column","alter table %1$s.lg4jthread add column unknown_extension text");
+        Map<String,String> cases=mutations("columns-and-keys");
         for(var entry:cases.entrySet())fixture(true,(c,s)->{seed(c,s);sql(c,entry.getValue().formatted(s));refused(c,s,"23514",entry.getKey());});
     }
     @Test void requiredIndexSemanticsAndAdditionalUniquenessCannotBeSilentlyAdopted() throws Exception {
-        Map<String,String> cases=new LinkedHashMap<>();
-        cases.put("missing-index","drop index %1$s.idx_lg4jcheckpoint_thread_id");
-        cases.put("predicate","drop index %1$s.idx_unique_lg4jthread_thread_name_unreleased; create unique index idx_unique_lg4jthread_thread_name_unreleased on %1$s.lg4jthread(thread_name) where is_released=true");
-        cases.put("sort-order","drop index %1$s.idx_lg4jcheckpoint_thread_id_saved_at_desc; create index idx_lg4jcheckpoint_thread_id_saved_at_desc on %1$s.lg4jcheckpoint(thread_id,saved_at asc)");
-        cases.put("nulls-not-distinct","drop index %1$s.idx_unique_lg4jthread_thread_name_unreleased; create unique index idx_unique_lg4jthread_thread_name_unreleased on %1$s.lg4jthread(thread_name) nulls not distinct where is_released=false");
-        cases.put("extra-unique","create unique index no_released_duplicates on %1$s.lg4jthread(thread_name)");
+        Map<String,String> cases=mutations("indexes");
         for(var entry:cases.entrySet())fixture(true,(c,s)->{seed(c,s);sql(c,entry.getValue().formatted(s));refused(c,s,"23514",entry.getKey());});
     }
     @Test void shadowedNamespacesAndNonTableRelationsRefuseBeforeAdoption() throws Exception {
@@ -156,10 +157,7 @@ class ResearchCheckpointSchemaTest {
             sql(c,"create table "+s+".lg4jcheckpoint(checkpoint_id uuid)");refused(c,s,"23514","view");});
     }
     @Test void policyTriggersAndChecksOutsideThePinnedProfileAreNotRemovedOrBypassed() throws Exception {
-        Map<String,String> cases=new LinkedHashMap<>();
-        cases.put("row-security","alter table %1$s.lg4jthread enable row level security");
-        cases.put("check","alter table %1$s.lg4jthread add constraint unknown_business_rule check(thread_name<>'never')");
-        cases.put("trigger","create function %1$s.must_not_run() returns trigger language plpgsql as $$ begin raise exception 'unexpected fixture trigger invocation'; end; $$; create trigger unknown_profile_hook before update on %1$s.lg4jthread for each row execute function %1$s.must_not_run()");
+        Map<String,String> cases=mutations("policies");
         for(var entry:cases.entrySet())fixture(true,(c,s)->{seed(c,s);sql(c,entry.getValue().formatted(s));refused(c,s,"23514",entry.getKey());});
     }
 
