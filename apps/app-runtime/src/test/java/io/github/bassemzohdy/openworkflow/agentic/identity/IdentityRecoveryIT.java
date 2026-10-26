@@ -222,8 +222,8 @@ class IdentityRecoveryIT {
                 () -> read(second.logFile()).contains("probe-effect authority instance=" + engineY
                         + " subject=alice grant=" + renewed.id().value() + " correlation=" + corrY
                         + " state=AUTHORIZED epoch=1"));
-        decideUntilCompleted(second, x, bearer);
-        decideUntilCompleted(second, y, bearer);
+        decideUntilCompleted(second, x, engineX, bearer);
+        decideUntilCompleted(second, y, engineY, bearer);
 
         // ---- no credential in any stored state ---------------------------------------------------------------------------
         List<String> needles = needles(canary1, canary2);
@@ -344,18 +344,25 @@ class IdentityRecoveryIT {
         }
     }
 
-    private static void decideUntilCompleted(ManagedProcess process, String id, String bearer) throws Exception {
+    private static void decideUntilCompleted(ManagedProcess process, String id, String engineId, String bearer)
+            throws Exception {
         long deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos();
+        String lastRegistryStatus = "unavailable"; // last value this loop observed; no extra request on failure
         while (System.nanoTime() < deadline) {
-            if ("COMPLETED".equals(status(process, id, bearer))) {
+            String observed = status(process, id, bearer);
+            lastRegistryStatus = observed;
+            if ("COMPLETED".equals(observed)) {
                 return;
             }
             post(process, "/dev/lifecycle/events", null, null, "{\"type\":\"" + EVENT + "\"}");
             Thread.sleep(500);
         }
-        // CI keeps the failsafe XML but not target/process-logs, so the evidence has to travel in the message.
-        fail("instance " + id + " did not complete; status " + status(process, id, bearer)
-                + "; engine instance " + engineId(process, id, bearer) + "\n" + logTail(process.logFile(), 60));
+        // CI now retains target/process-logs (PR68); the snapshot also travels in this message, so it is in the failsafe XML too.
+        // The snapshot is evidence only: a diagnostic failure must never replace this failure (no claim about the cause).
+        fail("instance " + id + " did not complete; status " + lastRegistryStatus
+                + "; engine instance " + engineId + "; "
+                + RecoveryEngineSnapshot.describe(process.baseUrl(), DEFINITION, "0.1.0", engineId)
+                + "\n" + logTail(process.logFile(), 60));
     }
 
     private static String logTail(Path log, int lines) {
