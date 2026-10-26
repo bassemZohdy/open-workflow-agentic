@@ -2,7 +2,8 @@
 
 **Prepared:** 2026-10-26  
 **Producer/writer:** GPT (lifecycle, contracts, SQL and integration); **peer reviewer:** Claude  
-**Current implementation base:** `af9d7e2cfe8c298fc438878a4c5b38fc2bedf9aa`  
+**Current implementation base:** `af9d7e2cfe8c298fc438878a4c5b38fc2bedf9aa`
+
 **Implementation state:** Internal V76 schema, synchronous identity and JDBC callback components are merged. **Production composite, actual dispatch and async integration are NOT STARTED.** This matrix defines remaining end-state checks; it is not an authority grant or package acceptance.
 
 ## 1. Prerequisite and authoritative evidence
