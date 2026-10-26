@@ -25,11 +25,13 @@ class ResourceCredentialLookupTest {
                     b.issuingGrantId(),b.scope().tenant(),b.expiresAt()));
             var sameJti=store.bind(new ResourceCallBinding(issuer,b.tokenId(),b.issuingGrantId(),b.scope(),b.issuedAt(),b.expiresAt()));
             var now=databaseNow(db.owner);var refreshed=credential(db,f,now.minusSeconds(1),now.plusSeconds(120));
+            var expired=credential(db,f,now.minusSeconds(181),now.minusSeconds(61));
             assertNotEquals(b.key(),sameJti.key());assertNotEquals(b.key(),refreshed.key());
-            for(var binding:new ResourceCallBinding[]{b,sameJti,refreshed})assertEquals(binding,store.findBinding(binding.key()).orElseThrow());
+            for(var binding:new ResourceCallBinding[]{b,sameJti,refreshed,expired})assertEquals(binding,store.findBinding(binding.key()).orElseThrow());
             assertTrue(store.findBinding("rb1-"+"0".repeat(64)).isEmpty());
             execute(db.owner,"update task.instance set status='COMPLETED' where id='"+f.row().id()+"'");
             assertEquals(b,store.findBinding(b.key()).orElseThrow());
+            assertEquals(expired,store.findBinding(expired.key()).orElseThrow());
             assertEquals(1,count(db.owner,"select count(*) from task.resource_call"));
         }
     }
