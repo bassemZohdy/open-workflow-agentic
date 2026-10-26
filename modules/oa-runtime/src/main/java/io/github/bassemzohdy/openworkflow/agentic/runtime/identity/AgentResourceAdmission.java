@@ -1,9 +1,12 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.identity;
 
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceCallBindings;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
+import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -11,6 +14,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Governed admission of a delegated token at the agent-run resource ({@code POST /agents/research}, WP-103). The generic
@@ -38,11 +42,93 @@ public class AgentResourceAdmission {
                             VerifiedToken token, ResourceCallBinding call) {
     }
 
+    /** Why a witness was refused. Carries no token, claim or scope value. */
+    public static final class WitnessRefusedException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        WitnessRefusedException(String reason) {
+            super("admission witness refused: " + reason);
+        }
+    }
+
+    /**
+     * Opaque, non-serializable evidence that THIS admission instance verified a bearer and found its exact durable
+     * resource-call binding. Only {@link #admitCall} creates one (the constructor is private to this class and no
+     * factory takes a {@link Principal}, {@link VerifiedToken}, binding or scope as proof). It holds no bearer and
+     * exposes no token, claim or freshness: it is admission/attribution evidence, not a current permission, a callback
+     * acknowledgement, a ResourceExecutionFence or a graph capability. Never put it in graph/workflow state, config or
+     * checkpoint metadata, or a ThreadLocal.
+     */
+    public static final class AdmittedCall {
+        private final AgentResourceAdmission minter;
+        private final VerifiedToken token;
+        private final ResourceCallBinding call;
+        private final AtomicBoolean bound = new AtomicBoolean();
+
+        private AdmittedCall(AgentResourceAdmission minter, VerifiedToken token, ResourceCallBinding call) {
+            this.minter = minter;
+            this.token = token;
+            this.call = call;
+        }
+
+        /** Historical attribution data of the call (not authority). */
+        public ResourceCallScope scope() {
+            return call.scope();
+        }
+
+        public String callKey() {
+            return call.scope().key();
+        }
+
+        @Override
+        public String toString() {
+            return "AdmittedCall[redacted]";
+        }
+    }
+
+    /**
+     * An {@link AdmittedCall} bound once to the exact backend-owned {@link ResourceExecutionEntry}. Still only
+     * admission/attribution evidence: it does not say the entry is fresh (the durable gate owns NO_ENTRY -> ENTERED and
+     * dispatch) and is not permission to run; a later live fence must re-read grants, bindings and policy.
+     */
+    public static final class BoundCall {
+        private final AdmittedCall admitted;
+        private final ResourceExecutionEntry entry;
+
+        private BoundCall(AdmittedCall admitted, ResourceExecutionEntry entry) {
+            this.admitted = admitted;
+            this.entry = entry;
+        }
+
+        /** The exact retained entry (data). */
+        public ResourceExecutionEntry entry() {
+            return entry;
+        }
+
+        /**
+         * Requires that this witness is still open and unexpired and retains exactly {@code expected} (full scope and
+         * epoch). Does not consult grants, policy or the replay store.
+         */
+        public ResourceExecutionEntry requireEntry(ResourceExecutionEntry expected) {
+            admitted.minter.requireOpen(admitted);
+            if (!entry.equals(Objects.requireNonNull(expected, "expected"))) {
+                throw new WitnessRefusedException("entry differs from the retained one");
+            }
+            return entry;
+        }
+
+        @Override
+        public String toString() {
+            return "BoundCall[redacted]";
+        }
+    }
+
     private final ResourceTokenGuard guard;
     private final ResourceCallBindings calls;
     private final IssuedTokenBindings issued;
     private final String audience;
     private final Clock clock;
+    private volatile boolean closed;
 
     @Inject
     public AgentResourceAdmission(IdentitySettings settings, TokenVerifier verifier, DelegationGrants grants,
@@ -86,6 +172,68 @@ public class AgentResourceAdmission {
         ResourceCallBinding call = boundCall(token);
         return new Principal(token.tenant(), token.subject(), token.actor(), token.actors(), token.scopes(), token,
                 call);
+    }
+
+    /**
+     * Admits the bearer exactly like {@link #admit} (one replay use) and returns opaque evidence instead of data. The
+     * signed expiry and the exact grant chain are re-checked after the blocking binding lookups, without a second replay
+     * use, so a revocation or expiry that happened during the lookup refuses.
+     *
+     * @throws TokenRejectedException the token is refused
+     * @throws WitnessRefusedException this admission is closed
+     */
+    public AdmittedCall admitCall(String bearer) {
+        requireNotClosed();
+        if (guard == null) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.AUDIENCE);
+        }
+        VerifiedToken token = guard.admit(Objects.requireNonNull(bearer, "bearer"), Set.of(SCOPE));
+        ResourceCallBinding call = boundCall(token);
+        guard.revalidate(token, Set.of(SCOPE));
+        requireNotClosed();
+        return new AdmittedCall(this, token, call);
+    }
+
+    /**
+     * Binds the witness once to {@code entry}, which the backend (not the caller of this API) owns: its full scope must
+     * equal the admitted call's scope. A different admission instance, a closed admission, an expired credential, a
+     * different scope (also with the same call key) or a second bind refuses. Does not repeat admission, consume replay
+     * or establish that the entry is fresh.
+     */
+    public BoundCall bind(AdmittedCall admitted, ResourceExecutionEntry entry) {
+        Objects.requireNonNull(admitted, "admitted");
+        Objects.requireNonNull(entry, "entry");
+        requireOpen(admitted);
+        if (!admitted.call.scope().equals(entry.scope())) {
+            throw new WitnessRefusedException("entry scope differs from the admitted call");
+        }
+        if (!admitted.bound.compareAndSet(false, true)) {
+            throw new WitnessRefusedException("already bound");
+        }
+        requireOpen(admitted);
+        return new BoundCall(admitted, entry);
+    }
+
+    /** Invalidates every witness of this admission at once. */
+    @PreDestroy
+    public void close() {
+        closed = true;
+    }
+
+    private void requireNotClosed() {
+        if (closed) {
+            throw new WitnessRefusedException("admission closed");
+        }
+    }
+
+    private void requireOpen(AdmittedCall admitted) {
+        if (admitted.minter != this) {
+            throw new WitnessRefusedException("minted by another admission");
+        }
+        requireNotClosed();
+        if (!admitted.token.expiresAt().isAfter(clock.instant())) {
+            throw new WitnessRefusedException("credential expired");
+        }
     }
 
     /**
