@@ -246,11 +246,14 @@ class ResourceExecutionMigrationTest {
     }
 
     static Fixture fixture(Database db,String target) throws SQLException {
+        return fixture(db,target,"run");
+    }
+    static Fixture fixture(Database db,String target,String operation) throws SQLException {
         var registry=new JdbcInstanceStore(db.owner);var ids=UlidGenerator.shared();String tenant="execution-"+UUID.randomUUID();
         var request=new StartRequest(tenant,USER,new DefinitionRef("agentic/execution-schema-test","1"),Map.of(),"start-"+UUID.randomUUID());
         var row=registry.insertIfAbsent(InstanceRecord.starting(ids.next(),request,now()),"test.start").record();
         row=registry.replace(row.successor(now(),InstanceStatus.RUNNING,"engine-"+row.id(),1,null,null),row.version(),"test.running",USER);
-        var scope=new ResourceCallScope(tenant,row.id(),USER,"app-𝄞",row.engineInstanceId(),"agentic","execution-schema-test","1","/do/0/研究",1,"root/foreach/é","agent-run","run",target,"b".repeat(64));
+        var scope=new ResourceCallScope(tenant,row.id(),USER,"app-𝄞",row.engineInstanceId(),"agentic","execution-schema-test","1","/do/0/研究",1,"root/foreach/é","agent-run",operation,target,"b".repeat(64));
         var clock=Clock.systemUTC();
         // Fixture-only audit sink: this proves data DDL, not verified identity or mandatory dispatch audit.
         var grants=new DelegationGrants(new DelegationGrantStore(db.owner),new IdentityAudit(event->{},clock,ids),clock,ids,Duration.ofHours(2));
