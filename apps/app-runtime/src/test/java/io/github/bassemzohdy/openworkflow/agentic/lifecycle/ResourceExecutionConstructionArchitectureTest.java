@@ -1,4 +1,6 @@
-package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
+package io.github.bassemzohdy.openworkflow.agentic.lifecycle;
+
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static org.junit.jupiter.api.Assertions.*;
@@ -15,9 +17,9 @@ import org.junit.jupiter.api.*;
 
 /** A future composition root needs review; generic runtime code cannot construct a gate/fence or use legacy entry. */
 class ResourceExecutionConstructionArchitectureTest {
-    private static final String PREFIX="io.github.bassemzohdy.openworkflow.agentic.runtime";
+    private static final String PREFIX="io.github.bassemzohdy.openworkflow.agentic";
     private static final String GATE=JdbcResourceExecutionGate.class.getName();
-    private static final String ROOT=PREFIX+".execution.GovernedExecutionRoot";
+    private static final String ROOT=PREFIX+".runtime.execution.GovernedExecutionRoot";
     private static ArchRule rule(Set<String> roots) {
         return classes().that().resideInAPackage(PREFIX+"..")
                 .should(new ArchCondition<JavaClass>("construct/use the execution gate only at the exact reviewed root") {
@@ -42,6 +44,7 @@ class ResourceExecutionConstructionArchitectureTest {
     @Test void productionHasNoUnreviewedConstructionOrLegacyEntryPath() {
         JavaClasses imported=new ClassFileImporter().withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages(PREFIX);
         assertTrue(imported.stream().anyMatch(c->c.getName().equals(GATE)),"do not pass on an empty import");
+        assertTrue(imported.stream().anyMatch(c->c.getName().equals(PREFIX+".lifecycle.CheckpointReadiness")),"application classes must be imported too");
         rule(Set.of(ROOT)).check(imported);
     }
     @TestFactory Stream<DynamicTest> eachIndependentBypassFixtureIsRejected() {

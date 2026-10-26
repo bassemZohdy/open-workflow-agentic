@@ -19,9 +19,14 @@ protocol; graph/SDK cancellation and worker joining remain a separate reviewed c
 
 The legacy component callback cannot receive governed control, and governed attempts cannot invoke the legacy callback.
 Java serialization and Jackson serialization of Running/CredentialFence are rejected. No raw credential getters exist.
-An ArchUnit production rule permits construction/governed use only at the exact future
+An application-level ArchUnit production rule imports the project package across app-runtime and its production
+dependencies, checking construction/governed use only at the exact future
 `runtime.execution.GovernedExecutionRoot`, while legacy entry is forbidden even there. The root does not exist yet.
-Independent negative fixtures exercise constructor, legacy entry/callback, fence association and misleading simple name.
+Independent negative fixtures in the application package exercise constructor, legacy entry/callback, fence association
+and misleading simple name. Non-vacuity assertions require both runtime gate and application classes. This static-call
+architecture rule is a maintenance guard, not a reflection/MethodHandle/ServiceLoader security boundary; normal source
+review remains required. Fatal JVM Errors are rethrown after cleanup with suppressed causes and never permit callback;
+callers must not interpret fatal failures as proof that an entry did not commit.
 
 ## JDBC ownership and limits
 
