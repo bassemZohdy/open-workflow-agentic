@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge allocation DATA contracts89 as4b74700 after Claude exact41ba16c PASS/independent209 and verified full1427 current CI (including combined delivery/model controls). No store, migration, approved source or reservation is activated; original-call identity and immutable full contract/profile/lifetime remain data. Issue75 diagnostic intake leaves its cause unresolved.
+
 - Merge audit delivery87 (2570bea) and controlled model calls88 (2284d10) after exact peer reviews, independent53/63 and inspected current CI1395/1409, zero failures/errors/skips. Combined-main verification remains pending. Preserve default refusal and data/authority separation; record the staged allocation migration plan without activating V78 or inventing historical allocations.
 
 - Merge explicit atomic audit producer86 (4f41a60) after Claude exactdfb8030 PASS/independent61 and inspected full1386; actual postmerge1386 also passes. Preserve original scoped sources, refuse legacy upgrades/orphan reads, retain resume diagnostics and leave default registration absent. Audit delivery87 (52 focused green plus intended pre-append negative control/restored1) and controlled model API remain pending final review/CI. No production target/graph/context or acceptance closure.
