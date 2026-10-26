@@ -54,3 +54,14 @@ is still empty. Logs under target/atomic-producer-*.log. Exact Claude review and
 Only the producer/ledger patch and corresponding tests from historical preparation2941204 are carried forward.
 Later branch changes for V80/manual decisions, delivery, audited target adapters or other proposals are excluded.
 Current review/CI are required; old preparation evidence is not transferred as approval.
+
+## Peer follow-up
+
+Initial Claude exact66571db PASS independently ran59 cases. All three notes are addressed: clarify structural checks
+precede retries (historical data readback remains separate); preserve an original work exception and attach a concurrent
+resume failure as suppressed; page through retained origin/event references so a known orphan is not silently skipped.
+New real JTA controls cover original refusal plus lost resume reply, and actual commit plus lost resume reply retaining
+one original source without acknowledged return. The orphan control now checks both direct and paged reads.
+Final author61 cases pass (runtime17/app44, store15), zero failures/errors/skips, in a verified fresh suite database and
+its declared private store DBs, dropped after exit. Log target/atomic-producer-final.log. New exact peer/current CI are
+required; old66571db full1384 is retained only as earlier-head evidence, not approval of this final change.

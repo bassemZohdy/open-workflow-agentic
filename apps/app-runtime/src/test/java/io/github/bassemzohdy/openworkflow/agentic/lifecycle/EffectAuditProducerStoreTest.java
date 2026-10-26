@@ -241,9 +241,39 @@ class EffectAuditProducerStoreTest {
                 sql(c,"alter table effect.event disable trigger all");
                 try(var q=c.prepareStatement("delete from effect.event where id=?")){q.setLong(1,journal);assertEquals(1,q.executeUpdate());}
                 assertThrows(IllegalStateException.class,()->producer.find(c,journal));
+                assertThrows(IllegalStateException.class,()->producer.forKey(c,f.command().key(),0,128));
             }finally{c.rollback();}
         }
         assertEquals(1,history(f).size());
+    }
+
+    TransactionManager loseResumeReply() {
+        return (TransactionManager)Proxy.newProxyInstance(TransactionManager.class.getClassLoader(),new Class[]{TransactionManager.class},(proxy,method,args)->{
+            Object result;
+            try{result=method.invoke(manager,args);}catch(InvocationTargetException failed){throw failed.getCause();}
+            if(method.getName().equals("resume"))throw new SystemException("owned resume reply lost after actual resume");
+            return result;
+        });
+    }
+    @Test void resumeReplyFailureDoesNotHideTheOriginalSourceRefusal() throws Exception {
+        var f=fixture();var wrong=new EffectScope(f.scope().tenant(),f.scope().instanceId(),new Subject(SubjectKind.SERVICE,OWNER.id()));
+        var faulty=new JdbcEffectLedger(owned,loseResumeReply(),producer);
+        caller.begin();
+        try {
+            var error=assertThrows(IllegalStateException.class,()->faulty.prepareScoped(wrong,f.command(),Duration.ZERO,now()));
+            assertTrue(error.getMessage().contains("provenance or content differs"));assertEquals(1,error.getSuppressed().length);
+            assertTrue(error.getSuppressed()[0].getMessage().contains("resume reply lost"));assertEquals(Status.STATUS_ACTIVE,caller.getStatus());
+        }finally{caller.rollback();}
+        assertEquals(0,count(f,"ledger"));
+    }
+    @Test void actualCommitThenResumeReplyLossRetainsTheSameSourceWithoutAnAcknowledgedReturn() throws Exception {
+        var f=fixture();var faulty=new JdbcEffectLedger(owned,loseResumeReply(),producer);
+        caller.begin();
+        try {
+            var error=assertThrows(StoreUnavailableException.class,()->faulty.prepareScoped(f.scope(),f.command(),Duration.ZERO,now()));
+            assertTrue(error.getMessage().contains("cannot be resumed"));assertEquals(Status.STATUS_ACTIVE,caller.getStatus());
+        }finally{caller.rollback();}
+        var before=history(f);assertEquals(1,before.size());prepare(f);assertEquals(before,history(f));assertEquals(1,count(f,"audit_delivery"));
     }
 
 }

@@ -149,10 +149,17 @@ public final class EffectAuditProducer {
         if(afterJournalId<0 || limit<1 || limit>128) throw new IllegalArgumentException("effect source page must be bounded");
         var ids=new ArrayList<Long>();
         try(var q=c.prepareStatement("""
-                select a.source_event_id from effect.audit_source a join effect.event e on e.id=a.source_event_id
-                where e.thread_name=? and e.node_id=? and e.idempotency_key=? and e.id>? order by e.id limit ?
+                select a.source_event_id from effect.audit_source a
+                left join effect.event e on e.id=a.source_event_id
+                left join effect.audit_scope s on s.initial_event_id=a.scope_initial_event_id
+                where ((e.thread_name=? and e.node_id=? and e.idempotency_key=?)
+                    or (s.thread_name=? and s.node_id=? and s.idempotency_key=?)
+                    or (e.id is null and s.initial_event_id is null and a.key_fingerprint=?))
+                  and a.source_event_id>? order by a.source_event_id limit ?
                 """)) {
-            bind(q,key);q.setLong(4,afterJournalId);q.setInt(5,limit);try(var r=q.executeQuery()){while(r.next())ids.add(r.getLong(1));}
+            bind(q,key);q.setString(4,key.threadId().value());q.setString(5,key.nodeId());q.setString(6,key.idempotencyKey());
+            q.setString(7,keyFingerprint(key));q.setLong(8,afterJournalId);q.setInt(9,limit);
+            try(var r=q.executeQuery()){while(r.next())ids.add(r.getLong(1));}
         }
         var result=new ArrayList<Retained>();for(long id:ids)result.add(find(c,id).orElseThrow(EffectAuditProducer::inconsistent));return List.copyOf(result);
     }

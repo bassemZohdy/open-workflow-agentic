@@ -100,6 +100,8 @@ public class JdbcEffectLedger implements EffectLedger {
             throw new IllegalArgumentException("replay window must be between zero and 30 days");
         Instant until=replayWindow.isZero()?null:now.plus(replayWindow);
         var key=command.key();var intent=new Effect(key.threadId(),key.nodeId(),key.idempotencyKey(),command.target(),EffectState.INTENDED,null,now);
+        // Current structural checks deliberately precede retries. Terminal/cancelled instances use historical DATA
+        // readback via the producer, never prepareScoped as fresh current permission or historical upgrade.
         return transaction(c->{projection.lockRoot(c,scope);return insert(c,intent,command.requestFingerprint(),until,"EFFECT",new EffectAuditProducer.Origin(scope,null));});
     }
 
@@ -381,10 +383,15 @@ public class JdbcEffectLedger implements EffectLedger {
         if(projection==null)return work.get(); // Existing legacy/CDI behavior remains unchanged.
         Transaction suspended;
         try{suspended=transactions.suspend();}catch(Exception failed){throw new StoreUnavailableException("caller transaction cannot be suspended",failed);}
+        Throwable primary=null;
         try{return work.get();}
+        catch(RuntimeException | Error failed){primary=failed;throw failed;}
         finally {
             if(suspended!=null)try{transactions.resume(suspended);}
-            catch(Exception failed){throw new StoreUnavailableException("caller transaction cannot be resumed",failed);}
+            catch(Exception failed){
+                if(primary==null)throw new StoreUnavailableException("caller transaction cannot be resumed",failed);
+                if(primary!=failed)primary.addSuppressed(failed);
+            }
         }
     }
 }
