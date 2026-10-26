@@ -1,0 +1,35 @@
+**Claude: PASS for the DATA adapter only.** I found no blocking or material findings.
+
+- **Commit:** `ef91ff44547284e364ceba0b919522445e3eafa1` on `gpt/WP-103-allocation-store`. The worktree was clean and I edited, committed and commented on nothing.
+- **Environment:** the run used Temurin OpenJDK 21.0.12.1 and Maven 3.9.11, with Maven's Java version reporting 21.0.12.1 from the path you specified. The Postgres container reports PostgreSQL 16.15.
+- **Database handling:** I created `rev_9c147170daf14da2a340fc4b38182e5b` on `open-workflow-agentic-codex-postgres-1` and confirmed `current_database()`. I set `DB_URL` only for the Maven run, then dropped that database without FORCE after Maven exited. I did not touch the shared `agentic` database.
+
+**Totals:** `BUILD SUCCESS`, 57 tests, no failures, errors or skips.
+
+| Area | Tests |
+|---|---|
+| Contracts (`ResourceTaskAllocationTest`) | 9 |
+| Runtime (`ResourceTaskAllocationPreflightTest`) | 4 |
+| App | 44 |
+
+The 44 app tests break down as `ResourceTaskAllocationStoreTest` 14, `ResourceExecutionMigrationTest` 20, `ResourceTaskAllocationMigrationTest` 9 and `ResourceBindingsDefaultWiringTest` 1. One Flyway "V76 failed, rolled back" ERROR line in the log comes from an intentional negative test in `ResourceExecutionMigrationTest`, which passed.
+
+**Contract checks:** I read `JdbcResourceTaskAllocations`, `ResourceTaskAllocationCodec`, the `ResourceTaskAllocations` port and the proposed V78 SQL, and each point below holds.
+- **Identity and retries:** `same()` compares the whole `ResourceTaskAllocation` (full scope, contract and profile), so a changed retry throws a conflict. A concurrent first insert uses `on conflict do nothing`, then re-reads and compares.
+- **Absence versus corruption:** only a missing allocation row returns empty. A missing call or occurrence anchor, a fingerprint mismatch, a duplicate row, an oversized or corrupt JSON column, and any SQL, commit or JTA failure all refuse.
+- **Historical repeats:** the read path never touches the deadline, and the stored `deadline` and `created_at` come back as retained. Renewal and expiry checks happen only in the V78 trigger on new inserts (database-clock deadline, grant ancestry and parent narrowing).
+- **Codec:** it re-encodes the decoded value and compares it as a JSON tree, so type coercion and unknown fields fail. Allow-list order doesn't matter, but duplicates and non-text items are rejected before the set collapses them. Subsecond task wall time is refused before any I/O.
+- **Transactions:** the constructor requires a `TransactionManager`, and there is no CDI bean. Every call suspends the caller's transaction and resumes it afterwards. If both the work and the resume fail, the work failure is primary and the resume failure is suppressed. If only the resume fails, the call throws `StoreUnavailableException`. Isolation and timeouts are inherited, and the SERIALIZABLE/200ms/500ms case is tested.
+
+**Non-blocking notes:**
+- A resume failure after a successful commit refuses the return even though the row is already committed. The handoff and javadoc disclose this, and callers must reconcile through the same identity.
+- `read()` can surface `IllegalArgumentException` from `Ulid.parse` or `valueOf` rather than `IllegalStateException`. It is still a refusal, never absence, so this is cosmetic.
+- I did not re-mutate the author's `target/allocation-store-*` logs, including the conflict negative control. I saw the negative-control log exists but did not re-run it.
+
+**Activation and residual gates (not passed or claimed here):**
+- V78 stays in `db/proposed`, and current default Flyway is still V77, so the migration plan and rehearsal gates remain open.
+- Open items are source, role, default-privilege and executor denial, plus complete negative cases for parent, grant, expiry, cycle and narrowing.
+- Also open are the canonical original-occurrence producer, trusted model configuration and approval, V79 holds, budget and usage, and real consumers and freshness.
+- Not covered are acquisition, statement and network bounds, per-node and provider fences, Root and async recovery, and the legacy thread remapping behind issues 75 and 76.
+- Peer and current CI are still pending.
+- This adapter supplies no approval, budget or permission. An expired or historical repeat must never be used as current permission.

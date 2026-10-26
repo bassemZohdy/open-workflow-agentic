@@ -1,0 +1,52 @@
+**PR94 review: Claude PASS for the private V78 rehearsal only (not an approved V78 rollout).**
+
+**Exact SHA:** `ed86b9285baf66dde91978e9122565a400ba909d`. It is a single commit on `main` 9c61d21. The diff is the proposed V78 SQL, `ResourceTaskAllocationMigrationTest` and the handoff. I touched no files. The worktree was clean afterward and I made no external comments.
+
+**Independent run:**
+- **Runtime:** Temurin OpenJDK 21.0.12.1 LTS (from the `java -version` output). Maven was `mvn.cmd` 3.9.11 from the path you gave. Its enforcer rules passed, but the log never printed a Maven version line.
+- **Database:** PostgreSQL 16.15. I used a fresh UUID-named common database, `DB_URL` set only inside that PowerShell process. After Maven exited, I dropped it without FORCE. No `review_pr94_*` databases remain, and I did not touch the shared `agentic` database.
+- **Totals:** Maven reported BUILD SUCCESS with 39 tests, 0 failures, 0 errors, 0 skipped.
+
+| Suite | Tests |
+|---|---|
+| `ResourceTaskAllocationTest` | 9 |
+| `ResourceExecutionMigrationTest` | 20 |
+| `ResourceBindingsDefaultWiringTest` | 1 |
+| `ResourceTaskAllocationMigrationTest` | 9 |
+
+The one Flyway "V76 failed … rolled back" ERROR line in the log is an expected negative case inside `ResourceExecutionMigrationTest`. The PowerShell exit code 1 came from `java -version` writing to stderr, not from a test failure.
+
+**What I checked in the SQL and tests:**
+- **V77 baseline:**
+  - **Compatibility and history:** The proposal applies on an actual V77 database that already has execution history. It adds no allocation rows, and the original rows and the V76/V77 checksums are unchanged.
+  - **Flyway:** The file sits in `db/proposed/`, so Flyway never sees it, and no V78/V79 history rows exist.
+- **Inventory and NOT VALID FK:**
+  - **Inventory:** The immutable inventory captures call key, entry, contract, epoch, executor and time. INSERT, UPDATE, DELETE and TRUNCATE on it are refused with 42501, naming that table.
+  - **Insert guard:** The existing allocation insert guard still refuses retrofitting an allocation (23514) once an execution exists for the call.
+  - **FK boundary:** The FK is created `NOT VALID`, so a new unallocated entry fails with 23503 on the named constraint. Historical rows stay readable. Parent UPDATEs are still refused by the old guard.
+- **Concurrent writer:** The lock is `SHARE ROW EXCLUSIVE`, taken before the inventory read, under READ COMMITTED. The test confirms the migration is genuinely waiting on the lock (`pg_locks`, not granted) while an uncommitted writer holds a row. After the writer commits, its key is in the inventory.
+- **Isolation, timeouts, rollback:**
+  - **Isolation:** A SERIALIZABLE caller is refused with 25001 before any DDL, with no downgrade.
+  - **Timeouts:** The lock-timeout cap is 2s and the statement cap 5s. Stricter 100ms/500ms values are retained after commit, and the search path is restored.
+  - **Failure handling:** A lock timeout gives 55P03 in under 3s with no partial schema. A conflicting pre-existing allocation table keeps its marker row, and no functions or inventory remain.
+- **Catalog pinning:** All new functions pin `search_path = pg_catalog, pg_temp`. The test shows a hostile `public.sha256` and a `pg_temp.text` domain do not change the digest. The in-suite control that drops the pin fails or gives a different digest, then is rolled back.
+- **No fake backfill:** The insert into the inventory only copies existing execution facts, and nothing is inserted into the allocation table.
+
+**Material findings (none blocking this rehearsal):**
+1. **Statement timeout is never exercised.** The tests only show that stricter values survive, never that the 5s cap actually fires. A multi-statement simple-protocol string may be timed as a single statement, so the cap's behaviour depends on how the runner executes the file. pgjdbc and psql send statements separately, so this is likely fine. Add a test or a runner note before any activation.
+2. **Other locks are unproven.** The lock-wait tests only cover `task.resource_execution`. Creating the new table's FKs also locks `resource_call`, `agent_task` and `delegation_grant`. Those waits are bounded by the 2s cap and roll back the whole transaction, but they are untested.
+3. **Handoff wording.** The 55P03 test sets a 100ms lock timeout for the migration session, so it is a bounded-failure test rather than a test of the 2s default.
+4. **Unproven functions.** The new-7 functions reused from the stale proposal are not claimed fully verified. This rehearsal only checks their hashes, not their guard behaviour. For example, the insert-guard branches for parent, grant ancestry and expiry are not covered.
+
+**Activation limits:** This is not approval to activate V78 or to run it in Flyway or production. The following gates stay open:
+- Parent, grant, narrowing, expired, revoked and cyclic negative cases.
+- Writer-role, default-privilege and executor-denial proof.
+- Approved model source and store.
+- V79 reservation and budget checks.
+- Consumers and freshness.
+- Lost-reply and JTA semantics.
+- Quantitative cutover and reconciliation gates.
+
+The FK proves existence only; it is not live permission. Do not VALIDATE the FK while exemptions remain, and do not DROP it to reopen unallocated writes.
+
+I did not re-run your author logs (the validated-FK failure and the restored-39 run in `target/allocation-upgrade-*`). I only ran the complete-39 suite myself.
