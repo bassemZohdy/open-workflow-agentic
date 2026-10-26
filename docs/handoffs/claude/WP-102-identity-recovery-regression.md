@@ -13,11 +13,15 @@ Retained evidence: `ow-checkpoint-postmerge-failure.log` (runner output) and `ow
 the child-process log. `build.yml` uploads `failsafe-reports/*.xml` only, not `target/process-logs`, so
 `identity-run2.log` (the one file that would show y's listen registration and event delivery) is lost.
 
-## It is intermittent, not a tree regression
+## Same tree passed and failed: unresolved timing-dependent defect
 
 The same IT passed in every earlier retained run: 1396bd4, 33b0562, 6610bf1, cd15aca, de853bb (16.8-19.7 s each) and the
 Linux network run (38 s), including the PR67 head a01b8e1 run 40245351968 (all 170 suites green). The failing commit is
-the merge of that same tree. A tree defect is therefore unlikely; a timing-dependent path is.
+the merge of that same tree, so the same tree has both passed and failed. That demonstrates intermittent behaviour; it does
+not show the tree is free of a defect. This is an unresolved timing-dependent defect with an unidentified cause.
+
+Latest tracking of main d031e00, run 40246884344, succeeded. That is one passing run of an intermittent test; it is not a
+fix and does not clear the failure. The failure metadata (original run 40246336207 on b02875f) remains the evidence of record.
 
 ## Hypothesis check (shared raw event type, completion/reauthorization ordering)
 
