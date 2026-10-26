@@ -58,6 +58,11 @@ class InventoryTests(unittest.TestCase):
         other = json.loads(json.dumps(doc))
         other["do"][0]["begin"]["set"]["status"] = "changed"
         self.assertFalse(mod.compare_roundtrip(doc, other))
+        # Python equality alone incorrectly treats JSON true and 1 as equal.
+        other = json.loads(json.dumps(doc))
+        other["do"][0]["begin"]["set"]["status"] = True
+        doc["do"][0]["begin"]["set"]["status"] = 1
+        self.assertFalse(mod.compare_roundtrip(doc, other))
         self.assertEqual({"supported": [], "unsupported": [], "unverified": ["set"]},
                          mod.evaluate(["set"], {"LangGraph": {}})["LangGraph"])
         self.assertEqual(["set"], mod.evaluate(["set"], {"runtime": {"unsupported": ["set"]}})["runtime"]["unsupported"])
@@ -75,6 +80,16 @@ class InventoryTests(unittest.TestCase):
         self.assertTrue(all(v["unverified"] for v in payload["runtimes"].values()))
         strict = subprocess.run(cmd + ["--require-verified"], text=True, capture_output=True)
         self.assertEqual(1, strict.returncode)
+        missing = subprocess.run([sys.executable, str(SCRIPT), str(fixture), "--require-verified"],
+                                 text=True, capture_output=True)
+        self.assertNotEqual(0, missing.returncode)
+        with tempfile.TemporaryDirectory() as folder:
+            empty = Path(folder) / "empty.json"
+            empty.write_text("{}", encoding="utf-8")
+            no_providers = subprocess.run([sys.executable, str(SCRIPT), str(fixture),
+                                           "--capabilities", str(empty), "--require-verified"],
+                                          text=True, capture_output=True)
+            self.assertEqual(1, no_providers.returncode)
 
     def test_cli_exported_drift_fails(self):
         fixture = FIXTURES / "sequence.json"
