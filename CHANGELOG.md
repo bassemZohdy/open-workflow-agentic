@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge admission-witness73 asa87fc292 after exact GPT review9ce4279 and inspected full1242-case plus real-provider CI. Retain per-call isolated closure and default-denying wiring; live identity fence/graph adoption remain future gates. V76 PR74 corrects two earlier parent TRUNCATE probes for new FK descendants and passes combined60 locally; current CI and exact Claude review are pending after a recorded failed run.
+
 - Push admission-witness PR73 (9ce4279, GPT exact PASS and independent42 tests) and V76 data-only facts PR74 (d83b15f, author19 tests and two intended missing-guard controls). Current CI remains pending; Claude exact review for74 is delayed by its session limit until09:50 Dubai. Neither candidate is merged or activated; backend/current authority/package acceptance remain gated. Main5083e99 full40258664514 passes.
 
 - Merge checkpoint-profile PR67 as mainb02875f after exact Claude PASS a01b8e1/6405038545 and full40245351968. Inspected actual artifact12617854320:170 XML suites/1183 executed cases with zero failures/errors/skips, schema10/24 observations, migration/real-saver/grants4, default admission refusal1, exact migration/vendor digests and tested-tree/archive integrity. Runtime DDL removal/current-profile startup proof is the next Claude-owned handoff; credentials, execution authority and package/acceptance closure remain gated.

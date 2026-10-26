@@ -1,0 +1,238 @@
+{
+  "core": {
+    "xmlSuites": 174,
+    "totals": {
+      "tests": 1242,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": {
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AdmittedCallWitnessTest": {
+        "totals": {
+          "tests": 18,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "aSecondBindOrAChangedRetainedEpochRefuses",
+          "concurrentBindsOfOneWitnessYieldExactlyOne",
+          "closingTheOriginatingWitnessInvalidatesItsBoundCall",
+          "closeDuringTheSlowBindingLookupRefusesTheNewWitness",
+          "closeInvalidatesPromptly",
+          "badMissingOrExpiredInputsCannotYieldAWitness",
+          "realVerifiedAdmissionMintsAWitnessThatBindsOnceToTheExactEntry",
+          "handlesAreNotSerializableAndTheirTextCarriesNothing",
+          "aRepeatedBearerIsReplayedAndTheHistoricalAdmitStillWorks",
+          "aSecondCredentialAttestsTheSameCallButIsNotAFreshEntryClaim",
+          "aClosedUnboundWitnessRefusesBindAndStaysClosed",
+          "constructibleDataIsNotAMintPath",
+          "revocationOrExpiryInsideTheSlowLookupRefusesAndReplayIsNotConsumedTwice",
+          "aWitnessIsNotBoundByAnotherAdmissionInstance",
+          "closingOneCallDoesNotCloseAnotherFromTheSameAdmission",
+          "expiredCredentialRefusesBindAndLaterChecks",
+          "concurrentCloseAndBindNeverLeaveAUsableClosedWitness",
+          "aFullScopeChangeRefusesEvenWithTheSameCallKey"
+        ]
+      },
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ]
+      },
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT": {
+        "totals": {
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": []
+      },
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT": {
+        "totals": {
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": []
+      }
+    }
+  },
+  "keycloak-delegation-contract-java-results": {
+    "xmlSuites": 167,
+    "totals": {
+      "tests": 1239,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": {
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AdmittedCallWitnessTest": {
+        "totals": {
+          "tests": 18,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "aSecondBindOrAChangedRetainedEpochRefuses",
+          "concurrentBindsOfOneWitnessYieldExactlyOne",
+          "closingTheOriginatingWitnessInvalidatesItsBoundCall",
+          "closeDuringTheSlowBindingLookupRefusesTheNewWitness",
+          "closeInvalidatesPromptly",
+          "badMissingOrExpiredInputsCannotYieldAWitness",
+          "realVerifiedAdmissionMintsAWitnessThatBindsOnceToTheExactEntry",
+          "handlesAreNotSerializableAndTheirTextCarriesNothing",
+          "aRepeatedBearerIsReplayedAndTheHistoricalAdmitStillWorks",
+          "aSecondCredentialAttestsTheSameCallButIsNotAFreshEntryClaim",
+          "aClosedUnboundWitnessRefusesBindAndStaysClosed",
+          "constructibleDataIsNotAMintPath",
+          "revocationOrExpiryInsideTheSlowLookupRefusesAndReplayIsNotConsumedTwice",
+          "aWitnessIsNotBoundByAnotherAdmissionInstance",
+          "closingOneCallDoesNotCloseAnotherFromTheSameAdmission",
+          "expiredCredentialRefusesBindAndLaterChecks",
+          "concurrentCloseAndBindNeverLeaveAUsableClosedWitness",
+          "aFullScopeChangeRefusesEvenWithTheSameCallKey"
+        ]
+      },
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ]
+      },
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT": {
+        "totals": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "nativeDelegationPreservesAuthorityBounds",
+          "delegationRequiresPermissionAndConsent",
+          "anActorTokenOlderThanSixtySecondsIsRefusedBeforeAnythingIsSent",
+          "issuerKeyRotationIsHandled",
+          "subjectExpiryBoundsIssuedCredential",
+          "revokedOrExpiredGrantIsRejected",
+          "invalidActorIsRejected",
+          "aFreshActorYieldsACredentialThatOutlivesTheActorTokenWithinTheStatedContract"
+        ]
+      }
+    }
+  },
+  "keycloak-standard-contract-java-results": {
+    "xmlSuites": 167,
+    "totals": {
+      "tests": 1234,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": {
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AdmittedCallWitnessTest": {
+        "totals": {
+          "tests": 18,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "aSecondBindOrAChangedRetainedEpochRefuses",
+          "concurrentBindsOfOneWitnessYieldExactlyOne",
+          "closingTheOriginatingWitnessInvalidatesItsBoundCall",
+          "closeDuringTheSlowBindingLookupRefusesTheNewWitness",
+          "closeInvalidatesPromptly",
+          "badMissingOrExpiredInputsCannotYieldAWitness",
+          "realVerifiedAdmissionMintsAWitnessThatBindsOnceToTheExactEntry",
+          "handlesAreNotSerializableAndTheirTextCarriesNothing",
+          "aRepeatedBearerIsReplayedAndTheHistoricalAdmitStillWorks",
+          "aSecondCredentialAttestsTheSameCallButIsNotAFreshEntryClaim",
+          "aClosedUnboundWitnessRefusesBindAndStaysClosed",
+          "constructibleDataIsNotAMintPath",
+          "revocationOrExpiryInsideTheSlowLookupRefusesAndReplayIsNotConsumedTwice",
+          "aWitnessIsNotBoundByAnotherAdmissionInstance",
+          "closingOneCallDoesNotCloseAnotherFromTheSameAdmission",
+          "expiredCredentialRefusesBindAndLaterChecks",
+          "concurrentCloseAndBindNeverLeaveAUsableClosedWitness",
+          "aFullScopeChangeRefusesEvenWithTheSameCallKey"
+        ]
+      },
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ]
+      },
+      "TEST-io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT": {
+        "totals": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "realIssuerSignatureAndAudienceAreVerified",
+          "theServerStillRefusesWhatItCanSee",
+          "actorlessExchangeIsRejected"
+        ]
+      }
+    }
+  },
+  "reviewHead": "9ce42795e7f41c19af007b2bf3e67bca8891ac1e",
+  "mergeCommit": "a87fc292ef8843d3a7501b981dbda9d18adb0d1b",
+  "sourceReviewComment": 6407612733,
+  "ciReviewComment": 6407726466,
+  "coreRunId": 40264600608,
+  "providerRunId": 40264600618,
+  "actualCheckout": "a3cc8d7e9669ad0c569e5b3cd94fcdbf745750ea",
+  "testedTree": "d84b8bf06f3e26c5829d5e29fbe15b054a8d2627",
+  "reviewTreeMatches": true,
+  "negativeDefaultAdmissionMethod": "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired",
+  "archives": [
+    {
+      "id": 12625893955,
+      "sha256": "afd80f1fa9324694b8b8077f54ed40dc9dab0e861b2a76e5d26415bce50a6068",
+      "bytes": 2143033
+    },
+    {
+      "id": 12626490720,
+      "sha256": "1cc27118ddaab63b81cf0f91fe2cc959ff6272f955d382d97a08d932289cd2d9",
+      "bytes": 2110904
+    },
+    {
+      "id": 12625882733,
+      "sha256": "453eae97e808f42b4331e493e3a4393719d8110b0157bac235ac10192f357290",
+      "bytes": 2106899
+    }
+  ],
+  "archiveDigestAndCrcVerified": true,
+  "localIndependent": {
+    "java": "21.0.12.1",
+    "postgres": "16.15",
+    "tests": 42,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "scope": "Admission/attribution witnesses only; live authority, graph execution and package acceptance remain partial"
+}
