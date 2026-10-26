@@ -13,7 +13,7 @@
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
       "date": "2026-10-27",
-      "baseline_commit": "16c4262976f4f43d15515c5ffb28f2e5ff8d741a",
+      "baseline_commit": "15aefbb022aadbf1715862205d7b849f8ca15866",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -580,7 +580,7 @@
           "Shared retained-output fingerprint current product531acc3/BOTH39524191379 SUCCESS attempt1: all149 actual XML suites EACH,1055/1060 unique consistent cases zero failures/errors/skips; contracts186/runtime390/testkit196/app279 plus Failsafe4/9. Exact helper3/actual serializer1/inspector24/governed12/rule3/physical1 method sets, strict real providers/core and actual ZIP bytes-digests-CRC-paths independently checked. Final documentation changes no tested source. Exact other-agent/required PR/current-main gates and Claude inspector adoption remain; API is representation DATA, not completion or output authority. No schema/role/runtime activation, second implementation PR or package promotion.",
           "Merged zero-budget hard refusal83 and private Running-controlled model overload88 with checks before context lookup, after lookup, before physical provider and before private output. Allocation/profile DATA contracts89 bind original canonical scope and immutable full contract/lifetime; no approved profile source, durable reservation, migration or ResearchAgent adoption is installed.",
           "Audit query/verification API has verified caller/PEP/default-denial wiring and signed-expiry checks before I/O and after result materialization. Output93 mergedae57e4e after exact GPT independent37 and full1472 with native default-denial3 green. This closes that scoped remaining task, not tenant filtering, fresh PDP/emergency state or other product/async boundaries.",
-          "Allocation94 merged942cde1 after exact Claude independent39 and inspected CI; proposed V78 retains exact immutable legacy-exemption inventory with NOT VALID enforcement on new writes. Schema remains outside Flyway and unactivated. Allocation DATA adapter96 ef91ff4 has exact Claude independent57 PASS; current required CI pending, no budget/approval/dispatch authority.",
+          "Allocation94 merged942cde1 after exact Claude independent39 and inspected CI; proposed V78 retains exact immutable legacy-exemption inventory with NOT VALID enforcement on new writes. Schema remains outside Flyway and unactivated. Allocation DATA adapter96 merged15aefbb after exact Claude independent57 PASS and full1508 current CI; no budget/approval/dispatch authority.",
           "AgentResource95 merged16c4262 after exact GPT independent47 and full1490 plus both providers1482/1487. Responses materialize before final signed-expiry/current-grant check; late failure withholds output without claiming completed agent work was undone. Actual post95 same-main core/provider evidence verified."
         ],
         "completed_deliverables": [
@@ -613,7 +613,9 @@
           "docs/handoffs/gpt/evidence/WP-103-allocation-upgrade-preflight/current-ci.json",
           "docs/handoffs/gpt/evidence/WP-103-allocation-store/peer-review.json",
           "docs/handoffs/gpt/evidence/WP-103-agent-output-freshness/combined-main.json",
-          "docs/handoffs/gpt/evidence/WP-103-agent-output-freshness/combined-main-providers.json"
+          "docs/handoffs/gpt/evidence/WP-103-agent-output-freshness/combined-main-providers.json",
+          "docs/handoffs/gpt/WP-103-allocation-store.md",
+          "docs/handoffs/gpt/evidence/WP-103-allocation-store/current-ci.json"
         ]
       }
     },
@@ -2776,7 +2778,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-27",
-    "status": "Prerequisites74 through95 are merged after exact reciprocal reviews and inspected required CI. Actual post95 main16c4262 passes40411900718:196 suites/1490 tests; actual same-main providers40411900862 standard1482/delegation1487, all zero failures/errors/skips, digest/CRC and actual checkout verified. Allocation94 is a proposed V78 upgrade rehearsal only (independent39); AgentResource95 withholds stale private output after completed work (independent47). Allocation DATA store96 exactef91ff4 has Claude PASS/independent57; current required CI40412830026 pending. No activation/approval/budget/permission claim. Claude next implements scoped PEP checks at instance start/read/reauthorize, reusing oa.operate/oa.inspect with explicit GPT handoff for API fixtures. Issue75 cause/fix and76 supported-provider decision remain open. Approved-context source, V79 reservations, real Root/task/lease/Flow/physical async/current-authority gates remain; V78..V80 reserved and V78 outside Flyway. Defaults refuse. Counts and acceptance unchanged.",
+    "status": "Prerequisites74 through96 are merged after exact reciprocal reviews and inspected required CI. Actual post95 main16c4262 passes40411900718:196 suites/1490 tests; actual same-main providers40411900862 standard1482/delegation1487, all zero failures/errors/skips, digest/CRC and actual checkout verified. Allocation94 is a proposed V78 upgrade rehearsal only (independent39); AgentResource95 withholds stale private output after completed work (independent47). Allocation DATA store96 merged15aefbb after exactef91ff4 Claude PASS/independent57 and inspected40412830026:198 suites/1508 tests, all zero failures/errors/skips. Actual postmerge96 CI pending. GPT next completes proposed V78 denial matrix; No activation/approval/budget/permission claim. Claude next implements scoped PEP checks at instance start/read/reauthorize, reusing oa.operate/oa.inspect with explicit GPT handoff for API fixtures. Issue75 cause/fix and76 supported-provider decision remain open. Approved-context source, V79 reservations, real Root/task/lease/Flow/physical async/current-authority gates remain; V78..V80 reserved and V78 outside Flyway. Defaults refuse. Counts and acceptance unchanged.",
     "agents": [
       {
         "id": "GPT",
