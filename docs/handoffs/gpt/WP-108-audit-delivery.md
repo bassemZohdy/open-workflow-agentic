@@ -55,3 +55,15 @@ Only the port and initial data-delivery class from preparationc4adaab are carrie
 ACTUAL merged AuditAppendOnce/V77; old seeded-receipt, manual, history-barrier, target-adapter and later stacks are not
 merged wholesale. Production adoption still needs coherent current caller/PDP/task/lease/target and central receipt gates,
 resource-call/task/profile mapping, bounded operations, actual Flow/node/output association and private async/recovery.
+
+## Peer follow-up
+
+Initial Claude exactc2a7860 PASS independently ran52; old full1394 is earlier-head evidence only. A noted receipt-field
+coverage gap is now explicit: after a REAL central receipt exists for the SAME source/event/draft, changing only its
+hash or chain sequence is refused by the actual stored-binding check, without local ACK. The correct receipt then
+reopens and acknowledges that same source with one central event. Final focused53 pass (runtime28/app25, delivery9),
+zero failures/errors/skips. Production code is unchanged from c2a7860. New exact-head peer/current CI are required.
+
+Future scheduler/adoption notes: bounded drain stops on its first failure, so a poison record needs per-key backoff/skip
+before any scheduler rollout. Ordering is per effect key, not across an original/compensation pair. Call/statement/pool
+bounds remain caller deployment gates; this data component is not a whole-operation deadline or full-history barrier.

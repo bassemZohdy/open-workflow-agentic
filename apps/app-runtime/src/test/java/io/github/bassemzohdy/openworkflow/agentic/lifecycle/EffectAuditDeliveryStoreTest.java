@@ -82,6 +82,18 @@ class EffectAuditDeliveryStoreTest {
         var other=allocate(true);var wrong=new AuditAppendOnce(owned).appendOnce(other.initial().source(),other.initial().draft());
         assertThrows(IllegalStateException.class,()->delivery(owned,(s,d)->wrong).deliver(f.id()));assertEquals(2,pending());
     }
+    @Test void aStoredSourceWithATamperedReceiptHashOrSequenceCannotAcknowledge() {
+        var f=allocate(true);var once=new AuditAppendOnce(owned);var actual=once.appendOnce(f.initial().source(),f.initial().draft());
+        String changedHash=(actual.hash().startsWith("a")?"b":"a")+actual.hash().substring(1);
+        var changed=List.of(new AuditReceipt(actual.source(),actual.eventId(),actual.chainId(),actual.chainSequence()+1,actual.hash(),actual.contentFingerprint()),
+                new AuditReceipt(actual.source(),actual.eventId(),actual.chainId(),actual.chainSequence(),changedHash,actual.contentFingerprint()));
+        for(var forged:changed) {
+            forged.requireMatches(f.initial().source(),f.initial().draft()); // matching draft/source alone is insufficient
+            var error=assertThrows(IllegalStateException.class,()->delivery(owned,(s,d)->forged).deliver(f.id()));
+            assertTrue(error.getMessage().contains("matching stored central binding"));assertEquals(1,pending());
+        }
+        assertEquals(actual,delivery().deliver(f.id()));assertEquals(0,pending());assertEquals(1,countUnchecked("select count(*) from audit.event"));
+    }
     @Test void actualCentralCommitThenLostReplyLeavesSameSourcePendingForTrustedReadback() {
         var f=allocate(true);var fail=new AtomicBoolean(true);var once=new AuditAppendOnce(owned);var stored=new AtomicReference<AuditReceipt>();
         var relay=delivery(owned,(s,d)->{var r=once.appendOnce(s,d);stored.set(r);if(fail.getAndSet(false))throw new IllegalStateException("actual central reply lost");return r;});
