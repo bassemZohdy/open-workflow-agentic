@@ -28,6 +28,7 @@ class ResourceCallBindingStoreTest {
     @Inject DelegationGrants grants;
     @Inject JdbcResourceCallBindings bindings;
     @Inject UserTransaction transaction;
+    @Inject jakarta.transaction.TransactionManager transactionManager;
     private final List<InstanceRecord> instances=new ArrayList<>();
     private static final Subject ALICE=new Subject(SubjectKind.USER,"alice");
     private static final Subject WORKFLOW=new Subject(SubjectKind.WORKFLOW,"binding-test");
@@ -188,6 +189,22 @@ class ResourceCallBindingStoreTest {
         try {assertEquals(f.binding,bindings.bind(f.binding));assertEquals(jakarta.transaction.Status.STATUS_ACTIVE,transaction.getStatus());}
         finally {transaction.rollback();}
         assertEquals(f.binding,new JdbcResourceCallBindings(data).find(f.binding.issuer(),f.binding.tokenId()).orElseThrow());
+    }
+    @Test void executionEntryCommitsOutsideCallerTransactionAndResumesItBeforeCallback() throws Exception {
+        var f=fixture();bindings.bind(f.binding);
+        var entry=new io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry(f.binding.scope(),1);
+        try(var gate=new JdbcResourceExecutionGate(data,transactionManager,1)) {
+            transaction.begin();
+            try {
+                var result=gate.open(f.binding,entry,UUID.randomUUID(),ignored->{ }).execute(ignored->{
+                    assertDoesNotThrow(()->assertEquals(jakarta.transaction.Status.STATUS_ACTIVE,transactionManager.getStatus()));
+                    return "synchronous-fixture-callback";
+                });
+                assertEquals(JdbcResourceExecutionGate.Kind.CALLED,result.kind());
+                assertEquals(jakarta.transaction.Status.STATUS_ACTIVE,transaction.getStatus());
+            } finally {transaction.rollback();}
+            assertEquals(entry,gate.find(f.binding.scope()).orElseThrow().entry());
+        }
     }
     @Test void directSqlCannotBypassRegistryOrExactIssuingMetadataChecks() throws Exception {
         var f=fixture();var b=f.binding;bindings.bind(b);
