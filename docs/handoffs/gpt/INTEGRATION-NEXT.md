@@ -1,8 +1,13 @@
 # Integration queue: next actions (2026-10-26)
 
-Current implementation baseline: main `9734347747092b1297136fac168624ae27b61df8`.
-No open PR remains; the current-profile consumer and startup proof are integrated. Counts stay11 completed/12 partial/30 not started; acceptance
-stays3/39. These increments do not close WP-108 or authorize graph entry.
+Current implementation baseline (checked 2026-10-26): main `15bcdc8026fe03f14122378e27d994f540cf08be`.
+**One implementation PR is open: #74, V76 execution facts** at `3f37b3ba2a37981f2a99ad497227dab198719531`.
+Current full CI `40265793674` passed (175 suites/1262 cases, zero failed/errored/skipped), but **exact Claude peer review
+has not occurred**. Do not merge #74 or infer graph execution permission from this result. PR #73 (opaque admission
+witness) merged at `a87fc292ef8843d3a7501b981dbda9d18adb0d1b`. The current-profile consumer and startup proof
+remain merged. Counts stay 11 completed/12 partial/30 not started; acceptance stays 3/39. Flaky packaged identity
+recovery remains open as [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75).
+This file tracks the **integration queue**, not proof of work-package closure.
 
 ## Integrated prerequisites and evidence
 
@@ -55,11 +60,14 @@ stays3/39. These increments do not close WP-108 or authorize graph entry.
   40254990550/40254990868 and startup40256568737 pass. Source trees/archive hashes and methods
   verified. See [integration evidence](WP-108-checkpoint-consumer-integration.md).
 
-## Next ordered gate: V76 entry/backend and composite live fence
+## Next ordered gate: independent V76 review, then backend and composite live fence
 
-Use the older V76 proposal as intake only. Its cloned-metadata test is not an
-actual ordered migration, backend or callback proof. Reconcile against current
-immutable call/binding schema and the actual pinned checkpoint consumer first.
+PR #74 already provides the **actual ordered V76 schema candidate** and verifies its immutable
+entry/outcome data constraints. It remains unmerged pending independent exact-head Claude PASS; the current
+full CI PASS alone cannot satisfy that gate. See [V76 handoff](WP-108-v76-facts.md).
+After a reviewed merge, start the **separate JDBC entry backend and callback proof**, then composite
+live authority, actual workflow/agent dispatch, and output release. Follow the exact
+[backend preparation and failure matrix](WP-108-backend-entry-prep.md).
 
 1. One irreversible entry per original call key, not per credential/owner/epoch.
    Keep immutable facts and exact target/run/checkpoint outcome references after
@@ -86,9 +94,9 @@ original intermittent identity recovery failure remains open, separately tracked
 
 ## Following ordered gates
 
-The owned consumer/schema boundary is merged. Sequence reserved V76 against the
-actual pinned store as above. V77 producer/delivery, V78 allocation, V79 model reservations and
-V80 manual decisions remain later preparations, not active main features.
+The owned checkpoint consumer/schema boundary is merged; data-only V76 is still under review at PR #74.
+V77 producer/delivery, V78 allocation, V79 model reservations and V80 manual decisions remain
+later preparations, not active main features.
 
 Canonical original scope/full owner, one irreversible fresh entry acknowledgement,
 current caller/PDP/task/target/lease checks after blocking I/O, mandatory central
