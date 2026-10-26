@@ -77,7 +77,8 @@ did not cover the 2 new unit cases; it is superseded.
   no `#!` shortcut) + `PepTest` 17 + `ModelBoundaryArchitectureTest` 3 = 35.
 - Integration (app): `GovernedModelRunningControlTest` 21 + `ResourceExecutionConstructionArchitectureTest` 7 = 28.
 - Total 63, 0 failures/errors/skips (`target/running-model-claude-63.log`). Re-run here on JDK 25.0.2 (compiling
-  `--release 21`); no JDK 21 is installed on this machine, GPT's independent run was 21.0.12. The native case is
+  `--release 21`) because my CLI could not resolve/run the supplied Java 21 path; this was not a Java 21 runtime run.
+  GPT's independent run used the Java 21.0.12 runtime on this same shared filesystem. The native case is
   unverified locally; Linux CI must run it. Not a full-suite claim. No Quarkus boot, shared DB or native Windows suite;
   the test's own `oa_gm_run_<uuid>` DB is dropped.
 
