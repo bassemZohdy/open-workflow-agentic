@@ -163,7 +163,7 @@ def compare_roundtrip(original, exported):
     """Semantic JSON equality only; never a runtime execution parity assertion."""
     inventory(original)
     inventory(exported)
-    return canonical_bytes(original) == canonical_bytes(exported)
+    return canonical_bytes(original) == canonical_bytes(exported))
 
 
 def evaluate(features, capabilities):
