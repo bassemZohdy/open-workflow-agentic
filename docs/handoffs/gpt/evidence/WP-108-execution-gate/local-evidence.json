@@ -1,0 +1,48 @@
+{
+  "sourceGateProductCommit": "4fd49dd57dc2b8d97447624f009a903ab168ed60",
+  "java": "21.0.12.1",
+  "postgres": "16.15",
+  "gateStableTests": 17,
+  "priorCombinedTests": 55,
+  "restoredTests": 3,
+  "negativeControls": [
+    {
+      "name": "missing fresh check",
+      "expectedFailures": 1,
+      "errors": 0
+    },
+    {
+      "name": "early slot release",
+      "expectedFailures": 1,
+      "errors": 0
+    }
+  ],
+  "logs": [
+    {
+      "name": "execution-gate-stable.log",
+      "bytes": 163854,
+      "sha256": "d84be8025f2ba1acab732165a951a15e783d57eed0786e1f3808b68e6433b29d"
+    },
+    {
+      "name": "execution-gate-missing-fresh-check.log",
+      "bytes": 22195,
+      "sha256": "9f046b3f9dce40ff0907fb68e493fc118d0ae1e8861b4746b3ff5dd89f4e67d5"
+    },
+    {
+      "name": "execution-gate-early-slot-release.log",
+      "bytes": 22187,
+      "sha256": "ed052c12aeee77ee3240ddfbb8e663a4b5bf53b5d7f6e2bd071b107554c4ecb3"
+    },
+    {
+      "name": "execution-gate-restored.log",
+      "bytes": 37401,
+      "sha256": "3462d65e0fe0de748ec768a65bf15f6a413c83c1b3af7ac9d6ebe9308c3d6b90"
+    },
+    {
+      "name": "execution-gate-combined-final.log",
+      "bytes": 346201,
+      "sha256": "c84524d3c8957753a1afd2e8a2dcb5ba16244b4d71b8447327e9c919b6bae46f"
+    }
+  ],
+  "scope": "local author component evidence, fixture fences, no actual Flow/current authority"
+}

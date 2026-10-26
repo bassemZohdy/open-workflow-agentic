@@ -1,0 +1,180 @@
+{
+  "head": "04c55a153450bf1349f8dffede68a16b1fb0df30",
+  "runId": 40351776875,
+  "artifactId": 12664801936,
+  "archiveSha256": "88331e9e534617e7d04479ea275431baf3c867eb63049f8fccfc54da939bb821",
+  "archiveBytes": 2213179,
+  "archiveDigestAndCrcVerified": true,
+  "xmlSuites": 177,
+  "totals": {
+    "tests": 1291,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "selected": {
+    "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityCheckTest": {
+      "totals": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "methods": [
+        "theActingWorkloadMustBeTheIssuingGrantTypedAgent",
+        "closeDuringTheSlowLookupRefuses",
+        "signedExpiryDuringTheSlowBindingLookupRefusesAfterTheLookup",
+        "anUnavailableBindingStoreRefuses",
+        "missingRetargetedOrMismatchedBindingsRefuse",
+        "revocationDuringTheSlowBindingLookupRefusesAfterTheLookup",
+        "revokedAncestorRefuses",
+        "signedExpiryDuringTheGrantBindingWorkRefusesAfterIt",
+        "wrongEntryEpochMinterOrClosedHandlesRefuse",
+        "aLiveRealCredentialForTheExpectedWorkloadPassesAndNothingIsConsumedOrWritten",
+        "anInterruptRefusesAndTheFlagIsPreserved"
+      ]
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.identity.IdentityRecoveryIT": {
+      "totals": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "methods": [
+        "identitySurvivesAKillARevokedGrantHoldsTheInstanceAndNoCredentialIsPersisted"
+      ]
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResearchCheckpointStartupIT": {
+      "totals": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "methods": [
+        "unsupportedConfiguredNamespaceRefusesAtStartupWithoutFallback",
+        "freshProcessMigratesBeforeStartupProfileVerificationWithoutRunningTheGraph",
+        "currentMigrationHistoryDoesNotPermitDriftOrDecodeRetainedPrivateStateAtStartup",
+        "currentHistoryWithMissingTablesRefusesWithoutRuntimeCreation"
+      ]
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceBindingsDefaultWiringTest": {
+      "totals": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "methods": [
+        "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired"
+      ]
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceCallBindingStoreTest": {
+      "totals": {
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "methods": [
+        "terminalRegistryAllowsOnlyHistoricalReadbackNotNewBinding",
+        "exactV65GrantTenantExpiryAndGrantSubjectAreRequiredWithAtomicRollback",
+        "registryTenantFullOwnerDefinitionVersionAndEngineMustMatch",
+        "competingContractsHaveExactlyOneWinnerAndNoOrphanCredentialMapping",
+        "freshTokenCannotRetargetOrChangeRequestForTheSameInvocation",
+        "executionEntryCommitsOutsideCallerTransactionAndResumesItBeforeCallback",
+        "unknownActualCommitReplyRefusesReturnAndSameIdentityReadbackReconciles",
+        "concurrentExactBindReturnsTheOneImmutableRecord",
+        "canonicalScopeSurvivesChangedEntryCounterAndRefreshButDistinctBusinessWorkIsSeparate",
+        "callerRollbackCannotEraseAlreadyCommittedBinding",
+        "exactRepeatsNewCredentialsAndSameJtiDifferentIssuersRetainOneCall",
+        "actualAdditiveMigrationRefusesConflictingHistoricalOccurrencesAndRetainsBothOriginalRows",
+        "directSqlCannotBypassRegistryOrExactIssuingMetadataChecks",
+        "actualAdditiveMigrationBackfillsExactUnicodeCanonicalLookupWithoutChangingOldKey",
+        "directSqlCannotCreateAnotherCallForTheSameOccurrenceOrRewriteItsAnchor",
+        "issuerJtiCannotMoveToAnotherInvocationAndLeavesNoOrphan",
+        "occurrenceLookupRefusesChangedTargetRequestAudienceAndOperation",
+        "immutableRowsAndIssuingReferencesAreRetainedPastSignedExpiry"
+      ]
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionGateTest": {
+      "totals": {
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "methods": [
+        "interruptedClosedWorkerKeepsItsSlotWhileAnActualCommittedReplyIsStillBlocked",
+        "freshAcknowledgedEntryCallsOnceAndRetainedDataNeverCallsAgain",
+        "forgedBindingMetadataAndSameKeyDifferentFullScopeNeverReachTheCallback",
+        "cancellationAndNewEpochCannotEraseOrReplaceTheOriginalEntry",
+        "revocationAfterCommitAndAfterCallbackWithholdsWorkOrPrivateOutput",
+        "eightConcurrentCredentialsAndExecutorsHaveOnlyOneCallback",
+        "closeDuringARealRegistryLockWaitKeepsItsSlotUntilActualTermination",
+        "closedUnstartedHandlesReleaseCapacityAndBeanCloseRefusesNewOnes",
+        "anAlreadyTransactionalConnectionIsRefusedWithoutCommittingOrRollingBackItsOwner",
+        "callbackFailureRetainsEntryAndPreexistingInterruptIsPreserved",
+        "storageAndAmbientReplyFailuresNeverCallTheCallback()[1]",
+        "storageAndAmbientReplyFailuresNeverCallTheCallback()[2]",
+        "storageAndAmbientReplyFailuresNeverCallTheCallback()[3]",
+        "storageAndAmbientReplyFailuresNeverCallTheCallback()[4]",
+        "storageAndAmbientReplyFailuresNeverCallTheCallback()[5]",
+        "storageAndAmbientReplyFailuresNeverCallTheCallback()[6]",
+        "storageAndAmbientReplyFailuresNeverCallTheCallback()[7]"
+      ]
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionMigrationTest": {
+      "totals": {
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "methods": [
+        "newForeignKeysDoNotMaskEarlierParentTruncateGuards",
+        "waitDeadlineIsRecheckedAfterExpensiveCanonicalValidation",
+        "freshOrderedMigrationInstallsEmptyRetainedFactsAndRestoresTheConfiguredNamespace",
+        "nonemptySeventyFivePointOneUpgradePreservesAttributionWithoutInventingEntries",
+        "canonicalOccurrenceAnchorIsRequiredEvenIfCallMetadataAndCredentialStillExist",
+        "changedRegistryAttributionCannotCreateAnEntry()[1]",
+        "changedRegistryAttributionCannotCreateAnEntry()[2]",
+        "changedRegistryAttributionCannotCreateAnEntry()[3]",
+        "changedRegistryAttributionCannotCreateAnEntry()[4]",
+        "changedRegistryAttributionCannotCreateAnEntry()[5]",
+        "changedRegistryAttributionCannotCreateAnEntry()[6]",
+        "changedRegistryAttributionCannotCreateAnEntry()[7]",
+        "entryAndOutcomeFactsRefuseOwnerMutationAndStatementTruncation",
+        "databaseCanonicalFingerprintsMatchTheSharedJdkContractIncludingUnicode",
+        "expiredOrFutureBindingAndChangedContractEpochOrBindingAreRefusedIndependentlyOfJavaValidation",
+        "databaseClockAfterARegistryLockWaitRefusesTheNowExpiredBinding",
+        "oneFactPerOriginalCallSurvivesConcurrentEpochCredentialAndExecutorChanges",
+        "callerSearchPathCannotReplaceTheDatabaseClockForExpiredEntryMetadata",
+        "outcomeReferencesAreExactTargetScopedImmutableDataAndMayOutliveCancellation",
+        "conflictingPreexistingFactTableRollsBackWithoutRepairOrPartialFunctions"
+      ]
+    }
+  },
+  "java": {
+    "os.name": "Linux",
+    "java.version": "21.0.12.1",
+    "java.vendor": "Eclipse Adoptium"
+  },
+  "sourcePeerReviewComment": 6420317407,
+  "scope": "synchronous JDBC callback component only; no production current fence/Flow/graph/async activation",
+  "actualCheckout": "d74badfc932776fd8cec95bae723fab4d52ee93b",
+  "testedTree": "372acf644ea67573c8c24ae115d5ceb2364e75be",
+  "reviewHeadTreeMatches": true,
+  "ciInspectionComment": 6420494766,
+  "mergeCommit": "af9d7e2cfe8c298fc438878a4c5b38fc2bedf9aa",
+  "peerIndependent": {
+    "java": "21.0.12.1",
+    "postgres": "16",
+    "tests": 67,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "manualControlsRerun": false
+  }
+}
