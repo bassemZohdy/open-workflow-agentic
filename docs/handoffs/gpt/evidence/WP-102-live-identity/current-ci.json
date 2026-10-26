@@ -1,0 +1,252 @@
+{
+  "core": {
+    "artifactId": 12662354438,
+    "archiveSha256": "688ebc8a312ba46aa9ecb1c998a2e6d3a6b7d687c3c0c111b70aa26b74527536",
+    "archiveBytes": 2187172,
+    "archiveDigestAndCrcVerified": true,
+    "xmlSuites": 176,
+    "totals": {
+      "tests": 1273,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": {
+      "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityCheckTest": {
+        "totals": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "theActingWorkloadMustBeTheIssuingGrantTypedAgent",
+          "closeDuringTheSlowLookupRefuses",
+          "signedExpiryDuringTheSlowBindingLookupRefusesAfterTheLookup",
+          "anUnavailableBindingStoreRefuses",
+          "missingRetargetedOrMismatchedBindingsRefuse",
+          "revocationDuringTheSlowBindingLookupRefusesAfterTheLookup",
+          "revokedAncestorRefuses",
+          "signedExpiryDuringTheGrantBindingWorkRefusesAfterIt",
+          "wrongEntryEpochMinterOrClosedHandlesRefuse",
+          "aLiveRealCredentialForTheExpectedWorkloadPassesAndNothingIsConsumedOrWritten",
+          "anInterruptRefusesAndTheFlagIsPreserved"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.identity.IdentityRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "identitySurvivesAKillARevokedGrantHoldsTheInstanceAndNoCredentialIsPersisted"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT": {
+        "totals": {
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": []
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT": {
+        "totals": {
+          "tests": 0,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": []
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceBindingsDefaultWiringTest": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired"
+        ]
+      }
+    }
+  },
+  "delegation": {
+    "artifactId": 12662913971,
+    "archiveSha256": "51e6e75b1f3d9ae91249e235098a9d7c909a601b497e29385c136f10e604cdf3",
+    "archiveBytes": 2151524,
+    "archiveDigestAndCrcVerified": true,
+    "xmlSuites": 169,
+    "totals": {
+      "tests": 1270,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": {
+      "io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakDelegationIT": {
+        "totals": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "nativeDelegationPreservesAuthorityBounds",
+          "delegationRequiresPermissionAndConsent",
+          "anActorTokenOlderThanSixtySecondsIsRefusedBeforeAnythingIsSent",
+          "issuerKeyRotationIsHandled",
+          "subjectExpiryBoundsIssuedCredential",
+          "revokedOrExpiredGrantIsRejected",
+          "invalidActorIsRejected",
+          "aFreshActorYieldsACredentialThatOutlivesTheActorTokenWithinTheStatedContract"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceBindingsDefaultWiringTest": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityCheckTest": {
+        "totals": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "theActingWorkloadMustBeTheIssuingGrantTypedAgent",
+          "closeDuringTheSlowLookupRefuses",
+          "signedExpiryDuringTheSlowBindingLookupRefusesAfterTheLookup",
+          "anUnavailableBindingStoreRefuses",
+          "missingRetargetedOrMismatchedBindingsRefuse",
+          "revocationDuringTheSlowBindingLookupRefusesAfterTheLookup",
+          "revokedAncestorRefuses",
+          "signedExpiryDuringTheGrantBindingWorkRefusesAfterIt",
+          "wrongEntryEpochMinterOrClosedHandlesRefuse",
+          "aLiveRealCredentialForTheExpectedWorkloadPassesAndNothingIsConsumedOrWritten",
+          "anInterruptRefusesAndTheFlagIsPreserved"
+        ]
+      }
+    }
+  },
+  "standard": {
+    "artifactId": 12662559440,
+    "archiveSha256": "8dcef2af88fc3dff37ba526afa5dfc9841dd61c1776fb86c91e0f9c3adaa364b",
+    "archiveBytes": 2151080,
+    "archiveDigestAndCrcVerified": true,
+    "xmlSuites": 169,
+    "totals": {
+      "tests": 1265,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": {
+      "io.github.bassemzohdy.openworkflow.agentic.identity.KeycloakStandardIT": {
+        "totals": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "realIssuerSignatureAndAudienceAreVerified",
+          "theServerStillRefusesWhatItCanSee",
+          "actorlessExchangeIsRejected"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.effect.EffectCrashRecoveryIT": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "processDeathAfterTargetCommitDoesNotDuplicateEffectOrCompensation"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceBindingsDefaultWiringTest": {
+        "totals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "canonicalStorageIsAvailableWhileProductionAdmissionRemainsUnwired"
+        ]
+      },
+      "io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityCheckTest": {
+        "totals": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "methods": [
+          "theActingWorkloadMustBeTheIssuingGrantTypedAgent",
+          "closeDuringTheSlowLookupRefuses",
+          "signedExpiryDuringTheSlowBindingLookupRefusesAfterTheLookup",
+          "anUnavailableBindingStoreRefuses",
+          "missingRetargetedOrMismatchedBindingsRefuse",
+          "revocationDuringTheSlowBindingLookupRefusesAfterTheLookup",
+          "revokedAncestorRefuses",
+          "signedExpiryDuringTheGrantBindingWorkRefusesAfterIt",
+          "wrongEntryEpochMinterOrClosedHandlesRefuse",
+          "aLiveRealCredentialForTheExpectedWorkloadPassesAndNothingIsConsumedOrWritten",
+          "anInterruptRefusesAndTheFlagIsPreserved"
+        ]
+      }
+    }
+  },
+  "reviewHead": "7e2a9fc5f8f12b16350f21fdd105b05a145c7920",
+  "actualCheckout": "45b9f315e6f019da050ba58d72ddda46b8f9324f",
+  "sourceTreeMatches": true,
+  "fullTreeDiff": "Only CHANGELOG.md, TODO.md, docs/plan/work-packages.json and V76 evidence/current-ci.json; production/test/build/tool sources equal",
+  "sourceReviewComment": 6419940971,
+  "ciReviewComment": 6420182294,
+  "mergeCommit": "53eb0191e7e000086fb6a66e64a672df4121d138",
+  "coreRunId": 40349511275,
+  "providerRunId": 40349511142,
+  "localIndependent": {
+    "java": "21.0.12.1",
+    "postgres": "16.15",
+    "initial53Pass": true,
+    "finalHead11Pass": true
+  },
+  "scope": "synchronous identity component only; current composite, mapping, Flow/graph and package acceptance remain gated"
+}

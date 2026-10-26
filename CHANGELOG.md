@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge live identity PR77 as53eb019 after GPT exact PASS7e2a9fc, independent53/final11 and inspected full1273 plus real-provider CI. Current typed-workload/binding/grant checks remain a synchronous identity component; no production bridge/model/graph allowance. Open separate JDBC callback gate78 with stable17/combined55 and two intended negative controls; exact final peer review/current CI remain pending. No package or acceptance promotion.
+
 - Merge V76 facts PR74 as561c691 after exact Claude PASS3f37b3b/6419457964 and an independent60-case Java21/PG16 rerun. Full40265793674 remains verified at1262 cases with zero failures/errors/skips. V76 retains data only; next separate owned JDBC entry gate and live identity check do not yet enable production dispatch. V77-V80, composite current authority, Flow/recovery and package acceptance remain gated.
 
 - Verify V76 candidate74 exact3f37b3b with full40265793674:175 XML suites/1262 cases, zero failures/errors/skips. Inspect actual schema20, older parent22, witness18, startup4, default-denial1 and recovery1 plus archive digest/CRC and matching tested tree. Preserve initial failed CI and local missing-guard evidence. Claude exact review remains blocked by its session limit until09:50 Dubai; do not merge or activate V76 before that gate. Admission73 postmerge full/provider checks pass; no package/acceptance promotion.

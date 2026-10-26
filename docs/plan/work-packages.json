@@ -13,7 +13,7 @@
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
       "date": "2026-10-26",
-      "baseline_commit": "561c6915bd34799b248de30ac33f5b144ce04998",
+      "baseline_commit": "53eb0191e7e000086fb6a66e64a672df4121d138",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -2744,7 +2744,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-26",
-    "status": "V76 data-only PR74 merged as561c691 after exact Claude PASS3f37b3b/6419457964, independent Java21/PG16 focused60 and inspected full40265793674 (175 suites/1262 cases, no failures/errors/skips). New entry/outcome tables retain immutable facts; V77..V80 remain reserved. Earlier failed40264732622 and corrected parent-specific TRUNCATE/negative controls remain recorded. Next GPT slice is a bounded private JDBC gate: only a newly acknowledged entry commit may invoke its callback; uncertain/duplicate commits, changed credentials/epochs and closed contexts never re-enter. Claude owns a separate opaque-witness live identity check with typed server-trusted workload input and post-blocking revalidation. Actual combined registry/task/target/lease/identity/PDP fence, mandatory audit, governed Flow/agent dispatch, async context and exact retained-output association remain gates. No default admission/model allowance or production dispatch is enabled. Original intermittent recovery40246336207 remains open despite20 non-reproducing repeats and later passing CI. WP-108/WP-102 and acceptance remain partial",
+    "status": "V76 facts74 merged as561c691 after Claude exact PASS/independent60 and inspected full1262 cases. Live identity77 merged as53eb019 after GPT PASS7e2a9fc/6419940971, independent53 plus final11, full40349511275 (176 suites/1273 cases) and real-provider40349511142 (standard3/delegation8; identity11/effect1 non-skipped). Actual archive digests/CRC and product-source equality inspected. GPT callback gate78 exact04c55a1 is open: bounded one-shot synchronous entry/commit/close/resume callback, retained/uncertain replies never re-run. Stable17, prior combined55, real JTA and two missing-guard controls pass; initial Claude PASS4fd49dd/independent56 is historical, final combined-head peer review and current full CI pending. No production CDI/legacy/model/graph activation. Exact same credential must bind gate and composite fence; trusted workload/target mapping, current registry/task/lease/PDP/mandatory audit, private async context, actual Flow/node/output/terminal-association and recovery tests remain required. V77..V80 reserved; original intermittent recovery issue75 remains open. WP108/WP102 and acceptance remain partial",
     "agents": [
       {
         "id": "GPT",
