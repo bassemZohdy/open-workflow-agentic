@@ -1,0 +1,27 @@
+{
+  "runId": 40264732622,
+  "head": "d83b15f40d865804b7e02ffc8f30a0c9ee553875",
+  "conclusion": "failure",
+  "artifactId": 12625946492,
+  "artifactSha256": "9d7bdb3563dcf790233fdab701da23bb5a1edee86c3e2a4d5c78008563deb421",
+  "xmlSuites": 165,
+  "totals": {
+    "tests": 1231,
+    "failures": 2,
+    "errors": 0,
+    "skipped": 0
+  },
+  "failedMethods": [
+    {
+      "suite": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.IssuedTokenBindingMigrationTest",
+      "method": "updateEarlyDeleteAndTruncateCannotRemoveOrRewriteLiveProof",
+      "message": "expected: <42501> but was: <0A000>"
+    },
+    {
+      "suite": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceCallBindingStoreTest",
+      "method": "directSqlCannotCreateAnotherCallForTheSameOccurrenceOrRewriteItsAnchor",
+      "message": "expected: <42501> but was: <0A000>"
+    }
+  ],
+  "interpretation": "V76 foreign-key descendants caused earlier parent TRUNCATE probes to stop at 0A000; V76 suite19 passed. Correct probes to CASCADE and parent-specific message; not a passing full CI run."
+}

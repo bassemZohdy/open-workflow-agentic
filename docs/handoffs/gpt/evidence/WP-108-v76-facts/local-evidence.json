@@ -1,0 +1,51 @@
+{
+  "sourceCommit": "d83b15f40d865804b7e02ffc8f30a0c9ee553875",
+  "java": "21.0.12.1",
+  "postgres": "16.15",
+  "positive": {
+    "tests": 19,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "negativeControls": {
+    "parentTruncateMissing": {
+      "expectedFailures": 1,
+      "errors": 0
+    },
+    "childTruncateMissing": {
+      "expectedFailures": 1,
+      "errors": 0
+    }
+  },
+  "restored": {
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "files": [
+    {
+      "name": "v76-focused-corrected.log",
+      "sha256": "46739d201d31ca2de996512ed3a79832ac742141b72d789a21dc7cef57206107",
+      "bytes": 179355
+    },
+    {
+      "name": "v76-missing-resource_execution-guard.log",
+      "sha256": "018b9e696631776cfcd2fab202503a8e82f8e73011f42cc04ea6ef67a8c61370",
+      "bytes": 19420
+    },
+    {
+      "name": "v76-missing-resource_execution_outcome-guard.log",
+      "sha256": "bf8cc5a3b950e7c9fe170735aefe5893e49267f91bf6e314e81b79db604f2241",
+      "bytes": 18967
+    },
+    {
+      "name": "v76-restored-guards.log",
+      "sha256": "584dc08e3b5e8567ebf65a34b7b4dac30ccbc5f3de17178163e2431ef6a2451f",
+      "bytes": 17076
+    }
+  ],
+  "peerReview": "pending Claude session reset 2026-10-26 09:50 Asia/Dubai",
+  "scope": "local author schema DATA evidence only; no backend/current authority"
+}

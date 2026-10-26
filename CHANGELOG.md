@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify V76 candidate74 exact3f37b3b with full40265793674:175 XML suites/1262 cases, zero failures/errors/skips. Inspect actual schema20, older parent22, witness18, startup4, default-denial1 and recovery1 plus archive digest/CRC and matching tested tree. Preserve initial failed CI and local missing-guard evidence. Claude exact review remains blocked by its session limit until09:50 Dubai; do not merge or activate V76 before that gate. Admission73 postmerge full/provider checks pass; no package/acceptance promotion.
+
 - Merge admission-witness73 asa87fc292 after exact GPT review9ce4279 and inspected full1242-case plus real-provider CI. Retain per-call isolated closure and default-denying wiring; live identity fence/graph adoption remain future gates. V76 PR74 corrects two earlier parent TRUNCATE probes for new FK descendants and passes combined60 locally; current CI and exact Claude review are pending after a recorded failed run.
 
 - Push admission-witness PR73 (9ce4279, GPT exact PASS and independent42 tests) and V76 data-only facts PR74 (d83b15f, author19 tests and two intended missing-guard controls). Current CI remains pending; Claude exact review for74 is delayed by its session limit until09:50 Dubai. Neither candidate is merged or activated; backend/current authority/package acceptance remain gated. Main5083e99 full40258664514 passes.
