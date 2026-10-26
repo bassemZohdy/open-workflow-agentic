@@ -508,7 +508,8 @@
           "Claude c6a9228 strict Java tests and product hardening integrated into GPT #40; prior399fda1 full CI and six real delegation cases pass, standard never reached its IT. Current665547e reruns after a GPT fault-proxy fixture correction; H3/H4 remain open.",
           "GPT reviewed exact Claude a1b1c0b from detached worktree: SOURCE-PASS for pre-send fresh actor/subject after slow verification/secret access and exact signed output lifetime/iat. Commands/results in PR-39-review.md and6282871542. Current full39365958905/matrix39365958968 pending; no amended provider/merge approval inferred. Shared parent6a0081d full/matrix pass scoped legacy/cancellation checks; WP-102 remains partial.",
           "GPT APPROVE review5580828818 of exact #39 712c059 resolves both P1s (pre-send fresh actor/subject after slow reads; positive exact signed lifetime/iat before bind/release). Full39369999072 and real matrix39369999157 SUCCESS: native8/standard3 and binding7 each lane, zero skips; acceptance12 passing/0 missing/index consistent. GPT merged #39 to main as0aec745 after Claude6283500105 confirmed current head. This parent normally integrates it with reviewed #43/#44; current combined full/provider CI and Claude review remain required before parent main merge/package closure.",
-          "GPT merged exact #40 dbe3bd8 as main7c36d17 after Claude6283757505 APPROVE/6283759173 confirmation and full39370961537/matrix39370996254 SUCCESS, closing combined producer/provider integration. Scoped native8/standard3/binding7 each lane non-skipped. Original asynchronous live-Flow identity/correlation deliverable is NOT complete: source usage shows no running-flow TokenExchanger injection; AuthorityScope restore/wrappers support resume/development seams, not a governed production dispatch consumer (identity.md section12). Correct overbroad completed attribution; keep WP-102/M11 partial for that original gate, without blocking already merged interface consumers. ADR0021 profile A adoption recorded, preview limitation retained."
+          "GPT merged exact #40 dbe3bd8 as main7c36d17 after Claude6283757505 APPROVE/6283759173 confirmation and full39370961537/matrix39370996254 SUCCESS, closing combined producer/provider integration. Scoped native8/standard3/binding7 each lane non-skipped. Original asynchronous live-Flow identity/correlation deliverable is NOT complete: source usage shows no running-flow TokenExchanger injection; AuthorityScope restore/wrappers support resume/development seams, not a governed production dispatch consumer (identity.md section12). Correct overbroad completed attribution; keep WP-102/M11 partial for that original gate, without blocking already merged interface consumers. ADR0021 profile A adoption recorded, preview limitation retained.",
+          "Merged synchronous LiveIdentityCheck77, exact private credential/full binding pairing79 and fresh grant expiry after blocking lineage reads81. These reviewed producer interfaces do not implement the original asynchronous live-Flow dispatch or close intermittent recovery issue75."
         ],
         "completed_deliverables": [
           "OIDC for users and service identity for agents",
@@ -524,7 +525,8 @@
         "evidence": [
           "docs/identity.md",
           "docs/audit.md",
-          "docs/handoffs/gpt/WP-102.md"
+          "docs/handoffs/gpt/WP-102.md",
+          "docs/handoffs/gpt/evidence/WP-102-grant-expiry-after-io/current-ci.json"
         ],
         "scope_note": "Core/provider gate merged as7c36d17 after exactdbe3bd8 review/full/matrix; native8/standard3/binding7 non-skipped. ADR0021 amended actor-freshness/H4 profile A is adopted for pinned preview compatibility. Package remains partial for the explicit original asynchronous production Flow dispatch/identity propagation deliverable; bean/wrapper presence and fake resume proof are insufficient. No credential is added to workflow state."
       }
@@ -571,7 +573,8 @@
           "Integrated main2f10662 postmerge full39520880781/BOTH39520880697 SUCCESS; all three complete logs and real provider/core XML/exact methods/current strict checkers independently inspected. Inspector24/governed12/rule3/actual provider1/freshness3/caller11/HTTP caller7 and contracts183/runtime389/testkit196/app279 EACH zero skips, Failsafe8/full and4/9 strict. Current documentationc20d37f build39521142788 SUCCESS. Representation helper4e45373/product2e2e22c now isolated on a separate queued branch:186 contracts/four local golden+actual serializer controls/app compilation pass. Helper handoff is published here as a proposal; API/consumer not merged. No protected budget/profile/current fences/output recovery/package closure.",
           "Queued shared retained-output fingerprint contract isolates ResearchOutputFingerprint and actual serializer control byte-identical to preparationb349cc5, with three standalone helper controls. Product2e2e22c: all186 contracts and four focused representation controls/app compile/JVM augmentation pass; independent Python golden reproduced. No unrelated execution types/port/migration/consumer copied. Current peer/required CI and Claude inspector adoption remain pending; hash is exact stored-text DATA, not completed graph/current authority/output release. No second GPT implementation PR or status promotion.",
           "Normally reconcile the isolated ResearchOutputFingerprint contract with main513b878, preserving all implementation/test bytes from product2e2e22c. Retain app/module Surefire XML using the same two reviewed-preparation paths as queued attribution, with no changed test selection/checker semantics. Fresh exact Linux/BOTH verification pending before independent current peer/required PR gates. Shared main/c9ce389 remain frozen; no inspector adoption or table-schema activation, extra implementation PR or package completion.",
-          "Shared retained-output fingerprint current product531acc3/BOTH39524191379 SUCCESS attempt1: all149 actual XML suites EACH,1055/1060 unique consistent cases zero failures/errors/skips; contracts186/runtime390/testkit196/app279 plus Failsafe4/9. Exact helper3/actual serializer1/inspector24/governed12/rule3/physical1 method sets, strict real providers/core and actual ZIP bytes-digests-CRC-paths independently checked. Final documentation changes no tested source. Exact other-agent/required PR/current-main gates and Claude inspector adoption remain; API is representation DATA, not completion or output authority. No schema/role/runtime activation, second implementation PR or package promotion."
+          "Shared retained-output fingerprint current product531acc3/BOTH39524191379 SUCCESS attempt1: all149 actual XML suites EACH,1055/1060 unique consistent cases zero failures/errors/skips; contracts186/runtime390/testkit196/app279 plus Failsafe4/9. Exact helper3/actual serializer1/inspector24/governed12/rule3/physical1 method sets, strict real providers/core and actual ZIP bytes-digests-CRC-paths independently checked. Final documentation changes no tested source. Exact other-agent/required PR/current-main gates and Claude inspector adoption remain; API is representation DATA, not completion or output authority. No schema/role/runtime activation, second implementation PR or package promotion.",
+          "Merged zero-budget hard refusal83 and private Running-controlled model overload88 with checks before context lookup, after lookup, before physical provider and before private output. Allocation/profile DATA contracts89 bind original canonical scope and immutable full contract/lifetime; no approved profile source, durable reservation, migration or ResearchAgent adoption is installed."
         ],
         "completed_deliverables": [
           "PDP adapter, versioned and attributable decisions",
@@ -592,7 +595,11 @@
           "docs/handoffs/gpt/WP-103-review.md",
           "docs/handoffs/gpt/WP-108-integration-bindings.md",
           "docs/handoffs/gpt/WP-103-consolidated-review-r4.md",
-          "docs/handoffs/gpt/WP-108-output-fingerprint.md"
+          "docs/handoffs/gpt/WP-108-output-fingerprint.md",
+          "docs/handoffs/claude/WP-103-running-model-boundary.md",
+          "docs/handoffs/gpt/WP-103-allocation-contract.md",
+          "docs/handoffs/gpt/WP-103-allocation-migration-plan.md",
+          "docs/handoffs/gpt/evidence/WP-103-allocation-contract/combined-main.json"
         ]
       }
     },
@@ -679,7 +686,8 @@
         "status": "partial",
         "implemented": [
           "WP-105a/b/c/d implement the registry, task state machines, outbox/projection, reconciler and operator APIs.",
-          "Linked retry of FAILED instances and direct cancellation before engine preparation are implemented."
+          "Linked retry of FAILED instances and direct cancellation before engine preparation are implemented.",
+          "Merged diagnostic90 exposes disabled-by-default actual engine snapshots and asynchronous dev-publish failure evidence. Actual postmerge99631cc passes1432 with verified archived reports; absent engine remains unknown and issue75 is not fixed by passing runs or diagnostics."
         ],
         "completed_deliverables": [
           "agent_task state machine linked to the Flow instance and graph checkpoint",
@@ -694,7 +702,9 @@
           "Automate T16 over the complete workflow/agent recovery path, including no duplicate business effects and ownership/version checks."
         ],
         "evidence": [
-          "docs/lifecycle.md"
+          "docs/lifecycle.md",
+          "docs/handoffs/gpt/WP-105-recovery-diagnostics.md",
+          "docs/handoffs/gpt/evidence/WP-105-recovery-diagnostics/combined-main.json"
         ]
       }
     },
@@ -904,7 +914,8 @@
           "Execution entry/outcome/transient-fence contract PR66 is integrated as main1773a00 after exact Claude PASS de853bb/6404473197, independent contracts200/actual serializer1/Python88/generated checks and full40241496066 SUCCESS. Actual CI logs confirm new contract4, actual serializer1 and the negative production-default wiring1, plus acceptance/dependency checks. Production types retain prepared bytes; shared fingerprint and its existing tests are reused. No schema/backend/callback/current authority or admission bridge is added. ADR0028 remains Proposed; postmerge verification, checkpoint adoption, actual current fence/entry/producer and package/acceptance gates remain open.",
           "V75_1 checkpoint-profile PR67 integrated as mainb02875f after exact Claude PASS a01b8e1/6405038545 and full40245351968. Actual archived170 XML suites/1183 executed cases have zero failures/errors/skips; schema10/24 observations, ordered migration/real-saver/grants4 and negative default admission1 matched, with migration/vendor digests and archive/tree integrity independently checked. Compatible history is preserved; custom column collation, unsupported/partial/locked stores refuse. Fresh writer/read procedures allow actual mutable saver operations and deny protected DDL/audit/ledger access without deploying credentials. Runtime DDL removal/current-profile startup proof belongs to the next Claude-owned consumer; no V76 backend/callback/current authority or package/acceptance closure. Postmerge40246336207 failed the identity recovery process test; later main40246884344 passed. The timing-dependent defect remains open, separately recorded with diagnostics68/69 merged; schema evidence is not relabelled as a recovery fix.",
           "Checkpoint parity fixture70 merged as79da38e after exact Claude PASS b9db578/6405603074, GPT Java21 PostgreSQL16 test10/24 and full40249904765. Fifteen decoded mutation IDs/SQL strings equal the merged source; actual archived schema10/24, recovery1 and negative default-admission1 passed, migration hash unchanged. Main40250625309 passed. Diagnostics68/69 preserve assertions and retain actual process logs;69 full40248398566 and real-Keycloak40248398613 standard3/delegation8 executed without skips. Original intermittent40246336207 remains open despite initial Linux1 plus20 recorded repeats passing. Consumer implementation and separate packaged startup-refusal proof are underway, not integrated or authority/acceptance closure.",
-          "Current-profile consumer71 and packaged proof72 integrated as694dc326/97343477 after exact GPT6e02b0e/Claude031beee reviews and full40253621994/40255084555. Actual archives172/173 suites with1220/1224 executed cases zero fails/errors/skips, exact config/shadow/startup/default-denial controls, source-tree equality and unchanged migration bytes verified. Native real-Keycloak40253622052 standard3/delegation8 plus effect-recovery1 each pass. Independent Java21/PG16 focused68 and isolated startup4 pass; pre-consumer baseline1pass/3intended refusal failures preserved. Agent stops runtime DDL and verifies actual public profile at startup/build/run/inspection. Known shared-state local full attempt remains failed, and original intermittent recovery defect remains open. No deployed credential/current authority/entry callback/backend/producer or acceptance closure."
+          "Current-profile consumer71 and packaged proof72 integrated as694dc326/97343477 after exact GPT6e02b0e/Claude031beee reviews and full40253621994/40255084555. Actual archives172/173 suites with1220/1224 executed cases zero fails/errors/skips, exact config/shadow/startup/default-denial controls, source-tree equality and unchanged migration bytes verified. Native real-Keycloak40253622052 standard3/delegation8 plus effect-recovery1 each pass. Independent Java21/PG16 focused68 and isolated startup4 pass; pre-consumer baseline1pass/3intended refusal failures preserved. Agent stops runtime DDL and verifies actual public profile at startup/build/run/inspection. Known shared-state local full attempt remains failed, and original intermittent recovery defect remains open. No deployed credential/current authority/entry callback/backend/producer or acceptance closure.",
+          "Merged V76 DATA storage/callback/Running prerequisites74/78/80/82 and V77 facts85, atomic scoped producer86 and trusted append-once delivery87; verified actual combined main after90 passes1432. Default production composition remains absent: facts, prepared rows and receipts are not target permission."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -949,7 +960,11 @@
           "docs/handoffs/gpt/evidence/WP-108-checkpoint-consumer/current-ci.json",
           "docs/handoffs/gpt/evidence/WP-108-checkpoint-startup/current-ci.json",
           "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/CheckpointProfileVerifier.java",
-          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ResearchCheckpointStartupIT.java"
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ResearchCheckpointStartupIT.java",
+          "docs/handoffs/gpt/WP-108-v77-audit-facts.md",
+          "docs/handoffs/gpt/WP-108-atomic-audit-producer.md",
+          "docs/handoffs/gpt/WP-108-audit-delivery.md",
+          "docs/handoffs/gpt/evidence/WP-108-audit-delivery/current-ci.json"
         ]
       }
     },
@@ -2744,7 +2759,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-26",
-    "status": "Prerequisites74/77/78/79/80/81/82/83/84/85/86/87/88/89/90 are merged after exact reciprocal reviews/current CI. Actual main0856d92 after delivery/model/allocation contracts passes40396623027:190 suites/1427 tests, verified checkout/archive SHA/CRC. Recovery diagnostics90 merged99631cc after Claude exact5503932 PASS/independent5 and inspected40397015156:191 suites/1432 tests including original packaged IdentityRecoveryIT; actual postmerge90 CI pending. Claude timeout snapshot consumer has initial focused5 but GPT requested strict status allowlist and a proven whole-response deadline before PR. Observed audit-history DATA checks are independently being prepared with initial28 app tests green; final controls/review/CI pending. No issue75 cause/fix or absent-engine completion is inferred. No approved-context source, allocation/reservation store, migration or ResearchAgent adoption. V78..V80 reserved; reviewed rollout preserves exact historical inventory/new-write enforcement/restricted writer/profile provenance gates. Production root, trusted workload/target/task mapping, current authority/lease/PDP/audit, reservations, actual Flow/node/output/terminal association and async/recovery remain gates. Defaults refuse; issues75/76 open. Counts and acceptance unchanged.",
+    "status": "Prerequisites74/77/78/79/80/81/82/83/84/85/86/87/88/89/90 are merged after exact reciprocal reviews/current CI. Actual postmerge main99631cc passes40398552462:191 suites/1432 tests, zero failures/errors/skips, verified checkout/archive SHA/CRC. Observed audit-history DATA91 is open at8ac9035 after Claude exact PASS/independent73 and two intended guard-removal failures/restored family; current CI pending. Claude bounded private timeout consumer92 is open5a4ebff after GPT exact PASS/independent11; real-provider/current fullCI pending. Initial total-deadline, arbitrary-status and chunked-body-cap defects were reproduced then corrected; no issue75 cause/fix is inferred. No approved-context source, allocation/reservation store, migration or ResearchAgent adoption. V78..V80 reserved; rollout preserves historical inventory/new-write enforcement/restricted writer/profile gates. Production root, trusted workload/target/task mapping, current authority/lease/PDP/audit, reservations, actual Flow/node/output/terminal association and async/recovery remain gates. Defaults refuse; issues75/76 open. Counts and acceptance unchanged.",
     "agents": [
       {
         "id": "GPT",

@@ -1,0 +1,26 @@
+Both review gaps are fixed and committed as **`e13b54466d90a9d00378d69b2fae68c46903d41c`** on `claude/WP-102-recovery-timeout-snapshot`. Nothing was pushed and there are no external comments. I changed only test sources and the Claude handoff.
+
+**Tests:** I ran `RecoveryEngineSnapshotTest` on Java 21.0.12.1 with Maven 3.9.11. It ran 8 tests with 0 failures, 0 errors and 0 skipped, up from 5. That run also compiled the modified `IdentityRecoveryIT`, but I did not run `IdentityRecoveryIT` itself; it needs the packaged jar and Postgres and runs in Linux CI.
+
+**Delayed-body result:** I ran the new tests against the old helper first.
+- **Before:** the stalled-body test failed. The server sent headers immediately and then stalled, and the call took **5006 ms** at a 500 ms timeout, so `HttpRequest.timeout` did not bound the body. The `PRIVATECANARY` case also failed, because the old helper echoed it as a status.
+- **After:** both pass, and the stalled-body call returns the fixed marker inside the 2 s assertion.
+
+**Status allowlist:** `present=true` now accepts only an exact `EngineStatus` name, and `present=false` accepts only `ABSENT`. Any other combination, or any other text, gives `engine snapshot unavailable`. The tests cover `PRIVATECANARY` and `WAITING_CANARY` with `present=true`, `present=true` with `ABSENT`, and `present=false` with `COMPLETED`, `WAITING` or `PRIVATECANARY`. A separate test checks that every real `EngineStatus` is accepted.
+
+**Whole-snapshot deadline:**
+- **Mechanism:** the helper uses `sendAsync` with a bounded `get`. On exit it calls `cancel(true)` and `shutdownNow()`, never a blocking `close()`.
+- **Interrupts:** an interrupt keeps the caller's interrupt flag and returns the marker. The new interrupted-caller test checks both.
+- **Body size:** a body declaring more than 4096 bytes is dropped, and no response or exception text is copied.
+
+**Registry status:** `decideUntilCompleted` now keeps the last registry status that the loop itself read, so the failure path makes no extra HTTP request. The 90-second condition, order and event posting are unchanged.
+
+The handoff still makes no claim about the cause or fix of issue 75. The two stalled-server tests take about 5 s each because the test server's handler sleeps.
+
+The background command I started earlier was the scripted handoff edit that hung. The system stopped it after it hit its time limit. It had no effect, and I made the handoff edits afterwards with the edit tool. I'm not restarting it.
+
+The files changed on disk after my commit `e13b544`. I didn't make those changes, and I haven't touched them since the commit.
+- **Handoff and helper:** the handoff now describes a byte-counting body subscriber with a 4096-byte cap, chunked-body tests, and an 11-test result. Those changes are not in `e13b544`, which has 8 tests and only the declared-length check.
+- **`IdentityRecoveryIT.java`:** it also differs from my commit.
+
+So the working tree is ahead of `e13b544`, and the 8-test count I reported applies only to that commit. I haven't re-run the tests or reviewed the new edits, so I can't confirm the 11-test result in the handoff. Whoever made the edits should commit them and re-run the tests.

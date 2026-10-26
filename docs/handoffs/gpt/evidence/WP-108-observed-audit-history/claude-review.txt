@@ -1,0 +1,45 @@
+**Claude PASS on `8ac90351a7214f0facf2679f7356de794ed02504`** (`gpt/WP-108-observed-audit-history`, clean tree, no findings). Linux CI is not covered here.
+
+## Independent run
+I ran the complete family with Java 21 (`JAVA_HOME` set to the Codex runtime) against PostgreSQL 16.15, using your Maven command. I did not print the Java version, so "Java 21" rests on `JAVA_HOME`. I created the common DB through `open-workflow-agentic-codex-postgres-1` and confirmed `current_database()` before running. I dropped only that DB afterward, without FORCE. The shared `agentic` database was not touched, and I made no edits or commits.
+
+| Module | Tests |
+|---|---|
+| runtime | 28 (`AuditAppendOnceTest` 22, `EffectAuditProducerTest` 6) |
+| app | 45 (`EffectAuditHistoryStoreTest` 20, `EffectAuditDeliveryStoreTest` 9, `EffectAuditProducerStoreTest` 15, `ResourceBindingsDefaultWiringTest` 1) |
+| **Total** | **73** |
+
+There were 0 failures, 0 errors and 0 skips, and the build succeeded. The Maven log is `target/review-claude-family.txt`, which I converted from UTF-16.
+
+## Source review
+I read `EffectAuditHistory.java`, the history test, the handoff and the diff from main. The change adds one class and one test, and changes no production path. The other diff entries are docs, TODO/CHANGELOG and two removed evidence JSON files.
+
+- **Data, not authority:** the result is a plain immutable `List<AuditReceipt>`. Nothing is minted, registered as a bean or wired to a target, and `defaultHistoryIsNotInstalled` asserts the absence.
+- **Scope and anchors:** the full typed scope must equal the retained one. The ledger row, the INTENT initial event, the `effect.from`/`effect.to` chain and the purpose are all checked. The ledger state must equal the last `effect.to`.
+- **Membership:**
+  - The event, source and queue ID sets must be exactly equal. Each query ORs in every anchor (key columns, scope initial id, key fingerprint), so orphans and extras surface.
+  - Each is capped at `limit+1`, so 129 facts fail closed.
+  - IDs are only ordered, not contiguous.
+  - The first event must be the bound initial id (primitive `long`, so no boxed `!=` bug).
+- **ACK readback:**
+  - Every source goes through `delivery.deliver`, including ones already ACKed, with `requireMatches` against the first snapshot's source and draft.
+  - The second snapshot must have identical facts and a binding equal to the trusted receipt for every entry.
+  - A prior ACK's binding and `ackedAt` must be unchanged.
+  - There are no retries, so growth or a change refuses, and committed ACKs stay for an explicit retry.
+- **Isolation:**
+  - Each snapshot is its own `Transactions.inTransaction`, so the connection is closed before any central call.
+  - `SHOW` does not take a snapshot, so the `SET TRANSACTION` after it is legal.
+  - It sets REPEATABLE READ with READ ONLY, or only READ ONLY when already serializable. Both are transaction-local, with no pool or timeout setters.
+- **Cancellation:** the interrupt flag is checked before, between and after deliveries and is never cleared.
+- **JTA:** the primary exception is kept and the resume failure is added as suppressed. Success plus a resume failure throws `StoreUnavailableException`.
+- **Default/target:** the class is final, constructor-injected and used by nothing else.
+
+The handoff's claims match the 20 tests, which cover exact-128 versus 129, the orphan and extra queue, an uncommitted writer, isolation and timeout preservation, and resume handling.
+
+## Limits
+- **Time bounds:** no operational timeout is claimed. Pool acquisition, statements and the central sink still need inherited caller bounds, and that remains the adoption gate.
+- **Snapshot scope:** the result covers only what was committed and visible at the final snapshot. It is not an in-flight or later-write guarantee, not authenticity, and it grants no target permission.
+- **History size:** a history over 128 facts is a permanent refusal until a separate protocol exists.
+- **Ordering:** there is no cross-key ordering between original and compensation keys.
+- **Orphan checks:** they defend against a corrupt store, not a hostile DBA.
+- **Still open:** Linux CI, raw archive inspection and the two negative-control runs. I did not re-run the control mutations, and I rely on your author logs for those.

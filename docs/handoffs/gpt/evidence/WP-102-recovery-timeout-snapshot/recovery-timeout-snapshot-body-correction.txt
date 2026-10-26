@@ -1,0 +1,13 @@
+The snapshot helper now caps the body by bytes actually received, not just the declared Content-Length. I committed the change as `5a4ebff` and did not push or post anything externally.
+
+- **Body cap:** `RecoveryEngineSnapshot` now uses a small private subscriber, test-only, with no new production API. Past 4096 received bytes it cancels the stream and fails the body with a fixed message, so no response or exception text is passed on. The declared-length check stays as a quick pre-filter.
+- **Tests:** `RecoveryEngineSnapshotTest` now has 11 tests, with four new cases and the existing stalled-headers, stalled-body and interrupt tests untouched.
+  - **Chunked, no Content-Length:** a loopback response of 64 KiB and another of 4097 bytes, each a valid answer padded with spaces, are both rejected.
+  - **Exactly 4096 bytes, chunked:** still accepted.
+  - **Declared over-limit:** a response with a declared length above 4096 is rejected.
+- **Comment fix:** the `IdentityRecoveryIT` comment now says CI retains process logs (PR68) and that the snapshot also travels in the failsafe XML message. Its condition, order and timeouts are unchanged.
+- **Handoff:** `docs/handoffs/claude/WP-102-recovery-timeout-snapshot.md` is updated with the new behaviour, test count and results.
+
+On Java 21.0.12.1, `RecoveryEngineSnapshotTest` passes 11/11. Against the previous helper, the chunked oversized test fails: the padded body came back as `present=true status=WAITING`.
+
+`IdentityRecoveryIT` was still not run here. It needs the packaged jar and Postgres, so it only runs in Linux CI.

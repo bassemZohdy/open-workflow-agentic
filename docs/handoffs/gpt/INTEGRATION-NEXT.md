@@ -4,8 +4,11 @@ Current implementation baseline: main `99631cce87a5471704a3a8d9ddd63f78756bbc89`
 Audit delivery87/model88 actual combined main5864898 passes1418; archive and checkout verified.
 Allocation DATA contracts89 merged4b74700 after Claude exact41ba16c PASS/independent209 and inspected1427 PR CI.
 That tested merge includes87/88/89; actual postmerge89 at0856d92 passes1427 with verified raw evidence.
-Recovery diagnostics90 merged99631cc after Claude exact5503932 PASS/independent5 and inspected1432. Actual postmerge90 pending. Claude timeout consumer requires strict status/deadline follow-up before PR; observed audit-history checks are in preparation with initial28 passing.
+Recovery diagnostics90 merged99631cc and actual postmerge1432 is verified.
+Observed audit-history91 open8ac9035, Claude exact PASS/independent73; current CI pending.
+Bounded private timeout consumer92 open5a4ebff, GPT exact PASS/independent11; full/provider CI pending.
 No issue75 cause/fix, production authority, approved model source or graph adoption is claimed.
+After92 merges, Claude should review audit API identity freshness after blocking query/verification and before private response release; existing before-I/O checks remain required.
 Next: [staged allocation migration](WP-103-allocation-migration-plan.md), preserving historical unallocated entries and reserved V78..V80.
 Counts remain11 completed/12 partial/30 not started; acceptance3/39. Issues75/76 remain open.
 
