@@ -1,0 +1,11 @@
+I made all three corrections and committed them as `8a5896e`. Nothing is pushed, no PR is open and there are no external comments. The 30 focused tests and the 7 HTTP tests pass on Java 21, and the working tree is clean.
+
+1. **Check placement:** In `AuditResource`, the final `current(who)` now runs after the `EventPage`, `EventView` and `VerifyResult` are fully built, and the prepared result is returned straight after it. For a single event, the `EventView` is mapped first, and the final check runs before the not-found result is thrown. The before-I/O checks, defaults, policy order and the original tests are unchanged.
+
+2. **Private test database:**
+   - **Setup:** The fixture checks that the generated name matches `oa_audit_fresh_<32 hex>`. It confirms `select current_database()` equals that name before running Flyway or any append, and keeps a `created` flag.
+   - **Teardown:** It drops the database only if it created it, without `FORCE`, after the connections are closed. Nothing resets the shared database. Since the drop has no `FORCE` and the run passed, no connection was left open.
+
+3. **Handoff:** It now describes the final-check placement. It says the Cedar `UnsatisfiedLinkError` is an "observed loader failure, baseline not run" and that Linux CI is required. It also says the known unsupported native tests were not rerun here, and it records the re-run results.
+
+The 30 focused tests are `AuditResourceOutputFreshnessTest`, `AuditResourceFreshnessTest`, `AuditQueryTest` and `ChainVerifierTest`. The 7 HTTP tests are `AuditVerifiedCallerApiTest`.

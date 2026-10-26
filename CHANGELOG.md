@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge audit response freshness93 (ae57e4e) after exact GPT8a5896e PASS/independent37 and inspected full1472, including all3 native default-denial cases. Recheck signed identity after result materialization; expired reads release neither event data nor not-found evidence. Close the scoped audit caller/PEP response task while keeping tenant/emergency/other boundaries open. Combined91/92 main1463/provider1460/1455 evidence is verified.
+
 - Merge observed audit history91 (3610fca) and private bounded recovery snapshot92 (5f5a229) after exact reciprocal reviews, independent73/11 and inspected full1452/1443 plus provider1435/1440. Receipts remain observed snapshot DATA; later writes, target permission and whole-call bounds are not inferred. Timeout/status/chunked-body probes exposed real diagnostic defects before correction; issue75 cause/fix and production profile76 remain open.
 
 - Merge recovery diagnostics90 as99631cc after Claude exact5503932 PASS/independent5 and inspected full1432. Observe asynchronous dev-publish failures and expose disabled-by-default engine snapshots without inferring completion from absence. Actual postmerge allocation contracts main0856d92 passes1427; issue75 remains unresolved, with bounded timeout consumer follow-up in review.

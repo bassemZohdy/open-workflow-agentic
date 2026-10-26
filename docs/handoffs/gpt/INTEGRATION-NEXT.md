@@ -1,16 +1,12 @@
 # Integration queue: next actions (2026-10-27)
 
-Current implementation baseline: main `5f5a2295bba17e5e4d2b4a93e59542048125cc51`.
-Audit delivery87/model88 actual combined main5864898 passes1418; archive and checkout verified.
-Allocation DATA contracts89 merged4b74700 after Claude exact41ba16c PASS/independent209 and inspected1427 PR CI.
-That tested merge includes87/88/89; actual postmerge89 at0856d92 passes1427 with verified raw evidence.
-Recovery diagnostics90 merged99631cc and actual postmerge1432 is verified.
-Observed audit-history91 merged3610fca after Claude exact8ac9035 PASS/independent73 and inspected1452.
-Bounded private timeout consumer92 merged5f5a229 after GPT exact5a4ebff PASS/independent11 and inspected1443 core plus standard1435/delegation1440; actual combination pending.
-No issue75 cause/fix, production authority, approved model source or graph adoption is claimed.
-Claude is reviewing audit API identity freshness after blocking query/verification and before private response release; existing before-I/O checks remain required.
-Next: [staged allocation migration](WP-103-allocation-migration-plan.md), preserving historical unallocated entries and reserved V78..V80.
-Counts remain11 completed/12 partial/30 not started; acceptance3/39. Issues75/76 remain open.
+Current implementation baseline: main `ae57e4eb7ef7d5ad200b4229424023bad90b506d`.
+Observed history91 and timeout92 are merged; actual combined main1463/provider1460/1455 is verified.
+Audit output93 mergedae57e4e after exact GPT8a5896e PASS/independent37 and full1472, including native default-denial3. Actual postmerge93 pending.
+Allocation rehearsal94 opened86b92, restored39 and actual historical-FK/pin controls; exact peer/currentCI pending. V78 stays outside Flyway.
+Claude is implementing AgentResource post-run output freshness, distinguishing already completed work from withheld private output and keeping pre-run refusals.
+The reviewed [allocation migration plan](WP-103-allocation-migration-plan.md) still gates activation on approved source/roles/current consumers and historical preservation.
+Counts remain11 completed/12 partial/30 not started; acceptance3/39. Audit caller/PEP response task is now evidenced, while productionRoot/async and issues75/76 remain open.
 
 ## Integrated prerequisites and evidence
 
