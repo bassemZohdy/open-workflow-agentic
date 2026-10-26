@@ -11,6 +11,7 @@
 - PR [#74](https://github.com/bassemZohdy/open-workflow-agentic/pull/74) is the sole open implementation PR, providing **V76 immutable data only**. Current head `3f37b3ba2a37981f2a99ad497227dab198719531`: full CI run `40265793674` passed 175 suites / 1262 cases, zero failures/errors/skips. **Claude exact-head review is still pending. No merge or backend activation until that review passes.**
 - V73/V74 call/binding/occurrence storage, V75 central audit source receipts, V75.1 checkpoint profile ownership and startup verifier have already merged. Their existence does not authorize execution or private output release.
 - Intermittent packaged-process identity recovery remains unresolved: [issue #75](https://github.com/bassemZohdy/open-workflow-agentic/issues/75).
+- **Production identity-profile decision remains open:** Keycloak 26.8.1 actor-bearing delegation is a documented **preview** feature, while fully supported standard token exchange does not by itself establish the same `act` chain. Confirm the standard-only production requirement or explicitly accept the preview profile before claiming enterprise readiness: [issue #76](https://github.com/bassemZohdy/open-workflow-agentic/issues/76), [Keycloak official release notes](https://www.keycloak.org/docs/26.8.1/release_notes/).
 
 ## 2. Invariant and non-goals
 
