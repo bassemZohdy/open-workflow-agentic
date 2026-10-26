@@ -72,7 +72,7 @@ class ResearchCheckpointStartupIT {
         app.start();boolean ready=app.awaitReady(Duration.ofSeconds(45));
         assertFalse(ready,"incompatible current profile must refuse before HTTP readiness\n"+read(app));
         assertFalse(app.isAlive(),"startup must exit on profile refusal, rather than hang until the readiness deadline\n"+read(app));
-        assertTrue(read(app).contains("CheckpointProfileRefused"),"must fail for the intended current-profile check\n"+read(app));
+        assertTrue(read(app).contains("CheckpointProfileException"),"must fail for the intended current-profile check\n"+read(app));
     }
     private static String read(ManagedProcess app) throws Exception {return Files.readString(app.logFile());}
     private static ManagedProcess app(Database db,ModelProbe model,Map<String,String> extra) throws Exception {
