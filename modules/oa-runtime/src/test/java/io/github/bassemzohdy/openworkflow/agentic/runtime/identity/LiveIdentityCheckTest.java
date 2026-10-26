@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
@@ -28,6 +29,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.Supplier;
 import javax.sql.DataSource;
@@ -61,6 +63,7 @@ class LiveIdentityCheckTest {
     private InMemoryIssuedTokenBindings issuedStore;
     private ResourceCallFixtures.InMemory store;
     private Runnable duringCallLookup = () -> { };
+    private Consumer<Ulid> afterGrantRead = id -> { };
     private IntConsumer duringGrantBindingLookup = n -> { };
     private final AtomicInteger grantBindingLookups = new AtomicInteger();
     private Supplier<Optional<ResourceCallBinding>> callOverride;
@@ -105,13 +108,21 @@ class LiveIdentityCheckTest {
         Thread.interrupted();
         tokens.clear();
         duringCallLookup = () -> { };
+        afterGrantRead = id -> { };
         duringGrantBindingLookup = n -> { };
         grantBindingLookups.set(0);
         callOverride = null;
         grantBindingOverride = null;
         callStoreDown = false;
         clock = new MovableClock(Instant.parse("2026-10-20T10:00:00Z"));
-        grants = new DelegationGrants(new DelegationGrantStore(data),
+        grants = new DelegationGrants(new DelegationGrantStore(data) {
+            @Override
+            public Optional<DelegationGrant> find(Ulid id) {
+                Optional<DelegationGrant> found = super.find(id); // a real row, read before the delay
+                afterGrantRead.accept(id);
+                return found;
+            }
+        },
                 IdentityTestSupport.audit(new IdentityTestSupport.RecordingSink(), clock), clock, UlidGenerator.shared(),
                 Duration.ofDays(30));
         tenant = IdentityTestSupport.newTenant();
@@ -362,5 +373,52 @@ class LiveIdentityCheckTest {
         } finally {
             Thread.interrupted();
         }
+    }
+
+    // ---- grant expiry during the blocking lineage reads -----------------------------------------------------------------
+
+    /** Runs {@code delay} once, after the grant {@code id} has been read; later reads are undelayed. */
+    private void delayAfterReadOf(Ulid id, Runnable delay) {
+        AtomicInteger fired = new AtomicInteger();
+        afterGrantRead = read -> {
+            if (read.equals(id) && fired.getAndIncrement() == 0) {
+                delay.run();
+            }
+        };
+    }
+
+    @Test
+    void aGrantShorterThanItsTokenThatExpiresDuringItsReadRefuses() {
+        DelegationGrant shortGrant = grants.grant(tenant, ALICE, ALICE, WORKFLOW, Set.of(AgentResourceAdmission.SCOPE),
+                clock.instant().plus(Duration.ofMinutes(2)), null);
+        ResourceCallScope scope = scope();
+        BoundCall bound = bound(scope, credential(scope, shortGrant, List.of(WORKFLOW.id())));
+        // the signed token (5 minutes) outlives the grant (2 minutes); only the grant check can see it
+        delayAfterReadOf(shortGrant.id(), () -> clock.advance(Duration.ofMinutes(3)));
+        assertEquals(Reason.GRANT_INACTIVE, reason(() -> check.requireLive(bound, entry(scope, 1), WORKFLOW)));
+        assertTrue(lastToken.expiresAt().isAfter(clock.instant()), "the token itself is still inside its signed time");
+    }
+
+    @Test
+    void aChildThatExpiresExactlyWhileTheAncestorIsReadRefuses() {
+        Subject child = new Subject(SubjectKind.AGENT, "child-agent");
+        DelegationGrant delegated = grants.delegate(grant.id(), WORKFLOW, child, Set.of(AgentResourceAdmission.SCOPE),
+                clock.instant().plus(Duration.ofMinutes(2)), null);
+        ResourceCallScope scope = scope();
+        BoundCall bound = bound(scope, credential(scope, delegated, List.of(child.id(), WORKFLOW.id())));
+        // the child is read live; the (much longer) ancestor read then takes exactly until the child's expiry
+        delayAfterReadOf(grant.id(), () -> clock.advance(Duration.ofMinutes(2)));
+        assertEquals(Reason.GRANT_INACTIVE, reason(() -> check.requireLive(bound, entry(scope, 1), child)));
+    }
+
+    @Test
+    void anUnchangedActiveChainStillPassesOneMicrosecondBeforeExpiry() {
+        Subject child = new Subject(SubjectKind.AGENT, "child-agent");
+        DelegationGrant delegated = grants.delegate(grant.id(), WORKFLOW, child, Set.of(AgentResourceAdmission.SCOPE),
+                clock.instant().plus(Duration.ofMinutes(2)), null);
+        ResourceCallScope scope = scope();
+        BoundCall bound = bound(scope, credential(scope, delegated, List.of(child.id(), WORKFLOW.id())));
+        delayAfterReadOf(grant.id(), () -> clock.advance(Duration.ofMinutes(2).minusNanos(1_000)));
+        check.requireLive(bound, entry(scope, 1), child);
     }
 }

@@ -179,26 +179,35 @@ public class DelegationGrants {
      * May this grant be used now? Active only if the grant is ACTIVE, its expiry has not passed, and every grant above
      * it is active too. Anything else is a typed {@link GrantCheck.Inactive}. A store failure is an exception, never
      * "active".
+     *
+     * <p>The lineage reads are blocking, so a grant or an ancestor can expire while a later one is being read. Expiry is
+     * therefore judged against the clock again after the last read, over every grant read, not against a time taken
+     * before the first. This is an expiry fence only: grant status and revocation are still read grant by grant, not as
+     * one atomic snapshot.
      */
     public GrantCheck check(Ulid id) {
-        Instant now = now();
         Ulid current = id;
-        DelegationGrant first = null;
+        List<DelegationGrant> lineage = new ArrayList<>();
         for (int depth = 0; depth <= DelegationGrant.MAX_DEPTH; depth++) {
             DelegationGrant grant = store.find(current).orElse(null);
             if (grant == null) {
                 return new GrantCheck.Inactive(id, depth == 0 ? GrantCheck.Reason.UNKNOWN
                         : GrantCheck.Reason.ANCESTOR_INACTIVE);
             }
-            if (first == null) {
-                first = grant;
-            }
-            GrantCheck.Reason reason = inactiveReason(grant, now);
+            lineage.add(grant);
+            GrantCheck.Reason reason = inactiveReason(grant, now());
             if (reason != null) {
                 return new GrantCheck.Inactive(id, depth == 0 ? reason : GrantCheck.Reason.ANCESTOR_INACTIVE);
             }
             if (grant.parentId() == null) {
-                return new GrantCheck.Active(first);
+                Instant after = now();
+                for (int i = 0; i < lineage.size(); i++) {
+                    if (inactiveReason(lineage.get(i), after) != null) {
+                        return new GrantCheck.Inactive(id, i == 0 ? GrantCheck.Reason.EXPIRED
+                                : GrantCheck.Reason.ANCESTOR_INACTIVE);
+                    }
+                }
+                return new GrantCheck.Active(lineage.get(0));
             }
             current = grant.parentId();
         }
