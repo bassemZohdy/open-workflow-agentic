@@ -1,7 +1,7 @@
 # Integration queue: next actions (2026-10-26)
 
 Current implementation baseline: main `b02875f6d00f28d2d837505b56160db70c2dec48`.
-No open PR remains. Counts stay11 completed/12 partial/30 not started; acceptance
+Diagnostic PR69 is open; recovery investigation precedes the consumer. Counts stay11 completed/12 partial/30 not started; acceptance
 stays3/39. These increments do not close WP-108 or authorize graph entry.
 
 ## Integrated prerequisites and evidence
@@ -28,11 +28,17 @@ stays3/39. These increments do not close WP-108 or authorize graph entry.
   migration/real-saver/grants4, default admission refusal1 and required method sets.
   CRC/paths/archive digest/migration+vendor hashes and exact tested tree checked.
   See [retained inspection](evidence/WP-108-checkpoint-profile/current-ci.json).
-  Postmerge verification is pending. V75_1 preserves compatible private history,
+  Postmerge40246336207 failed IdentityRecoveryIT (reauthorized y stayed WAITING).
+  Main40246884344 later passed; this is an unresolved intermittent defect. See
+  [failure metadata](evidence/WP-108-checkpoint-profile/postmerge-recovery-failure.json).
+  Diagnostics68 merged as2bba3a5 after exact Claude PASS1a1adf0 and full40248132488;
+  process logs are retained. Claude69 adds unchanged-assertion timeout diagnostics.
+  Linux repeat verification is underway; runtime consumer work is paused.
+  V75_1 preserves compatible private history,
   refuses unsupported/partial/active stores and adds the observed collation gap
   regression. Runtime DDL removal and data-source adoption are not activated.
 
-## Next owned consumer: Claude stops runtime checkpoint DDL
+## Following recovery investigation: Claude stops runtime checkpoint DDL
 
 Follow [the exact handoff](WP-108-checkpoint-profile-activation.md). Its schema
 prerequisite is merged. Use a separate Claude branch/worktree from current main.

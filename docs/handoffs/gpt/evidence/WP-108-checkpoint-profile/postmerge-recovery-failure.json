@@ -1,0 +1,19 @@
+{
+  "runId": 40246336207,
+  "commit": "b02875f6d00f28d2d837505b56160db70c2dec48",
+  "conclusion": "failure",
+  "artifactId": 12619110891,
+  "archiveBytes": 2054584,
+  "archiveSha256": "28cbd8636f0dd23a7c15709ba695ef7900f42086072b5cb679988d7e883d66e3",
+  "suite": "IdentityRecoveryIT",
+  "method": "identitySurvivesAKillARevokedGrantHoldsTheInstanceAndNoCredentialIsPersisted",
+  "observed": "Reauthorized instance y remained WAITING after the existing 90-second completion polling deadline; preceding identity, held-grant and resumed-authority assertions passed.",
+  "missingEvidence": "Child process logs were not included in the original retained artifact.",
+  "cause": "unresolved timing-dependent defect",
+  "laterMainRun": {
+    "runId": 40246884344,
+    "commit": "d031e003a8325361e1138664851b25a0a2378596",
+    "conclusion": "success",
+    "limitation": "A passing run does not establish a fix."
+  }
+}
