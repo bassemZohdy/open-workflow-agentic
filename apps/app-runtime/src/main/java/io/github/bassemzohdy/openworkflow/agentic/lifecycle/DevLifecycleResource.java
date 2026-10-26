@@ -7,6 +7,8 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InstanceAutho
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.SecretProvider;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.SecretUnavailableException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.RegistryScan;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.DefinitionRef;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.WorkflowEngine;
 import io.serverlessworkflow.impl.WorkflowApplication;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -74,6 +76,35 @@ public class DevLifecycleResource {
     @Inject
     SecretProvider secrets;
 
+    @Inject
+    WorkflowEngine engine;
+
+    /** Diagnostic snapshot only: ABSENT cannot distinguish completion from a missing/restored instance. */
+    public record EngineProbe(boolean present, String status) { }
+
+    @GET
+    @Path("/engine")
+    public Response engine(@QueryParam("definition") String definition, @QueryParam("version") String version,
+                           @QueryParam("instanceId") String instanceId) {
+        if (!enabled) return Response.status(404).build();
+        DefinitionRef pinned;
+        try {
+            pinned = new DefinitionRef(definition, version);
+            if (instanceId == null || instanceId.isBlank() || instanceId.length() > 256)
+                return Response.status(400).build();
+        } catch (IllegalArgumentException | NullPointerException invalid) {
+            return Response.status(400).build();
+        }
+        try {
+            var view = engine.activeInstance(pinned, instanceId);
+            return Response.ok(view.map(v -> new EngineProbe(true, v.status().name()))
+                    .orElseGet(() -> new EngineProbe(false, "ABSENT"))).build();
+        } catch (RuntimeException unavailable) {
+            // No exception text or private engine/workflow data in the diagnostic response.
+            return Response.status(503).entity(new EngineProbe(false, "UNAVAILABLE")).build();
+        }
+    }
+
     @POST
     @Path("/effects")
     @Consumes(MediaType.APPLICATION_JSON)
@@ -140,7 +171,13 @@ public class DevLifecycleResource {
                 .withDataContentType(MediaType.APPLICATION_JSON)
                 .withData("{}".getBytes(StandardCharsets.UTF_8))
                 .build();
-        application.eventPublishers().forEach(publisher -> publisher.publish(event));
+        application.eventPublishers().forEach(publisher -> publisher.publish(event).whenComplete((ignored, failed) -> {
+            if (failed != null) {
+                // Keep asynchronous acceptance unchanged. Log only generated correlation and failure class,
+                // never an event payload, request-selected type, exception message or credential.
+                LOG.warnf("probe-event delivery failed id=%s failure=%s", event.getId(), failed.getClass().getName());
+            }
+        }));
         return Response.accepted(Map.of("type", type)).build();
     }
 
