@@ -14,6 +14,7 @@ import java.sql.*;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import javax.sql.DataSource;
 
 /**
@@ -38,6 +39,7 @@ public class JdbcResourceCallBindings implements ResourceInvocations {
             """;
     private static final Instant MIN = Instant.parse("0001-01-01T00:00:00Z");
     private static final Instant MAX = Instant.parse("9999-12-31T23:59:59.999999Z");
+    private static final Pattern BINDING_KEY = Pattern.compile("rb1-[0-9a-f]{64}");
     private final DataSource data;
     private final TransactionManager transactions;
 
@@ -94,6 +96,26 @@ public class JdbcResourceCallBindings implements ResourceInvocations {
     @Override public Optional<ResourceCallBinding> find(String issuer, String tokenId) {
         identity(issuer); identity(tokenId);
         return isolated(c -> read(c,issuer,tokenId));
+    }
+
+    @Override public Optional<ResourceCallBinding> findBinding(String credentialBindingKey) {
+        Checks.requireMatching("credential binding key",credentialBindingKey,BINDING_KEY);
+        return isolated(c -> {
+            // LEFT JOIN preserves a corrupt binding with missing canonical attribution as a refusal, not absence.
+            try(var q=c.prepareStatement("""
+                    select c.*,o.occurrence_key,b.binding_key,b.issuer,b.token_id,b.grant_id,b.issued_at,b.expires_at
+                    from task.resource_call_binding b left join task.resource_call c on c.call_key=b.call_key
+                    left join task.resource_occurrence o on o.call_key=c.call_key where b.binding_key=?
+                    """)) {
+                q.setString(1,credentialBindingKey);
+                try(var r=q.executeQuery()) {
+                    if(!r.next())return Optional.empty();
+                    var binding=binding(r);
+                    if(!credentialBindingKey.equals(binding.key()))throw conflict();
+                    return Optional.of(binding);
+                }
+            }
+        });
     }
 
     @Override public Optional<ResourceCallScope> findInvocation(ResourceCallScope candidate) {
@@ -186,14 +208,20 @@ public class JdbcResourceCallBindings implements ResourceInvocations {
             s.setString(1,issuer); s.setString(2,tokenId);
             try(var r=s.executeQuery()) {
                 if(!r.next()) return Optional.empty();
-                var value=new ResourceCallBinding(r.getString("issuer"),r.getString("token_id"),
-                        Ulid.parse(r.getString("grant_id")),scope(r),r.getTimestamp("issued_at").toInstant(),
-                        r.getTimestamp("expires_at").toInstant());
-                if(!issuer.equals(value.issuer()) || !tokenId.equals(value.tokenId())
-                   || !value.key().equals(r.getString("binding_key"))) throw conflict();
+                var value=binding(r);
+                if(!issuer.equals(value.issuer()) || !tokenId.equals(value.tokenId())) throw conflict();
                 return Optional.of(value);
             }
         }
+    }
+
+    private static ResourceCallBinding binding(ResultSet r) throws SQLException {
+        if(r.getString("call_key")==null)throw conflict();
+        var value=new ResourceCallBinding(r.getString("issuer"),r.getString("token_id"),
+                Ulid.parse(r.getString("grant_id")),scope(r),r.getTimestamp("issued_at").toInstant(),
+                r.getTimestamp("expires_at").toInstant());
+        if(!value.key().equals(r.getString("binding_key")))throw conflict();
+        return value;
     }
 
     private <T> T isolated(Transactions.Work<T> work) {
