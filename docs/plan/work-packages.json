@@ -13,7 +13,7 @@
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
       "date": "2026-10-27",
-      "baseline_commit": "15aefbb022aadbf1715862205d7b849f8ca15866",
+      "baseline_commit": "747158e3293e4e07b29e847d3c1d9e31fbe222be",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -564,7 +564,7 @@
         "implemented": [
           "Cedar PDP, versioned decisions, fail-closed decorator and an explicit 64-evaluation PEP bulkhead are implemented.",
           "Operator safe-recovery checks and the shared durable audit sink are integrated.",
-          "Claude route-inventory test0aeb52f passes one scoped case in CI39354688069; /agents/research is an explicit anonymous-route gap, not a default-deny pass.",
+          "Historical route-inventory baseline0aeb52f/CI39354688069 covered one scoped case and exempted /agents/research. That old gap is superseded: current HttpRouteDefaultDenyTest has empty KNOWN_GAPS, with AgentResource verified-caller/PEP/early refusal and late-output fences merged. Actual workflow dispatch/admission producers remain separate gates.",
           "GPT reviewed Claude exact60c1c7f5ddee25c9085bf8eb815718d54994e8e5 in detached worktree, comment6284804165. Claude-owned prior authority/thread/maximum-subject findings addressed;20 independent selected PEP/caller cases pass, new authority tests compile. REQUEST_CHANGES remains for shared instance/task/occurrence binding plus actual workflow credential adapter, still401. Claude accepted issuer+jti binding proposal; GPT owns producer/schema/dispatch, Claude admission/final-authority consumer. Current full/matrix still run at review; no local SQL/provider or actual workflow success claimed.",
           "GPT integrated #49 as main30e81c3 after exact411dc36 Claude APPROVE6285298422 and full39380912923/BOTH39380912505 SUCCESS; shared resource-call scope/binding port available, production storage/admission/dispatch and actual workflow401 gate remain. GPT reviewed stacked audit #50 exact427dc7267ba823e429b4d287688ed03a7bc60ef1/base60c1c7f REQUEST_CHANGES6285396372 for expiry during mandatory audit before read and lazy PEP DI failure500 instead503.34 independent cases pass, ignored actual-class probes reproduce both; full39383362196 SUCCESS does not resolve findings. Parent47 must resolve shared gate/merge before final retarget/review; WP-103 remains partial.",
           "GPT shared contract preparation: ResourceCallScope pins registry/full-owner/actual SDK task and stable enclosing occurrence; stable rc1 invocation excludes mutable target/request so changes conflict, while separate immutable contract fingerprint pins approved target configuration/audience/operation/request. Governed thread is bounded and stable across credentials. ResourceCallBinding pins verified issuer+jti/exact grant/signed lifetime; ResourceCallBindings documents atomic two-identity retention and fail-closed unknown replies.170 contracts pass including6 new semantic cases; no SQL/backend/admission/dispatch activated, actual workflow still401, no acceptance promotion. Claude exact60c1c7f review6284804165 acknowledges owned fixes; shared integration gate remains, full39379651134/both39379651142 SUCCESS.",
@@ -581,7 +581,8 @@
           "Merged zero-budget hard refusal83 and private Running-controlled model overload88 with checks before context lookup, after lookup, before physical provider and before private output. Allocation/profile DATA contracts89 bind original canonical scope and immutable full contract/lifetime; no approved profile source, durable reservation, migration or ResearchAgent adoption is installed.",
           "Audit query/verification API has verified caller/PEP/default-denial wiring and signed-expiry checks before I/O and after result materialization. Output93 mergedae57e4e after exact GPT independent37 and full1472 with native default-denial3 green. This closes that scoped remaining task, not tenant filtering, fresh PDP/emergency state or other product/async boundaries.",
           "Allocation94 merged942cde1 after exact Claude independent39 and inspected CI; proposed V78 retains exact immutable legacy-exemption inventory with NOT VALID enforcement on new writes. Schema remains outside Flyway and unactivated. Allocation DATA adapter96 merged15aefbb after exact Claude independent57 PASS and full1508 current CI; no budget/approval/dispatch authority.",
-          "AgentResource95 merged16c4262 after exact GPT independent47 and full1490 plus both providers1482/1487. Responses materialize before final signed-expiry/current-grant check; late failure withholds output without claiming completed agent work was undone. Actual post95 same-main core/provider evidence verified."
+          "AgentResource95 merged16c4262 after exact GPT independent47 and full1490 plus both providers1482/1487. Responses materialize before final signed-expiry/current-grant check; late failure withholds output without claiming completed agent work was undone. Actual post95 same-main core/provider evidence verified.",
+          "Allocation denial97 merged747158e after exact Claude independent85 and full1536 current CI. Tests28 exercise actual V77/private proposedV78 registry/parent/narrowing/revocation/expiry; existing V60 producer and immutable parent reject cycle construction, not arbitrary privileged corruption. Actual narrowing-guard removal fails5/5, original SQL restored. No activation, role, approved source, reservation or target-authority closure."
         ],
         "completed_deliverables": [
           "PDP adapter, versioned and attributable decisions",
@@ -590,7 +591,7 @@
         "remaining_tasks": [
           "Prove tool/model/human-task/publication boundaries cannot bypass the PEP as their product implementations land; enforce and test default deny on uncovered HTTP paths.",
           "Keep T23 emergency containment work with WP-305; production approved-state freshness is owned by WP-304.",
-          "Protect Claude-owned AgentResource with verified caller/PEP and no-business-invocation tests; GPT supplies dispatch-only credential integration outside persisted workflow state. Harden route inventory coverage/exemptions; do not treat known-gap exceptions as complete denial proof.",
+          "Integrate the actual GPT workflow dispatch-only credential producer outside persisted workflow state, consuming the merged AgentResource verified-caller/PEP/early no-invocation and late-output fences. Extend route inventory for authenticated permission denial; anonymous known-gap exemptions are empty, not a substitute for per-action policy coverage.",
           "Resolve GPT revised #47 exact8d63727 review: retain/revalidate signed expiry and exact current grant after blocking policy/audit, bind governed invocation to trusted registry instance/task/occurrence separate from direct threads, preserve valid maximum subject lengths, and integrate the actual GPT-owned workflow credential adapter with denial/no-effect evidence. See WP-103-admission-review.md; no whole WP-102 start gate.",
           "Resolve GPT #47 exact bb58420 material review: bind direct agent checkpoint access to verified user/instance/tenant ownership and reconcile workflow dispatch-only exchanged credentials with resource admission, proving the actual HTTP step and denial/no-effect cases; full39374220592 alone does not close these boundaries. See docs/handoffs/gpt/WP-103-review.md."
         ],
@@ -615,7 +616,11 @@
           "docs/handoffs/gpt/evidence/WP-103-agent-output-freshness/combined-main.json",
           "docs/handoffs/gpt/evidence/WP-103-agent-output-freshness/combined-main-providers.json",
           "docs/handoffs/gpt/WP-103-allocation-store.md",
-          "docs/handoffs/gpt/evidence/WP-103-allocation-store/current-ci.json"
+          "docs/handoffs/gpt/evidence/WP-103-allocation-store/current-ci.json",
+          "docs/handoffs/gpt/WP-103-allocation-denials.md",
+          "docs/handoffs/gpt/evidence/WP-103-allocation-denials/peer-review.json",
+          "docs/handoffs/gpt/evidence/WP-103-allocation-denials/current-ci.json",
+          "docs/handoffs/gpt/evidence/WP-103-allocation-store/combined-main.json"
         ]
       }
     },
@@ -2778,7 +2783,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-27",
-    "status": "Prerequisites74 through96 are merged after exact reciprocal reviews and inspected required CI. Actual post95 main16c4262 passes40411900718:196 suites/1490 tests; actual same-main providers40411900862 standard1482/delegation1487, all zero failures/errors/skips, digest/CRC and actual checkout verified. Allocation94 is a proposed V78 upgrade rehearsal only (independent39); AgentResource95 withholds stale private output after completed work (independent47). Allocation DATA store96 merged15aefbb after exactef91ff4 Claude PASS/independent57 and inspected40412830026:198 suites/1508 tests, all zero failures/errors/skips. Actual postmerge96 CI pending. GPT next completes proposed V78 denial matrix; No activation/approval/budget/permission claim. Claude next implements scoped PEP checks at instance start/read/reauthorize, reusing oa.operate/oa.inspect with explicit GPT handoff for API fixtures. Issue75 cause/fix and76 supported-provider decision remain open. Approved-context source, V79 reservations, real Root/task/lease/Flow/physical async/current-authority gates remain; V78..V80 reserved and V78 outside Flyway. Defaults refuse. Counts and acceptance unchanged.",
+    "status": "Prerequisites74 through97 are merged after exact reciprocal reviews and inspected required CI. Actual post96 main926b037 passes40414389616:198 suites/1508 tests, digest/CRC/actual checkout verified. Proposed allocation denial matrix97 merged747158e after exactf775a14 Claude PASS/independent85 and current40415304966:199 suites/1536 tests, all zero failures/errors/skips; post97 main pending. New28 real PG cases cover registry/parent attribution, narrowing, actual revocation/DB-clock expiry and existing immutable producer cycle refusal; removed narrowing guard makes5/5 tests fail and original SQL restored before85-pass family. No production SQL change or V78 activation. Claude instance API scoped PEP/freshness implementation is testing; Windows native Cedar limitation disclosed, Linux verification ongoing. GPT reworks V79 durable full-ceiling reservations against actual V77/private proposedV78, not old redirected schema fixtures; no new PR or consumer activation yet. Approved source/roles, actual occurrence/task/lease/PDP/audit/Flow/physical async and supported identity-profile gates remain. Issues75/76 stay open; defaults refuse; package counts and acceptance unchanged.",
     "agents": [
       {
         "id": "GPT",

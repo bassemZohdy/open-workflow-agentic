@@ -1,0 +1,52 @@
+**Verdict: PASS** for head `f775a14aa07b7557753fec7ee09dcb594c51ec0c`. The worktree is clean, and I made no edits, commits, pushes or comments. I found no blocking issues.
+
+**Independent full-85 run**
+- **Toolchain:** Temurin 21.0.12.1+1 at the path you gave, and Maven 3.9.11 (`mvn.cmd`). I ran Maven from PowerShell with `-pl apps/app-runtime -am` and failIfNoSpecifiedTests false.
+- **Database:** PostgreSQL 16.15 in `open-workflow-agentic-codex-postgres-1`. I created `oa_peer_claude_pr97_<uuid>` and checked `current_database`. I set `DB_URL` only for the run, then dropped the database without FORCE after Maven exited. The shared `agentic` database was not touched.
+- **Result:** BUILD SUCCESS with 85 tests, 0 failures, 0 errors, 0 skipped, matching the author's total:
+
+| Class | Tests |
+|---|---|
+| ResourceTaskAllocationTest (contracts) | 9 |
+| ResourceTaskAllocationPreflightTest (runtime) | 4 |
+| ResourceTaskAllocationDenialTest | 28 |
+| ResourceTaskAllocationStoreTest | 14 |
+| ResourceExecutionMigrationTest | 20 |
+| ResourceTaskAllocationMigrationTest | 9 |
+| ResourceBindingsDefaultWiringTest | 1 |
+
+The last five classes are the app-runtime tests, which total 72.
+- **Cleanup:** my database is gone. Two older leftover databases (`oa_wp102_expiry_*`, `oa_wp103_inst_*`) remain from other runs. They are not from this run, and I left them alone.
+
+**Review against V77, proposed V78 and the grants/task contracts**
+- **Guard tested:** every failure is checked for SQLState 23514 plus the guard's own message. The messages match the V78 `resource_task_allocation_insert_guard` branches: registry/occurrence, parent differs or closed, widens parent, grant ancestry not current, not an actual issuing chain, model agent differs, lifetime exhausted.
+- **No masked assertions:**
+  - `refused` also asserts zero allocation and zero execution rows after each failure.
+  - A positive retained-parent case shows the guard is not refusing everything.
+  - The author's negative control (5/5 failing with only the narrowing block removed) is consistent with `assertThrows` being the thing that fails.
+  - I did not re-mutate the source.
+- **Per-case isolation:** `isolated()` builds a new `ResourceTaskAllocationMigrationTest` for each case, so each case gets its own `oa_re_facts_<uuid>` database. That database is migrated through the actual V77, has V78 applied in an owned transaction, and is dropped without FORCE in `finally`. I saw the per-case migrations in the log, ending at v77.
+- **Mutation fixture limits:** the owner-connection `UPDATE`s on `task.instance` and `task.agent_task` are explicit test setup. The handoff says so and makes no claim that runtime writers can edit parent facts.
+- **Revocation and expiry:**
+  - Revocation goes through the real `DelegationGrants.revoke`, covering both the chosen child and the issuing ancestor.
+  - Expiry creates a real child grant 2 seconds out, polls the database clock until it passes (6-second bound), then expects "original lifetime is exhausted". No status is faked.
+- **Cycle claim:** the claim is narrow and accurate. The real producer throws `GrantException.CYCLE`, and the V60 immutable-parent guard refuses a reparent with SQLState 42501. The test never bypasses triggers, and the handoff disclaims arbitrary privileged corruption.
+- **No overclaims:** the handoff says there is no activation, approval, budget or permission claim, no work package closed, and that issues 75/76 stay open. Only the test and handoff are committed, with no production SQL change.
+
+**Non-blocking nits**
+1. The `expired` parent case and the elapsed registry wait deadline share the "original lifetime is exhausted" message with the grant-expiry case. Each is still discriminated by its own setup, so this is only a weak signal.
+2. `isolated()` closes the database in `finally`, so a failed assertion could mask a drop failure. That is unlikely to matter.
+3. The handoff says the matrix was expanded from 21 to 28 cases. The count is correct, and the SERVICE-to-AGENT fixture correction is disclosed.
+
+**Residual gates (all stated in the handoff, none introduced here):**
+- production writer role and source
+- model approval and budget
+- the execution consumer
+- V79 holds and usage
+- lease, PDP and audit
+- provider fences
+- Flow terminal behaviour
+- bounded I/O and async recovery
+- required CI on the PR
+
+The peer log is `%TEMP%\pr97-peer.log`, in UTF-16.
