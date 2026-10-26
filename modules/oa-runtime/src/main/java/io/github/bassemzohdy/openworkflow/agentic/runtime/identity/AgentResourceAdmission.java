@@ -276,6 +276,12 @@ public class AgentResourceAdmission {
         }
         ResourceCallBinding call = found.orElseThrow(
                 () -> new TokenRejectedException(TokenRejectedException.Reason.BINDING_MISSING));
+        requireAgreement(token, call, grantBinding);
+        return call;
+    }
+
+    private void requireAgreement(VerifiedToken token, ResourceCallBinding call,
+                                  java.util.Optional<IssuedTokenBindings.Binding> grantBinding) {
         var scope = call.scope();
         boolean agrees = grantBinding.isPresent()
                 && call.issuer().equals(token.issuer())
@@ -290,7 +296,65 @@ public class AgentResourceAdmission {
         if (!agrees) {
             throw new TokenRejectedException(TokenRejectedException.Reason.BINDING_MISMATCH);
         }
-        return call;
+    }
+
+    /**
+     * Synchronous identity HALF of a live check, rooted in the bound call's private verified token ({@link
+     * LiveIdentityCheck} is the only caller and documents the contract). Nothing is cached or returned: every call
+     * re-reads and refuses on any doubt; callers invoke it again after later blocking work.
+     */
+    void requireLiveIdentity(BoundCall bound, ResourceExecutionEntry expected, Subject actingWorkload) {
+        Objects.requireNonNull(bound, "bound");
+        Objects.requireNonNull(expected, "expected");
+        requireNotInterrupted();
+        requireOpen(bound.admitted);
+        if (actingWorkload == null) {
+            throw new WitnessRefusedException("expected acting workload missing");
+        }
+        if (!bound.entry.equals(expected)) {
+            throw new WitnessRefusedException("entry differs from the retained one");
+        }
+        if (guard == null) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.AUDIENCE);
+        }
+        if (calls == null || issued == null) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.BINDING_MISSING);
+        }
+        VerifiedToken token = bound.admitted.token;
+        java.util.Optional<ResourceCallBinding> found;
+        java.util.Optional<IssuedTokenBindings.Binding> grantBinding;
+        try {
+            found = calls.find(token.issuer(), token.tokenId());
+            grantBinding = issued.find(token.issuer(), token.tokenId());
+        } catch (RuntimeException unavailable) {
+            requireNotInterrupted();
+            throw new TokenRejectedException(TokenRejectedException.Reason.VERIFIER_UNAVAILABLE, unavailable);
+        }
+        // the lookups blocked: interruption, identity and signed time are re-read before their answer is used
+        requireNotInterrupted();
+        requireOpen(bound.admitted);
+        ResourceCallBinding call = found.orElseThrow(
+                () -> new TokenRejectedException(TokenRejectedException.Reason.BINDING_MISSING));
+        if (!call.equals(bound.admitted.call) || !call.scope().equals(bound.entry.scope())) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.BINDING_MISMATCH);
+        }
+        requireAgreement(token, call, grantBinding);
+        DelegationGrant grant = guard.revalidateGrant(token, Set.of(SCOPE));
+        // the grant reads blocked as well
+        requireNotInterrupted();
+        requireOpen(bound.admitted);
+        if (!grant.id().equals(call.issuingGrantId())) {
+            throw new TokenRejectedException(TokenRejectedException.Reason.BINDING_MISMATCH);
+        }
+        if (!grant.agent().equals(actingWorkload)) {
+            throw new WitnessRefusedException("acting workload differs from the issuing grant's agent");
+        }
+    }
+
+    private static void requireNotInterrupted() {
+        if (Thread.currentThread().isInterrupted()) { // never clears the flag
+            throw new WitnessRefusedException("interrupted");
+        }
     }
 
     /**
