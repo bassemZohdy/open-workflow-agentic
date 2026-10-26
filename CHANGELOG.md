@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge recovery diagnostics90 as99631cc after Claude exact5503932 PASS/independent5 and inspected full1432. Observe asynchronous dev-publish failures and expose disabled-by-default engine snapshots without inferring completion from absence. Actual postmerge allocation contracts main0856d92 passes1427; issue75 remains unresolved, with bounded timeout consumer follow-up in review.
+
 - Merge allocation DATA contracts89 as4b74700 after Claude exact41ba16c PASS/independent209 and verified full1427 current CI (including combined delivery/model controls). No store, migration, approved source or reservation is activated; original-call identity and immutable full contract/profile/lifetime remain data. Issue75 diagnostic intake leaves its cause unresolved.
 
 - Merge audit delivery87 (2570bea) and controlled model calls88 (2284d10) after exact peer reviews, independent53/63 and inspected current CI1395/1409, zero failures/errors/skips. Combined-main verification remains pending. Preserve default refusal and data/authority separation; record the staged allocation migration plan without activating V78 or inventing historical allocations.

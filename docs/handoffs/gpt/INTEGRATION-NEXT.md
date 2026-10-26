@@ -1,10 +1,10 @@
 # Integration queue: next actions (2026-10-27)
 
-Current implementation baseline: main `4b747001b5257ca9abc0ddad5bc112693ae97465`.
+Current implementation baseline: main `99631cce87a5471704a3a8d9ddd63f78756bbc89`.
 Audit delivery87/model88 actual combined main5864898 passes1418; archive and checkout verified.
 Allocation DATA contracts89 merged4b74700 after Claude exact41ba16c PASS/independent209 and inspected1427 PR CI.
-That tested merge includes87/88/89; actual postmerge89 verification remains pending.
-Recovery diagnostics90 open5503932, Claude exact PASS/independent5, current CI pending. Claude-owned bounded timeout consumer follows after merge.
+That tested merge includes87/88/89; actual postmerge89 at0856d92 passes1427 with verified raw evidence.
+Recovery diagnostics90 merged99631cc after Claude exact5503932 PASS/independent5 and inspected1432. Actual postmerge90 pending. Claude timeout consumer requires strict status/deadline follow-up before PR; observed audit-history checks are in preparation with initial28 passing.
 No issue75 cause/fix, production authority, approved model source or graph adoption is claimed.
 Next: [staged allocation migration](WP-103-allocation-migration-plan.md), preserving historical unallocated entries and reserved V78..V80.
 Counts remain11 completed/12 partial/30 not started; acceptance3/39. Issues75/76 remain open.
