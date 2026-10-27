@@ -68,11 +68,14 @@ class ManualEffectDecisionStoreTest {
         var requestId=UlidGenerator.shared().next();
         var resolved=resolver.resolve(authority,fixture.command().key(),requestId,EffectState.CONFIRMED,"TARGET_CONFIRMED");
         assertEquals(EffectState.CONFIRMED,resolved.state());
-        assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution'"));assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+        assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+        var registry=new JdbcInstanceStore(support.db.owner);var current=registry.find(fixture.instance().tenant(),fixture.instance().id()).orElseThrow();
+        registry.replace(current.successor(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS),InstanceStatus.COMPLETED,
+                current.engineInstanceId(),current.startAttempts(),null,null),current.version(),"test.complete",fixture.owner());
         assertEquals(EffectState.CONFIRMED,resolver.resolve(authority,fixture.command().key(),requestId,EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
         assertThrows(RuntimeException.class,()->resolver.resolve(authority,fixture.command().key(),requestId,EffectState.FAILED,"TARGET_REJECTED"));
         assertThrows(RuntimeException.class,()->resolver.resolve(authority,fixture.command().key(),UlidGenerator.shared().next(),EffectState.FAILED,"TARGET_REJECTED"));
-        assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution'"));assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+        assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
         var facts=Transactions.inTransaction(support.db.owner,c->producer.forKey(c,fixture.command().key(),0,128));
         assertEquals("OUTCOME",facts.getLast().source().transition().name());
     }
@@ -92,7 +95,7 @@ class ManualEffectDecisionStoreTest {
                     call==2?"policy changed":"allowed",policy,Instant.now());},event->{});
         assertThrows(io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PolicyDenied.class,
                 ()->resolver(denyOnce,new AuditAppendOnce(support.db.owner)).resolve(authority,f.command().key(),UlidGenerator.shared().next(),EffectState.CONFIRMED,"TARGET_CONFIRMED"));
-        assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution'"));
+        assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
         var resolved=resolver(allowingPep(),new AuditAppendOnce(support.db.owner)).resolve(authority,f.command().key(),UlidGenerator.shared().next(),EffectState.CONFIRMED,"TARGET_CONFIRMED");
         assertEquals(EffectState.CONFIRMED,resolved.state());assertEquals(2,count("select count(*) from effect.manual_decision"));
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
@@ -108,7 +111,7 @@ class ManualEffectDecisionStoreTest {
             var b=pool.submit(()->resolver.resolve(authority,f.command().key(),requestId,EffectState.CONFIRMED,"TARGET_CONFIRMED"));
             assertEquals(EffectState.CONFIRMED,a.get(20,TimeUnit.SECONDS).state());assertEquals(EffectState.CONFIRMED,b.get(20,TimeUnit.SECONDS).state());
         } finally {pool.shutdownNow();assertTrue(pool.awaitTermination(5,TimeUnit.SECONDS));}
-        assertEquals(1,count("select count(*) from effect.manual_decision"));assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution'"));
+        assertEquals(1,count("select count(*) from effect.manual_decision"));assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
     }
 
@@ -118,7 +121,7 @@ class ManualEffectDecisionStoreTest {
                 (proxy,method,args)->{if(method.getName().equals("getConnection"))throw new SQLException("audit store unavailable");throw new UnsupportedOperationException(method.getName());});
         assertThrows(RuntimeException.class,()->resolver(allowingPep(),new AuditAppendOnce(unavailable)).resolve(authority,f.command().key(),
                 UlidGenerator.shared().next(),EffectState.FAILED,"TARGET_REJECTED"));
-        assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution'"));
+        assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
         assertEquals(EffectState.FAILED,resolver(allowingPep(),new AuditAppendOnce(support.db.owner)).resolve(authority,f.command().key(),
                 UlidGenerator.shared().next(),EffectState.FAILED,"TARGET_REJECTED").state());
         assertEquals(2,count("select count(*) from effect.manual_decision"));assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
@@ -131,10 +134,30 @@ class ManualEffectDecisionStoreTest {
             return new Decision("test-engine",DecisionOutcome.ALLOW,"allowed",policy,Instant.now());},event->{});
         assertThrows(io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException.class,
                 ()->resolver(pep,new AuditAppendOnce(support.db.owner)).resolve(authority,f.command().key(),UlidGenerator.shared().next(),EffectState.CONFIRMED,"TARGET_CONFIRMED"));
-        assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution'"));
+        assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
         var refreshed=authority(f,Clock.systemUTC(),Instant.now().plusSeconds(600));
-        assertEquals(EffectState.CONFIRMED,resolver(allowingPep(),new AuditAppendOnce(support.db.owner)).resolve(refreshed,f.command().key(),
-                UlidGenerator.shared().next(),EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
+        assertEquals(EffectState.FAILED,resolver(allowingPep(),new AuditAppendOnce(support.db.owner)).resolve(refreshed,f.command().key(),
+                UlidGenerator.shared().next(),EffectState.FAILED,"TARGET_REJECTED").state());
+        assertEquals(2,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution'"));
+    }
+
+    @Test void slowPolicyRecheckIsBoundedAndReleasesApplyLocks() throws Exception {
+        var f=unresolved("occur-slow-policy");var authority=authority(f,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var calls=new AtomicInteger();var entered=new CountDownLatch(1);var release=new CountDownLatch(1);var policy=new PolicyRef("test.resolve-effect","1");
+        var pep=new Pep(request->{
+            if(calls.incrementAndGet()==4){entered.countDown();try{release.await();}catch(InterruptedException ignored){Thread.currentThread().interrupt();}}
+            return new Decision("test-engine",DecisionOutcome.ALLOW,"allowed",policy,Instant.now());
+        },event->{},Duration.ofSeconds(5),Clock.systemUTC());
+        try {
+            assertThrows(IllegalStateException.class,()->resolver(pep,new AuditAppendOnce(support.db.owner)).resolve(authority,
+                    f.command().key(),UlidGenerator.shared().next(),EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+            assertTrue(entered.await(1,TimeUnit.SECONDS));
+            assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());
+        } finally {release.countDown();}
+        var registry=new JdbcInstanceStore(support.db.owner);var current=registry.find(f.instance().tenant(),f.instance().id()).orElseThrow();
+        registry.replace(current.successor(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS),InstanceStatus.COMPLETED,
+                current.engineInstanceId(),current.startAttempts(),null,null),current.version(),"test.complete",f.owner());
     }
 
     private static final class AdvancingClock extends Clock {

@@ -17,6 +17,7 @@ import java.sql.*;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.*;
 import javax.sql.DataSource;
 
 /** Explicitly constructed, opt-in V80 proposal consumer. It is not CDI registered and opens no public route. */
@@ -56,7 +57,9 @@ public final class ManualEffectResolver {
         authority.requireCurrent(REQUIRED);
         var finalDecision=decide(authority,row.instanceId());
         if(!finalDecision.allows())throw new PolicyDenied(finalDecision);
-        return ledger.applyManualDecision(row.id(),key,desired,()->authority.requireCurrent(REQUIRED),()->decide(authority,row.instanceId()));
+        return ledger.applyManualDecision(row.id(),key,desired,
+                ()->bounded(()->{authority.requireCurrent(REQUIRED);return null;}),
+                ()->bounded(()->decide(authority,row.instanceId())));
     }
 
     private Decision decide(CallerAuthority authority,Ulid instanceId) {
@@ -94,9 +97,11 @@ public final class ManualEffectResolver {
         // Preserve the normal effect path lock order: registry instance, then ledger row.
         try(var q=c.prepareStatement("select id,status,wait_deadline,clock_timestamp() from task.instance where id=? and tenant=? for update")) {
             q.setString(1,instance);q.setString(2,tenant);try(var r=q.executeQuery()) {
-                if(!r.next()||!("RUNNING".equals(r.getString(2))||"WAITING".equals(r.getString(2))))
+                if(!r.next())
+                    throw new IllegalStateException("effect instance no longer exists");
+                if(!prior&&!("RUNNING".equals(r.getString(2))||"WAITING".equals(r.getString(2))))
                     throw new IllegalStateException("effect instance is no longer active");
-                Timestamp deadline=r.getTimestamp(3);if(deadline!=null&&!deadline.toInstant().isAfter(r.getTimestamp(4).toInstant()))
+                Timestamp deadline=r.getTimestamp(3);if(!prior&&deadline!=null&&!deadline.toInstant().isAfter(r.getTimestamp(4).toInstant()))
                     throw new IllegalStateException("effect instance wait deadline expired");
             }
         }
@@ -116,7 +121,7 @@ public final class ManualEffectResolver {
         if(!sf.equals(storedScope))throw new IllegalStateException("effect scope fingerprint differs from retained provenance");
         decision=new Decision(decision.decidedBy(),decision.outcome(),decision.reason(),decision.policy(),decision.decidedAt().truncatedTo(ChronoUnit.MICROS));
         Map<String,String> attrs=attributes(tenant,instance,ownerKind,ownerId,sf,kf,id,actor,desired,reason,decision);
-        var draft=AuditDraft.of(draftId,now,actor,"effect.manual-resolution","effect","efp1-"+kf,attrs);
+        var draft=AuditDraft.of(draftId,now,actor,"effect.manual-resolution-requested","effect","efp1-"+kf,attrs);
         var source=new AuditSource(1,sf,kf,AuditSource.Transition.MANUAL,id,AuditDraftFingerprint.of(draft));
         if(!prior)try(var q=c.prepareStatement("""
             insert into effect.manual_decision(decision_id,request_id,thread_name,node_id,idempotency_key,tenant,registry_instance_id,
@@ -136,7 +141,7 @@ public final class ManualEffectResolver {
                     throw new IllegalStateException("manual decision request id was already used with different content");
                 var storedDecision=new Decision(r.getString(12),DecisionOutcome.ALLOW,"retained",new PolicyRef(r.getString(13),r.getString(14)),r.getTimestamp(15).toInstant());
                 var storedAttrs=attributes(tenant,instance,ownerKind,ownerId,r.getString(7),r.getString(8),r.getLong(1),actor,desired,reason,storedDecision);
-                var storedDraft=AuditDraft.of(Ulid.parse(r.getString(10)),r.getTimestamp(11).toInstant(),actor,"effect.manual-resolution","effect","efp1-"+r.getString(8),storedAttrs);
+                var storedDraft=AuditDraft.of(Ulid.parse(r.getString(10)),r.getTimestamp(11).toInstant(),actor,"effect.manual-resolution-requested","effect","efp1-"+r.getString(8),storedAttrs);
                 var storedSource=new AuditSource(1,r.getString(7),r.getString(8),AuditSource.Transition.MANUAL,r.getLong(1),r.getString(9));
                 if(!storedSource.key().equals(r.getString(6))||!storedSource.contentFingerprint().equals(AuditDraftFingerprint.of(storedDraft)))throw new IllegalStateException("retained manual decision is inconsistent");
                 return new DecisionRow(r.getLong(1),Ulid.parse(instance),storedSource,storedDraft);
@@ -149,11 +154,18 @@ public final class ManualEffectResolver {
         var a=new TreeMap<String,String>();a.put("oa.chain","effect-"+fingerprint("oa.effect.audit-chain.v1",tenant));a.put("oa.tenant",tenant);a.put("oa.instance",instance);
         a.put("effect.owner.kind",ownerKind);a.put("effect.owner.id",ownerId);a.put("effect.scope",sf);a.put("effect.key",kf);
         a.put("effect.transition","MANUAL");a.put("effect.decision",Long.toString(id));a.put("effect.actor.kind",actor.kind().name());a.put("effect.actor.id",actor.id());
-        a.put("effect.to",desired.name());a.put("effect.reason",reason);a.put("effect.policy.decidedBy",decision.decidedBy());a.put("effect.policy.outcome",decision.outcome().name());
+        a.put("effect.status","REQUESTED");a.put("effect.to",desired.name());a.put("effect.reason",reason);a.put("effect.policy.decidedBy",decision.decidedBy());a.put("effect.policy.outcome",decision.outcome().name());
         a.put("effect.policy.id",decision.policy().policyId());a.put("effect.policy.version",decision.policy().policySetVersion());
         a.put("effect.policy.decidedAt",decision.decidedAt().toString());return a;
     }
     private static AuditEvent manualDraft(DecisionRow row,EffectKey key){return row.draft();}
+    private static <T> T bounded(Callable<T> work) {
+        var task=new FutureTask<>(work);Thread.ofVirtual().name("manual-effect-check").start(task);
+        try{return task.get(1,TimeUnit.SECONDS);}
+        catch(InterruptedException interrupted){Thread.currentThread().interrupt();task.cancel(true);throw new IllegalStateException("manual effect authorization check was interrupted",interrupted);}
+        catch(ExecutionException failed){Throwable cause=failed.getCause();if(cause instanceof RuntimeException runtime)throw runtime;if(cause instanceof Error error)throw error;throw new IllegalStateException("manual effect authorization check failed",cause);}
+        catch(TimeoutException timeout){task.cancel(true);throw new IllegalStateException("manual effect authorization check exceeded one second",timeout);}
+    }
     private static String scopeFingerprint(String tenant,String instance,String kind,String owner){return fingerprint("oa.effect.audit-scope.v1",tenant,instance,kind,owner);}
     private static String keyFingerprint(EffectKey key){return fingerprint("oa.effect.audit-key.v1",key.threadId().value(),key.nodeId(),key.idempotencyKey());}
     private static String fingerprint(String domain,String... parts){var e=new CanonicalEncoder(domain);for(String p:parts)e.text(p);return CanonicalEncoder.sha256Hex(e.toBytes());}

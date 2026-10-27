@@ -13,27 +13,33 @@ public route, Flyway migration or default runtime activation.
 
 The immutable V80 request retains caller, scope, desired state, finite reason,
 policy attribution, central audit source identity, draft id and draft time. The
-resolver appends that `MANUAL` source with `AuditAppendOnce` before any ledger
-mutation. It then rechecks authority and policy after locks, updates the effect
-through the existing `effect.outcome` journal reason, and records the V80 apply
-link in the same ledger transaction. The existing V77 source projection and
+resolver appends an `effect.manual-resolution-requested` central audit event
+before any ledger mutation. Its `REQUESTED` status is an immutable decision
+intent; the existing `effect.outcome` journal fact and atomic V80 apply link
+identify the decision that actually changed state. It then rechecks authority
+and policy under the apply transaction's locks, with each check bounded to one
+second, before updating the effect. The existing V77 source projection and
 constraints remain unchanged. A retry with the same request id reuses the
 stored source/draft and central receipt. A failed request can be superseded by
 a new request id while the effect remains unresolved; a conflicting reuse of
 an id or an already applied effect is refused. Multiple immutable requests
 may be retained for one effect, but a unique per-effect apply link permits
-only one outcome mutation.
+only one outcome mutation. Replaying an already-applied request returns the
+stored outcome after authority and policy rechecks even if its instance has
+since become terminal; a new mutation still requires a current active instance.
 
 ## Evidence
 
 - Exact local focused run: `mvn --% -pl apps/app-runtime -am test
   -Dtest=ManualEffectDecisionStoreTest,ManualEffectDecisionMigrationTest
-  -Dsurefire.failIfNoSpecifiedTests=false -Dcheckstyle.skip=true` — 8 tests,
+  -Dsurefire.failIfNoSpecifiedTests=false -Dcheckstyle.skip=true` — 9 tests,
   0 failures/errors/skips, PostgreSQL 16.15. Store coverage includes same-request
   retry/conflict, denied/unverified caller, superseding a policy-refused request,
   concurrent identical requests, audit-append failure recovery and caller
-  expiry during the final policy recheck. Migration coverage verifies proposal
-  isolation and transactional rollback.
+  expiry during the final policy recheck. It also verifies applied replay after
+  instance completion, a slow policy recheck timeout with lock release, and
+  distinguishes requested audit intents from the terminal applied outcome.
+  Migration coverage verifies proposal isolation and transactional rollback.
 - Runtime and application test compilation passed.
 - `git diff --check` passed.
 
