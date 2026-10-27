@@ -109,7 +109,9 @@ SQL state tamper refusal and aggregate-vs-retained amount/count checks are inclu
 The state summary removes account-wide historical rehash/sum work from the locked
 insert path. A non-locking read-only currentness variant avoids the exclusive registry
 lock after callbacks while reservation insertion retains its serialization lock.
-Client-side 5s query/socket timeouts complement stricter existing server limits.
+Client-side 5s query timeout and 30s socket bound complement the stricter 2s/5s
+server limits; the socket bound leaves commit headroom. A failed timeout reset after
+commit evicts the connection without changing the committed result.
 Exact new-head Claude review and required CI remain pending.
 
 The initial independent118 run had one private database teardown timeout while another

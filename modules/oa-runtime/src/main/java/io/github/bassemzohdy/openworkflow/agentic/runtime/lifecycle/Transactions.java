@@ -33,7 +33,7 @@ public final class Transactions {
     /** Adds a bounded client-side socket timeout, restoring the pooled connection before it is returned. */
     public static <T> T inTransaction(DataSource dataSource, Work<T> work, int networkTimeoutMillis) {
         try (Connection connection = dataSource.getConnection()) {
-            int oldNetwork=0;boolean networkChanged=false;Throwable primary=null;
+            int oldNetwork=0;boolean networkChanged=false,committed=false;Throwable primary=null;
             try {
                 if(networkTimeoutMillis>0) {
                     oldNetwork=connection.getNetworkTimeout();
@@ -43,6 +43,7 @@ public final class Transactions {
                 connection.setAutoCommit(false);
                 T result = work.run(connection);
                 connection.commit();
+                committed=true;
                 return result;
             } catch (SQLException e) {
                 primary=e;
@@ -55,8 +56,10 @@ public final class Transactions {
             } finally {
                 if(networkChanged)try {connection.setNetworkTimeout(DIRECT,oldNetwork);}
                 catch(SQLException reset) {
+                    try {connection.abort(DIRECT);}catch(SQLException abort){reset.addSuppressed(abort);}
                     if(primary!=null)primary.addSuppressed(reset);
-                    else throw reset;
+                    else if(!committed)throw reset;
+                    // If committed, discard the bad pooled connection without changing its durable result.
                 }
             }
         } catch (SQLException e) {
@@ -66,8 +69,8 @@ public final class Transactions {
 
     /** Runs short owned work outside an ambient JTA transaction and never loses the primary failure on resume. */
     public static <T> T inSuspendedTransaction(TransactionManager transactions,Supplier<T> work) {
+        Objects.requireNonNull(transactions);
         Objects.requireNonNull(work);
-        if(transactions==null)return work.get();
         Transaction prior;
         try {prior=transactions.suspend();}
         catch(Exception failed){throw new StoreUnavailableException("caller transaction cannot be suspended",failed);}

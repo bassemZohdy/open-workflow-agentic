@@ -216,6 +216,17 @@ class ModelCallReservationStoreTest {
         answer(calls,n,effects);assertTrue(gate.find(n).isPresent());
         assertFalse(commits.isEmpty());assertTrue(commits.stream().allMatch("serializable:100ms:500ms"::equals));
     }
+    @Test void timeoutResetFailureAfterCommitEvictsConnectionWithoutChangingCommittedResult() throws Exception {
+        var timeoutSets=new AtomicInteger();var commits=new AtomicInteger();var aborts=new AtomicInteger();
+        var resetFails=wrapping(data,c->(Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class[]{Connection.class},(p,m,args)->{
+            if(m.getName().equals("setNetworkTimeout")&&timeoutSets.incrementAndGet()==2)throw new SQLException("injected reset failure");
+            if(m.getName().equals("commit"))commits.incrementAndGet();
+            if(m.getName().equals("abort"))aborts.incrementAndGet();
+            return invoke(m,c,args);
+        }));
+        assertEquals("durably committed",Transactions.inTransaction(resetFails,c->"durably committed",30_000));
+        assertEquals(1,commits.get());assertEquals(2,timeoutSets.get());assertEquals(1,aborts.get());
+    }
     @Test void siblingsShareOneActualParentCapRatherThanReceivingFreshIndependentSourceBudgets() throws Exception {
         var old=a.contract();var child=new AgentTaskContract(old.id(),old.goal(),old.permittedTools(),old.permittedDataScopes(),old.riskTier(),
             new ExecutionLimits(5,Duration.ofSeconds(120),1000),old.requestingSubject(),old.delegationGrantId());

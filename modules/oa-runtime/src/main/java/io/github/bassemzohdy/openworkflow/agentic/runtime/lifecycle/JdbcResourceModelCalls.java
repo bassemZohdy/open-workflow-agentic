@@ -21,7 +21,7 @@ import javax.sql.DataSource;
  * the private consumer; a supplied guard or callback is never accepted from a request/serialized checkpoint.
  */
 public final class JdbcResourceModelCalls implements ResourceModelCalls {
-    private static final int NETWORK_TIMEOUT_MILLIS = 5_000;
+    private static final int NETWORK_TIMEOUT_MILLIS = 30_000;
     private static final int QUERY_TIMEOUT_SECONDS = 5;
     private final DataSource data;
     private final TransactionManager transactions;
