@@ -130,6 +130,26 @@ class ManualEffectDecisionStoreTest {
         assertEquals("read committed",isolation);
     }
 
+    @Test void manualResolutionCommitsOutsideAmbientJtaRollback() throws Exception {
+        var fixture=unresolved("occur-ambient-rollback");var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var requestId=UlidGenerator.shared().next();var resolver=resolver(allowingPep(),new AuditAppendOnce(support.db.owner));
+        manager.begin();var ambient=manager.getTransaction();
+        try {
+            assertEquals(EffectState.CONFIRMED,resolver.resolve(authority,fixture.command().key(),requestId,
+                    EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
+            assertSame(ambient,manager.getTransaction());
+        } finally {
+            if(manager.getTransaction()!=null)manager.rollback();
+        }
+        assertNull(manager.getTransaction());
+        assertEquals(EffectState.CONFIRMED,ledger.find(fixture.command().key()).orElseThrow().state());
+        assertEquals(1,count("select count(*) from effect.manual_decision"));
+        assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+        assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        var sources=Transactions.inTransaction(support.db.owner,c->producer.forKey(c,fixture.command().key(),0,128));
+        assertTrue(sources.stream().anyMatch(f->f.source().transition()==AuditSource.Transition.OUTCOME));
+    }
+
     @Test void requestRetainedBeforePolicyRefusalCanBeSupersededByANewRequestId() throws Exception {
         var f=unresolved("occur-policy-change");var authority=authority(f,Clock.systemUTC(),Instant.now().plusSeconds(600));var n=new AtomicInteger();
         var deniedRequest=UlidGenerator.shared().next();
