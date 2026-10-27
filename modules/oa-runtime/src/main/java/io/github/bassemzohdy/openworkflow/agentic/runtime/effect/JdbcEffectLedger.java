@@ -264,6 +264,7 @@ public class JdbcEffectLedger implements EffectLedger {
             throw new IllegalArgumentException("invalid manual effect decision");
         Objects.requireNonNull(currentAuthority);Objects.requireNonNull(recheckPolicy);
         return transaction(c -> {
+            lockManualInstance(c,key);
             Effect current=locked(c,key).effect();
             try(var q=c.prepareStatement("select desired_state,actor_kind,actor_id,source_key from effect.manual_decision where decision_id=? and thread_name=? and node_id=? and idempotency_key=? for update")) {
                 q.setLong(1,decisionId);bind(q,key,2);
@@ -293,13 +294,14 @@ public class JdbcEffectLedger implements EffectLedger {
             Decision fresh=Objects.requireNonNull(recheckPolicy.get());
             if(!fresh.allows()) throw new io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PolicyDenied(fresh);
             currentAuthority.run();
+            requireManualInstanceCurrent(c,key);
             try(var q=c.prepareStatement("update effect.ledger set state=?,detail=?,recorded_at=clock_timestamp()"+WHERE+" and state='INTENDED' returning *")) {
                 q.setString(1,desired.name());q.setString(2,"manual resolution");bind(q,key,3);
                 try(var r=q.executeQuery()) {
                     if(!r.next()) throw new IllegalStateException("effect resolution lost its unresolved state");
                     Effect resolved=read(r);EffectAuditProducer.Fact fact=journal(c,key,EffectState.INTENDED,desired,"effect.outcome");
-                    try(var applied=c.prepareStatement("insert into effect.manual_decision_applied(decision_id,effect_event_id,resulting_state) values(?,?,?)")) {
-                        applied.setLong(1,decisionId);applied.setLong(2,fact.id());applied.setString(3,desired.name());applied.executeUpdate();
+                    try(var applied=c.prepareStatement("insert into effect.manual_decision_applied(decision_id,thread_name,node_id,idempotency_key,effect_event_id,resulting_state) values(?,?,?,?,?,?)")) {
+                        applied.setLong(1,decisionId);bind(applied,key,2);applied.setLong(5,fact.id());applied.setString(6,desired.name());applied.executeUpdate();
                     }
                     try(var close=c.prepareStatement("update effect.manual_resolution set closed_at=clock_timestamp()"+WHERE+" and closed_at is null")) {bind(close,key);close.executeUpdate();}
                     return resolved;
@@ -313,6 +315,24 @@ public class JdbcEffectLedger implements EffectLedger {
     }
     private static boolean hasUnknown(Connection c,EffectKey key) throws SQLException {
         try(var q=c.prepareStatement("select 1 from effect.event"+WHERE+" and reason='effect.outcome.unknown' and from_state='INTENDED' and to_state='INTENDED' limit 1")) {bind(q,key);try(var r=q.executeQuery()){return r.next();}}
+    }
+    private static void lockManualInstance(Connection c,EffectKey key) throws SQLException {
+        try(var q=c.prepareStatement("""
+            select r.id from effect.audit_scope s join task.instance r on r.id=s.registry_instance_id
+            where s.thread_name=? and s.node_id=? and s.idempotency_key=? for update of r
+            """)) {bind(q,key);try(var r=q.executeQuery()){if(!r.next())throw new IllegalStateException("effect scope has no current registry instance");}}
+    }
+    private static void requireManualInstanceCurrent(Connection c,EffectKey key) throws SQLException {
+        try(var q=c.prepareStatement("""
+            select r.status,r.wait_deadline,clock_timestamp() from effect.audit_scope s
+            join task.instance r on r.id=s.registry_instance_id
+            where s.thread_name=? and s.node_id=? and s.idempotency_key=? for update of r
+            """)) {bind(q,key);try(var r=q.executeQuery()) {
+            if(!r.next()||!("RUNNING".equals(r.getString(1))||"WAITING".equals(r.getString(1))))
+                throw new IllegalStateException("effect instance is no longer active");
+            Timestamp deadline=r.getTimestamp(2);if(deadline!=null&&!deadline.toInstant().isAfter(r.getTimestamp(3).toInstant()))
+                throw new IllegalStateException("effect instance wait deadline expired");
+        }}
     }
 
     /** Bounded, thread-scoped internal queue; public operator access requires the verified caller/PEP integration. */

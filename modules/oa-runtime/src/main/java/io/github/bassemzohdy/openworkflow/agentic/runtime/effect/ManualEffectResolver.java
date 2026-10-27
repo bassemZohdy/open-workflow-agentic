@@ -43,24 +43,25 @@ public final class ManualEffectResolver {
         var caller=authority.caller();
         if(caller.subject()==null||caller.subject().kind()!=SubjectKind.USER)throw new IllegalArgumentException("manual resolution requires a verified user");
         authority.requireCurrent(REQUIRED);
-        var initial=decide(authority,key);
+        Ulid instanceId=instanceId(key);
+        var initial=decide(authority,instanceId);
         if(!initial.allows())throw new PolicyDenied(initial);
-        DecisionRow row=Transactions.inSuspendedTransaction(transactions,()->Transactions.inTransaction(dataSource,c->retain(c,authority,key,requestId,desired,reasonCode,initial)));
+        DecisionRow row=Transactions.inSuspendedTransaction(transactions,()->Transactions.inTransaction(dataSource,c->retain(c,authority,key,instanceId,requestId,desired,reasonCode,initial)));
         authority.requireCurrent(REQUIRED);
-        var beforeAppend=decide(authority,key);
+        var beforeAppend=decide(authority,row.instanceId());
         if(!beforeAppend.allows())throw new PolicyDenied(beforeAppend);
         authority.requireCurrent(REQUIRED);
         var draft=manualDraft(row,key);
         AuditReceipt receipt=audit.appendOnce(row.source(),draft);receipt.requireMatches(row.source(),draft);
         authority.requireCurrent(REQUIRED);
-        var finalDecision=decide(authority,key);
+        var finalDecision=decide(authority,row.instanceId());
         if(!finalDecision.allows())throw new PolicyDenied(finalDecision);
-        return ledger.applyManualDecision(row.id(),key,desired,()->authority.requireCurrent(REQUIRED),()->decide(authority,key));
+        return ledger.applyManualDecision(row.id(),key,desired,()->authority.requireCurrent(REQUIRED),()->decide(authority,row.instanceId()));
     }
 
-    private Decision decide(CallerAuthority authority,EffectKey key) {
+    private Decision decide(CallerAuthority authority,Ulid instanceId) {
         return pep.instanceOperation(Pep.InstanceOperation.RESOLVE_EFFECT,authority.caller().subject(),authority.caller().scopes(),
-                instanceId(key));
+                instanceId);
     }
 
     private Ulid instanceId(EffectKey key) {
@@ -71,28 +72,43 @@ public final class ManualEffectResolver {
         }));
     }
 
-    private DecisionRow retain(Connection c,CallerAuthority authority,EffectKey key,Ulid requestId,EffectState desired,String reason,Decision decision) throws SQLException {
+    private DecisionRow retain(Connection c,CallerAuthority authority,EffectKey key,Ulid expectedInstanceId,Ulid requestId,EffectState desired,String reason,Decision decision) throws SQLException {
         var caller=authority.caller();
         boolean prior;
         try(var q=c.prepareStatement("""
             select s.tenant,s.registry_instance_id,s.owner_kind,s.owner_id,s.scope_fingerprint,l.state,l.attempted,l.request_fingerprint
             from effect.audit_scope s join effect.ledger l using(thread_name,node_id,idempotency_key)
-            where s.thread_name=? and s.node_id=? and s.idempotency_key=? for update of s,l
+            where s.thread_name=? and s.node_id=? and s.idempotency_key=?
             """)) {
             bind(q,key);try(var r=q.executeQuery()) {
                 if(!r.next()||!caller.tenant().equals(r.getString(1))||r.getString(8)==null)
                     throw new IllegalStateException("effect has no matching retained verified caller scope");
+                if(!expectedInstanceId.value().equals(r.getString(2)))throw new IllegalStateException("effect registry scope changed");
                 prior=hasRequest(c,requestId,key,caller.subject(),desired,reason);
-                if(!prior&&(!"INTENDED".equals(r.getString(6))||!r.getBoolean(7)||!hasUnknown(c,key)))
+            }
+        }
+        String tenant,instance,ownerKind,ownerId,storedScope;
+        try(var q=c.prepareStatement("select s.tenant,s.registry_instance_id,s.owner_kind,s.owner_id from effect.audit_scope s where s.thread_name=? and s.node_id=? and s.idempotency_key=?")) {
+            bind(q,key);try(var r=q.executeQuery()){if(!r.next())throw new IllegalStateException("effect scope disappeared");tenant=r.getString(1);instance=r.getString(2);ownerKind=r.getString(3);ownerId=r.getString(4);}
+        }
+        // Preserve the normal effect path lock order: registry instance, then ledger row.
+        try(var q=c.prepareStatement("select id,status,wait_deadline,clock_timestamp() from task.instance where id=? and tenant=? for update")) {
+            q.setString(1,instance);q.setString(2,tenant);try(var r=q.executeQuery()) {
+                if(!r.next()||!("RUNNING".equals(r.getString(2))||"WAITING".equals(r.getString(2))))
+                    throw new IllegalStateException("effect instance is no longer active");
+                Timestamp deadline=r.getTimestamp(3);if(deadline!=null&&!deadline.toInstant().isAfter(r.getTimestamp(4).toInstant()))
+                    throw new IllegalStateException("effect instance wait deadline expired");
+            }
+        }
+        try(var q=c.prepareStatement("select state,attempted,request_fingerprint from effect.ledger where thread_name=? and node_id=? and idempotency_key=? for update")) {
+            bind(q,key);try(var r=q.executeQuery()) {
+                if(!r.next()||r.getString(3)==null)throw new IllegalStateException("effect has no verified request fingerprint");
+                if(!prior&&(!"INTENDED".equals(r.getString(1))||!r.getBoolean(2)||!hasUnknown(c,key)))
                     throw new IllegalStateException("effect is not an attempted unresolved effect with an unknown outcome");
             }
         }
         long id;try(var q=c.prepareStatement("select nextval(pg_get_serial_sequence('effect.manual_decision','decision_id'))")) {try(var r=q.executeQuery()){r.next();id=r.getLong(1);}}
         Instant now=Instant.now().truncatedTo(ChronoUnit.MICROS);Ulid draftId=UlidGenerator.shared().next();
-        String tenant,instance,ownerKind,ownerId,storedScope;
-        try(var q=c.prepareStatement("select s.tenant,s.registry_instance_id,s.owner_kind,s.owner_id from effect.audit_scope s where s.thread_name=? and s.node_id=? and s.idempotency_key=?")) {
-            bind(q,key);try(var r=q.executeQuery()){if(!r.next())throw new IllegalStateException("effect scope disappeared");tenant=r.getString(1);instance=r.getString(2);ownerKind=r.getString(3);ownerId=r.getString(4);}
-        }
         var actor=caller.subject();String sf=scopeFingerprint(tenant,instance,ownerKind,ownerId),kf=keyFingerprint(key);
         try(var q=c.prepareStatement("select scope_fingerprint from effect.audit_scope where thread_name=? and node_id=? and idempotency_key=?")) {
             bind(q,key);try(var r=q.executeQuery()){if(!r.next())throw new IllegalStateException("effect scope disappeared");storedScope=r.getString(1);}
@@ -123,7 +139,7 @@ public final class ManualEffectResolver {
                 var storedDraft=AuditDraft.of(Ulid.parse(r.getString(10)),r.getTimestamp(11).toInstant(),actor,"effect.manual-resolution","effect","efp1-"+r.getString(8),storedAttrs);
                 var storedSource=new AuditSource(1,r.getString(7),r.getString(8),AuditSource.Transition.MANUAL,r.getLong(1),r.getString(9));
                 if(!storedSource.key().equals(r.getString(6))||!storedSource.contentFingerprint().equals(AuditDraftFingerprint.of(storedDraft)))throw new IllegalStateException("retained manual decision is inconsistent");
-                return new DecisionRow(r.getLong(1),storedSource,storedDraft);
+                return new DecisionRow(r.getLong(1),Ulid.parse(instance),storedSource,storedDraft);
             }
         }
     }
@@ -155,5 +171,5 @@ public final class ManualEffectResolver {
             }
         }
     }
-    private record DecisionRow(long id,AuditSource source,AuditEvent draft){}
+    private record DecisionRow(long id,Ulid instanceId,AuditSource source,AuditEvent draft){}
 }

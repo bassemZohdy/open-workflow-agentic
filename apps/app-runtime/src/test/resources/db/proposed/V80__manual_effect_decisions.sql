@@ -40,8 +40,7 @@ create table effect.manual_decision (
     occurred_at timestamptz not null,
     created_at timestamptz not null default clock_timestamp(),
     foreign key(thread_name,node_id,idempotency_key) references effect.ledger(thread_name,node_id,idempotency_key),
-    foreign key(tenant,registry_instance_id) references task.instance(tenant,id),
-    unique(thread_name,node_id,idempotency_key)
+    foreign key(tenant,registry_instance_id) references task.instance(tenant,id)
 );
 create index manual_decision_effect_idx on effect.manual_decision(thread_name,node_id,idempotency_key,decision_id);
 create function effect.manual_decision_insert_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
@@ -71,9 +70,14 @@ $$;
 create trigger manual_decision_insert_guard before insert on effect.manual_decision for each row execute function effect.manual_decision_insert_guard();
 create table effect.manual_decision_applied (
     decision_id bigint primary key references effect.manual_decision(decision_id),
+    thread_name varchar(68) not null,
+    node_id varchar(128) not null,
+    idempotency_key varchar(200) not null,
     effect_event_id bigint not null unique references effect.event(id),
     resulting_state text not null check(resulting_state in ('CONFIRMED','FAILED')),
-    applied_at timestamptz not null default clock_timestamp()
+    applied_at timestamptz not null default clock_timestamp(),
+    unique(thread_name,node_id,idempotency_key),
+    foreign key(thread_name,node_id,idempotency_key) references effect.ledger(thread_name,node_id,idempotency_key)
 );
 create function effect.manual_decision_immutable() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 begin raise exception 'manual effect decisions are immutable and retained' using errcode='insufficient_privilege'; end;
@@ -90,6 +94,7 @@ begin
     if d.decision_id is null or e.id is null or e.thread_name is distinct from d.thread_name or e.node_id is distinct from d.node_id
        or e.idempotency_key is distinct from d.idempotency_key or e.reason<>'effect.outcome' or e.from_state<>'INTENDED'
        or e.to_state is distinct from d.desired_state or new.resulting_state is distinct from d.desired_state
+       or row(new.thread_name,new.node_id,new.idempotency_key) is distinct from row(d.thread_name,d.node_id,d.idempotency_key)
        or l.state is distinct from d.desired_state then
         raise exception 'manual decision application differs from effect outcome' using errcode='check_violation';
     end if;

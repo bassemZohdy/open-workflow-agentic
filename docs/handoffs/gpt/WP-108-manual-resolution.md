@@ -18,17 +18,28 @@ mutation. It then rechecks authority and policy after locks, updates the effect
 through the existing `effect.outcome` journal reason, and records the V80 apply
 link in the same ledger transaction. The existing V77 source projection and
 constraints remain unchanged. A retry with the same request id reuses the
-stored source/draft and central receipt; a conflicting request or terminal
-effect is refused.
+stored source/draft and central receipt. A failed request can be superseded by
+a new request id while the effect remains unresolved; a conflicting reuse of
+an id or an already applied effect is refused. Multiple immutable requests
+may be retained for one effect, but a unique per-effect apply link permits
+only one outcome mutation.
 
 ## Evidence
 
-- Exact local focused run: `mvn -pl apps/app-runtime -am test
+- Exact local focused run: `mvn --% -pl apps/app-runtime -am test
   -Dtest=ManualEffectDecisionStoreTest,ManualEffectDecisionMigrationTest
-  -Dsurefire.failIfNoSpecifiedTests=false -Dcheckstyle.skip=true` — 4 tests,
-  0 failures/errors/skips, PostgreSQL 16.15.
+  -Dsurefire.failIfNoSpecifiedTests=false -Dcheckstyle.skip=true` — 8 tests,
+  0 failures/errors/skips, PostgreSQL 16.15. Store coverage includes same-request
+  retry/conflict, denied/unverified caller, superseding a policy-refused request,
+  concurrent identical requests, audit-append failure recovery and caller
+  expiry during the final policy recheck. Migration coverage verifies proposal
+  isolation and transactional rollback.
 - Runtime and application test compilation passed.
 - `git diff --check` passed.
+
+The resolver test PEP permits only a user with `oa.recover` requesting the
+`operation:resolve-effect` boundary. The bundled Cedar snapshot's scope and
+principal rules are independently exercised by `ResolveEffectPolicyTest`.
 
 The V80 SQL is deliberately duplicated under the app test resources to rehearse
 the proposal only. Migration rehearsal proves it is absent from Flyway and that
