@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge model-reservation DATA increment PR98 as084a02d after Claude exact-head df8daa129c5d3a526a418238dbe4bf22afef3828 PASS and current full PR CI40428062558 SUCCESS. The 64 focused local cases and independent peer cases pass; post-merge main run40429186511 is tracked separately. Reservations remain opt-in and unapproved: no model call, source/role activation, V78/V79 deployment, package closure or acceptance promotion.
+
 - Merge audit response freshness93 (ae57e4e) after exact GPT8a5896e PASS/independent37 and inspected full1472, including all3 native default-denial cases. Recheck signed identity after result materialization; expired reads release neither event data nor not-found evidence. Close the scoped audit caller/PEP response task while keeping tenant/emergency/other boundaries open. Combined91/92 main1463/provider1460/1455 evidence is verified.
 
 - Merge observed audit history91 (3610fca) and private bounded recovery snapshot92 (5f5a229) after exact reciprocal reviews, independent73/11 and inspected full1452/1443 plus provider1435/1440. Receipts remain observed snapshot DATA; later writes, target permission and whole-call bounds are not inferred. Timeout/status/chunked-body probes exposed real diagnostic defects before correction; issue75 cause/fix and production profile76 remain open.

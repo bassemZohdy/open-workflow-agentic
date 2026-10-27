@@ -113,9 +113,20 @@ Client-side 5s query timeout and 30s socket bound complement the stricter 2s/5s
 server limits; the socket bound leaves commit headroom. A failed timeout reset after
 commit evicts the connection without changing the committed result. Owned transaction
 network timeout setup/reset/abort, PostgreSQL timeout caps and read snapshot isolation
-now use the shared Transactions helpers already used by the execution/history gates.
-The latest local store suite is 27/27, zero failures/errors/skips; exact new-head
-Claude review and required CI remain pending.
+now use shared `Transactions` helpers also used by the execution/history gates.
+
+## Integrated result
+
+PR #98 merged as `084a02d` after Claude exact-head PASS on
+`df8daa129c5d3a526a418238dbe4bf22afef3828` and current PR CI
+`40428062558` SUCCESS. Independent focused verification on that head passed 64
+tests (reservation store27, effect-history20, execution-gate17), zero failures,
+errors or skips. Claude also independently ran the 27-case store suite plus 44
+effect-history/execution-gate/IO-bounds cases, all green. Claude noted only
+non-blocking comment indentation and public-helper documentation nits. The post-merge
+main build `40429186511` was still in progress at this tracking update. The merged
+increment remains DATA-only: no source approval, budget authorization, model call,
+consumer activation or package/acceptance closure.
 
 The initial independent118 run had one private database teardown timeout while another
 broad test run was creating/dropping databases; all bodies passed, and independent

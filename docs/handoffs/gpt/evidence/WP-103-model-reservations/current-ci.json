@@ -1,0 +1,14 @@
+{
+  "runId": 40428062558,
+  "url": "https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/40428062558",
+  "reviewedHead": "df8daa129c5d3a526a418238dbe4bf22afef3828",
+  "conclusion": "success",
+  "workflow": "build",
+  "pullRequest": 98,
+  "mergeCommit": "084a02d06d84e29a8794dd5a431af724db40a4bf",
+  "postMergeMainRun": {
+    "runId": 40429186511,
+    "statusAtRecord": "in_progress"
+  },
+  "scope": "Exact PR head passed required GitHub CI before merge; post-merge main run status is recorded separately and does not change the pre-merge gate result"
+}
