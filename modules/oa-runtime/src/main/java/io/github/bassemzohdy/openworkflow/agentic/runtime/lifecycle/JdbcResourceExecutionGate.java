@@ -16,7 +16,6 @@ import java.sql.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -98,7 +97,6 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
     private final TransactionManager transactions;
     private final int limit;
     private final IoBounds io;
-    private static final Executor DIRECT = Runnable::run;
     private final Set<Attempt> active = new HashSet<>();
     private boolean closed;
 
@@ -277,19 +275,8 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         }
     }
     private void configureOwnedTransaction(Connection c) throws SQLException {
-        // A stricter role/session limit is never widened. PostgreSQL reports these GUCs as interval-compatible text.
-        String cap = "pg_catalog.set_config(?,least(coalesce(nullif(extract(epoch from "
-                + "pg_catalog.current_setting(?)::pg_catalog.interval)*1000,0),?),?)::bigint::text||'ms',true)";
-        try (var q = c.prepareStatement("select " + cap + "," + cap + "," + cap)) {
-            q.setQueryTimeout((int)((io.statement().toMillis()+999)/1000));
-            String[] names = {"lock_timeout", "statement_timeout", "idle_in_transaction_session_timeout"};
-            long[] values = {io.lock().toMillis(), io.statement().toMillis(), io.network().toMillis()};
-            for (int i=0;i<names.length;i++) {
-                q.setString(i*4+1,names[i]); q.setString(i*4+2,names[i]);
-                q.setLong(i*4+3,values[i]); q.setLong(i*4+4,values[i]);
-            }
-            q.execute();
-        }
+        // A stricter role/session limit is never widened.
+        Transactions.capPostgresTimeouts(c,(int)io.lock().toMillis(),(int)io.statement().toMillis(),(int)io.network().toMillis());
     }
     private static Throwable combine(Throwable primary, Throwable secondary) {
         if (primary == null || primary == secondary) return primary == null ? secondary : primary;
@@ -314,10 +301,8 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
             if (transactions != null) ambient = transactions.suspend();
             c = data.getConnection();
             if (!c.getAutoCommit()) throw new RefusedException("connection already has a transaction");
-            oldNetwork = c.getNetworkTimeout();
-            int network = (int)io.network().toMillis();
-            if (oldNetwork > 0) network = Math.min(network,oldNetwork);
-            networkChanged = true; c.setNetworkTimeout(DIRECT,network);
+            oldNetwork = Transactions.setClientNetworkTimeout(c,(int)io.network().toMillis());
+            networkChanged = true;
             oldIsolation = c.getTransactionIsolation();
             autoChanged = true; c.setAutoCommit(false); ownsTransaction = true;
             isolationChanged = true; c.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
@@ -337,12 +322,12 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
                     if (isolationChanged) c.setTransactionIsolation(oldIsolation);
                     // Never switch to auto-commit after a failed rollback: it could commit uncertain pending work.
                     if (autoChanged) c.setAutoCommit(true);
-                    if (networkChanged) c.setNetworkTimeout(DIRECT,oldNetwork);
+                    if (networkChanged) Transactions.restoreClientNetworkTimeout(c,oldNetwork);
                 } catch (Throwable reset) { failure = combine(failure,reset); discard = true; }
-                if (discard) try { c.abort(DIRECT); } catch (Throwable abort) { failure = combine(failure,abort); }
+                if (discard) try { Transactions.abort(c); } catch (Throwable abort) { failure = combine(failure,abort); }
                 try { c.close(); } catch (Throwable cleanup) {
                     failure = combine(failure,cleanup);
-                    try { c.abort(DIRECT); } catch (Throwable abort) { failure = combine(failure,abort); }
+                    try { Transactions.abort(c); } catch (Throwable abort) { failure = combine(failure,abort); }
                 }
             }
             if (ambient != null) try { transactions.resume(ambient); } catch (Throwable resume) {
