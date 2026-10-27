@@ -1,0 +1,17 @@
+{
+  "pullRequest": 100,
+  "reviewedHead": "19681a07daa56b3f7676664a4426547bf8c06ca8",
+  "mergeCommit": "601e1b174fd6d4b1051b6c3f08dad9a74d0412ba",
+  "pullRequestCheck": {
+    "runId": 40433470521,
+    "headSha": "19681a07daa56b3f7676664a4426547bf8c06ca8",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "postMergeCheck": {
+    "runId": 40435285080,
+    "headSha": "601e1b174fd6d4b1051b6c3f08dad9a74d0412ba",
+    "status": "completed",
+    "conclusion": "success"
+  }
+}
