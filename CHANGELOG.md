@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge opt-in manual effect-resolution PR100 as601e1b1 after Claude exact-head PASS19681a0, 10 focused PostgreSQL tests and full exact-head CI40433470521 SUCCESS. Post-merge main run40435285080 is pending. Keep V80 as an unapplied proposal with no CDI/public-route/Flyway activation; WP-108 and T03 governed Flow acceptance remain partial. Record tenant-before-PEP, runtime READ COMMITTED and future audit-grant checks as activation follow-ups.
+
 - Merge model-reservation DATA increment PR98 as084a02d after Claude exact-head df8daa129c5d3a526a418238dbe4bf22afef3828 PASS and current full PR CI40428062558 SUCCESS. The 64 focused local cases and independent peer cases pass; post-merge main run40429186511 is tracked separately. Reservations remain opt-in and unapproved: no model call, source/role activation, V78/V79 deployment, package closure or acceptance promotion.
 
 - Merge audit response freshness93 (ae57e4e) after exact GPT8a5896e PASS/independent37 and inspected full1472, including all3 native default-denial cases. Recheck signed identity after result materialization; expired reads release neither event data nor not-found evidence. Close the scoped audit caller/PEP response task while keeping tenant/emergency/other boundaries open. Combined91/92 main1463/provider1460/1455 evidence is verified.

@@ -943,7 +943,8 @@
           "Checkpoint parity fixture70 merged as79da38e after exact Claude PASS b9db578/6405603074, GPT Java21 PostgreSQL16 test10/24 and full40249904765. Fifteen decoded mutation IDs/SQL strings equal the merged source; actual archived schema10/24, recovery1 and negative default-admission1 passed, migration hash unchanged. Main40250625309 passed. Diagnostics68/69 preserve assertions and retain actual process logs;69 full40248398566 and real-Keycloak40248398613 standard3/delegation8 executed without skips. Original intermittent40246336207 remains open despite initial Linux1 plus20 recorded repeats passing. Consumer implementation and separate packaged startup-refusal proof are underway, not integrated or authority/acceptance closure.",
           "Current-profile consumer71 and packaged proof72 integrated as694dc326/97343477 after exact GPT6e02b0e/Claude031beee reviews and full40253621994/40255084555. Actual archives172/173 suites with1220/1224 executed cases zero fails/errors/skips, exact config/shadow/startup/default-denial controls, source-tree equality and unchanged migration bytes verified. Native real-Keycloak40253622052 standard3/delegation8 plus effect-recovery1 each pass. Independent Java21/PG16 focused68 and isolated startup4 pass; pre-consumer baseline1pass/3intended refusal failures preserved. Agent stops runtime DDL and verifies actual public profile at startup/build/run/inspection. Known shared-state local full attempt remains failed, and original intermittent recovery defect remains open. No deployed credential/current authority/entry callback/backend/producer or acceptance closure.",
           "Merged V76 DATA storage/callback/Running prerequisites74/78/80/82 and V77 facts85, atomic scoped producer86 and trusted append-once delivery87; verified actual combined main after90 passes1432. Default production composition remains absent: facts, prepared rows and receipts are not target permission.",
-          "Observed audit-history91 merged3610fca: consistent committed snapshot cross-checks exact journal/source/queue membership, canonical chain/ledger tail, every trusted central readback and unchanged prior ACKs. Exact Claude independent73/current full1452 pass; the immutable result is DATA with max128, no later-write/authority/deadline guarantee or default target wiring."
+          "Observed audit-history91 merged3610fca: consistent committed snapshot cross-checks exact journal/source/queue membership, canonical chain/ledger tail, every trusted central readback and unchanged prior ACKs. Exact Claude independent73/current full1452 pass; the immutable result is DATA with max128, no later-write/authority/deadline guarantee or default target wiring.",
+          "Opt-in manual effect-resolution PR100 merged as main601e1b1 after Claude exact-head PASS19681a0. Focused PostgreSQL suite10 and exact-head full check40433470521 pass; post-merge main check40435285080 is pending. V80 remains an unapplied proposal with no CDI/public-route/Flyway activation. Claude recorded non-blocking activation follow-ups: verify tenant scope before initial PEP evaluation, guarantee/document READ COMMITTED at runtime, and verify audit-table grants before activation. WP-108, T03 governed Flow proof and acceptance remain partial."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -994,7 +995,8 @@
           "docs/handoffs/gpt/WP-108-audit-delivery.md",
           "docs/handoffs/gpt/evidence/WP-108-audit-delivery/current-ci.json",
           "docs/handoffs/gpt/WP-108-observed-audit-history.md",
-          "docs/handoffs/gpt/evidence/WP-108-observed-audit-history/current-ci.json"
+          "docs/handoffs/gpt/evidence/WP-108-observed-audit-history/current-ci.json",
+          "docs/handoffs/gpt/WP-108-manual-resolution.md"
         ]
       }
     },
