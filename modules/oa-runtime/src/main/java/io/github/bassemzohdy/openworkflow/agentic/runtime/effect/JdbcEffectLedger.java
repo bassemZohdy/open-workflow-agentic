@@ -8,6 +8,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectCom
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectKey;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectState;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectScope;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.ManualEffect;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectLedger;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException;
@@ -255,6 +256,85 @@ public class JdbcEffectLedger implements EffectLedger {
         });
     }
 
+    /** Applies a retained V80 decision after all row locks are held; audit and current authority/policy precede mutation. */
+    Effect applyManualDecision(long decisionId, EffectKey key, EffectState desired,
+                               Runnable currentAuthority, java.util.function.Supplier<Decision> recheckPolicy) {
+        if (projection == null) throw new IllegalStateException("scoped effect audit producer is not configured");
+        if (decisionId < 1 || (desired != EffectState.CONFIRMED && desired != EffectState.FAILED))
+            throw new IllegalArgumentException("invalid manual effect decision");
+        Objects.requireNonNull(currentAuthority);Objects.requireNonNull(recheckPolicy);
+        return boundedTransaction(c -> {
+            lockManualInstance(c,key);
+            Effect current=locked(c,key).effect();
+            try(var q=c.prepareStatement("select desired_state,actor_kind,actor_id,source_key from effect.manual_decision where decision_id=? and thread_name=? and node_id=? and idempotency_key=? for update")) {
+                q.setLong(1,decisionId);bind(q,key,2);
+                try(var r=q.executeQuery()) {
+                    if(!r.next() || !desired.name().equals(r.getString(1)) || !"USER".equals(r.getString(2)))
+                        throw new IllegalStateException("manual decision does not match this effect");
+                }
+            }
+            try(var q=c.prepareStatement("select effect_event_id,resulting_state from effect.manual_decision_applied where decision_id=?")) {
+                q.setLong(1,decisionId);try(var r=q.executeQuery()) {
+                    if(r.next()) {
+                        if(!desired.name().equals(r.getString(2)) || current.state()!=desired)
+                            throw new IllegalStateException("applied manual decision readback differs");
+                        currentAuthority.run();
+                        Decision fresh=Objects.requireNonNull(recheckPolicy.get());
+                        if(!fresh.allows()) throw new io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PolicyDenied(fresh);
+                        currentAuthority.run();
+                        return current;
+                    }
+                }
+            }
+            if(current.state()!=EffectState.INTENDED) throw new IllegalStateException("effect is no longer unresolved");
+            if(!lockedAttempted(c,key)) throw new IllegalStateException("effect has not been attempted");
+            if(!hasUnknown(c,key)) throw new IllegalStateException("effect has no retained unknown outcome");
+            // Row-lock waits above may have consumed token or made authorization stale.
+            currentAuthority.run();
+            Decision fresh=Objects.requireNonNull(recheckPolicy.get());
+            if(!fresh.allows()) throw new io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PolicyDenied(fresh);
+            currentAuthority.run();
+            requireManualInstanceCurrent(c,key);
+            try(var q=c.prepareStatement("update effect.ledger set state=?,detail=?,recorded_at=clock_timestamp()"+WHERE+" and state='INTENDED' returning *")) {
+                q.setString(1,desired.name());q.setString(2,"manual resolution");bind(q,key,3);
+                try(var r=q.executeQuery()) {
+                    if(!r.next()) throw new IllegalStateException("effect resolution lost its unresolved state");
+                    Effect resolved=read(r);EffectAuditProducer.Fact fact=journal(c,key,EffectState.INTENDED,desired,"effect.outcome");
+                    try(var applied=c.prepareStatement("insert into effect.manual_decision_applied(decision_id,thread_name,node_id,idempotency_key,effect_event_id,resulting_state) values(?,?,?,?,?,?)")) {
+                        applied.setLong(1,decisionId);bind(applied,key,2);applied.setLong(5,fact.id());applied.setString(6,desired.name());applied.executeUpdate();
+                    }
+                    try(var close=c.prepareStatement("update effect.manual_resolution set closed_at=clock_timestamp()"+WHERE+" and closed_at is null")) {bind(close,key);close.executeUpdate();}
+                    return resolved;
+                }
+            }
+        });
+    }
+
+    private static boolean lockedAttempted(Connection c,EffectKey key) throws SQLException {
+        try(var q=c.prepareStatement("select attempted from effect.ledger"+WHERE)) {bind(q,key);try(var r=q.executeQuery()){return r.next()&&r.getBoolean(1);}}
+    }
+    private static boolean hasUnknown(Connection c,EffectKey key) throws SQLException {
+        try(var q=c.prepareStatement("select 1 from effect.event"+WHERE+" and reason='effect.outcome.unknown' and from_state='INTENDED' and to_state='INTENDED' limit 1")) {bind(q,key);try(var r=q.executeQuery()){return r.next();}}
+    }
+    private static void lockManualInstance(Connection c,EffectKey key) throws SQLException {
+        try(var q=c.prepareStatement("""
+            select r.id from effect.audit_scope s join task.instance r on r.id=s.registry_instance_id
+            where s.thread_name=? and s.node_id=? and s.idempotency_key=? for update of r
+            """)) {bind(q,key);try(var r=q.executeQuery()){if(!r.next())throw new IllegalStateException("effect scope has no current registry instance");}}
+    }
+    private static void requireManualInstanceCurrent(Connection c,EffectKey key) throws SQLException {
+        try(var q=c.prepareStatement("""
+            select r.status,r.wait_deadline,clock_timestamp() from effect.audit_scope s
+            join task.instance r on r.id=s.registry_instance_id
+            where s.thread_name=? and s.node_id=? and s.idempotency_key=? for update of r
+            """)) {bind(q,key);try(var r=q.executeQuery()) {
+            if(!r.next()||!("RUNNING".equals(r.getString(1))||"WAITING".equals(r.getString(1))))
+                throw new IllegalStateException("effect instance is no longer active");
+            Timestamp deadline=r.getTimestamp(2);if(deadline!=null&&!deadline.toInstant().isAfter(r.getTimestamp(3).toInstant()))
+                throw new IllegalStateException("effect instance wait deadline expired");
+        }}
+    }
+
     /** Bounded, thread-scoped internal queue; public operator access requires the verified caller/PEP integration. */
     public List<ManualEffect> manualQueue(ThreadId thread, int limit) {
         Objects.requireNonNull(thread, "thread"); Checks.requireInRange("limit", limit, 1, 200);
@@ -378,6 +458,9 @@ public class JdbcEffectLedger implements EffectLedger {
 
     private <T> T transaction(Transactions.Work<T> work) {
         return isolated(()->Transactions.inTransaction(dataSource,work));
+    }
+    private <T> T boundedTransaction(Transactions.Work<T> work) {
+        return isolated(()->Transactions.inBoundedPostgresTransaction(dataSource,work,2_000,5_000,5_000));
     }
     private <T> T isolated(Supplier<T> work) {
         if(projection==null)return work.get(); // Existing legacy/CDI behavior remains unchanged.

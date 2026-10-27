@@ -30,6 +30,17 @@ public final class Transactions {
         return inTransaction(dataSource,work,0);
     }
 
+    /** Runs a bounded PostgreSQL unit of work with transaction-local lock, statement and idle timeouts. */
+    public static <T> T inBoundedPostgresTransaction(DataSource dataSource,Work<T> work,
+            int lockTimeoutMillis,int statementTimeoutMillis,int idleTimeoutMillis) {
+        if(lockTimeoutMillis<1||statementTimeoutMillis<lockTimeoutMillis||idleTimeoutMillis<1)
+            throw new IllegalArgumentException("PostgreSQL transaction timeouts must be positive and ordered");
+        return inTransaction(dataSource,c->{
+            capPostgresTimeouts(c,lockTimeoutMillis,statementTimeoutMillis,idleTimeoutMillis);
+            return work.run(c);
+        });
+    }
+
     /** Adds a bounded client-side socket timeout, restoring the pooled connection before it is returned. */
     public static <T> T inTransaction(DataSource dataSource, Work<T> work, int networkTimeoutMillis) {
         try (Connection connection = dataSource.getConnection()) {
