@@ -63,7 +63,7 @@ exact-head GitHub check `40433470521` and post-merge main check
 `40435285080` both succeeded. Claude's non-blocking activation follow-ups were
 to verify tenant scope before the initial PEP evaluation, guarantee or document
 READ COMMITTED for runtime transactions, and verify audit-table grants before
-activation. Local hardening commit `2049b37` now filters the retained scope by
+activation. A local hardening follow-up now filters the retained scope by
 the verified caller tenant before PEP evaluation and sets READ COMMITTED in the
 bounded transaction helper. Its focused PostgreSQL run passes 12 tests with
 zero failures/errors/skips; exact peer review and PR CI are pending. Audit-table
