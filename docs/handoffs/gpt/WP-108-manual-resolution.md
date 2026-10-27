@@ -60,9 +60,13 @@ the proposal only. Migration rehearsal proves it is absent from Flyway and that
 a conflicting existing table rolls back all proposal objects. Claude reviewed
 implementation head `19681a07daa56b3f7676664a4426547bf8c06ca8` and returned PASS;
 exact-head GitHub check `40433470521` and post-merge main check
-`40435285080` both succeeded. Claude's non-blocking activation follow-ups are
+`40435285080` both succeeded. Claude's non-blocking activation follow-ups were
 to verify tenant scope before the initial PEP evaluation, guarantee or document
 READ COMMITTED for runtime transactions, and verify audit-table grants before
-activation. This is not deployment-role evidence, a public operator API,
-target-state proof, a process crash/lost-ack T03 result, or WP-108 acceptance
-closure.
+activation. A local hardening follow-up now filters the retained scope by
+the verified caller tenant before PEP evaluation and sets READ COMMITTED in the
+bounded transaction helper. Its focused PostgreSQL run passes 12 tests with
+zero failures/errors/skips; exact peer review and PR CI are pending. Audit-table
+grant verification remains an activation gate. This is not deployment-role
+evidence, a public operator API, target-state proof, a process crash/lost-ack
+T03 result, or WP-108 acceptance closure.

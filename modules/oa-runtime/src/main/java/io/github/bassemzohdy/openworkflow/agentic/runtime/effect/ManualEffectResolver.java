@@ -44,7 +44,7 @@ public final class ManualEffectResolver {
         var caller=authority.caller();
         if(caller.subject()==null||caller.subject().kind()!=SubjectKind.USER)throw new IllegalArgumentException("manual resolution requires a verified user");
         authority.requireCurrent(REQUIRED);
-        Ulid instanceId=instanceId(key);
+        Ulid instanceId=instanceId(key,caller.tenant());
         var initial=decide(authority,instanceId);
         if(!initial.allows())throw new PolicyDenied(initial);
         DecisionRow row=Transactions.inSuspendedTransaction(transactions,()->Transactions.inBoundedPostgresTransaction(dataSource,
@@ -68,10 +68,10 @@ public final class ManualEffectResolver {
                 instanceId);
     }
 
-    private Ulid instanceId(EffectKey key) {
+    private Ulid instanceId(EffectKey key,String tenant) {
         return Transactions.inSuspendedTransaction(transactions,()->Transactions.inTransaction(dataSource,c->{
-            try(var q=c.prepareStatement("select registry_instance_id from effect.audit_scope where thread_name=? and node_id=? and idempotency_key=?")) {
-                bind(q,key);try(var r=q.executeQuery()){if(!r.next())throw new IllegalStateException("effect has no retained verified scope");return Ulid.parse(r.getString(1));}
+            try(var q=c.prepareStatement("select registry_instance_id from effect.audit_scope where thread_name=? and node_id=? and idempotency_key=? and tenant=?")) {
+                bind(q,key);q.setString(4,tenant);try(var r=q.executeQuery()){if(!r.next())throw new IllegalStateException("effect has no matching retained verified caller scope");return Ulid.parse(r.getString(1));}
             }
         }));
     }
