@@ -57,7 +57,7 @@ to applied migration history. This is not deployed executor/writer-role proof.
 
 ## Verification
 
-Actual Temurin21.0.12.1+1 / Maven3.9.11 / PostgreSQL16.15: restored full allocation/reservation family116 passes (contracts15/runtime4/app97), zero failures/errors/skips. Two final test-only additions pass in a separate named delta2 run; no production change followed the116 run. The final peer selection is118 (contracts15/runtime4/app99: model store22/migration5 plus prior allocation72). That initial head subsequently received Claude REQUEST_CHANGES for inherited REPEATABLE READ sibling accounting; those earlier passes are not current-head approval. Logs: target/model-reservations-{fence-negative,restored-final,final-delta}.log. Initial six contract plus sixteen store cases had
+Actual Temurin21.0.12.1+1 / Maven3.9.11 / PostgreSQL16.15: restored full allocation/reservation family116 passes (contracts15/runtime4/app97), zero failures/errors/skips. Two final test-only additions pass in a separate named delta2 run; no production change followed the116 run. The previous peer selection was118 (contracts15/runtime4/app99: model store22/migration5 plus prior allocation72). That initial head subsequently received Claude REQUEST_CHANGES for inherited REPEATABLE READ sibling accounting; those earlier passes are not current-head approval. Logs: target/model-reservations-{fence-negative,restored-final,final-delta}.log. Initial six contract plus sixteen store cases had
 one fixture error: a parent was inserted RUNNING despite the existing PENDING insert
 contract. The fixture now uses real pending insertion and running transition; the
 expanded six-contract/eighteen-store run passes24.
@@ -103,8 +103,14 @@ never silently weakened. Historical snapshots still retain SERIALIZABLE and stri
 one new1000 hold/callback after an observed registry-lock wait) and repeatable read /
 serializable (both refuse, seed hold unchanged), plus direct SQL isolation refusal.
 Five focused fixed-isolation cases pass. The old Java/SQL bytes were used only for the
-negative control, then the corrected bytes restored for the full122-case rerun.
-Current full122, exact new-head peer review and required CI remain pending.
+negative control, then the corrected bytes restored. The 26-case model reservation
+store suite passes on the rebased candidate, zero failures/errors/skips; the direct
+SQL state tamper refusal and aggregate-vs-retained amount/count checks are included.
+The state summary removes account-wide historical rehash/sum work from the locked
+insert path. A non-locking read-only currentness variant avoids the exclusive registry
+lock after callbacks while reservation insertion retains its serialization lock.
+Client-side 5s query/socket timeouts complement stricter existing server limits.
+Exact new-head Claude review and required CI remain pending.
 
 The initial independent118 run had one private database teardown timeout while another
 broad test run was creating/dropping databases; all bodies passed, and independent

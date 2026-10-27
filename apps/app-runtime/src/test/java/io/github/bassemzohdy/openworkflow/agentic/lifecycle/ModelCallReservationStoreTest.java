@@ -65,7 +65,15 @@ class ModelCallReservationStoreTest {
             new ModelCall(a.contract().id(),a.modelProfile().modelId(),"private fixture prompt 研究𝄞",100));
     }
     long count(String table) throws SQLException {return ResourceExecutionMigrationTest.count(data,"select count(*) from task."+table);}
-    long held() throws Exception {return Long.parseLong(scalar("select coalesce(sum(held_micros),0)::text from task.model_call_reservation"));}
+    long held() throws Exception {
+        long rows=Long.parseLong(scalar("select coalesce(sum(held_micros),0)::text from task.model_call_reservation"));
+        long summary=Long.parseLong(scalar("select coalesce(sum(reserved_micros),0)::text from task.model_budget_state"));
+        long reservations=Long.parseLong(scalar("select count(*)::text from task.model_call_reservation"));
+        long summarized=Long.parseLong(scalar("select coalesce(sum(reservation_count),0)::text from task.model_budget_state"));
+        assertEquals(rows,summary,"trigger-maintained account summary must match retained reservations");
+        assertEquals(reservations,summarized,"trigger-maintained reservation count must match retained rows");
+        return rows;
+    }
     String scalar(String query) throws Exception {try(var c=data.getConnection()){return ResourceTaskAllocationMigrationTest.scalar(c,query);}}
     static ResourceExecutionFence current(){return entry->{};}
     static String answer(JdbcResourceModelCalls gate,ResourceModelCall node,AtomicInteger effects) {
@@ -289,11 +297,11 @@ class ModelCallReservationStoreTest {
     }
     @Test void accountingRowsCannotBeUpdatedDeletedOrTruncatedAndFailedMutationDoesNotReleaseHolds() throws Exception {
         enter();var n=node("graph/plan");answer(calls,n,new AtomicInteger());var original=calls.find(n).orElseThrow();
-        for(var table:List.of("model_budget_account","model_call_reservation")) {
-            String column=table.equals("model_budget_account")?"max_cost_micros":"held_micros";
+        for(var table:List.of("model_budget_account","model_call_reservation","model_budget_state")) {
+            String column=switch(table){case "model_budget_account"->"max_cost_micros";case "model_call_reservation"->"held_micros";default->"reserved_micros";};
             for(var sql:List.of("update task."+table+" set "+column+"="+column,"delete from task."+table,"truncate task."+table+" cascade")) {
                 assertEquals("42501",assertThrows(SQLException.class,()->execute(data,sql)).getSQLState());
-                assertEquals(1,count("model_budget_account"));assertEquals(1,count("model_call_reservation"));
+                assertEquals(1,count("model_budget_account"));assertEquals(1,count("model_call_reservation"));assertEquals(1,count("model_budget_state"));
                 assertEquals(1000,held());assertEquals(original,calls.find(n).orElseThrow());
             }
         }

@@ -19,8 +19,8 @@ public record ModelCallReservation(ResourceModelCall call, AllocatedResourceTask
         if (!call.entry().scope().equals(scope) || !scope.tenant().equals(account.tenant())
                 || !scope.instanceId().equals(account.instanceId()) || !scope.owner().equals(account.owner())
                 || !ModelBudgetAccount.keyFor(allocation).equals(account.key())
-                || account.anchorKind() != (allocation.parentTaskId() == null ? ModelBudgetAccount.AnchorKind.ALLOCATION : ModelBudgetAccount.AnchorKind.TASK)
-                || !account.anchorId().equals(allocation.parentTaskId() == null ? allocation.key() : allocation.parentTaskId().value())
+                || account.anchorKind() != ModelBudgetAccount.anchorKind(allocation)
+                || !account.anchorId().equals(ModelBudgetAccount.anchorId(allocation))
                 || call.maxOutputTokens() > allocation.modelProfile().maxOutputTokens())
             throw new IllegalArgumentException("reservation attribution differs");
         if (heldMicros != allocation.modelProfile().perCallCeilingMicros()

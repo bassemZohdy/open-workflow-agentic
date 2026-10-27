@@ -4,7 +4,6 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.*;
-import jakarta.transaction.Transaction;
 import jakarta.transaction.TransactionManager;
 import java.sql.*;
 import java.time.Instant;
@@ -22,6 +21,8 @@ import javax.sql.DataSource;
  * the private consumer; a supplied guard or callback is never accepted from a request/serialized checkpoint.
  */
 public final class JdbcResourceModelCalls implements ResourceModelCalls {
+    private static final int NETWORK_TIMEOUT_MILLIS = 5_000;
+    private static final int QUERY_TIMEOUT_SECONDS = 5;
     private final DataSource data;
     private final TransactionManager transactions;
     public JdbcResourceModelCalls(DataSource data, TransactionManager transactions) {
@@ -52,7 +53,7 @@ public final class JdbcResourceModelCalls implements ResourceModelCalls {
     private ModelCallReservation reserve(Connection c,ResourceModelCall call) throws SQLException {
         var existing=read(c,call);
         if(existing.isPresent())throw new ModelCallAlreadyReservedException();
-        try(var lock=c.prepareStatement("select id from task.instance where id=? for update")) {
+        try(var lock=prepare(c,"select id from task.instance where id=? for update")) {
             lock.setString(1,call.entry().scope().instanceId().value());
             try(var r=lock.executeQuery()){if(!r.next())throw conflict();}
         }
@@ -63,17 +64,17 @@ public final class JdbcResourceModelCalls implements ResourceModelCalls {
         if(call.maxOutputTokens()>allocation.modelProfile().maxOutputTokens())throw conflict();
         String account=ModelBudgetAccount.keyFor(allocation);
         if(account(c,account).isEmpty()) {
-            try(var insert=c.prepareStatement("""
+            try(var insert=prepare(c,"""
                     insert into task.model_budget_account(account_key,tenant,instance_id,owner_kind,owner_id,anchor_kind,anchor_id)
                     values(?,?,?,?,?,?,?) on conflict(account_key) do nothing
                     """)) {
                 var scope=allocation.scope();insert.setString(1,account);insert.setString(2,scope.tenant());
                 insert.setString(3,scope.instanceId().value());insert.setString(4,scope.owner().kind().name());insert.setString(5,scope.owner().id());
-                insert.setString(6,allocation.parentTaskId()==null?"ALLOCATION":"TASK");
-                insert.setString(7,allocation.parentTaskId()==null?allocation.key():allocation.parentTaskId().value());insert.executeUpdate();
+                insert.setString(6,ModelBudgetAccount.anchorKind(allocation).name());
+                insert.setString(7,ModelBudgetAccount.anchorId(allocation));insert.executeUpdate();
             }
         }
-        try(var insert=c.prepareStatement("""
+        try(var insert=prepare(c,"""
                 insert into task.model_call_reservation(reservation_key,call_key,entry_key,executor,node_occurrence,
                     request_fingerprint,max_output_tokens,intent_fingerprint,allocation_key,allocation_fingerprint,account_key)
                 values(?,?,?,?,?,?,?,?,?,?,?)
@@ -89,7 +90,7 @@ public final class JdbcResourceModelCalls implements ResourceModelCalls {
         authority(expected.call(),current);
         transaction(false,c->{
             Instant clock;
-            try(var s=c.prepareStatement("select task.model_call_current_v1(?,?,?,?,?)")) {
+            try(var s=prepare(c,"select task.model_call_current_v1(?,?,?,?,?,false)")) {
                 s.setString(1,expected.call().entry().callKey());s.setString(2,expected.task().allocation().fingerprint());
                 s.setString(3,expected.call().entry().fingerprint());s.setObject(4,expected.call().executor());s.setString(5,expected.account().key());
                 try(var r=s.executeQuery()){if(!r.next())throw conflict();clock=r.getTimestamp(1).toInstant();}
@@ -101,7 +102,7 @@ public final class JdbcResourceModelCalls implements ResourceModelCalls {
         authority(expected.call(),current); // Signed identity/policy freshness AFTER all database I/O.
     }
     private static Optional<ModelBudgetAccount> account(Connection c,String key) throws SQLException {
-        try(var s=c.prepareStatement("select * from task.model_budget_account where account_key=?")) {
+        try(var s=prepare(c,"select * from task.model_budget_account where account_key=?")) {
             s.setString(1,key);
             try(var r=s.executeQuery()) {
                 if(!r.next())return Optional.empty();
@@ -115,7 +116,7 @@ public final class JdbcResourceModelCalls implements ResourceModelCalls {
         }
     }
     private static Optional<ModelCallReservation> read(Connection c,ResourceModelCall expected) throws SQLException {
-        try(var s=c.prepareStatement("""
+        try(var s=prepare(c,"""
                 select r.*,e.execution_epoch,e.entry_key as retained_entry,e.entering_executor as retained_executor,
                     e.call_key as retained_call,e.contract_fingerprint as retained_contract
                 from task.model_call_reservation r left join task.resource_execution e on e.entry_key=r.entry_key
@@ -150,6 +151,7 @@ public final class JdbcResourceModelCalls implements ResourceModelCalls {
     private <T> T transaction(boolean snapshot,Transactions.Work<T> work) {
         return Transactions.inTransaction(data,c->{
             try(var limits=c.createStatement()) {
+                limits.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
                 limits.execute("set local search_path = pg_catalog, pg_temp");
                 String isolation;
                 try(var r=limits.executeQuery("show transaction_isolation")){r.next();isolation=r.getString(1);}
@@ -175,19 +177,13 @@ public final class JdbcResourceModelCalls implements ResourceModelCalls {
                     """);
             }
             return work.run(c);
-        });
+        },NETWORK_TIMEOUT_MILLIS);
+    }
+    private static PreparedStatement prepare(Connection connection,String sql) throws SQLException {
+        var statement=connection.prepareStatement(sql);statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);return statement;
     }
     private <T> T suspended(Supplier<T> work) {
-        Transaction prior;
-        try {prior=transactions.suspend();}
-        catch(Exception failed){throw new StoreUnavailableException("caller transaction cannot be suspended",failed);}
-        Throwable primary=null;
-        try {return work.get();}
-        catch(RuntimeException|Error failed){primary=failed;throw failed;}
-        finally {if(prior!=null)try{transactions.resume(prior);}catch(Exception failed){
-            if(primary==null)throw new StoreUnavailableException("caller transaction cannot be resumed",failed);
-            if(primary!=failed)primary.addSuppressed(failed);
-        }}
+        return Transactions.inSuspendedTransaction(transactions,work);
     }
     private static void authority(ResourceModelCall call,ResourceExecutionFence current) {
         interrupted();current.requireCurrent(call.entry());interrupted();

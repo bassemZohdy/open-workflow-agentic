@@ -27,6 +27,18 @@ create function task.mb_fingerprint_v1(k text,c text,maximum bigint,created time
     select encode(sha256(task.ra_text_v1('oa.model.budget-account-contract.v1')||task.ra_text_v1(k)||task.ra_text_v1(c)
         ||int8send(maximum)||task.mb_time_v1(created)||task.mb_time_v1(deadline)),'hex')
 $$;
+create function task.mb_parent_current_v1(parent task.agent_task, expected_tenant text, expected_instance text,
+    expected_owner_kind text, expected_owner_id text) returns boolean language sql stable set search_path = pg_catalog, pg_temp as $$
+    select parent.id is not null and parent.tenant is not distinct from expected_tenant
+       and parent.instance_id is not distinct from expected_instance and parent.owner_kind is not distinct from expected_owner_kind
+       and parent.owner_id is not distinct from expected_owner_id and parent.status in ('RUNNING','RESUMING')
+       and parent.created_at is not null and parent.created_at<=clock_timestamp()
+       and parent.contract->>'id' is not distinct from parent.id
+       and parent.contract#>>'{requestingSubject,kind}' is not distinct from parent.owner_kind
+       and parent.contract#>>'{requestingSubject,id}' is not distinct from parent.owner_id
+       and parent.thread_name is not distinct from 'ws1-'||encode(sha256(task.ra_text_v1('oa.thread.ws1')
+            ||task.ra_text_v1(parent.tenant)||task.ra_text_v1(parent.owner_id)||task.ra_text_v1(parent.instance_id)),'hex')
+$$;
 create function task.mn_key_v1(call_key text,node text) returns text language sql immutable strict set search_path = pg_catalog, pg_temp as $$
     select 'mn1-'||encode(sha256(task.ra_text_v1('oa.resource.model-node.v1')||task.ra_text_v1(call_key)||task.ra_text_v1(node)),'hex')
 $$;
@@ -86,6 +98,16 @@ create table task.model_call_reservation (
     fingerprint text not null check(fingerprint ~ '^[0-9a-f]{64}$'),
     unique(allocation_key,ordinal)
 );
+create table task.model_budget_state (
+    account_key text primary key references task.model_budget_account(account_key),
+    account_fingerprint text not null check(account_fingerprint ~ '^[0-9a-f]{64}$'),
+    reserved_micros bigint not null default 0 check(reserved_micros between 0 and 1000000000000),
+    reservation_count bigint not null default 0 check(reservation_count>=0),
+    tail_reservation_key text references task.model_call_reservation(reservation_key),
+    tail_fingerprint text check(tail_fingerprint is null or tail_fingerprint ~ '^[0-9a-f]{64}$'),
+    check((reservation_count=0 and reserved_micros=0 and tail_reservation_key is null and tail_fingerprint is null)
+       or (reservation_count>0 and tail_reservation_key is not null and tail_fingerprint is not null))
+);
 create index model_reservation_allocation_idx on task.model_call_reservation(allocation_key);
 create index model_reservation_account_idx on task.model_call_reservation(account_key);
 create index model_reservation_entry_idx on task.model_call_reservation(entry_key);
@@ -108,14 +130,7 @@ begin
     end if;
     if new.anchor_kind='TASK' then
         select * into parent from task.agent_task where id=new.anchor_id for share;
-        if not found or parent.tenant is distinct from new.tenant or parent.instance_id is distinct from new.instance_id
-           or parent.owner_kind is distinct from new.owner_kind or parent.owner_id is distinct from new.owner_id
-           or parent.status not in ('RUNNING','RESUMING') or parent.created_at is null or parent.created_at>clock_timestamp()
-           or parent.contract->>'id' is distinct from parent.id
-           or parent.contract#>>'{requestingSubject,kind}' is distinct from parent.owner_kind
-           or parent.contract#>>'{requestingSubject,id}' is distinct from parent.owner_id
-           or parent.thread_name is distinct from 'ws1-'||encode(sha256(task.ra_text_v1('oa.thread.ws1')
-                ||task.ra_text_v1(parent.tenant)||task.ra_text_v1(parent.owner_id)||task.ra_text_v1(parent.instance_id)),'hex') then
+        if not task.mb_parent_current_v1(parent,new.tenant,new.instance_id,new.owner_kind,new.owner_id) then
             raise exception 'model budget parent task differs' using errcode='check_violation';
         end if;
         source=parent.contract;
@@ -151,7 +166,7 @@ create trigger model_budget_account_guard before insert on task.model_budget_acc
 -- Called in short owned transactions; no JDBC connection is held across policy/audit/provider callbacks.
 -- This validates retained metadata, not signed identity, registered approval, model scope or actual provider pricing.
 create function task.model_call_current_v1(call_identity text,allocation_contract text,execution_identity text,
-    execution_owner uuid,budget_identity text) returns timestamptz language plpgsql set search_path = pg_catalog, pg_temp as $$
+    execution_owner uuid,budget_identity text,lock_registry boolean default true) returns timestamptz language plpgsql set search_path = pg_catalog, pg_temp as $$
 declare invocation task.resource_call%rowtype; registry task.instance%rowtype; a task.resource_task_allocation%rowtype;
         e task.resource_execution%rowtype; b task.model_budget_account%rowtype; parent task.agent_task%rowtype;
         g identity.delegation_grant%rowtype; ancestry text[]; chosen identity.delegation_grant%rowtype;
@@ -163,7 +178,11 @@ begin
     end if;
     select * into invocation from task.resource_call where call_key=call_identity;
     if not found then raise exception 'model call source missing' using errcode='foreign_key_violation';end if;
-    select * into registry from task.instance where id=invocation.instance_id for update;
+    if lock_registry then
+        select * into registry from task.instance where id=invocation.instance_id for update;
+    else
+        select * into registry from task.instance where id=invocation.instance_id;
+    end if;
     if not found or registry.tenant is distinct from invocation.tenant or registry.owner_kind is distinct from invocation.owner_kind
        or registry.owner_id is distinct from invocation.owner_id or registry.definition_id is distinct from invocation.namespace||'/'||invocation.definition_name
        or registry.definition_version is distinct from invocation.definition_version or registry.engine_instance_id is distinct from invocation.engine_instance_id
@@ -209,14 +228,7 @@ begin
     end if;
     if a.parent_task_id is not null then
         select * into parent from task.agent_task where id=a.parent_task_id for share;
-        if not found or parent.tenant is distinct from invocation.tenant or parent.instance_id is distinct from invocation.instance_id
-           or parent.owner_kind is distinct from invocation.owner_kind or parent.owner_id is distinct from invocation.owner_id
-           or parent.status not in ('RUNNING','RESUMING') or parent.created_at is null or parent.created_at>clock_timestamp()
-           or parent.contract->>'id' is distinct from parent.id
-           or parent.contract#>>'{requestingSubject,kind}' is distinct from parent.owner_kind
-           or parent.contract#>>'{requestingSubject,id}' is distinct from parent.owner_id
-           or parent.thread_name is distinct from 'ws1-'||encode(sha256(task.ra_text_v1('oa.thread.ws1')||task.ra_text_v1(parent.tenant)
-                ||task.ra_text_v1(parent.owner_id)||task.ra_text_v1(parent.instance_id)),'hex') then
+        if not task.mb_parent_current_v1(parent,invocation.tenant,invocation.instance_id,invocation.owner_kind,invocation.owner_id) then
             raise exception 'model parent task ended or differs' using errcode='check_violation';
         end if;
         perform task.ra_contract_hash_v1(parent.contract);
@@ -252,7 +264,8 @@ begin
 end $$;
 
 create function task.model_reservation_insert_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
-declare a task.resource_task_allocation%rowtype; b task.model_budget_account%rowtype;
+declare a task.resource_task_allocation%rowtype; b task.model_budget_account%rowtype; state task.model_budget_state%rowtype;
+        tail task.model_call_reservation%rowtype;
         clock_value timestamptz; leaf_held bigint; root_held bigint; used_calls integer; ceiling bigint; calls integer;
         timeout_micros bigint;
 begin
@@ -267,28 +280,28 @@ begin
     clock_value=task.model_call_current_v1(new.call_key,new.allocation_fingerprint,new.entry_key,new.executor,new.account_key);
     select * into a from task.resource_task_allocation where call_key=new.call_key;
     select * into b from task.model_budget_account where account_key=new.account_key;
+    select * into state from task.model_budget_state where account_key=b.account_key for update;
+    if not found or state.account_fingerprint is distinct from b.fingerprint then
+        raise exception 'model budget state missing or differs' using errcode='check_violation';
+    end if;
     if new.allocation_key is distinct from a.allocation_key or new.reservation_key is distinct from task.mn_key_v1(new.call_key,new.node_occurrence)
        or new.intent_fingerprint is distinct from task.mn_fingerprint_v1(new.reservation_key,new.entry_key,new.executor,new.request_fingerprint,new.max_output_tokens)
        or new.max_output_tokens>(a.model_profile->>'maxOutputTokens')::integer then
         raise exception 'model node request attribution differs' using errcode='check_violation';
     end if;
-    -- Validate retained source/charge facts before deriving balances. No mutable JVM/caller counter.
-    if exists(select 1 from task.model_call_reservation r
-        left join task.resource_task_allocation x on x.allocation_key=r.allocation_key
-        left join task.resource_execution e on e.entry_key=r.entry_key
-        where r.account_key=b.account_key and (x.allocation_key is null or e.entry_key is null
-          or r.call_key is distinct from x.call_key or r.call_key is distinct from e.call_key or r.executor is distinct from e.entering_executor
-          or r.allocation_fingerprint is distinct from x.fingerprint or r.held_micros is distinct from (x.model_profile->>'perCallCeilingMicros')::bigint
-          or r.account_fingerprint is distinct from b.fingerprint
-          or r.reservation_key is distinct from task.mn_key_v1(r.call_key,r.node_occurrence)
-          or r.intent_fingerprint is distinct from task.mn_fingerprint_v1(r.reservation_key,r.entry_key,r.executor,r.request_fingerprint,r.max_output_tokens)
-          or r.fingerprint is distinct from task.mr_fingerprint_v1(r.reservation_key,r.intent_fingerprint,x.fingerprint,x.created_at,x.deadline,
-                b.account_key,b.fingerprint,r.held_micros,r.allocation_remaining_after,r.account_remaining_after,r.ordinal,r.calls_remaining,r.reserved_at,r.call_deadline))) then
-        raise exception 'retained model reservation data differs' using errcode='check_violation';
+    -- Validate the immutable tail in constant work; the trigger-maintained account summary avoids rescanning history.
+    if state.reservation_count=0 then
+        if state.reserved_micros<>0 then raise exception 'empty model budget state differs' using errcode='check_violation';end if;
+    else
+        select * into tail from task.model_call_reservation where reservation_key=state.tail_reservation_key;
+        if not found or tail.account_key is distinct from b.account_key or tail.account_fingerprint is distinct from b.fingerprint
+           or tail.fingerprint is distinct from state.tail_fingerprint then
+            raise exception 'retained model reservation tail differs' using errcode='check_violation';
+        end if;
     end if;
     select coalesce(sum(held_micros),0)::bigint,count(*)::integer into leaf_held,used_calls
         from task.model_call_reservation where allocation_key=a.allocation_key;
-    select coalesce(sum(held_micros),0)::bigint into root_held from task.model_call_reservation where account_key=b.account_key;
+    root_held=state.reserved_micros;
     ceiling=(a.model_profile->>'perCallCeilingMicros')::bigint;calls=(a.model_profile->>'maxModelCalls')::integer;
     if leaf_held>(a.contract#>>'{limits,maxCostMicros}')::bigint or root_held>b.max_cost_micros or used_calls>calls then
         raise exception 'retained model budget exceeds original source' using errcode='check_violation';
@@ -308,6 +321,46 @@ begin
 end $$;
 create trigger model_reservation_insert_guard before insert on task.model_call_reservation
     for each row execute function task.model_reservation_insert_guard();
+create function task.model_budget_state_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
+begin
+    if pg_trigger_depth()<2 then raise exception 'model budget state is trigger-maintained' using errcode='insufficient_privilege';end if;
+    if tg_op='INSERT' then
+        if not exists(select 1 from task.model_budget_account b where b.account_key=new.account_key and b.fingerprint=new.account_fingerprint)
+           or new.reserved_micros<>0 or new.reservation_count<>0 or new.tail_reservation_key is not null or new.tail_fingerprint is not null then
+            raise exception 'model budget state source differs' using errcode='check_violation';
+        end if;
+    elsif tg_op='UPDATE' then
+        if new.account_key is distinct from old.account_key or new.account_fingerprint is distinct from old.account_fingerprint
+           or new.reservation_count<>old.reservation_count+1 or new.reserved_micros<=old.reserved_micros
+           or new.tail_reservation_key is null or new.tail_fingerprint is null then
+            raise exception 'model budget state transition differs' using errcode='check_violation';
+        end if;
+    end if;
+    return new;
+end $$;
+create trigger model_budget_state_guard before insert or update on task.model_budget_state
+    for each row execute function task.model_budget_state_guard();
+create trigger model_budget_state_no_delete before delete on task.model_budget_state
+    for each row execute function task.resource_call_no_change();
+create trigger model_budget_state_no_truncate before truncate on task.model_budget_state
+    for each statement execute function task.resource_call_no_change();
+create function task.model_budget_state_create() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
+begin
+    insert into task.model_budget_state(account_key,account_fingerprint) values(new.account_key,new.fingerprint);
+    return new;
+end $$;
+create trigger model_budget_state_create after insert on task.model_budget_account
+    for each row execute function task.model_budget_state_create();
+create function task.model_reservation_state_advance() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
+begin
+    update task.model_budget_state set reserved_micros=reserved_micros+new.held_micros,
+        reservation_count=reservation_count+1,tail_reservation_key=new.reservation_key,tail_fingerprint=new.fingerprint
+        where account_key=new.account_key and account_fingerprint=new.account_fingerprint;
+    if not found then raise exception 'model budget state advance refused' using errcode='check_violation';end if;
+    return new;
+end $$;
+create trigger model_reservation_state_advance after insert on task.model_call_reservation
+    for each row execute function task.model_reservation_state_advance();
 create trigger model_budget_no_change before update or delete on task.model_budget_account
     for each row execute function task.resource_call_no_change();
 create trigger model_budget_no_truncate before truncate on task.model_budget_account
@@ -319,4 +372,4 @@ create trigger model_reservation_no_truncate before truncate on task.model_call_
 
 -- Clear PUBLIC mutation privileges even when creator default privileges granted them.
 -- Restricted producer/executor roles and approved-source activation remain separate gates.
-revoke all on task.model_budget_account,task.model_call_reservation from public;
+revoke all on task.model_budget_account,task.model_call_reservation,task.model_budget_state from public;

@@ -33,8 +33,13 @@ public record ModelBudgetAccount(String key, String tenant, Ulid instanceId, Sub
     }
     public static String keyFor(ResourceTaskAllocation allocation) {
         var s = allocation.scope();
-        return keyFor(s.tenant(), s.instanceId(), s.owner(), allocation.parentTaskId() == null ? AnchorKind.ALLOCATION : AnchorKind.TASK,
-                allocation.parentTaskId() == null ? allocation.key() : allocation.parentTaskId().value());
+        return keyFor(s.tenant(), s.instanceId(), s.owner(), anchorKind(allocation), anchorId(allocation));
+    }
+    public static AnchorKind anchorKind(ResourceTaskAllocation allocation) {
+        return allocation.parentTaskId() == null ? AnchorKind.ALLOCATION : AnchorKind.TASK;
+    }
+    public static String anchorId(ResourceTaskAllocation allocation) {
+        return allocation.parentTaskId() == null ? allocation.key() : allocation.parentTaskId().value();
     }
     public String fingerprint() {
         return CanonicalEncoder.sha256Hex(new CanonicalEncoder("oa.model.budget-account-contract.v1")

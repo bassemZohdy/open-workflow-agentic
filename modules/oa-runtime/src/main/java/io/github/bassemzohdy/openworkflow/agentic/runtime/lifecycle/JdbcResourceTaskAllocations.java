@@ -4,7 +4,6 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceTaskAllocations;
-import jakarta.transaction.Transaction;
 import jakarta.transaction.TransactionManager;
 import java.sql.*;
 import java.util.Objects;
@@ -119,18 +118,6 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
     }
 
     private <T> T isolated(Transactions.Work<T> work) {
-        Transaction suspended;
-        try { suspended = transactions.suspend(); }
-        catch (Exception failed) { throw new StoreUnavailableException("caller transaction cannot be suspended", failed); }
-        Throwable primary = null;
-        try { return Transactions.inTransaction(data, work); }
-        catch (RuntimeException | Error failed) { primary = failed; throw failed; }
-        finally {
-            if (suspended != null) try { transactions.resume(suspended); }
-            catch (Exception failed) {
-                if (primary == null) throw new StoreUnavailableException("caller transaction cannot be resumed", failed);
-                if (primary != failed) primary.addSuppressed(failed);
-            }
-        }
+        return Transactions.inSuspendedTransaction(transactions,()->Transactions.inTransaction(data,work));
     }
 }
