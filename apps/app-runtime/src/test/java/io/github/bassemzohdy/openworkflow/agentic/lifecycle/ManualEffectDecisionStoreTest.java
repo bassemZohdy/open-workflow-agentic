@@ -16,6 +16,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import jakarta.inject.Inject;
 import jakarta.transaction.TransactionManager;
 import java.time.*;
+import java.lang.reflect.InvocationTargetException;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.*;
@@ -61,6 +62,25 @@ class ManualEffectDecisionStoreTest {
     private ManualEffectResolver resolver(Pep pep,AuditAppendOnce audit){return new ManualEffectResolver(support.db.owner,manager,pep,audit,ledger);}
     private long count(String sql)throws Exception{return ResourceExecutionMigrationTest.count(support.db.owner,sql);}
     private record Ready(Subject owner,InstanceRecord instance,EffectCommand command){}
+    private DataSource withTransactionIsolation(DataSource delegate,int isolation) {
+        return (DataSource)java.lang.reflect.Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},
+                (proxy,method,args)->{
+                    if(!method.getName().equals("getConnection")||method.getParameterCount()!=0)try{return method.invoke(delegate,args);}
+                    catch(InvocationTargetException failed){throw failed.getCause();}
+                    var connection=delegate.getConnection();int previous=connection.getTransactionIsolation();
+                    try{connection.setTransactionIsolation(isolation);}catch(SQLException failed){connection.close();throw failed;}
+                    return java.lang.reflect.Proxy.newProxyInstance(java.sql.Connection.class.getClassLoader(),new Class[]{java.sql.Connection.class},
+                            (connectionProxy,connectionMethod,connectionArgs)->{
+                                if(connectionMethod.getName().equals("close")&&connectionMethod.getParameterCount()==0) {
+                                    SQLException reset=null;try{connection.setTransactionIsolation(previous);}catch(SQLException failed){reset=failed;}
+                                    try{connection.close();}catch(SQLException failed){if(reset!=null)failed.addSuppressed(reset);throw failed;}
+                                    if(reset!=null)throw reset;return null;
+                                }
+                                try{return connectionMethod.invoke(connection,connectionArgs);}
+                                catch(InvocationTargetException failed){throw failed.getCause();}
+                            });
+                });
+    }
 
     @Test void centralManualDecisionPrecedesAtomicOutcomeAndRetryReusesTheSameEvent() throws Exception {
         var fixture=unresolved("occur-1");var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
@@ -94,15 +114,17 @@ class ManualEffectDecisionStoreTest {
         var now=Instant.now();var token=new VerifiedToken("test-issuer",fixture.owner(),Set.of("test-audience"),Set.of("oa.recover"),
                 "another-tenant",now,now.plusSeconds(600),"manual-token-other-tenant",List.of());
         var authority=CallerAuthority.ofUserToken(token,Clock.systemUTC());
-        assertThrows(IllegalStateException.class,()->resolver(pep,new AuditAppendOnce(support.db.owner)).resolve(authority,
+        var mismatch=assertThrows(IllegalStateException.class,()->resolver(pep,new AuditAppendOnce(support.db.owner)).resolve(authority,
                 fixture.command().key(),UlidGenerator.shared().next(),EffectState.FAILED,"TARGET_REJECTED"));
+        assertEquals("effect has no matching retained verified caller scope",mismatch.getMessage());
         assertEquals(0,calls.get());assertEquals(0,count("select count(*) from effect.manual_decision"));
         assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
         assertEquals(EffectState.INTENDED,ledger.find(fixture.command().key()).orElseThrow().state());
     }
 
     @Test void boundedManualTransactionsUseReadCommittedIsolation() throws Exception {
-        var isolation=Transactions.inBoundedPostgresTransaction(support.db.owner,c->{
+        var repeatableRead=withTransactionIsolation(support.db.owner,java.sql.Connection.TRANSACTION_REPEATABLE_READ);
+        var isolation=Transactions.inBoundedPostgresTransaction(repeatableRead,c->{
             try(var q=c.createStatement();var r=q.executeQuery("show transaction_isolation")){assertTrue(r.next());return r.getString(1);}
         },2_000,5_000,5_000);
         assertEquals("read committed",isolation);
