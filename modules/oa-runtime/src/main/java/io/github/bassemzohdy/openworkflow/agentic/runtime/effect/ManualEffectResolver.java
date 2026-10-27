@@ -47,7 +47,8 @@ public final class ManualEffectResolver {
         Ulid instanceId=instanceId(key);
         var initial=decide(authority,instanceId);
         if(!initial.allows())throw new PolicyDenied(initial);
-        DecisionRow row=Transactions.inSuspendedTransaction(transactions,()->Transactions.inTransaction(dataSource,c->retain(c,authority,key,instanceId,requestId,desired,reasonCode,initial)));
+        DecisionRow row=Transactions.inSuspendedTransaction(transactions,()->Transactions.inBoundedPostgresTransaction(dataSource,
+                c->retain(c,authority,key,instanceId,requestId,desired,reasonCode,initial),2_000,5_000,5_000));
         authority.requireCurrent(REQUIRED);
         var beforeAppend=decide(authority,row.instanceId());
         if(!beforeAppend.allows())throw new PolicyDenied(beforeAppend);
@@ -87,7 +88,6 @@ public final class ManualEffectResolver {
                 if(!r.next()||!caller.tenant().equals(r.getString(1))||r.getString(8)==null)
                     throw new IllegalStateException("effect has no matching retained verified caller scope");
                 if(!expectedInstanceId.value().equals(r.getString(2)))throw new IllegalStateException("effect registry scope changed");
-                prior=hasRequest(c,requestId,key,caller.subject(),desired,reason);
             }
         }
         String tenant,instance,ownerKind,ownerId,storedScope;
@@ -95,22 +95,29 @@ public final class ManualEffectResolver {
             bind(q,key);try(var r=q.executeQuery()){if(!r.next())throw new IllegalStateException("effect scope disappeared");tenant=r.getString(1);instance=r.getString(2);ownerKind=r.getString(3);ownerId=r.getString(4);}
         }
         // Preserve the normal effect path lock order: registry instance, then ledger row.
-        try(var q=c.prepareStatement("select id,status,wait_deadline,clock_timestamp() from task.instance where id=? and tenant=? for update")) {
+        String instanceStatus;Timestamp waitDeadline;
+        try(var q=c.prepareStatement("select id,status,wait_deadline from task.instance where id=? and tenant=? for update")) {
             q.setString(1,instance);q.setString(2,tenant);try(var r=q.executeQuery()) {
                 if(!r.next())
                     throw new IllegalStateException("effect instance no longer exists");
-                if(!prior&&!("RUNNING".equals(r.getString(2))||"WAITING".equals(r.getString(2))))
-                    throw new IllegalStateException("effect instance is no longer active");
-                Timestamp deadline=r.getTimestamp(3);if(!prior&&deadline!=null&&!deadline.toInstant().isAfter(r.getTimestamp(4).toInstant()))
-                    throw new IllegalStateException("effect instance wait deadline expired");
+                instanceStatus=r.getString(2);waitDeadline=r.getTimestamp(3);
             }
         }
+        String ledgerState;boolean attempted;
         try(var q=c.prepareStatement("select state,attempted,request_fingerprint from effect.ledger where thread_name=? and node_id=? and idempotency_key=? for update")) {
             bind(q,key);try(var r=q.executeQuery()) {
                 if(!r.next()||r.getString(3)==null)throw new IllegalStateException("effect has no verified request fingerprint");
-                if(!prior&&(!"INTENDED".equals(r.getString(1))||!r.getBoolean(2)||!hasUnknown(c,key)))
-                    throw new IllegalStateException("effect is not an attempted unresolved effect with an unknown outcome");
+                ledgerState=r.getString(1);attempted=r.getBoolean(2);
             }
+        }
+        prior=hasRequest(c,requestId,key,caller.subject(),desired,reason);
+        if(!prior&&(!"INTENDED".equals(ledgerState)||!attempted||!hasUnknown(c,key)))
+            throw new IllegalStateException("effect is not an attempted unresolved effect with an unknown outcome");
+        if(!prior&&!("RUNNING".equals(instanceStatus)||"WAITING".equals(instanceStatus)))
+            throw new IllegalStateException("effect instance is no longer active");
+        if(!prior&&waitDeadline!=null)try(var q=c.createStatement();var r=q.executeQuery("select clock_timestamp()")) {
+            r.next();if(!waitDeadline.toInstant().isAfter(r.getTimestamp(1).toInstant()))
+                throw new IllegalStateException("effect instance wait deadline expired");
         }
         long id;try(var q=c.prepareStatement("select nextval(pg_get_serial_sequence('effect.manual_decision','decision_id'))")) {try(var r=q.executeQuery()){r.next();id=r.getLong(1);}}
         Instant now=Instant.now().truncatedTo(ChronoUnit.MICROS);Ulid draftId=UlidGenerator.shared().next();

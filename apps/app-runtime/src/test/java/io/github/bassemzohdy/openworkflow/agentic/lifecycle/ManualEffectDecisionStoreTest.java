@@ -90,12 +90,31 @@ class ManualEffectDecisionStoreTest {
 
     @Test void requestRetainedBeforePolicyRefusalCanBeSupersededByANewRequestId() throws Exception {
         var f=unresolved("occur-policy-change");var authority=authority(f,Clock.systemUTC(),Instant.now().plusSeconds(600));var n=new AtomicInteger();
+        var deniedRequest=UlidGenerator.shared().next();
         var policy=new PolicyRef("test.resolve-effect","1");var denyOnce=new Pep(request->{
             int call=n.incrementAndGet();return new Decision("test-engine",call==2?DecisionOutcome.DENY:DecisionOutcome.ALLOW,
                     call==2?"policy changed":"allowed",policy,Instant.now());},event->{});
         assertThrows(io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PolicyDenied.class,
-                ()->resolver(denyOnce,new AuditAppendOnce(support.db.owner)).resolve(authority,f.command().key(),UlidGenerator.shared().next(),EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+                ()->resolver(denyOnce,new AuditAppendOnce(support.db.owner)).resolve(authority,f.command().key(),deniedRequest,EffectState.CONFIRMED,"TARGET_CONFIRMED"));
         assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        long decisionId=Transactions.inTransaction(support.db.owner,c->{try(var q=c.prepareStatement("select decision_id from effect.manual_decision where request_id=?")) {
+            q.setString(1,deniedRequest.value());try(var r=q.executeQuery()){assertTrue(r.next());return r.getLong(1);}
+        }});
+        var bypass=assertThrows(io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException.class,
+                ()->Transactions.inTransaction(support.db.owner,c->{
+                    try(var q=c.prepareStatement("update effect.ledger set state='CONFIRMED',detail='manual resolution',recorded_at=clock_timestamp() where thread_name=? and node_id=? and idempotency_key=?")) {
+                        q.setString(1,f.command().key().threadId().value());q.setString(2,f.command().key().nodeId());q.setString(3,f.command().key().idempotencyKey());assertEquals(1,q.executeUpdate());
+                    }
+                    long eventId;try(var q=c.prepareStatement("insert into effect.event(thread_name,node_id,idempotency_key,from_state,to_state,reason) values(?,? ,?,'INTENDED','CONFIRMED','effect.outcome') returning id")) {
+                        q.setString(1,f.command().key().threadId().value());q.setString(2,f.command().key().nodeId());q.setString(3,f.command().key().idempotencyKey());try(var r=q.executeQuery()){assertTrue(r.next());eventId=r.getLong(1);}
+                    }
+                    try(var q=c.prepareStatement("insert into effect.manual_decision_applied(decision_id,thread_name,node_id,idempotency_key,effect_event_id,resulting_state) values(?,?,?,?,?,'CONFIRMED')")) {
+                        q.setLong(1,decisionId);q.setString(2,f.command().key().threadId().value());q.setString(3,f.command().key().nodeId());q.setString(4,f.command().key().idempotencyKey());q.setLong(5,eventId);q.executeUpdate();
+                    }
+                    return null;
+                }));
+        assertEquals("23514",assertInstanceOf(SQLException.class,bypass.getCause()).getSQLState());
+        assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());
         var resolved=resolver(allowingPep(),new AuditAppendOnce(support.db.owner)).resolve(authority,f.command().key(),UlidGenerator.shared().next(),EffectState.CONFIRMED,"TARGET_CONFIRMED");
         assertEquals(EffectState.CONFIRMED,resolved.state());assertEquals(2,count("select count(*) from effect.manual_decision"));
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
@@ -155,9 +174,34 @@ class ManualEffectDecisionStoreTest {
             assertTrue(entered.await(1,TimeUnit.SECONDS));
             assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());
         } finally {release.countDown();}
+        try(var c=support.db.owner.getConnection()) {
+            c.setAutoCommit(false);
+            try(var q=c.prepareStatement("select id from task.instance where id=? for update nowait")) {
+                q.setString(1,f.instance().id().value());try(var r=q.executeQuery()){assertTrue(r.next());}
+            }
+            c.commit();
+        }
         var registry=new JdbcInstanceStore(support.db.owner);var current=registry.find(f.instance().tenant(),f.instance().id()).orElseThrow();
         registry.replace(current.successor(Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS),InstanceStatus.COMPLETED,
                 current.engineInstanceId(),current.startAttempts(),null,null),current.version(),"test.complete",f.owner());
+    }
+
+    @Test void retainRowLockWaitStopsAtPostgresLockTimeout() throws Exception {
+        var f=unresolved("occur-lock-timeout");var authority=authority(f,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var blocker=support.db.owner.getConnection();blocker.setAutoCommit(false);
+        try(var q=blocker.prepareStatement("select id from task.instance where id=? for update")) {
+            q.setString(1,f.instance().id().value());try(var r=q.executeQuery()){assertTrue(r.next());}
+        }
+        var pool=Executors.newSingleThreadExecutor();
+        try {
+            var pending=pool.submit(()->resolver(allowingPep(),new AuditAppendOnce(support.db.owner)).resolve(authority,
+                    f.command().key(),UlidGenerator.shared().next(),EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+            var failure=assertThrows(ExecutionException.class,()->pending.get(4,TimeUnit.SECONDS));
+            var unavailable=assertInstanceOf(io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException.class,failure.getCause());
+            assertEquals("55P03",assertInstanceOf(SQLException.class,unavailable.getCause()).getSQLState());
+        } finally {blocker.rollback();blocker.close();pool.shutdownNow();assertTrue(pool.awaitTermination(5,TimeUnit.SECONDS));}
+        assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());
+        assertEquals(0,count("select count(*) from effect.manual_decision"));
     }
 
     private static final class AdvancingClock extends Clock {

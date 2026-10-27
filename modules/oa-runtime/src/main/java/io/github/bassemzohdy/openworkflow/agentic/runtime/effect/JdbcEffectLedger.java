@@ -263,7 +263,7 @@ public class JdbcEffectLedger implements EffectLedger {
         if (decisionId < 1 || (desired != EffectState.CONFIRMED && desired != EffectState.FAILED))
             throw new IllegalArgumentException("invalid manual effect decision");
         Objects.requireNonNull(currentAuthority);Objects.requireNonNull(recheckPolicy);
-        return transaction(c -> {
+        return boundedTransaction(c -> {
             lockManualInstance(c,key);
             Effect current=locked(c,key).effect();
             try(var q=c.prepareStatement("select desired_state,actor_kind,actor_id,source_key from effect.manual_decision where decision_id=? and thread_name=? and node_id=? and idempotency_key=? for update")) {
@@ -458,6 +458,9 @@ public class JdbcEffectLedger implements EffectLedger {
 
     private <T> T transaction(Transactions.Work<T> work) {
         return isolated(()->Transactions.inTransaction(dataSource,work));
+    }
+    private <T> T boundedTransaction(Transactions.Work<T> work) {
+        return isolated(()->Transactions.inBoundedPostgresTransaction(dataSource,work,2_000,5_000,5_000));
     }
     private <T> T isolated(Supplier<T> work) {
         if(projection==null)return work.get(); // Existing legacy/CDI behavior remains unchanged.

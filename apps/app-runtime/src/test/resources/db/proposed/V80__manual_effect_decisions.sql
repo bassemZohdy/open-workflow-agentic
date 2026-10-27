@@ -46,9 +46,10 @@ create index manual_decision_effect_idx on effect.manual_decision(thread_name,no
 create function effect.manual_decision_insert_guard() returns trigger language plpgsql set search_path = pg_catalog, pg_temp as $$
 declare l effect.ledger%rowtype; s effect.audit_scope%rowtype; r task.instance%rowtype;
 begin
-    select * into l from effect.ledger where thread_name=new.thread_name and node_id=new.node_id and idempotency_key=new.idempotency_key for update;
-    select * into s from effect.audit_scope where thread_name=new.thread_name and node_id=new.node_id and idempotency_key=new.idempotency_key;
+    -- Match the live path's registry-before-ledger order to avoid deadlocks with normal effect work.
     select * into r from task.instance where id=new.registry_instance_id for update;
+    select * into s from effect.audit_scope where thread_name=new.thread_name and node_id=new.node_id and idempotency_key=new.idempotency_key;
+    select * into l from effect.ledger where thread_name=new.thread_name and node_id=new.node_id and idempotency_key=new.idempotency_key for update;
     if not found or l.state<>'INTENDED' or not l.attempted or l.request_fingerprint is null
        or s.tenant is distinct from new.tenant or s.registry_instance_id is distinct from new.registry_instance_id
        or s.owner_kind is distinct from new.owner_kind or s.owner_id is distinct from new.owner_id
@@ -95,7 +96,13 @@ begin
        or e.idempotency_key is distinct from d.idempotency_key or e.reason<>'effect.outcome' or e.from_state<>'INTENDED'
        or e.to_state is distinct from d.desired_state or new.resulting_state is distinct from d.desired_state
        or row(new.thread_name,new.node_id,new.idempotency_key) is distinct from row(d.thread_name,d.node_id,d.idempotency_key)
-       or l.state is distinct from d.desired_state then
+       or l.state is distinct from d.desired_state
+       or not exists(select 1 from audit.source_binding b join audit.event a on a.event_id=b.event_id
+           where b.source_key=d.source_key and b.transition='MANUAL' and b.scope_fingerprint=d.source_scope_fingerprint
+             and b.key_fingerprint=d.source_key_fingerprint and b.content_fingerprint=d.source_content_fingerprint
+             and a.event_type='effect.manual-resolution-requested' and a.actor_kind='USER' and a.actor_id=d.actor_id
+             and a.attributes->>'effect.status'='REQUESTED' and a.attributes->>'effect.decision'=d.decision_id::text
+             and a.attributes->>'effect.to'=d.desired_state) then
         raise exception 'manual decision application differs from effect outcome' using errcode='check_violation';
     end if;
     return new;
