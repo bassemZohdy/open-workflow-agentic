@@ -153,29 +153,18 @@ public final class JdbcResourceModelCalls implements ResourceModelCalls {
             try(var limits=c.createStatement()) {
                 limits.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
                 limits.execute("set local search_path = pg_catalog, pg_temp");
-                String isolation;
-                try(var r=limits.executeQuery("show transaction_isolation")){r.next();isolation=r.getString(1);}
-                if(snapshot) {
-                    limits.execute(isolation.equals("serializable")?"set transaction read only":
-                            "set transaction isolation level repeatable read read only");
-                } else if(!isolation.equals("read committed")) {
+                if(!snapshot) {
+                    String isolation;
+                    try(var r=limits.executeQuery("show transaction_isolation")){r.next();isolation=r.getString(1);}
+                    if(!isolation.equals("read committed")) {
                     // An unchanged row lock does not refresh a REPEATABLE READ snapshot of sibling holds.
                     // Refuse unsupported writer profiles rather than silently weakening configured isolation.
-                    throw new IllegalStateException("model reservation writes require READ COMMITTED");
+                        throw new IllegalStateException("model reservation writes require READ COMMITTED");
+                    }
                 }
-                limits.execute("""
-                    do $$ begin
-                        if current_setting('lock_timeout')::interval = interval '0'
-                           or current_setting('lock_timeout')::interval > interval '2 seconds' then
-                            perform set_config('lock_timeout','2s',true);
-                        end if;
-                        if current_setting('statement_timeout')::interval = interval '0'
-                           or current_setting('statement_timeout')::interval > interval '5 seconds' then
-                            perform set_config('statement_timeout','5s',true);
-                        end if;
-                    end $$
-                    """);
             }
+            if(snapshot)Transactions.beginReadOnlySnapshot(c,QUERY_TIMEOUT_SECONDS);
+            Transactions.capPostgresTimeouts(c,2_000,5_000,5_000);
             return work.run(c);
         },NETWORK_TIMEOUT_MILLIS);
     }

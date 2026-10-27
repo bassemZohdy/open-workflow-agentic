@@ -70,14 +70,8 @@ public final class EffectAuditHistory {
 
     private Snapshot snapshot(EffectScope scope,EffectKey key,int limit) {
         return Transactions.inTransaction(data,c->{
-            // SHOW does not establish a query snapshot. SET TRANSACTION is local to this owned transaction,
-            // so neither JDBC/pool isolation nor read-only defaults leak after commit/rollback. Preserve SERIALIZABLE.
-            try(var s=c.createStatement()) {
-                String isolation;
-                try(var r=s.executeQuery("show transaction_isolation")){r.next();isolation=r.getString(1);}
-                s.execute(isolation.equals("serializable")?"set transaction read only":
-                        "set transaction isolation level repeatable read read only");
-            }
+            // Preserve SERIALIZABLE; otherwise use a repeatable read snapshot without leaking pool settings.
+            Transactions.beginReadOnlySnapshot(c,5);
             String ledgerState, purpose;
             try(var q=c.prepareStatement("select state,purpose from effect.ledger where "+KEY)) {
                 bind(q,1,key);try(var r=q.executeQuery()){if(!r.next())throw inconsistent();ledgerState=r.getString(1);purpose=r.getString(2);}

@@ -36,9 +36,7 @@ public final class Transactions {
             int oldNetwork=0;boolean networkChanged=false,committed=false;Throwable primary=null;
             try {
                 if(networkTimeoutMillis>0) {
-                    oldNetwork=connection.getNetworkTimeout();
-                    int effective=oldNetwork>0?Math.min(oldNetwork,networkTimeoutMillis):networkTimeoutMillis;
-                    connection.setNetworkTimeout(DIRECT,effective);networkChanged=true;
+                    oldNetwork=setClientNetworkTimeout(connection,networkTimeoutMillis);networkChanged=true;
                 }
                 connection.setAutoCommit(false);
                 T result = work.run(connection);
@@ -54,9 +52,9 @@ public final class Transactions {
                 rollback(connection);
                 throw e;
             } finally {
-                if(networkChanged)try {connection.setNetworkTimeout(DIRECT,oldNetwork);}
+                if(networkChanged)try {restoreClientNetworkTimeout(connection,oldNetwork);}
                 catch(SQLException reset) {
-                    try {connection.abort(DIRECT);}catch(SQLException abort){reset.addSuppressed(abort);}
+                    try {abort(connection);}catch(SQLException abort){reset.addSuppressed(abort);}
                     if(primary!=null)primary.addSuppressed(reset);
                     else if(!committed)throw reset;
                     // If committed, discard the bad pooled connection without changing its durable result.
@@ -64,6 +62,45 @@ public final class Transactions {
             }
         } catch (SQLException e) {
             throw new StoreUnavailableException("the registry database is not reachable", e);
+        }
+    }
+
+    static int setClientNetworkTimeout(Connection connection,int requestedMillis) throws SQLException {
+        int old=connection.getNetworkTimeout();
+        int effective=old>0?Math.min(old,requestedMillis):requestedMillis;
+        connection.setNetworkTimeout(DIRECT,effective);
+        return old;
+    }
+
+    static void restoreClientNetworkTimeout(Connection connection,int previousMillis) throws SQLException {
+        connection.setNetworkTimeout(DIRECT,previousMillis);
+    }
+
+    static void abort(Connection connection) throws SQLException { connection.abort(DIRECT); }
+
+    static void capPostgresTimeouts(Connection connection,int lockMillis,int statementMillis,int idleMillis) throws SQLException {
+        String cap="pg_catalog.set_config(?,least(coalesce(nullif(extract(epoch from "
+                +"pg_catalog.current_setting(?)::pg_catalog.interval)*1000,0),?),?)::bigint::text||'ms',true)";
+        try(var q=connection.prepareStatement("select "+cap+","+cap+","+cap)) {
+            q.setQueryTimeout((statementMillis+999)/1000);
+            String[] names={"lock_timeout","statement_timeout","idle_in_transaction_session_timeout"};
+            long[] values={lockMillis,statementMillis,idleMillis};
+            for(int i=0;i<names.length;i++) {
+                q.setString(i*4+1,names[i]);q.setString(i*4+2,names[i]);
+                q.setLong(i*4+3,values[i]);q.setLong(i*4+4,values[i]);
+            }
+            q.execute();
+        }
+    }
+
+    public static String beginReadOnlySnapshot(Connection connection,int queryTimeoutSeconds) throws SQLException {
+        try(var s=connection.createStatement()) {
+            s.setQueryTimeout(queryTimeoutSeconds);
+            String isolation;
+            try(var r=s.executeQuery("show transaction_isolation")){r.next();isolation=r.getString(1);}
+            s.execute(isolation.equals("serializable")?"set transaction read only":
+                    "set transaction isolation level repeatable read read only");
+            return isolation;
         }
     }
 

@@ -103,7 +103,7 @@ never silently weakened. Historical snapshots still retain SERIALIZABLE and stri
 one new1000 hold/callback after an observed registry-lock wait) and repeatable read /
 serializable (both refuse, seed hold unchanged), plus direct SQL isolation refusal.
 Five focused fixed-isolation cases pass. The old Java/SQL bytes were used only for the
-negative control, then the corrected bytes restored. The 26-case model reservation
+negative control, then the corrected bytes restored. The 27-case model reservation
 store suite passes on the rebased candidate, zero failures/errors/skips; the direct
 SQL state tamper refusal and aggregate-vs-retained amount/count checks are included.
 The state summary removes account-wide historical rehash/sum work from the locked
@@ -111,8 +111,11 @@ insert path. A non-locking read-only currentness variant avoids the exclusive re
 lock after callbacks while reservation insertion retains its serialization lock.
 Client-side 5s query timeout and 30s socket bound complement the stricter 2s/5s
 server limits; the socket bound leaves commit headroom. A failed timeout reset after
-commit evicts the connection without changing the committed result.
-Exact new-head Claude review and required CI remain pending.
+commit evicts the connection without changing the committed result. Owned transaction
+network timeout setup/reset/abort, PostgreSQL timeout caps and read snapshot isolation
+now use the shared Transactions helpers already used by the execution/history gates.
+The latest local store suite is 27/27, zero failures/errors/skips; exact new-head
+Claude review and required CI remain pending.
 
 The initial independent118 run had one private database teardown timeout while another
 broad test run was creating/dropping databases; all bodies passed, and independent
