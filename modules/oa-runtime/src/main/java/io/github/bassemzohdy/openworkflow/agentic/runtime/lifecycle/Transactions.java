@@ -30,12 +30,13 @@ public final class Transactions {
         return inTransaction(dataSource,work,0);
     }
 
-    /** Runs a bounded PostgreSQL unit of work with transaction-local lock, statement and idle timeouts. */
+    /** Runs a bounded READ COMMITTED PostgreSQL unit of work with transaction-local timeouts. */
     public static <T> T inBoundedPostgresTransaction(DataSource dataSource,Work<T> work,
             int lockTimeoutMillis,int statementTimeoutMillis,int idleTimeoutMillis) {
         if(lockTimeoutMillis<1||statementTimeoutMillis<lockTimeoutMillis||idleTimeoutMillis<1)
             throw new IllegalArgumentException("PostgreSQL transaction timeouts must be positive and ordered");
         return inTransaction(dataSource,c->{
+            try(var s=c.createStatement()){s.execute("set transaction isolation level read committed");}
             capPostgresTimeouts(c,lockTimeoutMillis,statementTimeoutMillis,idleTimeoutMillis);
             return work.run(c);
         });

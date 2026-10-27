@@ -88,6 +88,26 @@ class ManualEffectDecisionStoreTest {
         assertEquals(0,count("select count(*) from effect.manual_decision"));assertEquals(EffectState.INTENDED,ledger.find(fixture.command().key()).orElseThrow().state());
     }
 
+    @Test void tenantMismatchIsRefusedBeforePolicyEvaluation() throws Exception {
+        var fixture=unresolved("occur-tenant-mismatch");var calls=new AtomicInteger();var policy=new PolicyRef("test.resolve-effect","1");
+        var pep=new Pep(request->{calls.incrementAndGet();return new Decision("test-engine",DecisionOutcome.ALLOW,"allowed",policy,Instant.now());},event->{});
+        var now=Instant.now();var token=new VerifiedToken("test-issuer",fixture.owner(),Set.of("test-audience"),Set.of("oa.recover"),
+                "another-tenant",now,now.plusSeconds(600),"manual-token-other-tenant",List.of());
+        var authority=CallerAuthority.ofUserToken(token,Clock.systemUTC());
+        assertThrows(IllegalStateException.class,()->resolver(pep,new AuditAppendOnce(support.db.owner)).resolve(authority,
+                fixture.command().key(),UlidGenerator.shared().next(),EffectState.FAILED,"TARGET_REJECTED"));
+        assertEquals(0,calls.get());assertEquals(0,count("select count(*) from effect.manual_decision"));
+        assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        assertEquals(EffectState.INTENDED,ledger.find(fixture.command().key()).orElseThrow().state());
+    }
+
+    @Test void boundedManualTransactionsUseReadCommittedIsolation() throws Exception {
+        var isolation=Transactions.inBoundedPostgresTransaction(support.db.owner,c->{
+            try(var q=c.createStatement();var r=q.executeQuery("show transaction_isolation")){assertTrue(r.next());return r.getString(1);}
+        },2_000,5_000,5_000);
+        assertEquals("read committed",isolation);
+    }
+
     @Test void requestRetainedBeforePolicyRefusalCanBeSupersededByANewRequestId() throws Exception {
         var f=unresolved("occur-policy-change");var authority=authority(f,Clock.systemUTC(),Instant.now().plusSeconds(600));var n=new AtomicInteger();
         var deniedRequest=UlidGenerator.shared().next();
