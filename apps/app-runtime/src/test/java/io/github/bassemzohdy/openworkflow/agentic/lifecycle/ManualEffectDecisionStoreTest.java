@@ -62,6 +62,17 @@ class ManualEffectDecisionStoreTest {
     private ManualEffectResolver resolver(Pep pep,AuditAppendOnce audit){return new ManualEffectResolver(support.db.owner,manager,pep,audit,ledger);}
     private long count(String sql)throws Exception{return ResourceExecutionMigrationTest.count(support.db.owner,sql);}
     private record Ready(Subject owner,InstanceRecord instance,EffectCommand command){}
+    private DataSource observingSuspendedConnections(AtomicInteger opened,int failAt) {
+        return (DataSource)java.lang.reflect.Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},
+                (proxy,method,args)->{
+                    if(method.getName().equals("getConnection")) {
+                        assertNull(manager.getTransaction(),"owned JDBC work must suspend the caller transaction");
+                        if(opened.incrementAndGet()==failAt)throw new SQLException("injected connection failure");
+                    }
+                    try{return method.invoke(support.db.owner,args);}
+                    catch(InvocationTargetException failed){throw failed.getCause();}
+                });
+    }
     private DataSource withTransactionIsolation(DataSource delegate,int isolation) {
         return (DataSource)java.lang.reflect.Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},
                 (proxy,method,args)->{
@@ -132,12 +143,16 @@ class ManualEffectDecisionStoreTest {
 
     @Test void manualResolutionCommitsOutsideAmbientJtaRollback() throws Exception {
         var fixture=unresolved("occur-ambient-rollback");var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
-        var requestId=UlidGenerator.shared().next();var resolver=resolver(allowingPep(),new AuditAppendOnce(support.db.owner));
+        var requestId=UlidGenerator.shared().next();var resolverConnections=new AtomicInteger();var ledgerConnections=new AtomicInteger();
+        var observedLedger=new JdbcEffectLedger(observingSuspendedConnections(ledgerConnections,0),manager,producer);
+        var resolver=new ManualEffectResolver(observingSuspendedConnections(resolverConnections,0),manager,allowingPep(),
+                new AuditAppendOnce(support.db.owner),observedLedger);
         manager.begin();var ambient=manager.getTransaction();
         try {
             assertEquals(EffectState.CONFIRMED,resolver.resolve(authority,fixture.command().key(),requestId,
                     EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
             assertSame(ambient,manager.getTransaction());
+            assertEquals(2,resolverConnections.get());assertEquals(1,ledgerConnections.get());
         } finally {
             if(manager.getTransaction()!=null)manager.rollback();
         }
@@ -147,7 +162,23 @@ class ManualEffectDecisionStoreTest {
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
         assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
         var sources=Transactions.inTransaction(support.db.owner,c->producer.forKey(c,fixture.command().key(),0,128));
-        assertTrue(sources.stream().anyMatch(f->f.source().transition()==AuditSource.Transition.OUTCOME));
+        assertEquals(AuditSource.Transition.OUTCOME,sources.getLast().source().transition());
+    }
+
+    @Test void failedManualRetainRestoresAmbientTransaction() throws Exception {
+        var fixture=unresolved("occur-ambient-failure");var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var opened=new AtomicInteger();var resolver=new ManualEffectResolver(observingSuspendedConnections(opened,2),manager,allowingPep(),
+                new AuditAppendOnce(support.db.owner),ledger);
+        manager.begin();var ambient=manager.getTransaction();
+        try {
+            assertThrows(StoreUnavailableException.class,()->resolver.resolve(authority,fixture.command().key(),UlidGenerator.shared().next(),
+                    EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+            assertEquals(2,opened.get());assertSame(ambient,manager.getTransaction());
+        } finally {
+            if(manager.getTransaction()!=null)manager.rollback();
+        }
+        assertNull(manager.getTransaction());assertEquals(0,count("select count(*) from effect.manual_decision"));
+        assertEquals(EffectState.INTENDED,ledger.find(fixture.command().key()).orElseThrow().state());
     }
 
     @Test void requestRetainedBeforePolicyRefusalCanBeSupersededByANewRequestId() throws Exception {
