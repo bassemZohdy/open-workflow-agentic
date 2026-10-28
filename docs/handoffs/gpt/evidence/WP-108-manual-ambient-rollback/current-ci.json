@@ -1,0 +1,31 @@
+{
+  "pullRequest": 104,
+  "reviewedHead": "3d62ad4ac1b61992ae52dd16db173f9ee37b0c1c",
+  "mergeCommit": "2c25b4bda6cd33f6deac65a6115412018ec951bd",
+  "review": {
+    "reviewer": "Claude",
+    "verdict": "PASS",
+    "commentId": 6483551599,
+    "independentTestCommentId": 6483586857
+  },
+  "focusedRun": {
+    "command": "mvn -pl apps/app-runtime -am test -Dtest=ManualEffectDecisionStoreTest -Dsurefire.failIfNoSpecifiedTests=false -Dcheckstyle.skip=true",
+    "database": "PostgreSQL 16.15",
+    "tests": 12,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "pullRequestCheck": {
+    "runId": 40788462057,
+    "headSha": "3d62ad4ac1b61992ae52dd16db173f9ee37b0c1c",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "postMergeCheck": {
+    "runId": 40789673082,
+    "headSha": "2c25b4bda6cd33f6deac65a6115412018ec951bd",
+    "status": "in_progress",
+    "conclusion": null
+  }
+}
