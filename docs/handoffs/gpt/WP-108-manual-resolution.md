@@ -75,7 +75,8 @@ or WP-108 acceptance closure.
 PR #104 adds ambient JTA regression coverage. Claude reviewed and independently
 ran 12 focused PostgreSQL tests at `3d62ad4ac1b61992ae52dd16db173f9ee37b0c1c`
 with zero failures/errors/skips; exact-head PR CI `40788462057` passed and it
-merged as `2c25b4bda6cd33f6deac65a6115412018ec951bd`. The test observes the
+merged as `2c25b4bda6cd33f6deac65a6115412018ec951bd`; post-merge main CI
+`40789673082` passed. The test observes the
 resolver and ledger connections opening with no ambient transaction and checks
 that retain failure restores the caller transaction. The audit append uses a
 plain non-enlisted datasource in the fixture; behavior with a managed audit

@@ -1,6 +1,6 @@
 # Changelog
 
-- Merge WP-108 ambient transaction regression PR104 as 2c25b4b after Claude review and independent 12-test PostgreSQL run at 3d62ad4, plus PR CI40788462057. Resolver and ledger connection suspension and retain-failure restoration are observed; managed audit datasource behavior remains an activation gate. WP-108 and T03 remain partial.
+- Merge WP-108 ambient transaction regression PR104 as 2c25b4b after Claude review and independent 12-test PostgreSQL run at 3d62ad4, plus PR CI40788462057 and post-merge main CI40789673082. Resolver and ledger connection suspension and retain-failure restoration are observed; managed audit datasource behavior remains an activation gate. WP-108 and T03 remain partial.
 
 - Merge WP-108 tenant/isolation hardening PR102 as70a6337 after Claude exact-head PASS50d75c9, 12 focused PostgreSQL tests, exact-head CI40438255834 and post-merge main CI40439483024 SUCCESS. The retry-isolation test starts from REPEATABLE READ; tenant mismatch refuses before PEP. V80 stays unapplied, audit-table grants remain an activation gate, and WP-108/T03 governed Flow acceptance remain partial.
 

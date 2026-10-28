@@ -25,7 +25,7 @@
   "postMergeCheck": {
     "runId": 40789673082,
     "headSha": "2c25b4bda6cd33f6deac65a6115412018ec951bd",
-    "status": "in_progress",
-    "conclusion": null
+    "status": "completed",
+    "conclusion": "success"
   }
 }
