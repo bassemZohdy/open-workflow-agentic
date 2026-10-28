@@ -54,7 +54,8 @@ public final class ManualEffectResolver {
         if(!beforeAppend.allows())throw new PolicyDenied(beforeAppend);
         authority.requireCurrent(REQUIRED);
         var draft=manualDraft(row,key);
-        AuditReceipt receipt=audit.appendOnce(row.source(),draft);receipt.requireMatches(row.source(),draft);
+        AuditReceipt receipt=Transactions.inSuspendedTransaction(transactions,()->audit.appendOnce(row.source(),draft));
+        receipt.requireMatches(row.source(),draft);
         authority.requireCurrent(REQUIRED);
         var finalDecision=decide(authority,row.instanceId());
         if(!finalDecision.allows())throw new PolicyDenied(finalDecision);

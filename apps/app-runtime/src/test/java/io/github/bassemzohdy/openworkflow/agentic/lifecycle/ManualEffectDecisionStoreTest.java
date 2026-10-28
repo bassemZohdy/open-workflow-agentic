@@ -144,15 +144,16 @@ class ManualEffectDecisionStoreTest {
     @Test void manualResolutionCommitsOutsideAmbientJtaRollback() throws Exception {
         var fixture=unresolved("occur-ambient-rollback");var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
         var requestId=UlidGenerator.shared().next();var resolverConnections=new AtomicInteger();var ledgerConnections=new AtomicInteger();
+        var auditConnections=new AtomicInteger();
         var observedLedger=new JdbcEffectLedger(observingSuspendedConnections(ledgerConnections,0),manager,producer);
         var resolver=new ManualEffectResolver(observingSuspendedConnections(resolverConnections,0),manager,allowingPep(),
-                new AuditAppendOnce(support.db.owner),observedLedger);
+                new AuditAppendOnce(observingSuspendedConnections(auditConnections,0)),observedLedger);
         manager.begin();var ambient=manager.getTransaction();
         try {
             assertEquals(EffectState.CONFIRMED,resolver.resolve(authority,fixture.command().key(),requestId,
                     EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
             assertSame(ambient,manager.getTransaction());
-            assertEquals(2,resolverConnections.get());assertEquals(1,ledgerConnections.get());
+            assertEquals(2,resolverConnections.get());assertEquals(1,ledgerConnections.get());assertEquals(1,auditConnections.get());
         } finally {
             if(manager.getTransaction()!=null)manager.rollback();
         }
@@ -178,6 +179,23 @@ class ManualEffectDecisionStoreTest {
             if(manager.getTransaction()!=null)manager.rollback();
         }
         assertNull(manager.getTransaction());assertEquals(0,count("select count(*) from effect.manual_decision"));
+        assertEquals(EffectState.INTENDED,ledger.find(fixture.command().key()).orElseThrow().state());
+    }
+
+    @Test void failedManualAuditRestoresAmbientTransactionAndLeavesEffectUnchanged() throws Exception {
+        var fixture=unresolved("occur-ambient-audit-failure");var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var opened=new AtomicInteger();var resolver=resolver(allowingPep(),new AuditAppendOnce(observingSuspendedConnections(opened,1)));
+        manager.begin();var ambient=manager.getTransaction();
+        try {
+            assertThrows(io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditStoreException.class,()->resolver.resolve(authority,fixture.command().key(),UlidGenerator.shared().next(),
+                    EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+            assertEquals(1,opened.get());assertSame(ambient,manager.getTransaction());
+        } finally {
+            if(manager.getTransaction()!=null)manager.rollback();
+        }
+        assertNull(manager.getTransaction());assertEquals(1,count("select count(*) from effect.manual_decision"));
+        assertEquals(0,count("select count(*) from effect.manual_decision_applied"));
+        assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
         assertEquals(EffectState.INTENDED,ledger.find(fixture.command().key()).orElseThrow().state());
     }
 
