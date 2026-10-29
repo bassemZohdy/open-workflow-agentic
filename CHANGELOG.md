@@ -1,5 +1,7 @@
 # Changelog
 
+- Merge WP-108 audit-read grant proof PR111 as d709906 after Claude PASS and independent 16 focused PostgreSQL tests at 833c013 plus PR CI40796666096. A disposable non-owner role needs audit reads for the V80 apply guard; broad effect grants are test setup, not a production profile. Deployed datasource and role grants remain activation gates; WP-108 and T03 stay partial.
+
 - Merge WP-108 managed JTA pool PR109 as 57389b3 after Claude PASS at 53c89ab, CI40794331994 and both provider checks40794331895; post-merge build40796036689 and provider checks40796036659 passed, and Claude independently reran all 15 focused PostgreSQL tests after merge. The test-created pool demonstrates ambient caller rollback with separately durable decision, audit binding and outcome. Deployed datasource and grants remain activation gates; WP-108 and T03 stay partial.
 
 - Merge WP-108 manual audit lost-reply retry PR107 as 3576a94 after Claude PASS and independent 14 focused PostgreSQL tests at 7567c9e plus PR CI40791984770 and post-merge main CI40793439594. A real committed audit whose reply and readback fail is retried with the same request under ambient JTA, leaving one applied outcome. WP-108 and T03 remain partial.

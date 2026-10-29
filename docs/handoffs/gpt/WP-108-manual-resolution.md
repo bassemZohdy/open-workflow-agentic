@@ -122,3 +122,14 @@ ran the same 15 tests locally with zero failures/errors/skips. An earlier local
 execution attempt failed before test execution because PostgreSQL was down. The
 pool is created for the test: deployed datasource configuration and role grants
 remain activation gates. V80 and WP-108 remain partial.
+
+
+PR #111 tests the proposed V80 apply guard with a disposable non-owner role.
+Without audit table SELECT it fails with 42501 and the effect update rolls back;
+after SELECT on `audit.source_binding` and `audit.event`, the same request
+completes while audit INSERT remains absent. Broad effect grants are fixture
+setup and do not establish a production least-privilege profile. Claude reviewed
+`833c013679fa9b60ef6074054f9ec8bbd7ab00dd` and independently ran 16 focused
+PostgreSQL cases with zero failures/errors/skips; PR CI `40796666096` passed
+and the test merged as `d7099067f5cc0bafc5a4f9bc0878866f235c3df9`. Deployed
+roles/datasource, V80 activation and WP-108/T03 closure remain open.
