@@ -124,7 +124,10 @@ transition, and a row that already waits gets a same-status history row. No stat
 outbox, the task view (`lastReason`) and the inspect output, which also has an `authority` section (subject, grant, correlation
 id, state, reason, since).
 
-Renewal: `POST /instances/{id}/reauthorize` with `{"delegationGrantId": "..."}`. Only the user who started the instance
+Renewal: `POST /instances/{id}/reauthorize` with `{"delegationGrantId": "..."}` and the scope `oa.operate` (policy action
+`instance:reauthorize`; 403 without it, 503 when the decision is unavailable, and then nothing is written or resumed; the
+signed token expiry is rechecked before the authority write, before the immediate resume and before the response).
+Only the user who started the instance
 (403 for another user in the tenant, 404 for another tenant), only while the instance waits (409 otherwise), only with an
 active grant of the same user to the same agent (409 if it is not usable). The audit event `identity.reauthorization.granted`
 is written, the grant is rebound by compare-and-set, and the reconciler resumes the instance at once. A gate that is

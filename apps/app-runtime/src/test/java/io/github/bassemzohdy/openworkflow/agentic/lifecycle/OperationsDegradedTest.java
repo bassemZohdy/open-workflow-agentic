@@ -8,15 +8,19 @@ import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSup
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.moveTo;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.post;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.retriesOf;
-import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.startRunning;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsSupport.status;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.DefinitionRef;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceService;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceStatus;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcInstanceStore;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StartRequest;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
@@ -36,6 +40,22 @@ class OperationsDegradedTest {
 
     @Inject
     JdbcInstanceStore store;
+
+    @Inject
+    InstanceService service;
+
+    /**
+     * Starts a probe instance through the service. With the main policy unavailable the instance API is itself refused
+     * (503, WP-103: starting is not a safe-recovery operation), so the instance under test is created below the HTTP route.
+     */
+    private String startRunning(String tenant) {
+        var request = LifecycleSupport.standardBody(LifecycleSupport.newKey());
+        @SuppressWarnings("unchecked")
+        var input = (java.util.Map<String, Object>) request.get("input");
+        return service.start(new StartRequest(tenant, new Subject(SubjectKind.USER, "alice"),
+                new DefinitionRef(LifecycleSupport.DEFINITION_ID, LifecycleSupport.DEFINITION_VERSION), input,
+                (String) request.get("idempotencyKey"))).record().id().value();
+    }
 
     @Test
     void retryOfAFailedInstanceIsRefusedWithTheEngineDownAndCreatesNothing() {

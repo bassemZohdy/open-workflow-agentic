@@ -46,3 +46,19 @@ when { context.scopes.contains("oa.audit.verify") };
 @id("operations.resolve-effect")
 permit (principal is User, action == Action::"operation", resource == Resource::"operation:resolve-effect")
 when { context.scopes.contains("oa.recover") };
+
+// WP-103: the instance API. Start and re-authorize need oa.operate, read needs oa.inspect (the documented operator
+// scopes; no new permission model). The resources are distinct from operation:*, and none is a safe-recovery
+// operation, so an unavailable policy engine refuses all three. Reading stays tenant-wide (the resource filters by the
+// caller's tenant, as before); re-authorize still needs the exact starter, tenant and grant checks of the identity layer.
+@id("instances.start")
+permit (principal is User, action == Action::"operation", resource == Resource::"instance:start")
+when { context.scopes.contains("oa.operate") };
+
+@id("instances.get")
+permit (principal is User, action == Action::"operation", resource == Resource::"instance:get")
+when { context.scopes.contains("oa.inspect") };
+
+@id("instances.reauthorize")
+permit (principal is User, action == Action::"operation", resource == Resource::"instance:reauthorize")
+when { context.scopes.contains("oa.operate") };

@@ -54,6 +54,7 @@ final class LifecycleSupport {
         return given()
                 .header("X-Tenant", tenant)
                 .header("X-Subject", "alice")
+                .header("X-Scopes", "oa.operate")
                 .contentType("application/json")
                 .body(body)
                 .when().post("/instances")
@@ -64,6 +65,7 @@ final class LifecycleSupport {
         return given()
                 .header("X-Tenant", tenant)
                 .header("X-Subject", "alice")
+                .header("X-Scopes", "oa.inspect")
                 .when().get("/instances/" + id)
                 .then();
     }
