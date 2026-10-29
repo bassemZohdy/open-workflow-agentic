@@ -20,3 +20,11 @@ Focused local verification: `mvn -pl modules/oa-runtime -am test
 -Dcheckstyle.skip=true`: nine tests, zero failures/errors/skips. Exact peer review and GitHub CI are required.
 
 Review remains open: registration-to-snapshot binding and full pre-classification replay identity are not yet enforced. The selector must not be connected to production delivery.
+
+## Open review findings and next design boundary
+
+Claude re-reviewed `a7e392a` and requested changes. The focused tests passed, but they do not establish the pinned-registration binding or replay safety. Refusing every correlation predicate avoids invoking the known first-value correlation mutation; it does not establish that the main predicate is pure. A caller must treat this refusal as terminal and must not fall back to unfiltered delivery.
+
+The SDK exposes `EventRegistrationBuilderInfo.from` to derive registrations from the listen task using the application's configured event consumer. That is a possible construction path, not a verification mechanism by itself: it still needs to bind the task and the configured consumer to the retained snapshot and approved routes, and handle wildcard registrations. Caller-supplied predicate objects cannot be authenticated by checking only their slot labels. Any expression or custom consumer may require stronger isolation before speculative evaluation.
+
+The group store currently records classified memberships rather than the complete data-and-until match set. Replay can therefore accept a changed complete set when the classification is unchanged. Correcting that requires retained complete-set identity and a migration strategy for existing immutable history. A token or hash supplied by an unchecked caller cannot prove that no matching slot was omitted. Until these boundaries and rejected-offer/lease-loss behavior are established, this draft must not be wired to delivery or merged as a completed coordinator.
