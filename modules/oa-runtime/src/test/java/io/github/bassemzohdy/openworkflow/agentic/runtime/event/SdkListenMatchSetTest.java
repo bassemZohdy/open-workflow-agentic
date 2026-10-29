@@ -1,7 +1,6 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.event;
 
 import static org.junit.jupiter.api.Assertions.*;
-import io.cloudevents.CloudEvent;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.serverlessworkflow.impl.*;
@@ -32,7 +31,7 @@ class SdkListenMatchSetTest {
     @Test void duplicateAllFiltersYieldBothSlotsWithoutInvokingCallbacks() {
         var group=group(InboxListenGroup.Strategy.ALL,List.of(HASH,HASH),InboxListenGroup.Stop.NONE,List.of());
         var slots=group.slots(InboxListenGroup.Role.DATA);var callbacks=new AtomicInteger();
-        var registration=registration("order.ready",(event,w,t)->true,List.of((event,w,t)->true),null,null,callbacks);
+        var registration=registration("order.ready",(event,w,t)->true,List.of(),null,null,callbacks);
         var selector=new SdkListenMatchSet(group,List.of(bound(slots.get(0),registration),bound(slots.get(1),registration)));
         var matches=selector.matches(receipt(group));
         assertEquals(Set.copyOf(slots),matches);assertEquals(slots,group.classify(matches).slots());assertEquals(0,callbacks.get());
@@ -47,13 +46,20 @@ class SdkListenMatchSetTest {
         assertEquals(InboxListenGroup.Disposition.UNTIL,group.classify(matches).disposition());
         assertEquals(List.of(until.get(0)),group.classify(matches).slots());assertEquals(0,callbacks.get());
     }
-    @Test void typeAndCorrelationFiltersDoNotProduceAMatch() {
+    @Test void correlationIsRefusedBeforeAnyPredicateCanMutateState() {
         var group=group(InboxListenGroup.Strategy.ALL,List.of(HASH,HASH),InboxListenGroup.Stop.NONE,List.of());
-        var slots=group.slots(InboxListenGroup.Role.DATA);var callbacks=new AtomicInteger();var predicates=new AtomicInteger();
-        var wrongType=registration("another.type",(event,w,t)->{predicates.incrementAndGet();return true;},List.of(),null,null,callbacks);
-        var wrongCorrelation=registration("order.ready",(event,w,t)->true,List.of((event,w,t)->false),null,null,callbacks);
-        var matches=new SdkListenMatchSet(group,List.of(bound(slots.get(0),wrongType),bound(slots.get(1),wrongCorrelation))).matches(receipt(group));
-        assertTrue(matches.isEmpty());assertEquals(0,predicates.get());assertEquals(0,callbacks.get());
+        var slots=group.slots(InboxListenGroup.Role.DATA);var calls=new AtomicInteger();var callbacks=new AtomicInteger();
+        var first=registration("order.ready",(event,w,t)->{calls.incrementAndGet();return true;},List.of(),null,null,callbacks);
+        var correlated=registration("order.ready",(event,w,t)->true,List.of((event,w,t)->{calls.incrementAndGet();return true;}),null,null,callbacks);
+        assertThrows(IllegalArgumentException.class,()->new SdkListenMatchSet(group,List.of(bound(slots.getFirst(),first),bound(slots.getLast(),correlated))));
+        assertEquals(0,calls.get());assertEquals(0,callbacks.get());
+    }
+    @Test void typeMismatchDoesNotEvaluatePredicate() {
+        var group=group(InboxListenGroup.Strategy.ONE,List.of(HASH),InboxListenGroup.Stop.NONE,List.of());
+        var calls=new AtomicInteger();var callbacks=new AtomicInteger();
+        var wrong=registration("another.type",(event,w,t)->{calls.incrementAndGet();return true;},List.of(),null,null,callbacks);
+        assertTrue(new SdkListenMatchSet(group,List.of(bound(group.slots(InboxListenGroup.Role.DATA).getFirst(),wrong))).matches(receipt(group)).isEmpty());
+        assertEquals(0,calls.get());assertEquals(0,callbacks.get());
     }
     @Test void wildcardCanBindMultiplePhysicalTypesToOneLogicalSlot() {
         var group=group(InboxListenGroup.Strategy.ANY,List.of(),InboxListenGroup.Stop.NONE,List.of());
@@ -83,18 +89,5 @@ class SdkListenMatchSetTest {
         var selector=new SdkListenMatchSet(group,List.of(bound(slots.getFirst(),yes),bound(slots.getLast(),fail)));
         assertEquals("predicate unavailable",assertThrows(IllegalStateException.class,()->selector.matches(receipt(group))).getMessage());
         assertEquals(0,callbacks.get());
-    }
-    @Test void modelAwareCorrelationUsesSdkModelRatherThanCloudEventOverload() throws Exception {
-        try(var captured=new ListenGroupSnapshotsTest.Captured(ListenGroupSnapshotsTest.ONE)) {
-            var group=group(InboxListenGroup.Strategy.ONE,List.of(HASH),InboxListenGroup.Stop.NONE,List.of());
-            var slot=group.slots(InboxListenGroup.Role.DATA).getFirst();var calls=new AtomicInteger();var callbacks=new AtomicInteger();
-            var modelAware=new ModelAwareCloudEventPredicate() {
-                public boolean test(CloudEvent event,WorkflowContext workflow,TaskContext task) {throw new AssertionError("wrong predicate overload");}
-                public boolean test(WorkflowModel model,WorkflowContext workflow,TaskContext task) {assertNotNull(model);calls.incrementAndGet();return true;}
-            };
-            var actual=registration("order.ready",(event,w,t)->true,List.of(modelAware),captured.context.workflow(),captured.context.task(),callbacks);
-            assertEquals(Set.of(slot),new SdkListenMatchSet(group,List.of(bound(slot,actual))).matches(receipt(group)));
-            assertEquals(1,calls.get());assertEquals(0,callbacks.get());
-        }
     }
 }
