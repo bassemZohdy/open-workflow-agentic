@@ -1,0 +1,29 @@
+{
+  "pullRequest": 113,
+  "reviewedHead": "28455e107c45d6bd76311bbce456f7a0021016c2",
+  "mergeCommit": "0d5aa2b88427e1511d387a4ac7aeec8f531b4321",
+  "review": {
+    "reviewer": "Claude",
+    "verdict": "PASS",
+    "commentNodeId": "IC_kwDOVOXf2M8AAAABgokiZw"
+  },
+  "focusedRun": {
+    "command": "mvn -pl apps/app-runtime -am test -Dtest=ManualEffectDecisionStoreTest -Dsurefire.failIfNoSpecifiedTests=false -Dcheckstyle.skip=true",
+    "tests": 17,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "pullRequestCheck": {
+    "runId": 40798076108,
+    "headSha": "28455e107c45d6bd76311bbce456f7a0021016c2",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "postMergeCheck": {
+    "runId": 40799276896,
+    "headSha": "0d5aa2b88427e1511d387a4ac7aeec8f531b4321",
+    "status": "in_progress",
+    "conclusion": null
+  }
+}

@@ -133,3 +133,13 @@ setup and do not establish a production least-privilege profile. Claude reviewed
 PostgreSQL cases with zero failures/errors/skips; PR CI `40796666096` passed
 and the test merged as `d7099067f5cc0bafc5a4f9bc0878866f235c3df9`. Deployed
 roles/datasource, V80 activation and WP-108/T03 closure remain open.
+
+
+PR #113 injects an ambient transaction resume failure after audit append. The failure
+is surfaced; after the caller transaction is restored, a same-request retry retains
+one audit event and one applied outcome. Claude reviewed `28455e107c45d6bd76311bbce456f7a0021016c2`
+and independently ran 17 focused tests with no failures, errors or skips. PR CI
+`40798076108` passed; the test merged as `0d5aa2b88427e1511d387a4ac7aeec8f531b4321`.
+The post-merge build `40799276896` is pending. Lookup and retain resume failures,
+and failure of the real transaction manager to resume, are not covered. Deployment
+datasource and role configuration, V80 activation and WP-108/T03 remain open.
