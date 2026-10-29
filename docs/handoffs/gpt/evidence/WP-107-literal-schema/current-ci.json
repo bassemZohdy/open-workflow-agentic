@@ -1,0 +1,28 @@
+{
+  "pullRequest": 125,
+  "reviewedHead": "1ad4f67475a7f5862d41083c9a5870ca9647d858",
+  "mergeCommit": "b2a84c839dffc70c37e2839776f4a3c77772db66",
+  "review": {
+    "reviewer": "Claude",
+    "verdict": "PASS",
+    "commentUrl": "https://github.com/bassemZohdy/open-workflow-agentic/pull/125#issuecomment-6487719093",
+    "recordedBy": "connected GitHub account; Claude CLI review reported in task transcript"
+  },
+  "focusedRun": {
+    "tests": 23,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "source": "local run; Claude independently ran the 15 selector tests on the final head"
+  },
+  "pullRequestCheck": {
+    "runId": 40816443429,
+    "headSha": "1ad4f67475a7f5862d41083c9a5870ca9647d858",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "postMergeCheck": {
+    "runId": 40817321563,
+    "headSha": "b2a84c839dffc70c37e2839776f4a3c77772db66"
+  }
+}

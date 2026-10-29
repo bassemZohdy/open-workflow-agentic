@@ -854,7 +854,8 @@
           "PR114 merged as 8cba02d after Claude PASS at 343a595 and successful PR CI40806307889. Fail-closed literal-only selection binds the retained snapshot and receipt, with proposed complete-match replay identity. Post-merge CI40807299499 passed. Correlation, expression, general SDK conformance, deployed schema/grants, route authorization, coordinator and T13 remain open.",
           "Literal source URI matching PR120 merged as 898a19e after Claude PASS at ffdf6dd, 19 focused runtime tests and PR CI40810235295. Tests compare accepted and rejected sources with the pinned SDK; URI templates, expressions, correlations, approved routing and full consumer/T13 remain open. Post-merge CI40811215404 passed.",
           "Literal content-type matching PR121 merged as 7e21193 after Claude PASS at 3732980, 20 focused runtime tests and PR CI40811603653. Matching and rejection were compared with the pinned SDK. Correlation, expressions, routing, deployment and full consumer/T13 remain open. Post-merge CI40812450304 passed.",
-          "Legacy match replay proof PR123 merged as 328297e after Claude PASS at 6195adc, 19 PostgreSQL component tests and PR CI40814049581. A simulated pre-fingerprint selection remains readable but refuses replay in an isolated test database; this is not a production upgrade proof. Post-merge CI40815224198 passed. Deployment and T13 remain open."
+          "Legacy match replay proof PR123 merged as 328297e after Claude PASS at 6195adc, 19 PostgreSQL component tests and PR CI40814049581. A simulated pre-fingerprint selection remains readable but refuses replay in an isolated test database; this is not a production upgrade proof. Post-merge CI40815224198 passed. Deployment and T13 remain open.",
+          "Literal data-schema URI matching PR125 merged as b2a84c8 after Claude PASS at 1ad4f67 and PR CI40816443429. Local 23 focused tests passed; Claude independently ran the 15 selector tests. SDK comparisons cover matching, nonmatching and absent schemas; null filters and invalid, expression and template values are tested. Post-merge build is tracked as run 40817321563. General matching, routing, deployment and T13 remain open."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -883,7 +884,8 @@
           "docs/handoffs/gpt/evidence/WP-107-literal-match/current-ci.json",
           "docs/handoffs/gpt/evidence/WP-107-literal-source/current-ci.json",
           "docs/handoffs/gpt/evidence/WP-107-content-type/current-ci.json",
-          "docs/handoffs/gpt/evidence/WP-107-legacy-replay/current-ci.json"
+          "docs/handoffs/gpt/evidence/WP-107-legacy-replay/current-ci.json",
+          "docs/handoffs/gpt/evidence/WP-107-literal-schema/current-ci.json"
         ]
       }
     },

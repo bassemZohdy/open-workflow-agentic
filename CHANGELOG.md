@@ -1,5 +1,6 @@
 # Changelog
 
+- Merge WP-107 literal data-schema matching PR125 as b2a84c8 after Claude PASS, 23 local focused tests and PR CI40816443429. General matching and T13 remain open.
 - Merge WP-107 legacy replay proof PR123 as 328297e after Claude PASS, 19 PostgreSQL cases, PR CI40814049581 and post-merge CI40815224198. Production upgrade and T13 remain open.
 - Merge WP-107 literal content-type matching PR121 as 7e21193 after Claude PASS, 20 focused runtime cases, PR CI40811603653 and post-merge CI40812450304. General matching and T13 remain open.
 - Merge WP-107 literal source URI matching PR120 as 898a19e after Claude PASS, 19 focused runtime cases, PR CI40810235295 and post-merge CI40811215404. General matching and T13 remain open.
