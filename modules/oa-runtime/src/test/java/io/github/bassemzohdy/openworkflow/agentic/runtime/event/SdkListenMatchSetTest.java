@@ -183,4 +183,23 @@ class SdkListenMatchSetTest {
             assertEquals(1,calls.get());
         }
     }
+    @Test void literalDataSchemaMatchesActualSdk() throws Exception {
+        try(var run=new ListenGroupSnapshotsTest.Captured("""
+            listen:
+              to:
+                one:
+                  with: { type: org.openworkflow.agentic.group.a, dataschema: 'https://example.test/schema/v1' }
+            """);var events=new InMemoryEvents()) {
+            var pinned=run.prepare(ListenGroupSnapshotsTest.settings(),Map.of());var group=pinned.group();
+            var filter=((ListenTask)run.context.task().task()).getListen().getTo().getOneEventConsumptionStrategy().getOne();
+            var calls=new AtomicInteger();events.register(events.listen(filter,run.app),event->calls.incrementAndGet(),run.context.workflow(),run.context.task());
+            for(var schema:List.of("https://example.test/schema/v1","https://example.test/schema/v2")) {
+                var message=new InboxMessage(group.task().tenant(),"urn:test:source","id-1",ListenGroupSnapshotsTest.TYPE,group.task().instanceId(),"route",
+                        "{\"specversion\":\"1.0\",\"source\":\"urn:test:source\",\"id\":\"id-1\",\"type\":\""+ListenGroupSnapshotsTest.TYPE+"\",\"dataschema\":\""+schema+"\"}");
+                int before=calls.get();events.publish(StoredCloudEventDecoder.decode(message)).get(5,TimeUnit.SECONDS);
+                assertEquals(calls.get()>before,!new SdkListenMatchSet(group,pinned.snapshot()).matches(message).slots().isEmpty());
+            }
+            assertEquals(1,calls.get());
+        }
+    }
 }
