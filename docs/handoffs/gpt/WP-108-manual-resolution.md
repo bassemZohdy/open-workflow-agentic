@@ -108,3 +108,17 @@ without failures/errors/skips; PR CI `40791984770` passed and it merged as
 `40793439594` passed. The test uses a plain observed
 datasource; real JTA-managed datasource and deployment grants remain activation
 gates. No V80 activation or WP-108 closure is claimed.
+
+
+PR #109 tests a private PostgreSQL database with an Agroal pool integrated with
+Quarkus Narayana. The caller marker rolls back while the manual decision, audit
+event and source binding, and applied outcome persist. Claude reviewed
+`53c89ab2e9f71bd5f2bf60a0466f2ea5636087cd` and independently inspected CI
+`40794331994` (15 focused tests, zero failures/errors/skips) and both passing
+provider checks `40794331895`; it merged as
+`57389b34cc9740c5d3465dc229cc5fed07473340`; post-merge build `40796036689`
+and provider checks `40796036659` passed. After merge, Claude independently
+ran the same 15 tests locally with zero failures/errors/skips. An earlier local
+execution attempt failed before test execution because PostgreSQL was down. The
+pool is created for the test: deployed datasource configuration and role grants
+remain activation gates. V80 and WP-108 remain partial.

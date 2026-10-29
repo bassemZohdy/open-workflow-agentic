@@ -1,0 +1,44 @@
+{
+  "pullRequest": 109,
+  "reviewedHead": "53c89ab2e9f71bd5f2bf60a0466f2ea5636087cd",
+  "mergeCommit": "57389b34cc9740c5d3465dc229cc5fed07473340",
+  "review": {
+    "reviewer": "Claude",
+    "verdict": "PASS",
+    "commentId": 6484669080,
+    "postMergeIndependentTestCommentId": 6484716845
+  },
+  "focusedRun": {
+    "command": "mvn -pl apps/app-runtime -am test -Dtest=ManualEffectDecisionStoreTest -Dsurefire.failIfNoSpecifiedTests=false -Dcheckstyle.skip=true",
+    "database": "PostgreSQL 16.15",
+    "tests": 15,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "independentRunTiming": "after merge"
+  },
+  "pullRequestCheck": {
+    "runId": 40794331994,
+    "headSha": "53c89ab2e9f71bd5f2bf60a0466f2ea5636087cd",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "providerCheck": {
+    "runId": 40794331895,
+    "headSha": "53c89ab2e9f71bd5f2bf60a0466f2ea5636087cd",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "postMergeBuild": {
+    "runId": 40796036689,
+    "headSha": "57389b34cc9740c5d3465dc229cc5fed07473340",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "postMergeProvider": {
+    "runId": 40796036659,
+    "headSha": "57389b34cc9740c5d3465dc229cc5fed07473340",
+    "status": "completed",
+    "conclusion": "success"
+  }
+}
