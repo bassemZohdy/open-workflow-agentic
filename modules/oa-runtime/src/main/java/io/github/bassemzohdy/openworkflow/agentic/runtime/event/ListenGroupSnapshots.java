@@ -71,8 +71,8 @@ public class ListenGroupSnapshots {
         return new Prepared(group,text);
     }
 
-    private record Shape(InboxListenGroup.Strategy strategy,List<String> filters) { }
-    private static Shape shape(JsonNode strategy) {
+    static record Shape(InboxListenGroup.Strategy strategy,List<String> filters) { }
+    static Shape shape(JsonNode strategy) {
         if(!strategy.isObject()) throw new IllegalArgumentException("event consumption strategy required");
         var names=List.of("one","any","all").stream().filter(strategy::hasNonNull).toList();
         if(names.size()!=1) throw new IllegalArgumentException("exactly one event consumption strategy required");
@@ -89,7 +89,7 @@ public class ListenGroupSnapshots {
         if(!node.isObject()) throw new IllegalArgumentException("event filter object required");
         return fingerprint("oa.inbox.event-filter.v1",node);
     }
-    private static String fingerprint(String domain,JsonNode node) {
+    static String fingerprint(String domain,JsonNode node) {
         return CanonicalEncoder.sha256Hex(new CanonicalEncoder(domain).text(canonical(node)).toBytes());
     }
     /** Object keys sorted recursively; arrays (including duplicate filters) retain declaration order. */

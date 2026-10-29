@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.*;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.InboxListenGroup.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
@@ -69,20 +70,28 @@ public class JdbcListenGroups {
         record(group,null,"event.group.registered");return binding;
     }
 
-    /** Trusted selector supplied the complete matching slots of this exact receipt. No predicate runs under locks. */
-    public Optional<Recorded> offer(InboxTaskClaim claim,InboxListenGroup group,InboxMessage candidate,Set<Slot> matches) {
-        sameTask(claim,group);Objects.requireNonNull(candidate);var match=group.classify(matches);
+    /** Only a selector-produced complete match set for this group and receipt can reach the public store. */
+    public Optional<Recorded> offer(InboxTaskClaim claim,InboxListenGroup group,InboxMessage candidate,SdkListenMatchSet.Selection selection) {
+        Objects.requireNonNull(selection).require(group,Objects.requireNonNull(candidate));
+        return offer(claim,group,candidate,selection.slots());
+    }
+
+    // Component-only entry point; production callers cannot construct their own selection.
+    Optional<Recorded> offer(InboxTaskClaim claim,InboxListenGroup group,InboxMessage candidate,Set<Slot> matches) {
+        sameTask(claim,group);Objects.requireNonNull(candidate);matches=Set.copyOf(matches);var match=group.classify(matches);
+        String completeFingerprint=completeFingerprint(group,candidate,matches);
         if(!candidate.tenant().equals(group.task().tenant()) || !candidate.instanceId().equals(group.task().instanceId()))
             throw new IllegalArgumentException("receipt belongs to another registry scope");
         Optional<Recorded> result=Transactions.inTransaction(data,c->{
             leases.requireCurrent(c,claim,true);var row=row(c,group);
             var actual=message(c,group,candidate.source(),candidate.eventId(),true);
             if(!candidate.equals(actual)) throw new IllegalStateException("selected receipt content changed");
-            try(var s=statement(c,"select sequence,matched_slots from inbox.listen_item where tenant=? and instance_id=? and task_digest=? and source=? and event_id=?")) {
+            try(var s=statement(c,"select sequence,matched_slots,full_match_fingerprint from inbox.listen_item where tenant=? and instance_id=? and task_digest=? and source=? and event_id=?")) {
                 key(s,group,1);s.setString(4,candidate.source());s.setString(5,candidate.eventId());
                 try(var r=s.executeQuery()) {if(r.next()) {
                     if(r.getLong(1)>row.binding().lastSequence()) throw new IllegalStateException("selected receipt is not finalized");
-                    if(!readSlots(r.getString(2)).equals(match.slots())) throw new IllegalStateException("receipt match set changed");
+                    if(!readSlots(r.getString(2)).equals(match.slots()) || !completeFingerprint.equals(r.getString(3)))
+                        throw new IllegalStateException("receipt complete match set changed or predates complete-match retention");
                     var previous=read(c,group,r.getLong(1));leases.requireCurrent(c,claim,true);return Optional.of(previous);
                 }}
             }
@@ -101,10 +110,10 @@ public class JdbcListenGroups {
             long sequence=Math.addExact(row.binding().lastSequence(),1L);
             try(var s=statement(c,"""
                     insert into inbox.listen_item(tenant,instance_id,task_digest,sequence,role,source,event_id,receipt_fingerprint,
-                      matched_slots,selecting_owner,selecting_epoch) values(?,?,?,?,?,?,?,?,?::jsonb,?,?)
+                      matched_slots,selecting_owner,selecting_epoch,full_match_fingerprint) values(?,?,?,?,?,?,?,?,?::jsonb,?,?,?)
                     """)) {
                 key(s,group,1);s.setLong(4,sequence);s.setString(5,match.disposition().name());s.setString(6,candidate.source());s.setString(7,candidate.eventId());
-                s.setString(8,candidate.fingerprint());s.setString(9,json(match.slots()));s.setString(10,claim.owner());s.setLong(11,claim.epoch());s.executeUpdate();
+                s.setString(8,candidate.fingerprint());s.setString(9,json(match.slots()));s.setString(10,claim.owner());s.setLong(11,claim.epoch());s.setString(12,completeFingerprint);s.executeUpdate();
             }
             for(var slot:available) try(var s=statement(c,"""
                     insert into inbox.listen_member(tenant,instance_id,task_digest,sequence,role,ordinal,filter_fingerprint,exclusive_slot)
@@ -121,6 +130,12 @@ public class JdbcListenGroups {
             return Optional.of(new Recorded(sequence,match.disposition(),available,actual,claim.owner(),claim.epoch()));
         });
         record(group,result.orElse(null),result.isPresent()?"event.group.selected":"event.group.selection.refused");return result;
+    }
+
+    private static String completeFingerprint(InboxListenGroup group,InboxMessage receipt,Set<Slot> slots) {
+        var ordered=slots.stream().sorted(Comparator.comparing(Slot::role).thenComparingInt(Slot::ordinal)).toList();
+        var encoder=new CanonicalEncoder("oa.inbox.complete-match.v1").text(group.digest()).text(receipt.fingerprint()).number(ordered.size());
+        ordered.forEach(slot->encoder.text(slot.key()));return CanonicalEncoder.sha256Hex(encoder.toBytes());
     }
 
     /** Bounded ordered history for whole-group reconstruction. No callback authority is inferred, even for a new epoch. */
