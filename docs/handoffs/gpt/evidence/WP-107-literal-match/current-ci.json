@@ -1,0 +1,29 @@
+{
+  "pullRequest": 114,
+  "reviewedHead": "343a5956a1e133048fe622d0c8d98ad6cec5465e",
+  "review": {
+    "reviewer": "Claude",
+    "verdict": "PASS",
+    "commentUrl": "https://github.com/bassemZohdy/open-workflow-agentic/pull/114#issuecomment-6486238062"
+  },
+  "pullRequestCheck": {
+    "runId": 40806307889,
+    "headSha": "343a5956a1e133048fe622d0c8d98ad6cec5465e",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "scope": "literal-only match preparation and proposed SQL; no production activation or T13 closure",
+  "previousFailedCheck": {
+    "runId": 40805083121,
+    "headSha": "96da1903b0f6af57893b062a641c054517e59695",
+    "conclusion": "failure",
+    "reason": "test-only migration leaked into shared Flyway history"
+  },
+  "mergeCommit": "8cba02da658c4eaaedc14926201125f68ade8f74",
+  "postMergeCheck": {
+    "runId": 40807299499,
+    "headSha": "8cba02da658c4eaaedc14926201125f68ade8f74",
+    "status": "in_progress",
+    "conclusion": null
+  }
+}
