@@ -1,30 +1,9 @@
-# WP-107 SDK match-set preparation
+# WP-107 literal match-set preparation
 
-Owner: GPT. Reviewer: Claude. Status: opt-in data preparation; WP-107 and T13 remain partial.
+Owner: GPT. Reviewer: Claude. Status: partial, not wired to a production consumer; WP-107 and T13 remain open.
 
-`SdkListenMatchSet` evaluates a complete bounded set of SDK type registrations for one retained CloudEvent. It
-returns every matching logical slot before `InboxListenGroup.classify` or `JdbcListenGroups.offer` chooses a
-disposition. Duplicate `all` filters stay distinct; several physical wildcard registrations may share the one
-logical wildcard slot. The SDK main predicate uses the registered workflow and task context. Any correlation predicate is
-refused at construction, before predicate evaluation, until its state can be bound to durable selection. Type mismatch skips predicate evaluation. Missing or foreign slots, different
-task contexts, excessive registrations/correlations, malformed receipts and predicate failures refuse the selection.
-No registration callback is invoked and no database connection is opened by the selector.
+The selector derives slots from the exact retained snapshot and verifies the group's strategy and filter fingerprints. It evaluates only literal CloudEvent `type`, `id`, and `subject` filters without calling SDK predicates, modifying workflow metadata, or invoking callbacks. It refuses correlations, expressions, source and other properties. An untyped filter with other constraints is refused because the pinned SDK's null-type registration becomes an unconditional broadcast. `ANY []` uses a wildcard slot. The tests compare the supported literal path with the pinned SDK's actual in-memory consumer. This limited subset is not general SDK conformance; unsupported inputs must fail closed, with no unfiltered fallback.
 
-The trusted coordinator still must derive the binding between SDK registrations and the pinned configuration
-snapshot, validate deployment-approved routes and current authority, bound predicate execution time, and pass the
-complete set to the owned group store. A match set is data, not a lease, reservation, receipt proof, callback
-permission or continuation fence. The selector is not CDI-wired and cannot deliver events or complete T13.
+The selector produces an immutable result bound to the group and receipt. The public group-store method accepts only that result. V81 adds the complete pre-classification match fingerprint to each newly retained selection, including both data and until matches, and rejects a replay whose full set differs even when the classified winner is unchanged. V81 retains old rows without a fingerprint; their replay is refused because the full set cannot be reconstructed. Classified memberships remain unchanged. The package-private raw store entry point is used by component tests, not as a production selector.
 
-Focused local verification: `mvn -pl modules/oa-runtime -am test
--Dtest=SdkListenMatchSetTest,SdkEventRegistrationSemanticsTest -Dsurefire.failIfNoSpecifiedTests=false
--Dcheckstyle.skip=true`: nine tests, zero failures/errors/skips. Exact peer review and GitHub CI are required.
-
-Review remains open: registration-to-snapshot binding and full pre-classification replay identity are not yet enforced. The selector must not be connected to production delivery.
-
-## Open review findings and next design boundary
-
-Claude re-reviewed `a7e392a` and requested changes. The focused tests passed, but they do not establish the pinned-registration binding or replay safety. Refusing every correlation predicate avoids invoking the known first-value correlation mutation; it does not establish that the main predicate is pure. A caller must treat this refusal as terminal and must not fall back to unfiltered delivery.
-
-The SDK exposes `EventRegistrationBuilderInfo.from` to derive registrations from the listen task using the application's configured event consumer. That is a possible construction path, not a verification mechanism by itself: it still needs to bind the task and the configured consumer to the retained snapshot and approved routes, and handle wildcard registrations. Caller-supplied predicate objects cannot be authenticated by checking only their slot labels. Any expression or custom consumer may require stronger isolation before speculative evaluation.
-
-The group store currently records classified memberships rather than the complete data-and-until match set. Replay can therefore accept a changed complete set when the classification is unchanged. Correcting that requires retained complete-set identity and a migration strategy for existing immutable history. A token or hash supplied by an unchecked caller cannot prove that no matching slot was omitted. Until these boundaries and rejected-offer/lease-loss behavior are established, this draft must not be wired to delivery or merged as a completed coordinator.
+Local verification used the focused runtime tests and PostgreSQL 16.15 group-store tests in a separate database. These cover duplicate filters, data/until overlap, SDK matching for a literal filter, refusal of unsupported cases, group/receipt binding, retained replay identity, and the existing lease and storage component cases. A separate upgrade rehearsal preserves a synthetic pre-V81 row and rejects new rows lacking a complete-match fingerprint; it does not prove an actual legacy-row replay. The tests do not prove general expression or correlation evaluation, deployed database grants, production route authorization, complete consumer integration, or T13. The trusted coordinator must validate approved routes and current authority, preserve FIFO and recovery semantics, and fence callbacks. The proposed V81 SQL is outside the default Flyway path; a test-resource copy exercises it. Deployment activation, migration ordering and database grants need review before the store is used.
