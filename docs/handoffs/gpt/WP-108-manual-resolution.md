@@ -96,3 +96,15 @@ CI `40790001025` passed and the change merged as
 at audit connection acquisition and restoration after an injected connection
 failure. A real JTA-enlisted datasource and deployment role grants remain
 activation gates; no CDI route, Flyway V80 activation, or WP-108 closure is claimed.
+
+
+PR #107 adds a real-commit, lost-reply and failed-readback test under an ambient
+transaction. It observes suspension for both connections, verifies the effect
+remains unresolved after the uncertain result, then retries the same request
+and retains one audit event and one applied outcome. Claude reviewed and
+independently ran 14 PostgreSQL tests at `7567c9e3a7a0a35c1c5e362c8d9782786c7e2c05`
+without failures/errors/skips; PR CI `40791984770` passed and it merged as
+`3576a94514ff3b4804bb8e09d3bee496f598b9b6`; post-merge main CI
+`40793439594` passed. The test uses a plain observed
+datasource; real JTA-managed datasource and deployment grants remain activation
+gates. No V80 activation or WP-108 closure is claimed.
