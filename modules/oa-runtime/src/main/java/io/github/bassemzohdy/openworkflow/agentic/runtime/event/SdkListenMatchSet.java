@@ -42,6 +42,9 @@ public final class SdkListenMatchSet {
             if(!stop.strategy().name().equals(group.stop().name()) || !stop.filters().equals(group.stopFilters()))
                 throw new IllegalArgumentException("snapshot stop registrations differ from group");
         }
+        // InMemoryEvents has one broadcast registration; two wildcard strategies can replace each other.
+        if(group.dataFilters().isEmpty() && group.stop()==InboxListenGroup.Stop.ANY && group.stopFilters().isEmpty())
+            throw new IllegalArgumentException("overlapping wildcard strategies unsupported");
         var compiled=new ArrayList<Filter>();
         append(compiled,group.slots(InboxListenGroup.Role.DATA),to,data.strategy());
         if(until!=null && !until.isNull()) append(compiled,group.slots(InboxListenGroup.Role.UNTIL),until,
@@ -71,7 +74,8 @@ public final class SdkListenMatchSet {
             if(!Set.of("type","id","subject").containsAll(names))throw new IllegalArgumentException("unsupported event property");
             var type=literal(with,"type");var id=literal(with,"id");var subject=literal(with,"subject");
             // The pinned SDK registers a null type as an unconditional broadcast and discards its predicate.
-            if(type==null && (id!=null || subject!=null))throw new IllegalArgumentException("untyped filtered broadcast unsupported");
+            // Multiple untyped filters can also replace each other, so only explicit ANY [] is supported.
+            if(type==null)throw new IllegalArgumentException("untyped filter unsupported");
             out.add(new Filter(slots.get(i),type,id,subject));
         }
     }

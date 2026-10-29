@@ -121,4 +121,30 @@ class SdkListenMatchSetTest {
             assertThrows(IllegalArgumentException.class,()->new SdkListenMatchSet(pinned.group(),pinned.snapshot()));
         }
     }
+    @Test void wildcardMatchesActualSdkBroadcast() throws Exception {
+        try(var run=new ListenGroupSnapshotsTest.Captured("""
+            listen:
+              to:
+                any: []
+            """);var events=new InMemoryEvents()) {
+            var pinned=run.prepare(ListenGroupSnapshotsTest.settings(),Map.of());var group=pinned.group();
+            var calls=new AtomicInteger();var builder=events.listenToAll(run.app).iterator().next();
+            events.register(builder,event->calls.incrementAndGet(),run.context.workflow(),run.context.task());
+            var message=receipt(group,"arbitrary.type");events.publish(StoredCloudEventDecoder.decode(message)).get(5,TimeUnit.SECONDS);
+            assertEquals(1,calls.get());assertEquals(Set.copyOf(group.slots(InboxListenGroup.Role.DATA)),
+                    new SdkListenMatchSet(group,pinned.snapshot()).matches(message).slots());
+        }
+    }
+    @Test void overlappingWildcardStrategiesAreRefused() throws Exception {
+        try(var run=new ListenGroupSnapshotsTest.Captured("""
+            listen:
+              to:
+                any: []
+                until:
+                  any: []
+            """,false)) {
+            var pinned=run.prepare(ListenGroupSnapshotsTest.settings(),Map.of());
+            assertThrows(IllegalArgumentException.class,()->new SdkListenMatchSet(pinned.group(),pinned.snapshot()));
+        }
+    }
 }
