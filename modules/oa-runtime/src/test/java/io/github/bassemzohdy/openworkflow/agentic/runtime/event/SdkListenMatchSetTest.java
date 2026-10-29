@@ -1,6 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.event;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -199,7 +200,46 @@ class SdkListenMatchSetTest {
                 int before=calls.get();events.publish(StoredCloudEventDecoder.decode(message)).get(5,TimeUnit.SECONDS);
                 assertEquals(calls.get()>before,!new SdkListenMatchSet(group,pinned.snapshot()).matches(message).slots().isEmpty());
             }
+            var absent=receipt(group,ListenGroupSnapshotsTest.TYPE);
+            events.publish(StoredCloudEventDecoder.decode(absent)).get(5,TimeUnit.SECONDS);
+            assertTrue(new SdkListenMatchSet(group,pinned.snapshot()).matches(absent).slots().isEmpty());
             assertEquals(1,calls.get());
+        }
+    }
+    private static ListenGroupSnapshots.Prepared withDataSchema(ListenGroupSnapshots.Prepared pinned,String value) throws Exception {
+        var tree=(ObjectNode)ListenGroupSnapshotsTest.JSON.readTree(pinned.snapshot());
+        var with=(ObjectNode)tree.path("task").path("listen").path("to").path("one").path("with");
+        if(value==null)with.putNull("dataschema");else with.put("dataschema",value);
+        String snapshot=tree.toString();var old=pinned.group();var shape=ListenGroupSnapshots.shape(tree.path("task").path("listen").path("to"));
+        var group=new InboxListenGroup(old.task(),shape.strategy(),shape.filters(),old.stop(),old.stopFilters(),old.expressionFingerprint(),InboxListenGroup.snapshotFingerprint(snapshot));
+        return new ListenGroupSnapshots.Prepared(group,snapshot);
+    }
+    @Test void schemaExpressionTemplateAndInvalidUriAreRefused() throws Exception {
+        try(var run=new ListenGroupSnapshotsTest.Captured("""
+            listen:
+              to:
+                one:
+                  with: { type: org.openworkflow.agentic.group.a }
+            """)) {
+            var original=run.prepare(ListenGroupSnapshotsTest.settings(),Map.of());
+            for(String value:List.of("${ .schema }","https://example.test/{id}","not a uri")) {
+                var pinned=withDataSchema(original,value);
+                assertThrows(IllegalArgumentException.class,()->new SdkListenMatchSet(pinned.group(),pinned.snapshot()));
+            }
+        }
+    }
+    @Test void explicitNullSchemaHasNoConstraintAsInSdk() throws Exception {
+        try(var run=new ListenGroupSnapshotsTest.Captured("""
+            listen:
+              to:
+                one:
+                  with: { type: org.openworkflow.agentic.group.a }
+            """);var events=new InMemoryEvents()) {
+            var pinned=withDataSchema(run.prepare(ListenGroupSnapshotsTest.settings(),Map.of()),null);var group=pinned.group();
+            var filter=((ListenTask)run.context.task().task()).getListen().getTo().getOneEventConsumptionStrategy().getOne();
+            var calls=new AtomicInteger();events.register(events.listen(filter,run.app),event->calls.incrementAndGet(),run.context.workflow(),run.context.task());
+            var message=receipt(group,ListenGroupSnapshotsTest.TYPE);events.publish(StoredCloudEventDecoder.decode(message)).get(5,TimeUnit.SECONDS);
+            assertEquals(1,calls.get());assertFalse(new SdkListenMatchSet(group,pinned.snapshot()).matches(message).slots().isEmpty());
         }
     }
 }
