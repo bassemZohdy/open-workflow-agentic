@@ -1,5 +1,6 @@
 # Changelog
 
+- Merge WP-108 early resume failure tests PR118 as b0d2342 after Claude PASS, 19 focused PostgreSQL cases, PR CI40807640559 and post-merge CI40808892550. Actual transaction-manager recovery and deployment remain open.
 - Merge WP-107 literal match selection PR114 as 8cba02d after Claude PASS, PR CI40806307889 and post-merge CI40807299499. Complete-match replay identity uses proposed, unactivated SQL; broader consumer and T13 remain open.
 - Merge WP-108 ambient resume failure proof PR113 as 0d5aa2b after Claude PASS and 17 focused tests at 28455e1 and PR CI40798076108 and post-merge CI40799276896. Same-request retry after the injected failure retains one audit event and outcome; other failure points and deployment configuration remain open.
 - Merge WP-108 audit-read grant proof PR111 as d709906 after Claude PASS and independent 16 focused PostgreSQL tests at 833c013 plus PR CI40796666096 and post-merge CI40797871572. A disposable non-owner role needs audit reads for the V80 apply guard; broad effect grants are test setup, not a production profile. Deployed datasource and role grants remain activation gates; WP-108 and T03 stay partial.
