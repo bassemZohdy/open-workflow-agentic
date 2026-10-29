@@ -248,7 +248,8 @@ class ManualEffectDecisionStoreTest {
         }
         var config=new io.agroal.api.configuration.supplier.AgroalDataSourceConfigurationSupplier();
         var pool=config.connectionPoolConfiguration();
-        pool.maxSize(3).transactionIntegration(new io.agroal.narayana.NarayanaTransactionIntegration(manager,transactionRegistry));
+        pool.maxSize(3).acquisitionTimeout(Duration.ofSeconds(5))
+                .transactionIntegration(new io.agroal.narayana.NarayanaTransactionIntegration(manager,transactionRegistry));
         pool.connectionFactoryConfiguration().connectionProviderClass(org.postgresql.Driver.class)
                 .jdbcUrl(support.db.owner.getURL()).principal(new io.agroal.api.security.NamePrincipal(support.db.owner.getUser()))
                 .credential(new io.agroal.api.security.SimplePassword(support.db.owner.getPassword()));
@@ -269,6 +270,7 @@ class ManualEffectDecisionStoreTest {
         assertEquals(0,count("select count(*) from public.manual_caller_probe"));
         assertEquals(1,count("select count(*) from effect.manual_decision"));
         assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        assertEquals(1,count("select count(*) from audit.source_binding"));
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
         assertEquals(EffectState.CONFIRMED,ledger.find(fixture.command().key()).orElseThrow().state());
     }
