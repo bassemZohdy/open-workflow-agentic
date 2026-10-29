@@ -102,6 +102,14 @@ class ManualEffectDecisionStoreTest {
                     try{return method.invoke(support.db.owner,args);}catch(InvocationTargetException failed){throw failed.getCause();}
                 });
     }
+    private TransactionManager failResumeAt(AtomicInteger resumes,int failAt) {
+        return (TransactionManager)java.lang.reflect.Proxy.newProxyInstance(TransactionManager.class.getClassLoader(),new Class[]{TransactionManager.class},
+                (proxy,method,args)->{
+                    if(method.getName().equals("resume")&&resumes.incrementAndGet()==failAt)
+                        throw new jakarta.transaction.SystemException("injected resume failure");
+                    try{return method.invoke(manager,args);}catch(InvocationTargetException failed){throw failed.getCause();}
+                });
+    }
     private DataSource withTransactionIsolation(DataSource delegate,int isolation) {
         return (DataSource)java.lang.reflect.Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},
                 (proxy,method,args)->{
@@ -248,6 +256,33 @@ class ManualEffectDecisionStoreTest {
             if(manager.getTransaction()!=null)manager.rollback();
         }
         assertNull(manager.getTransaction());assertEquals(1,count("select count(*) from effect.manual_decision"));
+        assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+        assertEquals(EffectState.CONFIRMED,ledger.find(fixture.command().key()).orElseThrow().state());
+    }
+
+    @Test void auditCommittedBeforeResumeFailureCanBeRetriedWithSameRequest() throws Exception {
+        var fixture=unresolved("occur-ambient-audit-resume-failure");var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var requestId=UlidGenerator.shared().next();var resumes=new AtomicInteger();
+        var failing=new ManualEffectResolver(support.db.owner,failResumeAt(resumes,3),allowingPep(),new AuditAppendOnce(support.db.owner),ledger);
+        var retry=resolver(allowingPep(),new AuditAppendOnce(support.db.owner));
+        manager.begin();var ambient=manager.getTransaction();
+        try {
+            var error=assertThrows(StoreUnavailableException.class,()->failing.resolve(authority,fixture.command().key(),requestId,
+                    EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+            assertInstanceOf(jakarta.transaction.SystemException.class,error.getCause());assertEquals(3,resumes.get());
+            assertNull(manager.getTransaction());assertEquals(1,count("select count(*) from effect.manual_decision"));
+            assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+            assertEquals(0,count("select count(*) from effect.manual_decision_applied"));
+            assertEquals(EffectState.INTENDED,ledger.find(fixture.command().key()).orElseThrow().state());
+            manager.resume(ambient);
+            assertEquals(EffectState.CONFIRMED,retry.resolve(authority,fixture.command().key(),requestId,EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
+            assertSame(ambient,manager.getTransaction());
+        } finally {
+            if(manager.getTransaction()==null)manager.resume(ambient);
+            manager.rollback();
+        }
+        assertEquals(1,count("select count(*) from effect.manual_decision"));
         assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
         assertEquals(EffectState.CONFIRMED,ledger.find(fixture.command().key()).orElseThrow().state());
