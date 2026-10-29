@@ -1,0 +1,29 @@
+{
+  "pullRequest": 118,
+  "reviewedHead": "cd85cd084a08396d37ecd5180ea3fb647e709a74",
+  "mergeCommit": "b0d2342f017a5dc88a6624823f255ce25ec54449",
+  "review": {
+    "reviewer": "Claude",
+    "verdict": "PASS",
+    "commentUrl": "https://github.com/bassemZohdy/open-workflow-agentic/pull/118#issuecomment-6486408099"
+  },
+  "focusedRun": {
+    "tests": 19,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "database": "PostgreSQL 16.15"
+  },
+  "pullRequestCheck": {
+    "runId": 40807640559,
+    "headSha": "cd85cd084a08396d37ecd5180ea3fb647e709a74",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "postMergeCheck": {
+    "runId": 40808892550,
+    "headSha": "b0d2342f017a5dc88a6624823f255ce25ec54449",
+    "status": "completed",
+    "conclusion": "success"
+  }
+}

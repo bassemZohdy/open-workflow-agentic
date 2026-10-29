@@ -953,7 +953,8 @@
           "Manual audit uncertain-commit retry PR107 merged as 3576a94 after Claude PASS and independent 14 focused PostgreSQL tests at 7567c9e, and PR CI40791984770 and post-merge main CI40793439594 passed. A real commit with lost reply and failed readback leaves the effect unresolved; retrying the same request yields one audit event and one applied outcome under an ambient transaction. Managed datasource and role grants remain activation gates; WP-108 and T03 remain partial.",
           "Managed pool PR109 merged as 57389b3 after Claude PASS at 53c89ab, exact build CI40794331994 with 15 focused tests and both provider checks40794331895; Post-merge build40796036689 and provider checks40796036659 passed; Claude also independently reran the 15 tests after merge. A test-created Agroal/Narayana pool proves caller marker rollback while decision, audit binding and outcome persist. Deployed datasource configuration and role grants remain activation gates; WP-108 and T03 remain partial.",
           "Audit-read grant proof PR111 merged as d709906 after Claude PASS and independent 16 focused PostgreSQL tests at 833c013, and PR CI40796666096 and post-merge CI40797871572 passed. A disposable non-owner role fails apply without audit reads and succeeds on same-request retry with SELECT on audit.source_binding and audit.event while lacking audit INSERT. Broad effect permissions are fixture setup; deployed role profile and datasource remain activation gates. WP-108 and T03 remain partial.",
-          "Resume failure proof PR113 merged as 0d5aa2b after Claude PASS and 17 focused tests at 28455e1; PR CI40798076108 and post-merge CI40799276896 passed. Failure after audit append is surfaced and same-request retry yields one audit event and applied outcome. Other resume failure points and deployment configuration remain open; WP-108 and T03 remain partial."
+          "Resume failure proof PR113 merged as 0d5aa2b after Claude PASS and 17 focused tests at 28455e1; PR CI40798076108 and post-merge CI40799276896 passed. Failure after audit append is surfaced and same-request retry yields one audit event and applied outcome. Other resume failure points and deployment configuration remain open; WP-108 and T03 remain partial.",
+          "Early resume failure tests PR118 merged as b0d2342 after Claude PASS at cd85cd0, independent 19 focused PostgreSQL tests and PR CI40807640559. Injected lookup and retain resume failures leave the effect unresolved; after caller restoration, same-request retry retains one decision, audit event and outcome. Post-merge CI40808892550 passed. Real transaction-manager recovery, deployment and T03 remain open."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -1013,7 +1014,9 @@
           "docs/handoffs/gpt/evidence/WP-108-manual-audit-lost-reply/current-ci.json",
           "docs/handoffs/gpt/evidence/WP-108-managed-pool/current-ci.json",
           "docs/handoffs/gpt/evidence/WP-108-manual-audit-grants/current-ci.json",
-          "docs/handoffs/gpt/evidence/WP-108-manual-resume-failure/current-ci.json"
+          "docs/handoffs/gpt/evidence/WP-108-manual-resume-failure/current-ci.json",
+          "docs/handoffs/gpt/WP-108-early-resume-failures.md",
+          "docs/handoffs/gpt/evidence/WP-108-early-resume-failures/current-ci.json"
         ]
       }
     },
