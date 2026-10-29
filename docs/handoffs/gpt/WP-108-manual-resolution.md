@@ -82,3 +82,17 @@ that retain failure restores the caller transaction. The audit append uses a
 plain non-enlisted datasource in the fixture; behavior with a managed audit
 datasource and audit-table grants remain activation gates. V80 and WP-108 stay
 partial.
+
+
+PR #105 suspends the caller transaction around the entire central audit append,
+including uncertain-commit readback, and resumes it on success or failure. The
+retained decision, audit intent and ledger outcome are separately durable;
+caller rollback cannot undo them. A failed audit can leave a retained decision
+with the effect still unresolved. Claude reviewed `a1e0737d6b1900166917f6504aa50e7c300402bf`
+and independently ran 13 PostgreSQL tests without failures/errors/skips; PR
+CI `40790001025` passed and the change merged as
+`2305bce6ec3376c53bc74454ec663d0cada15621`; post-merge main CI
+`40791140439` passed. Tests observe transaction suspension
+at audit connection acquisition and restoration after an injected connection
+failure. A real JTA-enlisted datasource and deployment role grants remain
+activation gates; no CDI route, Flyway V80 activation, or WP-108 closure is claimed.
