@@ -1,5 +1,6 @@
 # Changelog
 
+- Merge WP-107 literal content-type matching PR121 as 7e21193 after Claude PASS, 20 focused runtime cases, PR CI40811603653 and post-merge CI40812450304. General matching and T13 remain open.
 - Merge WP-107 literal source URI matching PR120 as 898a19e after Claude PASS, 19 focused runtime cases, PR CI40810235295 and post-merge CI40811215404. General matching and T13 remain open.
 - Merge WP-108 early resume failure tests PR118 as b0d2342 after Claude PASS, 19 focused PostgreSQL cases, PR CI40807640559 and post-merge CI40808892550. Actual transaction-manager recovery and deployment remain open.
 - Merge WP-107 literal match selection PR114 as 8cba02d after Claude PASS, PR CI40806307889 and post-merge CI40807299499. Complete-match replay identity uses proposed, unactivated SQL; broader consumer and T13 remain open.
