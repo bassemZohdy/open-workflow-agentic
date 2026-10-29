@@ -74,6 +74,18 @@ class ManualEffectDecisionStoreTest {
                     catch(InvocationTargetException failed){throw failed.getCause();}
                 });
     }
+    private DataSource asRole(String role) {
+        if(!role.matches("manual_probe_[0-9a-f]{32}"))throw new IllegalArgumentException("invalid test role");
+        return (DataSource)java.lang.reflect.Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},
+                (proxy,method,args)->{
+                    if(method.getName().equals("getConnection")&&method.getParameterCount()==0) {
+                        var connection=support.db.owner.getConnection();
+                        try(var statement=connection.createStatement()){statement.execute("set role "+role);return connection;}
+                        catch(Throwable failure){connection.close();throw failure;}
+                    }
+                    try{return method.invoke(support.db.owner,args);}catch(InvocationTargetException failed){throw failed.getCause();}
+                });
+    }
     private DataSource lostAuditReplyAndUnavailableReadback(AtomicInteger opened) {
         return (DataSource)java.lang.reflect.Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class[]{DataSource.class},
                 (proxy,method,args)->{
@@ -273,6 +285,47 @@ class ManualEffectDecisionStoreTest {
         assertEquals(1,count("select count(*) from audit.source_binding"));
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
         assertEquals(EffectState.CONFIRMED,ledger.find(fixture.command().key()).orElseThrow().state());
+    }
+
+    @Test void manualApplyRequiresAuditReadAccessWithoutAuditWriteAccess() throws Exception {
+        var fixture=unresolved("occur-audit-read-grant");var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var role="manual_probe_"+UUID.randomUUID().toString().replace("-","");var requestId=UlidGenerator.shared().next();
+        try(var c=support.db.owner.getConnection();var statement=c.createStatement()) {
+            statement.execute("create role "+role+" nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
+        }
+        try {
+            try(var c=support.db.owner.getConnection();var statement=c.createStatement()) {
+                statement.execute("grant usage on schema effect, task, audit to "+role);
+                // Broad effect grants are fixture setup, not a proposed production role profile.
+                statement.execute("grant all on all tables in schema effect to "+role);
+                statement.execute("grant all on all sequences in schema effect to "+role);
+                statement.execute("grant select, update on task.instance to "+role);
+            }
+            var roleData=asRole(role);var roleLedger=new JdbcEffectLedger(roleData,manager,producer);
+            var resolver=new ManualEffectResolver(roleData,manager,allowingPep(),new AuditAppendOnce(support.db.owner),roleLedger);
+            var denied=assertThrows(StoreUnavailableException.class,()->resolver.resolve(authority,fixture.command().key(),requestId,
+                    EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+            assertEquals("42501",assertInstanceOf(SQLException.class,denied.getCause()).getSQLState());
+            assertEquals(1,count("select count(*) from effect.manual_decision"));
+            assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+            assertEquals(0,count("select count(*) from effect.manual_decision_applied"));
+            assertEquals(EffectState.INTENDED,ledger.find(fixture.command().key()).orElseThrow().state());
+            try(var c=support.db.owner.getConnection();var statement=c.createStatement()) {
+                statement.execute("grant select on audit.source_binding, audit.event to "+role);
+            }
+            try(var c=roleData.getConnection();var statement=c.createStatement();var r=statement.executeQuery(
+                    "select has_table_privilege(current_user,'audit.event','INSERT'),has_table_privilege(current_user,'audit.source_binding','INSERT')")) {
+                assertTrue(r.next());assertFalse(r.getBoolean(1));assertFalse(r.getBoolean(2));
+            }
+            assertEquals(EffectState.CONFIRMED,resolver.resolve(authority,fixture.command().key(),requestId,
+                    EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
+            assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+            assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        } finally {
+            try(var c=support.db.owner.getConnection();var statement=c.createStatement()) {
+                statement.execute("drop owned by "+role);statement.execute("drop role "+role);
+            }
+        }
     }
 
     @Test void requestRetainedBeforePolicyRefusalCanBeSupersededByANewRequestId() throws Exception {
