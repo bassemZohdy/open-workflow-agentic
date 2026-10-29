@@ -58,11 +58,7 @@ class SdkListenMatchSetTest {
             assertThrows(IllegalArgumentException.class,()->new SdkListenMatchSet(changed,pinned.snapshot()));
         }
     }
-    @Test void unsupportedSourceAndForeignReceiptAreRefused() throws Exception {
-        try(var run=new ListenGroupSnapshotsTest.Captured(ListenGroupSnapshotsTest.ONE)) {
-            var pinned=run.prepare(ListenGroupSnapshotsTest.settings(),Map.of());
-            assertThrows(IllegalArgumentException.class,()->new SdkListenMatchSet(pinned.group(),pinned.snapshot()));
-        }
+    @Test void foreignReceiptIsRefused() throws Exception {
         try(var run=new ListenGroupSnapshotsTest.Captured("""
             listen:
               to:
@@ -143,6 +139,27 @@ class SdkListenMatchSetTest {
                 until:
                   any: []
             """,false)) {
+            var pinned=run.prepare(ListenGroupSnapshotsTest.settings(),Map.of());
+            assertThrows(IllegalArgumentException.class,()->new SdkListenMatchSet(pinned.group(),pinned.snapshot()));
+        }
+    }
+    @Test void literalSourceMatchesTheActualSdkAndWrongSourceIsRejected() throws Exception {
+        try(var run=new ListenGroupSnapshotsTest.Captured(ListenGroupSnapshotsTest.ONE);var events=new InMemoryEvents()) {
+            var pinned=run.prepare(ListenGroupSnapshotsTest.settings(),Map.of());var group=pinned.group();
+            var filter=((ListenTask)run.context.task().task()).getListen().getTo().getOneEventConsumptionStrategy().getOne();
+            var builder=events.listen(filter,run.app);var calls=new AtomicInteger();
+            events.register(builder,event->calls.incrementAndGet(),run.context.workflow(),run.context.task());
+            String source="urn:test:producer";String type=ListenGroupSnapshotsTest.TYPE;
+            var accepted=new InboxMessage(group.task().tenant(),source,"id-1",type,group.task().instanceId(),"route",
+                    "{\"specversion\":\"1.0\",\"source\":\""+source+"\",\"id\":\"id-1\",\"type\":\""+type+"\"}");
+            events.publish(StoredCloudEventDecoder.decode(accepted)).get(5,TimeUnit.SECONDS);
+            assertEquals(1,calls.get());assertFalse(new SdkListenMatchSet(group,pinned.snapshot()).matches(accepted).slots().isEmpty());
+            var rejected=receipt(group,type);events.publish(StoredCloudEventDecoder.decode(rejected)).get(5,TimeUnit.SECONDS);
+            assertEquals(1,calls.get());assertTrue(new SdkListenMatchSet(group,pinned.snapshot()).matches(rejected).slots().isEmpty());
+        }
+    }
+    @Test void runtimeExpressionSourceRemainsUnsupported() throws Exception {
+        try(var run=new ListenGroupSnapshotsTest.Captured(ListenGroupSnapshotsTest.ONE.replace("'urn:test:producer'", "'${ .source }'"),false)) {
             var pinned=run.prepare(ListenGroupSnapshotsTest.settings(),Map.of());
             assertThrows(IllegalArgumentException.class,()->new SdkListenMatchSet(pinned.group(),pinned.snapshot()));
         }
