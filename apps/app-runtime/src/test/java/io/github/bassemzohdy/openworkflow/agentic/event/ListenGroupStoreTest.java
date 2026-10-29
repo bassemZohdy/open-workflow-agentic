@@ -10,6 +10,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.event.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.common.QuarkusTestResource;
 import jakarta.inject.Inject;
 import java.lang.reflect.*;
 import java.sql.*;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 
 /** Real PostgreSQL selection/order, not predicate truth, callback permission, SDK processing or T13. */
 @QuarkusTest
+@QuarkusTestResource(value=ListenGroupProposedSchemaResource.class,restrictToAnnotatedClass=true)
 class ListenGroupStoreTest {
     static final String A="a".repeat(64),B="b".repeat(64),SNAPSHOT="{\"definition\":\"test-pinned-listen\",\"bindings\":\"test-approved\"}";
     @Inject DataSource data;
