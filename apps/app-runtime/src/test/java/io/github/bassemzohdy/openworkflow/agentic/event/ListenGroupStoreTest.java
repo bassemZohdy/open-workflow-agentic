@@ -87,6 +87,29 @@ class ListenGroupStoreTest {
         var retained=groups.offer(f.claim,f.group,message,selection).orElseThrow();
         assertEquals(retained,groups.offer(f.claim,f.group,message,selection).orElseThrow());
     }
+    @Test void replayRefusesLegacyRowWithoutInventingItsCompleteMatches() throws Exception {
+        var f=fixture(Strategy.ANY,List.of(A,B),Stop.NONE,List.of());var message=receipt(f,"legacy");
+        var matches=Set.of(f.group.slots(Role.DATA).getFirst());var retained=offer(groups,f.claim,f.group,message,matches).orElseThrow();
+        // Test-only simulation of an immutable row retained before the proposed column existed.
+        // DDL and trigger changes are confined to this class's disposable database and one transaction.
+        try(var c=data.getConnection()) {
+            c.setAutoCommit(false);
+            try(var statement=c.createStatement()) {
+                statement.execute("alter table inbox.listen_item drop constraint listen_item_full_match_fingerprint_check");
+                statement.execute("alter table inbox.listen_item disable trigger listen_item_immutable");
+                try(var update=c.prepareStatement("update inbox.listen_item set full_match_fingerprint=null where tenant=? and instance_id=? and task_digest=?")) {
+                    key(update,f);assertEquals(1,update.executeUpdate());
+                }
+                statement.execute("alter table inbox.listen_item enable trigger listen_item_immutable");
+                statement.execute("alter table inbox.listen_item add constraint listen_item_full_match_fingerprint_check check (full_match_fingerprint is not null and full_match_fingerprint ~ '^[0-9a-f]{64}$') not valid");
+                c.commit();
+            } catch(Exception failure) {c.rollback();throw failure;}
+        }
+        assertEquals(List.of(retained),groups.selected(f.claim,f.group,0,128));
+        assertThrows(IllegalStateException.class,()->offer(groups,f.claim,f.group,message,matches));
+        assertEquals(1,count(f,"inbox.listen_item"));
+    }
+
     @Test void replayRejectsChangedCompleteSetEvenWhenAnyWinnerIsUnchanged() throws Exception {
         var f=fixture(Strategy.ANY,List.of(A,B),Stop.NONE,List.of());var message=receipt(f,"same");
         var slots=f.group.slots(Role.DATA);var first=offer(groups,f.claim,f.group,message,Set.of(slots.getFirst())).orElseThrow();
