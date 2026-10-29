@@ -17,7 +17,7 @@ import java.util.*;
 public final class SdkListenMatchSet {
     private static final ObjectMapper JSON=new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
-    private record Filter(InboxListenGroup.Slot slot,String type,String id,String subject,URI source,String contentType) { }
+    private record Filter(InboxListenGroup.Slot slot,String type,String id,String subject,URI source,String contentType,URI dataSchema) { }
     private final InboxListenGroup group;
     private final List<Filter> filters;
 
@@ -64,7 +64,7 @@ public final class SdkListenMatchSet {
     private static void append(List<Filter> out,List<InboxListenGroup.Slot> slots,JsonNode strategy,InboxListenGroup.Strategy kind) {
         var node=strategy.path(kind.name().toLowerCase(Locale.ROOT));
         if(kind!=InboxListenGroup.Strategy.ONE && node.isArray() && node.isEmpty()) {
-            out.add(new Filter(slots.getFirst(),null,null,null,null,null));return;
+            out.add(new Filter(slots.getFirst(),null,null,null,null,null,null));return;
         }
         var nodes=new ArrayList<JsonNode>();if(kind==InboxListenGroup.Strategy.ONE)nodes.add(node);else node.forEach(nodes::add);
         if(nodes.size()!=slots.size()) throw new IllegalArgumentException("slot count differs from snapshot");
@@ -73,16 +73,18 @@ public final class SdkListenMatchSet {
                 throw new IllegalArgumentException("unsupported filter or correlation");
             var with=filter.get("with");if(!with.isObject())throw new IllegalArgumentException("event properties required");
             var names=new HashSet<String>();with.fieldNames().forEachRemaining(names::add);
-            if(!Set.of("type","id","subject","source","datacontenttype").containsAll(names))throw new IllegalArgumentException("unsupported event property");
+            if(!Set.of("type","id","subject","source","datacontenttype","dataschema").containsAll(names))throw new IllegalArgumentException("unsupported event property");
             var type=literal(with,"type");var id=literal(with,"id");var subject=literal(with,"subject");
             // The pinned SDK registers a null type as an unconditional broadcast and discards its predicate.
             // Multiple untyped filters can also replace each other, so only explicit ANY [] is supported.
             if(type==null)throw new IllegalArgumentException("untyped filter unsupported");
-            String sourceText=literal(with,"source");URI source=null;
-            if(sourceText!=null)try {source=URI.create(sourceText);}catch(IllegalArgumentException invalid) {
-                throw new IllegalArgumentException("only a literal source URI is supported",invalid);
-            }
-            out.add(new Filter(slots.get(i),type,id,subject,source,literal(with,"datacontenttype")));
+            out.add(new Filter(slots.get(i),type,id,subject,uri(with,"source"),literal(with,"datacontenttype"),uri(with,"dataschema")));
+        }
+    }
+    private static URI uri(JsonNode node,String name) {
+        String text=literal(node,name);if(text==null)return null;
+        try {return URI.create(text);}catch(IllegalArgumentException invalid) {
+            throw new IllegalArgumentException("only a literal "+name+" URI is supported",invalid);
         }
     }
     private static String literal(JsonNode node,String name) {
@@ -112,7 +114,8 @@ public final class SdkListenMatchSet {
         for(var f:filters) if((f.type()==null || f.type().equals(event.getType()))
                 && (f.id()==null || f.id().equals(event.getId())) && (f.subject()==null || f.subject().equals(event.getSubject()))
                 && (f.source()==null || f.source().equals(event.getSource()))
-                && (f.contentType()==null || f.contentType().equals(event.getDataContentType()))) matches.add(f.slot());
+                && (f.contentType()==null || f.contentType().equals(event.getDataContentType()))
+                && (f.dataSchema()==null || f.dataSchema().equals(event.getDataSchema()))) matches.add(f.slot());
         return new Selection(group,receipt,matches);
     }
 }
