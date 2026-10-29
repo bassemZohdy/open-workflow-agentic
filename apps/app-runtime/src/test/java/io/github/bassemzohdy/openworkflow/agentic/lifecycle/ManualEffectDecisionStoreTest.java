@@ -261,6 +261,42 @@ class ManualEffectDecisionStoreTest {
         assertEquals(EffectState.CONFIRMED,ledger.find(fixture.command().key()).orElseThrow().state());
     }
 
+    @Test void lookupResumeFailureCanBeRetriedWithSameRequest() throws Exception {
+        earlyResumeFailureCanBeRetried(1,0);
+    }
+
+    @Test void retainResumeFailureCanBeRetriedWithSameRequest() throws Exception {
+        earlyResumeFailureCanBeRetried(2,1);
+    }
+
+    private void earlyResumeFailureCanBeRetried(int failAt,int retainedBeforeRetry) throws Exception {
+        var fixture=unresolved("occur-ambient-early-resume-"+failAt);
+        var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var requestId=UlidGenerator.shared().next();var resumes=new AtomicInteger();
+        var failing=new ManualEffectResolver(support.db.owner,failResumeAt(resumes,failAt),allowingPep(),new AuditAppendOnce(support.db.owner),ledger);
+        var retry=resolver(allowingPep(),new AuditAppendOnce(support.db.owner));
+        manager.begin();var ambient=manager.getTransaction();
+        try {
+            var error=assertThrows(StoreUnavailableException.class,()->failing.resolve(authority,fixture.command().key(),requestId,
+                    EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+            assertInstanceOf(jakarta.transaction.SystemException.class,error.getCause());assertEquals(failAt,resumes.get());
+            assertNull(manager.getTransaction());assertEquals(retainedBeforeRetry,count("select count(*) from effect.manual_decision"));
+            assertEquals(0,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+            assertEquals(0,count("select count(*) from effect.manual_decision_applied"));
+            assertEquals(EffectState.INTENDED,ledger.find(fixture.command().key()).orElseThrow().state());
+            manager.resume(ambient);
+            assertEquals(EffectState.CONFIRMED,retry.resolve(authority,fixture.command().key(),requestId,EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
+            assertSame(ambient,manager.getTransaction());
+        } finally {
+            if(manager.getTransaction()==null)manager.resume(ambient);
+            manager.rollback();
+        }
+        assertEquals(1,count("select count(*) from effect.manual_decision"));
+        assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+        assertEquals(EffectState.CONFIRMED,ledger.find(fixture.command().key()).orElseThrow().state());
+    }
+
     @Test void auditCommittedBeforeResumeFailureCanBeRetriedWithSameRequest() throws Exception {
         var fixture=unresolved("occur-ambient-audit-resume-failure");var authority=authority(fixture,Clock.systemUTC(),Instant.now().plusSeconds(600));
         var requestId=UlidGenerator.shared().next();var resumes=new AtomicInteger();
