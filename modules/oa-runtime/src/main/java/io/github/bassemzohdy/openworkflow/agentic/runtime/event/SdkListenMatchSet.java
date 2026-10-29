@@ -5,17 +5,19 @@ import com.fasterxml.jackson.databind.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.InboxListenGroup;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.InboxMessage;
 import java.io.IOException;
+import java.net.URI;
 import java.util.*;
 
 /**
  * Fail-closed literal filter preparation from a retained configuration. No SDK predicate, workflow context,
- * callback, I/O or authority is used. Unsupported filters (including correlations and expressions) are refused.
+ * callback, I/O or authority is used. Literal source URIs use the same URI equality as the pinned SDK.
+ * Unsupported filters (including correlations and expressions) are refused.
  * This result is not delivery permission; the store still needs complete-match replay protection before integration.
  */
 public final class SdkListenMatchSet {
     private static final ObjectMapper JSON=new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
-    private record Filter(InboxListenGroup.Slot slot,String type,String id,String subject) { }
+    private record Filter(InboxListenGroup.Slot slot,String type,String id,String subject,URI source) { }
     private final InboxListenGroup group;
     private final List<Filter> filters;
 
@@ -62,7 +64,7 @@ public final class SdkListenMatchSet {
     private static void append(List<Filter> out,List<InboxListenGroup.Slot> slots,JsonNode strategy,InboxListenGroup.Strategy kind) {
         var node=strategy.path(kind.name().toLowerCase(Locale.ROOT));
         if(kind!=InboxListenGroup.Strategy.ONE && node.isArray() && node.isEmpty()) {
-            out.add(new Filter(slots.getFirst(),null,null,null));return;
+            out.add(new Filter(slots.getFirst(),null,null,null,null));return;
         }
         var nodes=new ArrayList<JsonNode>();if(kind==InboxListenGroup.Strategy.ONE)nodes.add(node);else node.forEach(nodes::add);
         if(nodes.size()!=slots.size()) throw new IllegalArgumentException("slot count differs from snapshot");
@@ -71,12 +73,16 @@ public final class SdkListenMatchSet {
                 throw new IllegalArgumentException("unsupported filter or correlation");
             var with=filter.get("with");if(!with.isObject())throw new IllegalArgumentException("event properties required");
             var names=new HashSet<String>();with.fieldNames().forEachRemaining(names::add);
-            if(!Set.of("type","id","subject").containsAll(names))throw new IllegalArgumentException("unsupported event property");
+            if(!Set.of("type","id","subject","source").containsAll(names))throw new IllegalArgumentException("unsupported event property");
             var type=literal(with,"type");var id=literal(with,"id");var subject=literal(with,"subject");
             // The pinned SDK registers a null type as an unconditional broadcast and discards its predicate.
             // Multiple untyped filters can also replace each other, so only explicit ANY [] is supported.
             if(type==null)throw new IllegalArgumentException("untyped filter unsupported");
-            out.add(new Filter(slots.get(i),type,id,subject));
+            String sourceText=literal(with,"source");URI source=null;
+            if(sourceText!=null)try {source=URI.create(sourceText);}catch(IllegalArgumentException invalid) {
+                throw new IllegalArgumentException("only a literal source URI is supported",invalid);
+            }
+            out.add(new Filter(slots.get(i),type,id,subject,source));
         }
     }
     private static String literal(JsonNode node,String name) {
@@ -104,7 +110,8 @@ public final class SdkListenMatchSet {
             throw new IllegalArgumentException("receipt belongs to another registry scope");
         var event=StoredCloudEventDecoder.decode(receipt);var matches=new LinkedHashSet<InboxListenGroup.Slot>();
         for(var f:filters) if((f.type()==null || f.type().equals(event.getType()))
-                && (f.id()==null || f.id().equals(event.getId())) && (f.subject()==null || f.subject().equals(event.getSubject()))) matches.add(f.slot());
+                && (f.id()==null || f.id().equals(event.getId())) && (f.subject()==null || f.subject().equals(event.getSubject()))
+                && (f.source()==null || f.source().equals(event.getSource()))) matches.add(f.slot());
         return new Selection(group,receipt,matches);
     }
 }
