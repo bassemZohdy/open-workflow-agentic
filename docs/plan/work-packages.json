@@ -946,7 +946,8 @@
           "Observed audit-history91 merged3610fca: consistent committed snapshot cross-checks exact journal/source/queue membership, canonical chain/ledger tail, every trusted central readback and unchanged prior ACKs. Exact Claude independent73/current full1452 pass; the immutable result is DATA with max128, no later-write/authority/deadline guarantee or default target wiring.",
           "Opt-in manual effect-resolution PR100 merged as main601e1b1 after Claude exact-head PASS19681a0. Focused PostgreSQL suite10, exact-head full check40433470521 and post-merge main check40435285080 all pass. PR102 then moved tenant matching before PEP and explicitly set READ COMMITTED; its regression uses a REPEATABLE READ connection and proves the override. PR102 merged as main70a6337 after Claude exact-head PASS50d75c9, 12 focused PostgreSQL tests, exact-head CI40438255834 and post-merge main CI40439483024 all SUCCESS. V80 remains an unapplied proposal with no CDI/public-route/Flyway activation or audit-grant proof. WP-108, T03 governed Flow proof and acceptance remain partial.",
           "Manual resolver ambient transaction regression PR104 merged as 2c25b4b after Claude PASS at 3d62ad4 and independent 12-test PostgreSQL verification; PR CI40788462057 and post-merge main CI40789673082 passed. Resolver and ledger owned connections are observed suspended, including retain-failure restoration. The audit fixture uses a non-enlisted datasource; managed audit behavior and grant verification remain activation gates. WP-108 and T03 remain partial.",
-          "Manual audit suspension PR105 merged as 2305bce after Claude PASS and independent 13 focused PostgreSQL tests at a1e0737, and PR CI40790001025 and post-merge main CI40791140439 passed. The caller transaction is suspended around the append and readback; observed connection and failure tests verify restoration. Managed audit datasource and role grants remain activation gates. WP-108 and T03 remain partial."
+          "Manual audit suspension PR105 merged as 2305bce after Claude PASS and independent 13 focused PostgreSQL tests at a1e0737, and PR CI40790001025 and post-merge main CI40791140439 passed. The caller transaction is suspended around the append and readback; observed connection and failure tests verify restoration. Managed audit datasource and role grants remain activation gates. WP-108 and T03 remain partial.",
+          "Manual audit uncertain-commit retry PR107 merged as 3576a94 after Claude PASS and independent 14 focused PostgreSQL tests at 7567c9e, and PR CI40791984770 and post-merge main CI40793439594 passed. A real commit with lost reply and failed readback leaves the effect unresolved; retrying the same request yields one audit event and one applied outcome under an ambient transaction. Managed datasource and role grants remain activation gates; WP-108 and T03 remain partial."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -1002,7 +1003,8 @@
           "docs/handoffs/gpt/evidence/WP-108-manual-resolution/current-ci.json",
           "docs/handoffs/gpt/evidence/WP-108-manual-resolution-hardening/current-ci.json",
           "docs/handoffs/gpt/evidence/WP-108-manual-ambient-rollback/current-ci.json",
-          "docs/handoffs/gpt/evidence/WP-108-manual-audit-suspension/current-ci.json"
+          "docs/handoffs/gpt/evidence/WP-108-manual-audit-suspension/current-ci.json",
+          "docs/handoffs/gpt/evidence/WP-108-manual-audit-lost-reply/current-ci.json"
         ]
       }
     },
