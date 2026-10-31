@@ -127,6 +127,10 @@
           <systemPropertyVariables>
             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
           </systemPropertyVariables>
+          <!-- Cedar's native library needs static TLS; several loads in one fork exhaust glibc's default (Linux only, ignored elsewhere). -->
+          <environmentVariables>
+            <GLIBC_TUNABLES>glibc.rtld.optional_static_tls=4096</GLIBC_TUNABLES>
+          </environmentVariables>
         </configuration>
       </plugin>
       <!--
