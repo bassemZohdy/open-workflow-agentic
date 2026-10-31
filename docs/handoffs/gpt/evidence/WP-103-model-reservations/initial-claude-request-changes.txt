@@ -1,0 +1,43 @@
+**REQUEST_CHANGES** for head `4f8f9da07bddcea40ef2373045f753b50030522c`.
+
+The component is mostly sound and the tests pass, but there is one money-ceiling hole under inherited REPEATABLE READ writes, which the author's docs claim to support.
+
+## Independent run
+- **Toolchain:** Temurin 21.0.12.1+1 and Maven 3.9.11, both at the paths you gave. PostgreSQL 16.15 in `open-workflow-agentic-codex-postgres-1`.
+- **Common DB:** `claude_review_0b83cf60…` (strict UUID), `current_database` verified, passed as `DB_URL` for the run only.
+- **Run 1, the full 118 selection:** contracts 15, runtime 4, app 99, with 1 error. The error was `ModelCallReservationStoreTest.concurrentDistinctNodesCannotBothSpendTheSameLeafAllowance`. The failure was in `@AfterEach` (`Database.close`): `DROP DATABASE` was cancelled at the test's 10s query timeout, and the test body had passed. Another session was creating and dropping DBs on the same Postgres at that moment.
+- **Run 2, `ModelCallReservationStoreTest` alone:** 22/22 pass, BUILD SUCCESS.
+- **Net:** I have no clean single 118 run. Every case passed at least once, and the one error was an infrastructure timeout on teardown. I don't consider it a source defect, but the 10s drop bound makes the fixture flaky on a shared Postgres.
+- **Cleanup:** my leaked per-case DB `oa_re_facts_31ca…` was dropped without FORCE. The common DB was dropped without FORCE after Maven exited. `agentic` was never touched. The worktree is clean (no edits).
+
+## Blocking finding
+**Stale snapshot under inherited REPEATABLE READ.**
+- **What happens:** `reserve()` and the V79 insert guard serialize on `select … for update` of the `task.instance` row. They then `sum(held_micros)` over the account. The code deliberately preserves inherited write isolation. Under REPEATABLE READ the snapshot is taken before the lock wait, so the sum misses a sibling hold that committed while waiting.
+- **What I checked:** a two-session psql experiment on a scratch DB, since dropped. Post-lock `sum` returned 0 while a fresh transaction saw 1000. I did not exercise it through the gate itself.
+- **Impact:** two sibling allocations under one parent account could both pass the `root_held` and ceiling check, and the parent cap could be exceeded. `unique(allocation_key, ordinal)` and the node primary key still protect the per-leaf count and same-node reuse. The comment "READ COMMITTED after the serialization wait" is only true at READ COMMITTED.
+- **Test gap:** no test runs concurrent writes under REPEATABLE READ or SERIALIZABLE. The SERIALIZABLE test is a single sequential node. SERIALIZABLE should fail closed through SSI, but that is also untested.
+- **Fix:** make the reserving write refuse REPEATABLE READ, either in the Java transaction or in the insert guard via `transaction_isolation`. Alternatively require READ COMMITTED for that transaction. Then add a concurrent sibling test under each isolation level.
+
+## Non-blocking findings and residuals
+- **V79 atomicity:** the gate checks isolation, not that an explicit transaction block surrounds it. A per-statement autocommit runner would pass the check and apply objects piecemeal. This is a precondition, not enforced.
+- **Concurrency tests:** there is no true concurrent test across sibling allocations or the parent cap. The sibling test is sequential.
+- **Lock contention:** each `requireCurrent` re-locks the instance row (`for update`). That adds contention and a 2s lock-timeout risk. A late timeout withholds output after the closure already ran, which is safe but costs availability.
+- **Hierarchy depth:** accounts anchor only to the immediate parent task or root allocation. Grandparent-level aggregation is not enforced, so it sits with the "other budget categories" residuals.
+- **Deletion tamper evidence:** deleting a tail reservation by bypassing the triggers (`session_replication_role=replica`, as the test's `corrupt()` does) is undetectable. Deleting a middle row trips the ordinal uniqueness check.
+- **Function execute grants:** PUBLIC retains EXECUTE on the 9 new functions. This is harmless under SECURITY INVOKER with table privileges revoked, and the PUBLIC clearing is tested for tables only.
+
+## Confirmed sound
+- **Node identity:** the key is `call_key` plus node. Changed request, epoch, executor or output limit conflicts at the same node. Limits come from the stored allocation, not the caller.
+- **Invocation path:** only a fresh, acknowledged committed insert reaches preparation and the single closure. `find` and repeats throw `ModelCallAlreadyReservedException` or return data and never invoke.
+- **Fence checks:** the DB check plus the private fence run before preparation, after preparation, and after the closure before output. No connection is held across callbacks. The caller's JTA is suspended and resumed, and a resume failure is suppressed behind the primary failure.
+- **Failure retention:** denied preparation, unknown outcomes, lost commit replies, revocation, registry cancel and DB-clock deadline expiry all retain the hold. Corrupt facts are treated as refusal rather than absence.
+- **Legacy entries:** an exempt legacy entry gets no allocation, so no budget and no callback.
+- **Accounting rows:** the 42501 guards on update, delete and truncate are tested.
+- **Hashes and precision:** microsecond and nanosecond hashing matches the JDK, including the hostile-function-namespace test.
+- **V79:** all 9 SQL functions are namespace-pinned (count asserted). The PUBLIC table privileges are cleared even under permissive default privileges. The READ COMMITTED gate fires before any DDL, and a conflicting schema rolls back cleanly.
+
+No claim of physical provider enforcement, source approval, production roles, measured spend, target transport, or lease/Root/worker is made here.
+
+**Residual gates:** V78 and V79 stay outside Flyway. The doc's remaining-gates list stands: approved model and price provenance, the real occurrence and Root producer, single-attempt provider I/O, other budget categories, and async termination.
+
+I did not repeat the author's negative control, per your instruction.

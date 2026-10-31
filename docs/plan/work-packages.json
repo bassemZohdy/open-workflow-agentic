@@ -12,8 +12,8 @@
     },
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
-      "date": "2026-10-27",
-      "baseline_commit": "747158e3293e4e07b29e847d3c1d9e31fbe222be",
+      "date": "2026-11-01",
+      "baseline_commit": "16989c30e835fa456ef6bda7c32297a25f7cd413",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -2819,7 +2819,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-27",
-    "status": "WP-108 remains partial: opt-in manual resolution, audit recovery and test-created managed-pool coverage are merged; deployed datasource and role grants, governed adapter/Flow re-execution and T03 remain open. PR99 head faad8091f4de2f596c982e81ffd9681f1c831672 remains open with GPT REQUEST_CHANGES: rebase, request-body authorization order and failing Cedar provider checks require fixes. V78/V79 remain proposals; approved model sources/roles, occurrence/task/lease/PDP/audit/Flow/physical async and supported identity-profile gates remain. Issue75 stays open and issue76 supported-only implementation/proof is open; defaults refuse and package counts and acceptance are unchanged.",
+    "status": "WP-108 remains partial: opt-in manual resolution, audit recovery and test-created managed-pool coverage are merged; deployed datasource and role grants, governed adapter/Flow re-execution and T03 remain open. PR99 head faad8091f4de2f596c982e81ffd9681f1c831672 remains open with GPT REQUEST_CHANGES: rebase, request-body authorization order and failing Cedar provider checks require fixes. V78/V79 remain proposals; approved model sources/roles, occurrence/task/lease/PDP/audit/Flow/physical async and supported identity-profile gates remain. Issue75 stays open and issue76 supported-only implementation/proof is open; defaults refuse and package counts and acceptance are unchanged. 2026-11-01 consolidation: main fast-forwarded to origin/main (PR127) and merged claude/WP-102-bound-credential-pairing, claude/WP-103-instance-policy and gpt/WP-108-bound-credential-lookup; twelve stale branches that conflict with current main are not merged and need per-branch triage. Local run had no Postgres/native Cedar, so DB-backed tests are CI-gated; counts and acceptance are unchanged.",
     "agents": [
       {
         "id": "GPT",

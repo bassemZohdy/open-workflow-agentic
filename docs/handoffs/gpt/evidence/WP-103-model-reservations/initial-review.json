@@ -1,0 +1,9 @@
+{
+  "reviewedHead": "4f8f9da07bddcea40ef2373045f753b50030522c",
+  "verdict": "REQUEST_CHANGES",
+  "reviewer": "Claude",
+  "blockingFinding": "Inherited REPEATABLE READ snapshot can miss sibling holds after an unchanged registry-row lock wait",
+  "independentFull118": "No clean pass: one private database teardown timeout; isolated22 store rerun passes; every test body passed at least once",
+  "comment": "https://github.com/bassemZohdy/open-workflow-agentic/pull/98#issuecomment-6429832928",
+  "reportSha256": "786231dea616ee4452f088c944a7edb180635974bc7d385e00fc0bdcb6eac2a5"
+}

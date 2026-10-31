@@ -1,0 +1,169 @@
+{
+  "reviewedHead": "faad8091f4de2f596c982e81ffd9681f1c831672",
+  "toolchain": "Actual Linux Temurin21.0.9+10 / Maven3.9.11 / PostgreSQL16.15",
+  "totals": {
+    "tests": 57,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "name": "io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PepInstanceApiTest",
+      "totals": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "sha256": "001f6649a6dadc995dbd8fce1b4407d3be049d737a7197817214a15b551888e6",
+      "methods": [
+        "anOperatorRuleDoesNotOpenTheInstanceRoutesAndTheOtherWayRound",
+        "everyDecisionIsAudited",
+        "theRequestIsADistinctOperationResourceAndOnlyAStartHasNoTask",
+        "anAuditSinkThatFailsRefusesEveryRouteAndAllowsNothing",
+        "anUnavailableEngineRefusesEveryRouteEvenWithTheRecoveryScope",
+        "theBundledSnapshotIsTheVersionThisChangePins",
+        "eachRouteIsAllowedByItsOwnScopeAndNoOther"
+      ]
+    },
+    {
+      "name": "io.github.bassemzohdy.openworkflow.agentic.identity.InstanceAuthorityApiTest",
+      "totals": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "sha256": "594ac294575e1c6ee5f14e3a35026b8970b9cc17180ad500b02bba73fb496d7c",
+      "methods": [
+        "anInstanceWithoutAGrantHasAnAuthorityRowWithoutOne",
+        "noTokenIs401OnTheNewEndpoint",
+        "aGrantThatIsNotUsableIsRefusedAndNoInstanceIsCreated",
+        "anInstanceStartedUnderTheCallersGrantStoresSubjectGrantAndCorrelationAndInspectShowsThem",
+        "onlyTheUserWhoStartedTheInstanceRenewsItWithAGrantThatIsTheirOwn"
+      ]
+    },
+    {
+      "name": "io.github.bassemzohdy.openworkflow.agentic.identity.VerifiedCallerApiTest",
+      "totals": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "sha256": "d6c40582e16b435f7e8c0900598c3251d0c30cfbe9b802962be4766e85be4cc1",
+      "methods": [
+        "theTokenScopesDecideWhatTheOperationsApiAllows",
+        "anExpiredTokenIs401",
+        "aWrongAudienceAForgedSignatureAndAMissingTenantAre401",
+        "noTokenIs401WithAChallengeAndAProblemBody",
+        "headersCannotAddScopesOrChangeTheTenantOfAVerifiedCaller"
+      ]
+    },
+    {
+      "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.CallerDefaultsTest",
+      "totals": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "sha256": "b698206e5fd8f5a7ef6f688a47225f3803d2bf815b7e58fef4d557fdfae651f7",
+      "methods": [
+        "readingWithHeadersIsRefusedByDefault",
+        "theDevelopmentHeadersAreNotTrustedByDefault",
+        "startingWithHeadersIsStillRefusedByDefault"
+      ]
+    },
+    {
+      "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.InstanceApiPolicyTest",
+      "totals": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "sha256": "fef3cef6a9a697f298f56155591dc41a51e755612c2d78b861c2d690f77724a7",
+      "methods": [
+        "aPermittedReauthorizationStillNeedsTheExactStarterAndTenant",
+        "aStillValidTokenGetsEveryOutput",
+        "anIdentityThatExpiresDuringPolicyAndAuditStartsAndChangesNothing",
+        "anIdentityThatExpiresDuringTheStartGetsNoViewAndTheSameKeyFindsTheInstance",
+        "aReadWithoutTheInspectScopeIs403EvenForTheOwnerAndAMalformedIdIsNotA404",
+        "theScopesDoNotCrossRoutes",
+        "aStartWithoutTheOperateScopeIs403AndStartsNothing",
+        "anIdentityThatExpiresDuringTheReadGetsNeitherTheViewNorA404",
+        "scopedCallersStartReadAndRepeatWithTheDocumentedStatuses",
+        "anIdentityThatExpiresDuringTheReauthorizationGetsNoViewAndTheRenewalIsNotUndone",
+        "anUnavailablePolicyOrAuditIs503OnEveryRouteAndNothingHappens",
+        "aReauthorizationWithoutTheOperateScopeIs403AndChangesNothing",
+        "anAnonymousCallerIs401OnEveryRouteBeforeAnyDecision"
+      ]
+    },
+    {
+      "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.InstanceApiTest",
+      "totals": {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "sha256": "0586841861bf52f3f9002e2deb9b55d2b6c2ebb3d5cab8db12ec0c4f23ec2ecb",
+      "methods": [
+        "aRepeatedRequestReturnsTheSameInstanceAndStartsNothing",
+        "unknownAndMalformedIdsAreNotFound",
+        "anotherTenantCannotReadTheInstanceAndTheIdDoesNotLeak",
+        "anIllegalTransitionIsRejectedAndLeavesNoHistory",
+        "theSameKeyForADifferentRequestIsAConflictAndChangesNothing",
+        "theInstanceEntityCarriesTheVersionAndTheTimes",
+        "aMalformedRequestIsBadRequest",
+        "theApiRefusesARequestWithoutCallerHeaders",
+        "theHistoryHoldsOneRowPerChangeInOrder",
+        "aStaleVersionIsRejectedAndNothingIsWritten",
+        "anUnknownDefinitionIsRejectedAndNoRowIsCreated",
+        "historyIsAppendOnlyInTheDatabase",
+        "identityAndInputMayNotBeChangedByAReplace",
+        "startAcceptsWithLocationAndRecordsTheRunningInstance"
+      ]
+    },
+    {
+      "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.OperationsDegradedTest",
+      "totals": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "sha256": "2cc527a9418b9f636348ee3a23ac807dd133fa9a0141ad7166a88463bab57342",
+      "methods": [
+        "retryIsRefusedWithTheEngineDownAndChangesNothing",
+        "cancelWithTheRecoveryScopeIsAllowedAndAuditedAsARecoveryDecision",
+        "inspectIsRefusedWithTheEngineDown",
+        "pauseWithTheRecoveryScopeIsAuthorizedAndNotImplemented",
+        "anUnavailablePolicyIs503ForTheAuditApiAndNeverAnAllow",
+        "cancelWithoutTheRecoveryScopeIsRefusedWithTheEngineDown",
+        "retryOfAFailedInstanceIsRefusedWithTheEngineDownAndCreatesNothing",
+        "recoverIsRefusedWithTheEngineDownAndChangesNothing"
+      ]
+    },
+    {
+      "name": "io.github.bassemzohdy.openworkflow.agentic.policy.HttpRouteDefaultDenyTest",
+      "totals": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "sha256": "c0a111f38de35adbb53b08198d45896858bc48d18d0e7fa83f48efe1eb28a949",
+      "methods": [
+        "everyDiscoveredRouteRefusesAnAnonymousCallerWith401",
+        "publicExemptionsAreBoundToWholePathSegments"
+      ]
+    }
+  ],
+  "reviewer": "GPT",
+  "verdict": "PASS scoped implementation",
+  "comment": "https://github.com/bassemZohdy/open-workflow-agentic/pull/99#issuecomment-6429960525",
+  "database": "Verified strictUUID privately created commonDB, source mountedread-only; droppedwithoutFORCE afterMavenexit; sharedagentic untouched"
+}
