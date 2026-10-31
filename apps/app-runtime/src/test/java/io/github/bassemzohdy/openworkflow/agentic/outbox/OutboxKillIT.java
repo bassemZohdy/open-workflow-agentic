@@ -108,6 +108,7 @@ class OutboxKillIT {
                 .header("Content-Type", "application/json")
                 .header("X-Tenant", tenant)
                 .header("X-Subject", "alice")
+                .header("X-Scopes", "oa.operate")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .timeout(Duration.ofSeconds(30))
                 .build();

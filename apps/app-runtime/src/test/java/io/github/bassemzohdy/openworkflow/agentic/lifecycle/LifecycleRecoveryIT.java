@@ -157,6 +157,7 @@ class LifecycleRecoveryIT {
                 .header("Content-Type", "application/json")
                 .header("X-Tenant", tenant)
                 .header("X-Subject", "alice")
+                .header("X-Scopes", "oa.operate")
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
         assertTrue(response.statusCode() == 202 || response.statusCode() == 200,
                 "POST " + path + " answered " + response.statusCode() + ": " + response.body());
@@ -167,7 +168,7 @@ class LifecycleRecoveryIT {
         HttpResponse<String> response = HTTP.send(HttpRequest.newBuilder(URI.create(process.baseUrl() + "/instances/" + id))
                 .timeout(Duration.ofSeconds(10))
                 .header("X-Tenant", tenant)
-                .header("X-Subject", "alice").GET().build(), HttpResponse.BodyHandlers.ofString());
+                .header("X-Subject", "alice").header("X-Scopes", "oa.inspect").GET().build(), HttpResponse.BodyHandlers.ofString());
         assertEquals(200, response.statusCode(), response.body());
         return JSON.readTree(response.body());
     }

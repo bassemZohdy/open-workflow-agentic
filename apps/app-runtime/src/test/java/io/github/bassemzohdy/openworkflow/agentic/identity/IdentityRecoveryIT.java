@@ -150,7 +150,7 @@ class IdentityRecoveryIT {
 
         String corrX = "corr-x-" + UUID.randomUUID().toString().substring(0, 8);
         String corrY = "corr-y-" + UUID.randomUUID().toString().substring(0, 8);
-        String startToken = token("alice", tenant, "profile");
+        String startToken = token("alice", tenant, "oa.operate oa.inspect");
         String x = startInstance(first, startToken, corrX, keep.id().value());
         String y = startInstance(first, startToken, corrY, doomed.id().value());
         String engineX = engineId(first, x, startToken);
@@ -175,7 +175,7 @@ class IdentityRecoveryIT {
 
         // ---- run 2: the valid instance resumes with its identity, the other is held -------------------------------------
         ManagedProcess second = app("identity-run2", port);
-        String bearer = token("alice", tenant, "profile");
+        String bearer = token("alice", tenant, "oa.operate oa.inspect");
         await("x resumes with epoch 1 and the same identity", Duration.ofSeconds(90), () -> read(second.logFile())
                 .contains("probe-effect authority instance=" + engineX + " subject=alice grant=" + keep.id().value()
                         + " correlation=" + corrX + " state=AUTHORIZED epoch=1"));
