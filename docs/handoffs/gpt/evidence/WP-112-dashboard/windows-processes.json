@@ -1,0 +1,44 @@
+{
+  "sourceSha": "5312221ee7f781914de8aadb53169db63026b343",
+  "platform": "win32",
+  "python": "3.12.10",
+  "workingTreeDirty": false,
+  "sourceUtf8LfSha256": {
+    "preview_job_windows.py": "8b84697b4bbba54fccc855e6c46e4cacd5987db7c0f2d19473e861309456aaac",
+    "check_preview_job_windows.py": "5fa21902fd9925134d606b1d10dfbde6f1bd8a958f78b5061ffbcaa4e9bc6dd5"
+  },
+  "cases": [
+    {
+      "kind": "python",
+      "case": "leader-alive",
+      "passed": true,
+      "descendantInJobBeforeStop": true,
+      "remainingMembersAfterStop": [],
+      "unrelatedSentinelSurvived": true
+    },
+    {
+      "kind": "python",
+      "case": "leader-exited",
+      "passed": true,
+      "descendantInJobBeforeStop": true,
+      "remainingMembersAfterStop": [],
+      "unrelatedSentinelSurvived": true
+    },
+    {
+      "kind": "native-powershell",
+      "case": "leader-alive",
+      "passed": true,
+      "descendantInJobBeforeStop": true,
+      "remainingMembersAfterStop": [],
+      "unrelatedSentinelSurvived": true
+    },
+    {
+      "kind": "native-powershell",
+      "case": "leader-exited",
+      "passed": true,
+      "descendantInJobBeforeStop": true,
+      "remainingMembersAfterStop": [],
+      "unrelatedSentinelSurvived": true
+    }
+  ]
+}

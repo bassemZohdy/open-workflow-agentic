@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "productSha": "5312221ee7f781914de8aadb53169db63026b343",
+  "workingTreeDirty": false,
+  "promtoolVersion": "promtool, version 3.15.0 (branch: HEAD, revision: 5241a27fe3c6983549fccc32f6e65917408c63cd)\n  build user:       root@4635dd007a60\n  build date:       20260925-07:33:45\n  go version:       go1.27.1\n  platform:         linux/amd64\n  tags:             netgo,builtinassets",
+  "metricMethods": [
+    "aBlockedObservationDoesNotStartASecondDatabaseReadOnConcurrentScrapes",
+    "failedFirstObservationIsUnknownAndFailureAttemptsAreCachedAcrossAllGauges",
+    "realPrometheusRegistryExportsUnknownFailureAndRecoveryWithExactNamesAndNoPrivateLabels",
+    "successfulSampleIsRetainedButMarkedUnhealthyAndAgesUntilRecovery"
+  ],
+  "ruleScenarios": [
+    "healthy empty queue",
+    "reachable database failure with retained poison rows",
+    "missing instrumentation on reachable target",
+    "exporter down is distinct from observation failure",
+    "current poison rows need operator action",
+    "stale sample even when last read succeeded",
+    "recovery before hold clears pending failure",
+    "unknown initial observation before any successful sample"
+  ],
+  "dashboardQueries": 6,
+  "queryValueEvaluations": 9,
+  "sourceSha256": {
+    "outbox-dashboard.json": "8cfac2d65b996169ea488f7819d6021712175dba409e2470d52b17ebeb44b47d",
+    "outbox-rules.json": "2dc0c362d0699596dbc1a0847e91efdf6309b3c05e5e1e727507b584134e7d57",
+    "outbox-rules.test.json": "042b1c62d26d75617c1f10fa0783c2f5e826e78f296068b0610e6f54fad68426",
+    "prometheus.example.json": "25ab8d435e5899c26a7f19cf97df1d722d2f204917e042403c2c270ac7bf00ae"
+  },
+  "metricSampleSha256": {
+    "metrics-initial.prom": "936332cd6a245d80e2527dca3e95ed82ab7665d646d198bbeafb1ab920c2bb39",
+    "metrics-recovered.prom": "714df9a086a6c6cf85f728703a84a032ba29ccc236c532dcb56962ceb17328b1"
+  },
+  "producerSha256": "b97cb4ddac432e894ff37589db50ffc0119b5527b73db1c602fa8eb97eb386f4",
+  "scope": "Metric producer/export, rule evaluation and query syntax; no deployed collector, Grafana rendering, SLO, peer or package approval"
+}

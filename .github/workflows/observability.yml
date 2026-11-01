@@ -1,0 +1,71 @@
+name: observability-contract
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'gpt/**']
+    paths:
+      - 'deploy/observability/**'
+      - 'docs/operations-observability.md'
+      - 'tools/check_observability.py'
+      - 'tools/preview_observability.py'
+      - 'tools/preview_job_windows.py'
+      - 'tools/check_preview_job_windows.py'
+      - 'modules/oa-runtime/src/**/outbox/OutboxMetrics*'
+      - 'modules/oa-runtime/pom.xml'
+  pull_request:
+    paths:
+      - 'deploy/observability/**'
+      - 'docs/operations-observability.md'
+      - 'tools/check_observability.py'
+      - 'tools/preview_observability.py'
+      - 'tools/preview_job_windows.py'
+      - 'tools/check_preview_job_windows.py'
+      - 'modules/oa-runtime/src/**/outbox/OutboxMetrics*'
+      - 'modules/oa-runtime/pom.xml'
+permissions:
+  contents: read
+jobs:
+  signals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '21', cache: maven}
+      - name: Actual metric cache, concurrency and Prometheus export tests
+        run: mvn -B -pl modules/oa-runtime -am test -Dtest=OutboxMetricsTest -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Verify pinned upstream promtool archive before extraction
+        shell: bash
+        run: |
+          mkdir -p target/prometheus-tool
+          curl --fail --location --retry 3 --output target/prometheus.tar.gz https://github.com/prometheus/prometheus/releases/download/v3.15.0/prometheus-3.15.0.linux-amd64.tar.gz
+          echo '2a542df32eac02ee17b9d844fb2aa1de00dafa5476579ba8a3ba862e9d572ea0  target/prometheus.tar.gz' | sha256sum --check --strict
+          tar -xzf target/prometheus.tar.gz -C target/prometheus-tool --strip-components=1 prometheus-3.15.0.linux-amd64/promtool
+      - name: Evaluate operational warnings and dashboard query syntax
+        run: python3 tools/check_observability.py --promtool target/prometheus-tool/promtool
+      - name: Generated tracking is current
+        run: python3 tools/render_requirements.py --check
+      - name: Preview fixture driver compiles
+        run: python3 -m py_compile tools/preview_observability.py tools/preview_job_windows.py tools/check_preview_job_windows.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: observability-contract-results
+          path: |
+            modules/oa-runtime/target/surefire-reports/
+            modules/oa-runtime/target/observability/
+            target/observability/
+          if-no-files-found: error
+  windows-preview-processes:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Real native child and grandchild cleanup preserves unrelated processes
+        run: python tools/check_preview_job_windows.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: observability-windows-process-results
+          path: target/observability/preview-processes.json
+          if-no-files-found: error
