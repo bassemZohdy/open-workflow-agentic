@@ -62,6 +62,81 @@ class JdbcEventInboxTest {
                 () -> restarted.match(event.tenant(), event.instanceId(), "wait:1", "other.type"));
     }
 
+    // ---- retention sweep ---------------------------------------------------------------------------------------
+
+    private JdbcEventInbox later(Duration ahead) {
+        return new JdbcEventInbox(dataSource, Clock.offset(Clock.systemUTC(), ahead));
+    }
+
+    private long messages(String tenant) {
+        try (Connection c = dataSource.getConnection();
+             var s = c.prepareStatement("select count(*) from inbox.message where tenant = ?")) {
+            s.setString(1, tenant);
+            try (var r = s.executeQuery()) { r.next(); return r.getLong(1); }
+        } catch (java.sql.SQLException e) { throw new IllegalStateException(e); }
+    }
+
+    @Test
+    void purgeDeletesOnlyExpiredUnreferencedMessagesAndHonoursTheGrace() {
+        InstanceRecord row = instance(true);
+        receive(message(row, "old-1", "wait:1"));
+        receive(message(row, "old-2", "wait:2"));
+        inbox.receive(message(row, "fresh", "wait:3"), Instant.now().plus(Duration.ofHours(5)));
+        assertEquals(3, messages(row.tenant()));
+
+        // before any retention ended: nothing is purged
+        assertEquals(0, inbox.purgeExpired(Duration.ZERO, 100));
+        // expired, but inside the grace window: kept
+        assertEquals(0, later(Duration.ofMinutes(10)).purgeExpired(Duration.ofMinutes(30), 100));
+        // expired past the grace: the two old ones go, the fresh one stays
+        assertEquals(2, later(Duration.ofMinutes(10)).purgeExpired(Duration.ZERO, 100));
+        assertEquals(1, messages(row.tenant()));
+        // idempotent: a second run finds nothing
+        assertEquals(0, later(Duration.ofMinutes(10)).purgeExpired(Duration.ZERO, 100));
+    }
+
+    @Test
+    void aMessageAWaitSignalPointsAtIsKeptEvenAfterItsRetentionEnded() {
+        InstanceRecord row = instance(true);
+        InboxMessage matched = message(row, "matched", "wait:1");
+        receive(matched);
+        receive(message(row, "unmatched", "wait:9"));
+        assertEquals(Optional.of(matched), inbox.match(row.tenant(), row.id(), "wait:1", matched.type()));
+
+        assertEquals(1, later(Duration.ofHours(1)).purgeExpired(Duration.ZERO, 100), "only the unmatched one");
+        assertEquals(1, messages(row.tenant()), "the matched message is part of the wait's record");
+    }
+
+    @Test
+    void purgeIsBoundedByTheLimitAndOldestFirst() {
+        InstanceRecord row = instance(true);
+        for (int i = 0; i < 5; i++) receive(message(row, "bulk-" + i, "wait:" + i));
+
+        assertEquals(2, later(Duration.ofHours(1)).purgeExpired(Duration.ZERO, 2));
+        assertEquals(3, messages(row.tenant()));
+        assertEquals(3, later(Duration.ofHours(1)).purgeExpired(Duration.ZERO, 100));
+    }
+
+    @Test
+    void anEventIdRedeliveredAfterItsMessageWasPurgedIsANewReceipt() {
+        InstanceRecord row = instance(true);
+        InboxMessage event = message(row, "redelivered", "wait:1");
+        assertTrue(receive(event).created());
+        assertFalse(receive(event).created(), "inside retention the duplicate is recognised");
+
+        later(Duration.ofHours(1)).purgeExpired(Duration.ZERO, 100);
+
+        assertTrue(receive(event).created(), "the duplicate window is the retention period");
+    }
+
+    @Test
+    void purgeRefusesNegativeGraceAndOutOfRangeLimits() {
+        assertThrows(IllegalArgumentException.class, () -> inbox.purgeExpired(Duration.ofSeconds(-1), 10));
+        assertThrows(IllegalArgumentException.class, () -> inbox.purgeExpired(Duration.ZERO, 0));
+        assertThrows(IllegalArgumentException.class, () -> inbox.purgeExpired(Duration.ZERO, 10_001));
+        assertThrows(NullPointerException.class, () -> inbox.purgeExpired(null, 10));
+    }
+
     @Test
     void duplicateDoesNotExtendRetentionAndConflictingContentOrRoutingIsRefused() {
         InstanceRecord row = instance(true);
