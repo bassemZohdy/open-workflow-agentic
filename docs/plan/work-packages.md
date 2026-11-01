@@ -716,14 +716,14 @@ Deliverables:
 
 Implementation status: **partial**.
 - Implemented: An embedded plan/draft/review sample graph and PostgreSQL checkpoints exist.
+- Implemented: Governed model boundary converged and enforced per run (PRs 134-137): GovernedModelGateway implements the ModelGateway contract over GovernedLlmClient (sealed Rejected/Failed/Completed, no model switching, explicit cost); NodeInterceptor enforces the wall-clock limit and is used per run in the research graph from the approved task's ExecutionLimits with mandatory node audit; the research checkpoint state is versioned and an incompatible stored run is refused before any node or provider call. Database-backed behaviour is CI-evidenced. Governed graph/catalog patterns (tool use, plan-and-execute, supervision) and state conversion between versions remain open, so WP-201 stays partial.
 
 Remaining gates:
 
 - Build governed graph/catalog patterns for tool use, plan-and-execute and supervision.
-- Converge LlmClient and the ModelGateway contract into one governed model boundary.
-- Add node interceptors for policy, limits and audit; implement versioned checkpoint state and compatibility tests.
+- Convert stored checkpoint state between versions (today a different version is only refused) and add a compatibility test per supported version.
 
-Evidence: [docs/architecture.md](../../docs/architecture.md), [docs/contracts.md](../../docs/contracts.md)
+Evidence: [docs/architecture.md](../../docs/architecture.md), [docs/contracts.md](../../docs/contracts.md), [docs/handoffs/claude/WP-201-governed-model-gateway.md](../../docs/handoffs/claude/WP-201-governed-model-gateway.md)
 
 Reuse: LangGraph4j, LangChain4j
 

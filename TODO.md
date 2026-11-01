@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-WP-108 remains partial: opt-in manual resolution, audit recovery and test-created managed-pool coverage are merged; deployed datasource and role grants, governed adapter/Flow re-execution and T03 remain open. PR99 head faad8091f4de2f596c982e81ffd9681f1c831672 remains open with GPT REQUEST_CHANGES: rebase, request-body authorization order and failing Cedar provider checks require fixes. V78/V79 remain proposals; approved model sources/roles, occurrence/task/lease/PDP/audit/Flow/physical async and supported identity-profile gates remain. Issue75 stays open and issue76 supported-only implementation/proof is open; defaults refuse and package counts and acceptance are unchanged. 2026-11-01 consolidation: main fast-forwarded to origin/main (PR127) and merged claude/WP-102-bound-credential-pairing, claude/WP-103-instance-policy and gpt/WP-108-bound-credential-lookup; twelve stale branches that conflict with current main are not merged and need per-branch triage. Local run had no Postgres/native Cedar, so DB-backed tests are CI-gated; counts and acceptance are unchanged. 2026-11-01: WP-605 assessment (PR128) and WP-112 operational signals (PR129) merged; WP-605 is now partial, WP-112 stays partial. Remaining stacked WP-103/108 branches were verified superseded by reworked code on main. PRs 130 (WP-108 composite fence) and 131 (WP-102 governed async dispatch) merged as unwired building blocks; package statuses and acceptance are unchanged. PRs 132 (WP-102 task guard) and 133 (WP-108 registry fence) merged; statuses and acceptance unchanged..
+WP-108 remains partial: opt-in manual resolution, audit recovery and test-created managed-pool coverage are merged; deployed datasource and role grants, governed adapter/Flow re-execution and T03 remain open. PR99 head faad8091f4de2f596c982e81ffd9681f1c831672 remains open with GPT REQUEST_CHANGES: rebase, request-body authorization order and failing Cedar provider checks require fixes. V78/V79 remain proposals; approved model sources/roles, occurrence/task/lease/PDP/audit/Flow/physical async and supported identity-profile gates remain. Issue75 stays open and issue76 supported-only implementation/proof is open; defaults refuse and package counts and acceptance are unchanged. 2026-11-01 consolidation: main fast-forwarded to origin/main (PR127) and merged claude/WP-102-bound-credential-pairing, claude/WP-103-instance-policy and gpt/WP-108-bound-credential-lookup; twelve stale branches that conflict with current main are not merged and need per-branch triage. Local run had no Postgres/native Cedar, so DB-backed tests are CI-gated; counts and acceptance are unchanged. 2026-11-01: WP-605 assessment (PR128) and WP-112 operational signals (PR129) merged; WP-605 is now partial, WP-112 stays partial. Remaining stacked WP-103/108 branches were verified superseded by reworked code on main. PRs 130 (WP-108 composite fence) and 131 (WP-102 governed async dispatch) merged as unwired building blocks; package statuses and acceptance are unchanged. PRs 132 (WP-102 task guard) and 133 (WP-108 registry fence) merged; statuses and acceptance unchanged. WP-201 runtime increments merged (PRs 134-137); status stays partial..
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-27).
 
@@ -714,14 +714,14 @@ Implementation owner: **Claude**; reviewer: **GPT**; backlog: Claude-03. Shared 
 Implemented scope:
 
 - An embedded plan/draft/review sample graph and PostgreSQL checkpoints exist.
+- Governed model boundary converged and enforced per run (PRs 134-137): GovernedModelGateway implements the ModelGateway contract over GovernedLlmClient (sealed Rejected/Failed/Completed, no model switching, explicit cost); NodeInterceptor enforces the wall-clock limit and is used per run in the research graph from the approved task's ExecutionLimits with mandatory node audit; the research checkpoint state is versioned and an incompatible stored run is refused before any node or provider call. Database-backed behaviour is CI-evidenced. Governed graph/catalog patterns (tool use, plan-and-execute, supervision) and state conversion between versions remain open, so WP-201 stays partial.
 
 Additional closure/integration tasks:
 
 - [ ] Build governed graph/catalog patterns for tool use, plan-and-execute and supervision.
-- [ ] Converge LlmClient and the ModelGateway contract into one governed model boundary.
-- [ ] Add node interceptors for policy, limits and audit; implement versioned checkpoint state and compatibility tests.
+- [ ] Convert stored checkpoint state between versions (today a different version is only refused) and add a compatibility test per supported version.
 
-Evidence: [docs/architecture.md](docs/architecture.md), [docs/contracts.md](docs/contracts.md)
+Evidence: [docs/architecture.md](docs/architecture.md), [docs/contracts.md](docs/contracts.md), [docs/handoffs/claude/WP-201-governed-model-gateway.md](docs/handoffs/claude/WP-201-governed-model-gateway.md)
 
 ### WP-202 Budgets and limits — not-started
 
