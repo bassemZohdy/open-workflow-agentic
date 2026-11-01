@@ -25,10 +25,24 @@ piece that carries the effective user's authority into one asynchronous task of 
 identity, revocation and token expiry **during** blocking work, interrupt handling, malformed audience/scopes never
 reaching the exchanger, an audit-write failure not marking the instance, and the bearer never appearing in the scope.
 
+## Engine enforcement (this increment)
+
+`GovernedTaskGuard` is a `WorkflowExecutionCompletableListener` that makes the registry-only `CurrentAuthority` check at
+every task start, resume and completion and fails the task by throwing `AuthorityLostException`. Probed against the
+real Flow engine (SDK 7.35.3): a thrown exception from a *completable* listener fails the task and the instance; a
+failed future is ignored, and a plain synchronous `WorkflowExecutionListener` that throws is **swallowed** (the workflow
+completes), so only the completable form enforces. Eight tests run real workflows: revocation between tasks (next task
+never runs), revocation during the last task (output withheld), unknown/undelegated instances (refused or allowed per
+policy), unreadable registry (always refused), undecidable check.
+
+`IdentityProducers` produces it as a CDI listener, switched by `agentic.identity.task-guard`: `off` (default, no
+behaviour change, a no-op listener), `allow-ungoverned`, or `require-delegated`. Whether Quarkus Flow's own listener
+discovery wires this bean into live applications is verified only by CI and still needs live evidence.
+
 ## Not done (still open WP-102 gates)
 
-- Wiring into the actual Flow task execution path (GPT owns dispatch/lifecycle wiring) so every async task goes through
-  `run`, and a production `Credentials` that holds the user's subject token privately in memory only.
+- Every async task going through `run` (token exchange per tool call; the guard only enforces authority currency), and
+  a production `Credentials` that holds the user's subject token privately in memory only.
 - Evidence with real live tasks and a restart against PostgreSQL and the real provider: current effective user, acting
   workload, tenant, grant and correlation after restart, and denial after revocation/expiry during blocking work.
 - Reciprocal review of the exact head before WP-102 changes status.

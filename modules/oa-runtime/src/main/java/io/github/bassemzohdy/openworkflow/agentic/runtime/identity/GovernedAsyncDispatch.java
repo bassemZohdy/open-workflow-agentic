@@ -3,7 +3,6 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.identity;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException.Reason;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.ResumeGate.Decision;
-import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.ResumeGate.Outcome;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.Optional;
@@ -48,12 +47,14 @@ public final class GovernedAsyncDispatch {
     }
 
     private final Registry registry;
+    private final CurrentAuthority current;
     private final Credentials credentials;
     private final TokenExchanger exchanger;
     private final Clock clock;
 
     public GovernedAsyncDispatch(Registry registry, Credentials credentials, TokenExchanger exchanger, Clock clock) {
         this.registry = Objects.requireNonNull(registry, "registry");
+        this.current = new CurrentAuthority(registry);
         this.credentials = Objects.requireNonNull(credentials, "credentials");
         this.exchanger = Objects.requireNonNull(exchanger, "exchanger");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -83,44 +84,27 @@ public final class GovernedAsyncDispatch {
      */
     public <T> T run(String engineInstanceId, String audience, Set<String> scopes, Function<IssuedToken, T> work) {
         Objects.requireNonNull(work, "work");
-        if (engineInstanceId == null || engineInstanceId.isBlank()) throw new AuthorityLostException(Reason.NOT_VERIFIED);
-        refuseIfInterrupted();
-        InstanceAuthority authority = restore(engineInstanceId);
-        requireCurrent(authority);
+        InstanceAuthority authority = current.require(engineInstanceId);
         IssuedToken token = exchange(authority, audience, scopes);
         T result;
         try (AuthorityScope ignored = AuthorityScope.enter(authority)) {
             result = work.apply(token);
         }
         // Blocking work may have outlived the grant or the token: nothing is released unless both are still current.
-        refuseIfInterrupted();
-        requireCurrent(authority);
+        CurrentAuthority.refuseIfInterrupted();
+        current.requireCurrent(authority);
         if (!token.usableAt(clock.instant())) throw new AuthorityLostException(Reason.EXPIRED);
         return result;
     }
 
-    private InstanceAuthority restore(String engineInstanceId) {
-        Optional<InstanceAuthority> found;
-        try {
-            found = registry.find(engineInstanceId);
-        } catch (RuntimeException e) {
-            throw new AuthorityLostException(Reason.UNAVAILABLE, e);
-        }
-        InstanceAuthority authority = found.orElseThrow(() -> new AuthorityLostException(Reason.NOT_VERIFIED));
-        if (!authority.delegated()) throw new AuthorityLostException(Reason.NOT_VERIFIED);
-        return authority;
-    }
-
-    private void requireCurrent(InstanceAuthority authority) {
-        Decision decision;
-        try {
-            decision = registry.recheck(authority.instanceId());
-        } catch (RuntimeException e) {
-            throw new AuthorityLostException(Reason.UNAVAILABLE, e);
-        }
-        if (decision.outcome() == Outcome.PROCEED) return;
-        throw new AuthorityLostException(decision.outcome() == Outcome.REAUTHORIZATION_REQUIRED
-                ? Reason.REVOKED : Reason.UNAVAILABLE);
+    /**
+     * Restores the instance authority and shows it current NOW without exchanging anything: the check a task listener
+     * makes before, after a wait inside, and after a task. Refuses exactly as {@link #run} does.
+     *
+     * @throws AuthorityLostException the instance is unknown or undelegated, or its authority is not shown current
+     */
+    public InstanceAuthority requireCurrentAuthority(String engineInstanceId) {
+        return current.require(engineInstanceId);
     }
 
     private IssuedToken exchange(InstanceAuthority authority, String audience, Set<String> scopes) {
@@ -163,7 +147,4 @@ public final class GovernedAsyncDispatch {
         }
     }
 
-    private static void refuseIfInterrupted() {
-        if (Thread.currentThread().isInterrupted()) throw new AuthorityLostException(Reason.UNAVAILABLE);
-    }
 }

@@ -1,0 +1,12 @@
+document:
+  dsl: '1.0.3'
+  namespace: agentic-test
+  name: two-sets
+  version: '1.0.0'
+do:
+  - first:
+      set:
+        a: 1
+  - second:
+      set:
+        b: 2
