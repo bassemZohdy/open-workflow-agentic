@@ -250,9 +250,13 @@ public class Reconciler {
                 case STARTING -> repairStarting(ref, now, true);
                 case WAITING -> {
                     repairDeadline(ref, now);
+                    repairLifetime(ref, now);
                     repairRegistryRow(ref, now);
                 }
-                case RUNNING -> repairRegistryRow(ref, now);
+                case RUNNING -> {
+                    repairLifetime(ref, now);
+                    repairRegistryRow(ref, now);
+                }
                 case CANCEL_REQUESTED -> repairCancel(ref, now, true);
                 default -> {
                     // Terminal rows never change.
@@ -271,6 +275,7 @@ public class Reconciler {
         Instant now = clock.instant();
         startingRows(report, now);
         deadlinesPassed(report, now);
+        lifetimesExceeded(report, now);
         registryRows(report, now);
         unregisteredEngineInstances(report, now);
         stuckCancels(report, now);
@@ -404,24 +409,59 @@ public class Reconciler {
         if (row.status() != InstanceStatus.WAITING || row.waitDeadline() == null || !row.waitDeadline().isBefore(now)) {
             return;
         }
+        cancelOverdue(row, now, "deadline", "reconciler.deadline.no-engine-instance", "reconciler.deadline.passed",
+                "deadline " + row.waitDeadline() + " passed");
+    }
+
+    // ---- (vi-b) instances past their maximum lifetime --------------------------------------------------------------
+
+    private void lifetimesExceeded(ReconcileReport report, Instant now) {
+        if (settings.maxLifetime.isEmpty()) {
+            return;
+        }
+        for (RegistryScan.Ref ref : scan.livePastLifetime(now.minus(settings.maxLifetime.get()), settings.batchSize)) {
+            if (!tenantScope.test(ref.tenant())) {
+                continue;
+            }
+            report.bump(withInstance(ref.id(), () -> repairLifetime(ref, now)) ? "lifetime.examined" : "busy");
+        }
+    }
+
+    /**
+     * Cancels a RUNNING or WAITING instance created longer ago than the configured maximum lifetime, exactly as a
+     * passed wait deadline is cancelled (the request is recorded first, a refused cancel is re-sent by the next pass,
+     * an instance the engine no longer holds is failed). The age is judged on the row as loaded now, never on the scan.
+     */
+    private void repairLifetime(RegistryScan.Ref ref, Instant now) {
+        if (settings.maxLifetime.isEmpty()) {
+            return;
+        }
+        InstanceRecord row = load(ref);
+        if ((row.status() != InstanceStatus.RUNNING && row.status() != InstanceStatus.WAITING)
+                || !row.createdAt().isBefore(now.minus(settings.maxLifetime.get()))) {
+            return;
+        }
+        cancelOverdue(row, now, "lifetime", "reconciler.lifetime.no-engine-instance", "reconciler.lifetime.exceeded",
+                "created " + row.createdAt() + ", maximum lifetime " + settings.maxLifetime.get() + " exceeded");
+    }
+
+    private void cancelOverdue(InstanceRecord row, Instant now, String kind, String noEngineReason, String cancelReason,
+                               String detail) {
         String engineId = row.engineInstanceId();
         if (engineId == null || engine.activeInstance(row.definition(), engineId).isEmpty()) {
             store.replace(row.successor(now, InstanceStatus.FAILED, engineId, row.startAttempts(), row.lastError(), null),
-                    row.version(), "reconciler.deadline.no-engine-instance", InstanceService.RUNTIME_ACTOR);
-            repairs.record("deadline", row.id().value(), "failed", "deadline " + row.waitDeadline()
-                    + " passed and the engine holds no instance");
+                    row.version(), noEngineReason, InstanceService.RUNTIME_ACTOR);
+            repairs.record(kind, row.id().value(), "failed", detail + " and the engine holds no instance");
             return;
         }
-        // Record the request first: the engine's CANCELLED report then finds CANCEL_REQUESTED, not WAITING.
+        // Record the request first: the engine's CANCELLED report then finds CANCEL_REQUESTED, not the old status.
         InstanceRecord requested = store.replace(
                 row.successor(now, InstanceStatus.CANCEL_REQUESTED, engineId, row.startAttempts(), row.lastError(), null),
-                row.version(), "reconciler.deadline.passed", InstanceService.RUNTIME_ACTOR);
+                row.version(), cancelReason, InstanceService.RUNTIME_ACTOR);
         boolean accepted = engine.cancel(row.definition(), engineId);
-        repairs.record("deadline", row.id().value(), accepted ? "cancel-requested" : "cancel-refused",
-                "deadline " + row.waitDeadline() + " passed");
+        repairs.record(kind, row.id().value(), accepted ? "cancel-requested" : "cancel-refused", detail);
         if (!accepted) {
-            LOG.warnf("engine refused the cancel of %s after its deadline; the cancel is re-sent by the next pass",
-                    requested.id());
+            LOG.warnf("engine refused the cancel of %s (%s); the cancel is re-sent by the next pass", requested.id(), kind);
         }
     }
 

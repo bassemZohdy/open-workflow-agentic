@@ -304,6 +304,101 @@ class ReconcilerRepairTest {
         assertEquals(0, engine.cancels.get());
     }
 
+    /** A reconciler whose clock runs {@code ahead} of the real one and whose maximum lifetime is {@code lifetime}. */
+    private Reconciler lifetimeReconciler(FakeEngine engine, String tenant, Duration lifetime, Duration ahead) {
+        var withLifetime = new LifecycleSettings(true, Duration.ofSeconds(30), Duration.ofSeconds(120), TINY, 3,
+                TINY, TINY, Duration.ofHours(24), 100, Optional.empty(), Optional.of(lifetime));
+        return new Reconciler(store, engine, sync, scan, repairs, withLifetime, dataSource,
+                Clock.offset(Clock.systemUTC(), ahead), tenant::equals);
+    }
+
+    @Test
+    void aRunningInstanceOlderThanTheMaximumLifetimeIsCancelledAndTheRequestIsRecordedFirst() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String engineId = "lifetime-run-" + RUN;
+        engine.report(engineId, EngineStatus.RUNNING);
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+
+        var report = lifetimeReconciler(engine, tenant, Duration.ofMinutes(10), Duration.ofMinutes(11)).reconcileOnce();
+
+        assertTrue(report.count("lifetime.examined") >= 1);
+        assertTrue(engine.cancels.get() >= 1);
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+        assertTrue(count(dataSource, "select count(*) from task.repair_event where kind = 'lifetime' and subject = ?",
+                row.id().value()) >= 1);
+        sync.observe(engineId, EngineStatus.CANCELLED, "observed");
+        assertEquals(InstanceStatus.CANCELLED, reload(tenant, row).status());
+    }
+
+    @Test
+    void aWaitingInstanceOlderThanTheMaximumLifetimeIsCancelledEvenBeforeItsWaitDeadline() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String engineId = "lifetime-wait-" + RUN;
+        engine.report(engineId, EngineStatus.WAITING);
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.WAITING, engineId, Instant.now().plus(Duration.ofDays(30)));
+
+        lifetimeReconciler(engine, tenant, Duration.ofMinutes(10), Duration.ofMinutes(11)).reconcileOnce();
+
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+    }
+
+    @Test
+    void anInstanceWithinTheMaximumLifetimeIsLeftAlone() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String engineId = "lifetime-young-" + RUN;
+        engine.report(engineId, EngineStatus.RUNNING);
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+
+        lifetimeReconciler(engine, tenant, Duration.ofMinutes(10), Duration.ofMinutes(9)).reconcileOnce();
+
+        assertEquals(0, engine.cancels.get());
+        assertEquals(InstanceStatus.RUNNING, reload(tenant, row).status());
+    }
+
+    @Test
+    void aTerminalInstanceIsNeverTouchedByTheLifetimeLimit() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, "lifetime-done-" + RUN, null);
+        row = move(row, InstanceStatus.COMPLETED, "lifetime-done-" + RUN, null);
+
+        lifetimeReconciler(engine, tenant, Duration.ofMinutes(10), Duration.ofDays(1)).reconcileOnce();
+
+        assertEquals(InstanceStatus.COMPLETED, reload(tenant, row).status());
+        assertEquals(0, engine.cancels.get());
+    }
+
+    @Test
+    void anOverlongInstanceTheEngineNoLongerHoldsIsFailedNotCancelled() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, "lifetime-lost-" + RUN, null);
+
+        lifetimeReconciler(engine, tenant, Duration.ofMinutes(10), Duration.ofMinutes(11)).reconcileOnce();
+
+        assertEquals(InstanceStatus.FAILED, reload(tenant, row).status());
+        assertEquals(0, engine.cancels.get());
+    }
+
+    @Test
+    void withoutAConfiguredMaximumLifetimeNoInstanceIsEverCancelledForAge() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String engineId = "lifetime-off-" + RUN;
+        engine.report(engineId, EngineStatus.RUNNING);
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+
+        new Reconciler(store, engine, sync, scan, repairs, settings(3), dataSource,
+                Clock.offset(Clock.systemUTC(), Duration.ofDays(3650)), tenant::equals).reconcileOnce();
+
+        assertEquals(0, engine.cancels.get());
+        assertEquals(InstanceStatus.RUNNING, reload(tenant, row).status());
+    }
+
     @Test
     void twoReconcilersNeverActOnTheSameRowAtOnce() throws Exception {
         String tenant = newTenant();

@@ -74,6 +74,18 @@ public class RegistryScan {
         }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
     }
 
+    /** Running or waiting rows created before {@code cutoff}: instances past their maximum lifetime. */
+    public List<Ref> livePastLifetime(Instant cutoff, int limit) {
+        return query("""
+                select id, tenant from task.instance
+                 where status in ('RUNNING', 'WAITING') and created_at < ?
+                 order by created_at limit ?
+                """, statement -> {
+            statement.setTimestamp(1, Timestamp.from(cutoff));
+            statement.setInt(2, limit);
+        }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
+    }
+
     /** The registry row that holds this engine instance, if any. */
     public Optional<Ref> byEngineInstanceId(String engineInstanceId) {
         List<Ref> rows = query("select id, tenant from task.instance where engine_instance_id = ?", statement ->

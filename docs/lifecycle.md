@@ -281,6 +281,7 @@ No sleep. The reconciler's startup pass is started by Flow's `WorkflowApplicatio
 | `agentic.reconciler.start-backoff` | `PT5S` | Wait after the first failed attempt; doubles per attempt |
 | `agentic.reconciler.cancel-reissue-after` | `PT30S` | A `CANCEL_REQUESTED` row is sent to the engine again after this time |
 | `agentic.reconciler.wait-deadline` | `PT24H` | Wait given to a `WAITING` instance when the observer records it |
+| `agentic.reconciler.max-lifetime` | unset (no limit) | Longest a `RUNNING` or `WAITING` instance may live from creation. Past it the reconciler cancels the instance like a passed wait deadline (request recorded first, a refused cancel is re-sent, an instance the engine no longer holds is `FAILED`; repair kind `lifetime`). Persisted `created_at`, so it holds across restart and failover. |
 | `agentic.reconciler.batch-size` | `100` | Rows per page of the scans |
 | `agentic.dev.fault.crash-at` | unset | Dev only: halt the process (`137`) at `after-insert`, `after-prepare` or `before-accept` |
 | `agentic.dev.lifecycle-probes` | `false` | Dev only: expose `/dev/lifecycle/*` (probe effect, event injection). Never in a deployment. |

@@ -36,7 +36,17 @@ public class LifecycleSettings {
     public final Duration cancelReissueAfter;
     public final Duration waitDeadline;
     public final int batchSize;
+    /** The longest an instance may stay RUNNING or WAITING from creation; empty means no limit (the default). */
+    public final Optional<Duration> maxLifetime;
     public final Optional<String> crashAt;
+
+    /** Without a maximum lifetime. */
+    public LifecycleSettings(boolean reconcilerEnabled, Duration interval, Duration warmupTimeout,
+            Duration startStaleAfter, int startMaxAttempts, Duration startBackoffBase, Duration cancelReissueAfter,
+            Duration waitDeadline, int batchSize, Optional<String> crashAt) {
+        this(reconcilerEnabled, interval, warmupTimeout, startStaleAfter, startMaxAttempts, startBackoffBase,
+                cancelReissueAfter, waitDeadline, batchSize, crashAt, Optional.empty());
+    }
 
     /** For the container. Keys are the ones in docs/lifecycle.md. */
     @Inject
@@ -50,7 +60,8 @@ public class LifecycleSettings {
             @ConfigProperty(name = "agentic.reconciler.cancel-reissue-after", defaultValue = "PT30S") Duration cancelReissueAfter,
             @ConfigProperty(name = "agentic.reconciler.wait-deadline", defaultValue = "PT24H") Duration waitDeadline,
             @ConfigProperty(name = "agentic.reconciler.batch-size", defaultValue = "100") int batchSize,
-            @ConfigProperty(name = "agentic.dev.fault.crash-at") Optional<String> crashAt) {
+            @ConfigProperty(name = "agentic.dev.fault.crash-at") Optional<String> crashAt,
+            @ConfigProperty(name = "agentic.reconciler.max-lifetime") Optional<Duration> maxLifetime) {
         this.reconcilerEnabled = reconcilerEnabled;
         this.interval = positive("agentic.reconciler.interval", interval);
         this.warmupTimeout = positive("agentic.reconciler.warmup-timeout", warmupTimeout);
@@ -67,6 +78,8 @@ public class LifecycleSettings {
         }
         this.batchSize = batchSize;
         this.crashAt = Objects.requireNonNull(crashAt, "crashAt");
+        this.maxLifetime = Objects.requireNonNull(maxLifetime, "maxLifetime")
+                .map(value -> positive("agentic.reconciler.max-lifetime", value));
     }
 
     /** The defaults of docs/lifecycle.md, with the fault point off. */
