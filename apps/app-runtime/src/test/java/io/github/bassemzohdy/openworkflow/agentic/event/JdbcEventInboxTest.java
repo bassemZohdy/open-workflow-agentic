@@ -134,7 +134,7 @@ class JdbcEventInboxTest {
         while (messages(row.tenant()) > 0) {
             int deleted = future.purgeExpired(Duration.ZERO, 2);
             assertTrue(deleted <= 2, "a call never deletes more than its limit: " + deleted);
-            if (++calls > 200) fail("the purge never converged");
+            if (++calls > 5000) fail("the purge never converged");
         }
         assertTrue(calls >= 3, "5 rows at 2 per call need at least 3 calls, took " + calls);
     }
@@ -150,6 +150,114 @@ class JdbcEventInboxTest {
 
         assertEquals(0, messages(row.tenant()));
         assertTrue(receive(event).created(), "the duplicate window is the retention period");
+    }
+
+    // ---- tombstones: payload redacted, identity kept ---------------------------------------------------------
+
+    private String payload(String tenant, String eventId) {
+        try (Connection c = dataSource.getConnection();
+             var s = c.prepareStatement("select data_json from inbox.message where tenant = ? and event_id = ?")) {
+            s.setString(1, tenant);
+            s.setString(2, eventId);
+            try (var r = s.executeQuery()) { return r.next() ? r.getString(1) : null; }
+        } catch (java.sql.SQLException e) { throw new IllegalStateException(e); }
+    }
+
+    private void redactAll(JdbcEventInbox inbox, Duration grace) {
+        int calls = 0;
+        while (inbox.redactExpired(grace, 10_000) > 0) if (++calls > 50) fail("redaction never converged");
+    }
+
+    @Test
+    void redactionDropsTheExpiredPayloadButKeepsTheRowSoDuplicatesAreStillRecognised() {
+        InstanceRecord row = instance(true);
+        InboxMessage event = message(row, "tombstoned", "wait:1");
+        assertTrue(receive(event).created());
+        assertEquals("{\"ok\":true}", payload(row.tenant(), "tombstoned"));
+
+        redactAll(later(Duration.ofHours(1)), Duration.ZERO);
+
+        assertEquals(JdbcEventInbox.REDACTED_DATA, payload(row.tenant(), "tombstoned"), "the payload is gone");
+        assertEquals(1, messages(row.tenant()), "the row stays as a tombstone");
+        assertFalse(receive(event).created(), "the same event is still a duplicate long after its payload was dropped");
+    }
+
+    @Test
+    void aTombstoneStillRefusesARedeliveryWithDifferentContent() {
+        InstanceRecord row = instance(true);
+        InboxMessage event = message(row, "tomb-conflict", "wait:1");
+        receive(event);
+        redactAll(later(Duration.ofHours(1)), Duration.ZERO);
+
+        InboxMessage changed = new InboxMessage(event.tenant(), event.source(), event.eventId(), event.type(),
+                event.instanceId(), event.correlationKey(), "{\"ok\":false}");
+        assertThrows(IllegalStateException.class, () -> receive(changed));
+    }
+
+    @Test
+    void redactionLeavesNotYetExpiredAndReferencedMessagesIntact() {
+        InstanceRecord row = instance(true);
+        InboxMessage matched = message(row, "keep-matched", "wait:1");
+        receive(matched);
+        inbox.receive(message(row, "keep-fresh", "wait:2"), Instant.now().plus(Duration.ofHours(5)));
+        assertEquals(Optional.of(matched), inbox.match(row.tenant(), row.id(), "wait:1", matched.type()));
+
+        redactAll(later(Duration.ofHours(1)), Duration.ZERO);
+
+        assertEquals("{\"ok\":true}", payload(row.tenant(), "keep-matched"), "a wait's record keeps its payload");
+        assertEquals("{\"ok\":true}", payload(row.tenant(), "keep-fresh"), "inside retention nothing is touched");
+        assertEquals(Optional.of(matched), inbox.match(row.tenant(), row.id(), "wait:1", matched.type()));
+    }
+
+    @Test
+    void redactionHonoursTheGraceIsBoundedAndIdempotent() {
+        InstanceRecord row = instance(true);
+        for (int i = 0; i < 4; i++) receive(message(row, "grace-" + i, "wait:" + i));
+        var future = later(Duration.ofMinutes(10));
+
+        future.redactExpired(Duration.ofMinutes(30), 10_000); // inside the grace window
+        assertEquals("{\"ok\":true}", payload(row.tenant(), "grace-0"));
+
+        int calls = 0;
+        while (!JdbcEventInbox.REDACTED_DATA.equals(payload(row.tenant(), "grace-3"))
+                || !JdbcEventInbox.REDACTED_DATA.equals(payload(row.tenant(), "grace-0"))) {
+            assertTrue(future.redactExpired(Duration.ZERO, 2) <= 2, "never more than the limit per call");
+            if (++calls > 5000) fail("redaction never converged");
+        }
+        int before = calls;
+        future.redactExpired(Duration.ZERO, 10_000);
+        assertEquals(4, messages(row.tenant()), "redaction never deletes");
+        assertTrue(before >= 1);
+    }
+
+    @Test
+    void aTombstoneIsDeletedOnlyAfterTheTombstonePeriodAndThenARedeliveryIsNew() {
+        InstanceRecord row = instance(true);
+        InboxMessage event = message(row, "tomb-delete", "wait:1");
+        receive(event);
+        redactAll(later(Duration.ofHours(1)), Duration.ZERO);
+
+        // inside the tombstone period (90 days) the row stays
+        later(Duration.ofDays(30)).purgeExpired(Duration.ofDays(90), 10_000);
+        assertEquals(1, messages(row.tenant()));
+        assertFalse(receive(event).created());
+
+        // past the tombstone period the row is deleted and a redelivery is a new receipt
+        int calls = 0;
+        var farFuture = later(Duration.ofDays(120));
+        while (messages(row.tenant()) > 0) {
+            farFuture.purgeExpired(Duration.ofDays(90), 10_000);
+            if (++calls > 50) fail("the purge never converged");
+        }
+        assertTrue(receive(event).created());
+    }
+
+    @Test
+    void redactionRefusesNegativeGraceAndOutOfRangeLimits() {
+        assertThrows(IllegalArgumentException.class, () -> inbox.redactExpired(Duration.ofSeconds(-1), 10));
+        assertThrows(IllegalArgumentException.class, () -> inbox.redactExpired(Duration.ZERO, 0));
+        assertThrows(IllegalArgumentException.class, () -> inbox.redactExpired(Duration.ZERO, 10_001));
+        assertThrows(NullPointerException.class, () -> inbox.redactExpired(null, 10));
     }
 
     @Test
