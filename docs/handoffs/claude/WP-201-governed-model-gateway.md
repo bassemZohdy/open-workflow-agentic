@@ -35,9 +35,19 @@ Cost has deliberately no default: the narrow provider port reports no usage, so 
 - The approved context is read on the calling thread; the call must be synchronous on it.
 - The reservation-aware, execution-controlled variant (`complete(Running, expected, ...)`) is not exposed here.
 
+## Node interceptor: wall-clock limit
+
+`NodeInterceptor` already counted steps and audited every node; `ExecutionLimits.maxWallClock` was not enforced. It now
+takes an optional deadline (`startedAt + maxWallClock`, fixed at construction) and `NodeInterceptor.forLimits(actor,
+runId, ExecutionLimits, audit, clock)` applies both bounds. A node admitted at or after the deadline is refused with
+zero runs, an `agent.node.refused` record (best effort, the refusal stands if it fails) and no step used. A node already
+running is not interrupted (nothing here can stop it); the next node is refused. Six new tests cover exact-deadline,
+just-before, an overrunning node, a failing refusal record, `forLimits` and invalid input.
+`maxCostMicros` is not enforced by the interceptor: cost is charged where the model call is priced.
+
 ## Still open for WP-201
 
 - Governed graph/catalog patterns (tool use, plan-and-execute, supervision).
-- Node interceptors for limits and audit beyond the existing `NodeInterceptor`, and versioned checkpoint state with
+- Using `NodeInterceptor` in a production graph (today only tests construct it), and versioned checkpoint state with
   compatibility tests.
 - Moving agent code from `GovernedLlmClient` to this port, and the composition root that supplies context and cost.
