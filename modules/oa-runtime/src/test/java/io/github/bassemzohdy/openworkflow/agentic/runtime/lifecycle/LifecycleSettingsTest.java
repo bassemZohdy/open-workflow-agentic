@@ -3,6 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -34,6 +35,26 @@ class LifecycleSettingsTest {
         assertThrows(IllegalArgumentException.class, () -> new LifecycleSettings(true, Duration.ofSeconds(1),
                 Duration.ofSeconds(1), Duration.ofSeconds(1), 3, Duration.ofSeconds(1), Duration.ofSeconds(1),
                 Duration.ofSeconds(1), 0, Optional.empty()));
+    }
+
+    @Test
+    void thereIsNoMaximumLifetimeByDefaultSoExistingDeploymentsKeepRunningForever() {
+        assertTrue(LifecycleSettings.defaults().maxLifetime.isEmpty());
+    }
+
+    @Test
+    void aConfiguredMaximumLifetimeMustBePositive() {
+        var ok = new LifecycleSettings(true, Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1), 3,
+                Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1), 1, Optional.empty(),
+                Optional.of(Duration.ofDays(7)));
+        assertEquals(Optional.of(Duration.ofDays(7)), ok.maxLifetime);
+        for (Duration bad : new Duration[]{Duration.ZERO, Duration.ofSeconds(-1)})
+            assertThrows(IllegalArgumentException.class, () -> new LifecycleSettings(true, Duration.ofSeconds(1),
+                    Duration.ofSeconds(1), Duration.ofSeconds(1), 3, Duration.ofSeconds(1), Duration.ofSeconds(1),
+                    Duration.ofSeconds(1), 1, Optional.empty(), Optional.of(bad)));
+        assertThrows(NullPointerException.class, () -> new LifecycleSettings(true, Duration.ofSeconds(1),
+                Duration.ofSeconds(1), Duration.ofSeconds(1), 3, Duration.ofSeconds(1), Duration.ofSeconds(1),
+                Duration.ofSeconds(1), 1, Optional.empty(), null));
     }
 
     @Test
