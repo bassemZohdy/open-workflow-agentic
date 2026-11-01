@@ -86,6 +86,30 @@ public class IdentityProducers {
     }
 
     /**
+     * Per-task authority enforcement for live Flow instances (WP-102). {@code agentic.identity.task-guard} is {@code off}
+     * (default: no behaviour change), {@code allow-ungoverned} (instances with an authority row are checked at every
+     * task start, resume and completion; instances without one run as before) or {@code require-delegated} (every
+     * instance must be delegated). An unreadable registry always refuses when the guard is on.
+     */
+    @Produces
+    @Singleton
+    @io.quarkus.arc.Unremovable
+    public io.serverlessworkflow.impl.lifecycle.WorkflowExecutionCompletableListener governedTaskGuard(
+            InstanceAuthorities authorities, DelegationGrants grants,
+            @org.eclipse.microprofile.config.inject.ConfigProperty(name = "agentic.identity.task-guard",
+                    defaultValue = "off") String mode) {
+        GovernedTaskGuard.Ungoverned policy = switch (mode.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "off" -> null;
+            case "allow-ungoverned" -> GovernedTaskGuard.Ungoverned.ALLOW;
+            case "require-delegated" -> GovernedTaskGuard.Ungoverned.REFUSE;
+            default -> throw new IllegalStateException(
+                    "agentic.identity.task-guard must be off, allow-ungoverned or require-delegated");
+        };
+        if (policy == null) return new io.serverlessworkflow.impl.lifecycle.WorkflowExecutionCompletableListener() { };
+        return new GovernedTaskGuard(new CurrentAuthority(GovernedAsyncDispatch.over(authorities, grants)), policy);
+    }
+
+    /**
      * The secret provider: files in {@code agentic.secrets.dir}. Without the setting every secret is unavailable, so
      * work that needs one pauses or fails instead of running without it.
      */
