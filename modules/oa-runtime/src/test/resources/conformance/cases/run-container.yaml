@@ -1,0 +1,14 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: run-container
+  version: '1.0.0'
+do:
+- invoke:
+    run:
+      container:
+        image: example.invalid/fixture:1.0.0
+        command: fixture-not-executed
+    timeout:
+      after:
+        seconds: 1

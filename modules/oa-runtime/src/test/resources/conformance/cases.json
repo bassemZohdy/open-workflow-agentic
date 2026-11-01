@@ -1,0 +1,591 @@
+{
+  "profile": "released-1.0.1-and-development-1.0.3",
+  "specCommit": "2dd2c84170d5f3e05d58e913e9ca298dcf8d543a",
+  "schemaSha256": "704ef5e91c5d823167dd8751794edb1dd1a6f9a3bdf9bfd389bf9c6b23ae3816",
+  "sdkVersion": "7.35.3.Final",
+  "cases": [
+    {
+      "id": "dataflow",
+      "source": "cases/dataflow.yaml",
+      "features": [
+        "set",
+        "input.from",
+        "output.as",
+        "export.as",
+        "if"
+      ],
+      "schemaExpected": "VALID",
+      "execution": {
+        "input": {
+          "payload": {
+            "value": 41
+          }
+        },
+        "expected": {
+          "answer": 42,
+          "observed": 42
+        }
+      }
+    },
+    {
+      "id": "branch",
+      "source": "cases/branch.yaml",
+      "features": [
+        "do",
+        "switch",
+        "then"
+      ],
+      "schemaExpected": "VALID",
+      "execution": {
+        "input": {
+          "kind": "first"
+        },
+        "expected": {
+          "result": "selected"
+        }
+      }
+    },
+    {
+      "id": "iteration",
+      "source": "cases/iteration.yaml",
+      "features": [
+        "for",
+        "for.at"
+      ],
+      "schemaExpected": "VALID",
+      "execution": {
+        "input": {
+          "items": [
+            2,
+            3
+          ]
+        },
+        "expected": {
+          "value": 6,
+          "position": 1
+        }
+      },
+      "expectationSource": "specification/ctk/features/for.feature at pinned commit; final iteration state"
+    },
+    {
+      "id": "parallel",
+      "source": "cases/parallel.yaml",
+      "features": [
+        "fork"
+      ],
+      "schemaExpected": "VALID",
+      "execution": {
+        "input": {},
+        "expected": [
+          {
+            "side": "left"
+          },
+          {
+            "side": "right"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pause",
+      "source": "cases/pause.yaml",
+      "features": [
+        "wait"
+      ],
+      "schemaExpected": "VALID",
+      "execution": {
+        "input": {
+          "token": "same"
+        },
+        "expected": {
+          "token": "same"
+        }
+      }
+    },
+    {
+      "id": "catch-error",
+      "source": "cases/catch-error.yaml",
+      "features": [
+        "try",
+        "raise",
+        "catch"
+      ],
+      "schemaExpected": "VALID",
+      "execution": {
+        "input": {},
+        "expected": {
+          "handled": true
+        }
+      }
+    },
+    {
+      "id": "listen-one",
+      "source": "cases/listen-one.yaml",
+      "features": [
+        "listen",
+        "one"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "listen-any",
+      "source": "cases/listen-any.yaml",
+      "features": [
+        "listen",
+        "any"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "listen-all",
+      "source": "cases/listen-all.yaml",
+      "features": [
+        "listen",
+        "all"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "listen-foreach-until",
+      "source": "cases/listen-foreach-until.yaml",
+      "features": [
+        "listen",
+        "listen.until",
+        "foreach"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "emit-event",
+      "source": "cases/emit-event.yaml",
+      "features": [
+        "emit",
+        "CloudEvents"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "call-http",
+      "source": "cases/call-http.yaml",
+      "features": [
+        "call",
+        "http"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "call-openapi",
+      "source": "cases/call-openapi.yaml",
+      "features": [
+        "call",
+        "openapi"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "call-grpc",
+      "source": "cases/call-grpc.yaml",
+      "features": [
+        "call",
+        "grpc"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "call-asyncapi",
+      "source": "cases/call-asyncapi.yaml",
+      "features": [
+        "call",
+        "asyncapi"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "call-mcp",
+      "source": "cases/call-mcp.yaml",
+      "features": [
+        "call",
+        "mcp"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "call-a2a",
+      "source": "cases/call-a2a.yaml",
+      "features": [
+        "call",
+        "a2a"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "run-script",
+      "source": "cases/run-script.yaml",
+      "features": [
+        "run",
+        "script"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "run-shell",
+      "source": "cases/run-shell.yaml",
+      "features": [
+        "run",
+        "shell"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "run-container",
+      "source": "cases/run-container.yaml",
+      "features": [
+        "run",
+        "container"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "run-workflow",
+      "source": "cases/run-workflow.yaml",
+      "features": [
+        "run",
+        "workflow"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "reusable-components",
+      "source": "cases/reusable-components.yaml",
+      "features": [
+        "use",
+        "use.functions",
+        "use.authentications",
+        "use.secrets",
+        "use.timeouts",
+        "use.retries",
+        "call.custom"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "schedule-and-metadata",
+      "source": "cases/schedule-and-metadata.yaml",
+      "features": [
+        "schedule",
+        "metadata"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "standard-extensions",
+      "source": "cases/standard-extensions.yaml",
+      "features": [
+        "use.extensions"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "unknown-field",
+      "source": "cases/unknown-field.yaml",
+      "features": [
+        "negative",
+        "unknown-property"
+      ],
+      "schemaExpected": "INVALID"
+    },
+    {
+      "id": "missing-task-type",
+      "source": "cases/missing-task-type.yaml",
+      "features": [
+        "negative",
+        "missing-task-type"
+      ],
+      "schemaExpected": "INVALID"
+    },
+    {
+      "id": "invalid-schema-format",
+      "source": "cases/invalid-schema-format.yaml",
+      "features": [
+        "negative",
+        "schema-format"
+      ],
+      "schemaExpected": "INVALID"
+    },
+    {
+      "id": "shipped-lifecycle-probe",
+      "repositoryPath": "apps/app-runtime/src/main/resources/flow/lifecycle-probe.yaml",
+      "features": [
+        "shipped",
+        "http",
+        "listen"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "shipped-research-and-approve",
+      "repositoryPath": "apps/app-runtime/src/main/resources/flow/research-and-approve.yaml",
+      "features": [
+        "shipped",
+        "http",
+        "listen"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "root-unrecognized-field",
+      "source": "cases/root-unrecognized-field.yaml",
+      "features": [
+        "schema-versus-model-boundary"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "unregistered-schema-format",
+      "source": "cases/unregistered-schema-format.yaml",
+      "features": [
+        "schema-versus-model-boundary"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "ctk-for",
+      "source": "cases/ctk-for.yaml",
+      "features": [
+        "upstream-ctk",
+        "for"
+      ],
+      "schemaExpected": "VALID",
+      "upstream": {
+        "path": "ctk/features/for.feature",
+        "sha256": "4a0f782d926781bfba9d85c7be4bce88d7555058b0f0a54245c27a9b820507b2"
+      },
+      "execution": {
+        "input": {
+          "colors": [
+            "red",
+            "green",
+            "blue"
+          ]
+        },
+        "expected": {
+          "processed": {
+            "colors": [
+              "red",
+              "green",
+              "blue"
+            ],
+            "indexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "export-context",
+      "source": "cases/export-context.yaml",
+      "features": [
+        "export.as",
+        "output.as",
+        "context-reduction"
+      ],
+      "schemaExpected": "VALID",
+      "execution": {
+        "input": {},
+        "expected": {
+          "observed": 42
+        }
+      }
+    },
+    {
+      "id": "comments-and-aliases",
+      "source": "cases/comments-and-aliases.yaml",
+      "features": [
+        "YAML-lexical-loss",
+        "aliases",
+        "comments"
+      ],
+      "schemaExpected": "VALID"
+    },
+    {
+      "id": "released-dataflow",
+      "source": "cases/released-dataflow.yaml",
+      "features": [
+        "released-1.0.1",
+        "set",
+        "input.from",
+        "output.as",
+        "export.as",
+        "if"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "dataflow",
+      "execution": {
+        "input": {
+          "payload": {
+            "value": 41
+          }
+        },
+        "expected": {
+          "answer": 42,
+          "observed": 42
+        }
+      }
+    },
+    {
+      "id": "released-branch",
+      "source": "cases/released-branch.yaml",
+      "features": [
+        "released-1.0.1",
+        "do",
+        "switch",
+        "then"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "branch",
+      "execution": {
+        "input": {
+          "kind": "first"
+        },
+        "expected": {
+          "result": "selected"
+        }
+      }
+    },
+    {
+      "id": "released-iteration",
+      "source": "cases/released-iteration.yaml",
+      "features": [
+        "released-1.0.1",
+        "for",
+        "for.at"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "iteration",
+      "execution": {
+        "input": {
+          "items": [
+            2,
+            3
+          ]
+        },
+        "expected": {
+          "value": 6,
+          "position": 1
+        }
+      }
+    },
+    {
+      "id": "released-parallel",
+      "source": "cases/released-parallel.yaml",
+      "features": [
+        "released-1.0.1",
+        "fork"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "parallel",
+      "execution": {
+        "input": {},
+        "expected": [
+          {
+            "side": "left"
+          },
+          {
+            "side": "right"
+          }
+        ]
+      }
+    },
+    {
+      "id": "released-pause",
+      "source": "cases/released-pause.yaml",
+      "features": [
+        "released-1.0.1",
+        "wait"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "pause",
+      "execution": {
+        "input": {
+          "token": "same"
+        },
+        "expected": {
+          "token": "same"
+        }
+      }
+    },
+    {
+      "id": "released-catch-error",
+      "source": "cases/released-catch-error.yaml",
+      "features": [
+        "released-1.0.1",
+        "try",
+        "raise",
+        "catch"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "catch-error",
+      "execution": {
+        "input": {},
+        "expected": {
+          "handled": true
+        }
+      }
+    },
+    {
+      "id": "released-ctk-for",
+      "source": "cases/released-ctk-for.yaml",
+      "features": [
+        "released-1.0.1",
+        "upstream-ctk",
+        "for"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "ctk-for",
+      "execution": {
+        "input": {
+          "colors": [
+            "red",
+            "green",
+            "blue"
+          ]
+        },
+        "expected": {
+          "processed": {
+            "colors": [
+              "red",
+              "green",
+              "blue"
+            ],
+            "indexes": [
+              0,
+              1,
+              2
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "released-export-context",
+      "source": "cases/released-export-context.yaml",
+      "features": [
+        "released-1.0.1",
+        "export.as",
+        "output.as",
+        "context-reduction"
+      ],
+      "schemaExpected": "VALID",
+      "derivedFrom": "export-context",
+      "execution": {
+        "input": {},
+        "expected": {
+          "observed": 42
+        }
+      }
+    }
+  ]
+}

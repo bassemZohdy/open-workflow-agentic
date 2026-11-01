@@ -1,0 +1,21 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: call-mcp
+  version: '1.0.0'
+do:
+- invoke:
+    call: mcp
+    with:
+      method: resources/read
+      parameters:
+        uri: fixture://policy
+      protocolVersion: '2025-06-18'
+      transport:
+        http:
+          endpoint: https://example.invalid/mcp
+      timeout:
+        seconds: 1
+    timeout:
+      after:
+        seconds: 1

@@ -1,0 +1,18 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: listen-any
+  version: '1.0.0'
+do:
+- awaitEvents:
+    listen:
+      to:
+        any:
+        - with:
+            type: example.approved.v1
+        - with:
+            type: example.rejected.v1
+      read: envelope
+    timeout:
+      after:
+        seconds: 1

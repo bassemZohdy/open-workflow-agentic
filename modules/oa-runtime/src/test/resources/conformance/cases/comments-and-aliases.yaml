@@ -1,0 +1,12 @@
+# Lexical source annotation: importing a data model does not preserve this comment.
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: comments-and-aliases
+  version: '1.0.0'
+do:
+  - copy:
+      set:
+        first: &fixture
+          label: example
+        second: *fixture

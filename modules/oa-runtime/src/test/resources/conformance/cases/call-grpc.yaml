@@ -1,0 +1,21 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: call-grpc
+  version: '1.0.0'
+do:
+- invoke:
+    call: grpc
+    with:
+      proto:
+        endpoint: https://example.invalid/service.proto
+      service:
+        name: example.Inventory
+        host: example.invalid
+        port: 443
+      method: GetItem
+      arguments:
+        id: ${ .id }
+    timeout:
+      after:
+        seconds: 1

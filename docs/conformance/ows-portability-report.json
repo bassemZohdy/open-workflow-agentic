@@ -1,0 +1,3312 @@
+{
+  "profile" : "OWS-pinned-portability-assessment",
+  "sdkVersion" : "7.35.3.Final",
+  "specCommit" : "2dd2c84170d5f3e05d58e913e9ca298dcf8d543a",
+  "schemaSha256" : "704ef5e91c5d823167dd8751794edb1dd1a6f9a3bdf9bfd389bf9c6b23ae3816",
+  "scope" : "schema/model roundtrip; selected pure executions only; not full semantic conformance or product import/export",
+  "fullSemanticConformance" : "NOT_ESTABLISHED",
+  "serializationStack" : "SDK public APIs with Quarkus Flow classpath modules",
+  "metadataSerializerClass" : "io.quarkiverse.flow.dsl.serialization.jackson.TaskMetadataSerializer",
+  "knownForkDivergence" : {
+    "scope" : "parallel and released-parallel only; actual fingerprints retained; both named-branch orders remain DIVERGED",
+    "allowedObservedFingerprints" : [ "e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170", "69fa2e55fe1e428fa345c250358bb39aeec2e4073ebc59a98feaf2c19b15cad4" ]
+  },
+  "developmentSchemaVersion" : "1.0.3",
+  "releasedBaseline" : {
+    "version" : "1.0.1",
+    "specCommit" : "f43a6e3cfb97a724d4b434b0ecc769379af379e9",
+    "schemaSha256" : "67e328b71ada0516f64ad876a53c2a73eaf102e82d32d0052e6f118c8eeda9eb",
+    "latestReleaseObservedAt" : "2026-10-20"
+  },
+  "cases" : [ {
+    "id" : "dataflow",
+    "features" : [ "set", "input.from", "output.as", "export.as", "if" ],
+    "sourceSha256" : "fdfc4f0bfce1e3bf8ee2f0de905bba9f775557439433423731380f2a35bc0d57",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "573ad2c0c3609bed11da2666b37d8ee8809fb74035b537e298eae811e6ed117a",
+        "expectedFingerprint" : "dffc0a93035692cb8d7f8c2262c36140991e830dcfa6e19c3742e4c943bccffb"
+      },
+      "JSON" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "573ad2c0c3609bed11da2666b37d8ee8809fb74035b537e298eae811e6ed117a",
+        "expectedFingerprint" : "dffc0a93035692cb8d7f8c2262c36140991e830dcfa6e19c3742e4c943bccffb"
+      },
+      "YAML" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "573ad2c0c3609bed11da2666b37d8ee8809fb74035b537e298eae811e6ed117a",
+        "expectedFingerprint" : "dffc0a93035692cb8d7f8c2262c36140991e830dcfa6e19c3742e4c943bccffb"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "branch",
+    "features" : [ "do", "switch", "then" ],
+    "sourceSha256" : "b60c2084838acfcb04bca7dae7f4983c09639ba234fbfa1e4c7c1a8c5ae1a960",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98",
+        "expectedFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98",
+        "expectedFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98",
+        "expectedFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "iteration",
+    "features" : [ "for", "for.at" ],
+    "sourceSha256" : "d8767ce912bea39d2934e78198ce86d50ec5a2b9b656680f800d43b99af17796",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "expectationSource" : "specification/ctk/features/for.feature at pinned commit; final iteration state",
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f",
+        "expectedFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f",
+        "expectedFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f",
+        "expectedFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "parallel",
+    "features" : [ "fork" ],
+    "sourceSha256" : "ffc7faa421a7c6f2f857d76dfb02c91eae696dcf0071779f6486abe7d4c6697c",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170",
+        "expectedFingerprint" : "49968289acf0b384c1c237b87fa3e0dd10dde6e3451318fc600f2a28c713364c"
+      },
+      "JSON" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170",
+        "expectedFingerprint" : "49968289acf0b384c1c237b87fa3e0dd10dde6e3451318fc600f2a28c713364c"
+      },
+      "YAML" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170",
+        "expectedFingerprint" : "49968289acf0b384c1c237b87fa3e0dd10dde6e3451318fc600f2a28c713364c"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/gather/fork/compete",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/gather/fork/compete",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "pause",
+    "features" : [ "wait" ],
+    "sourceSha256" : "439d473557b7b6709672f5ac4bf71c3151c6379f58b0846654326d8b0099e98f",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba",
+        "expectedFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba",
+        "expectedFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba",
+        "expectedFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/pause/wait/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/seconds",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/pause/wait/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/seconds",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "catch-error",
+    "features" : [ "try", "raise", "catch" ],
+    "sourceSha256" : "9c754445024f6c429b61fba750cc160715ec47efd0c947ee11e5762467abcec0",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c",
+        "expectedFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c",
+        "expectedFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c",
+        "expectedFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/recover/catch/errors/with/status",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/recover/catch/errors/with/status",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "listen-one",
+    "features" : [ "listen", "one" ],
+    "sourceSha256" : "956706ad1fac9c221a40fe29d40d934c245204d3e762db5f189ac7b1325eb918",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/awaitEvents/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/awaitEvents/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "listen-any",
+    "features" : [ "listen", "any" ],
+    "sourceSha256" : "d8af6e26f93ee8b46b04826747024ed21c80dc098305e002894f0d426ac70b0e",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/awaitEvents/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/awaitEvents/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "listen-all",
+    "features" : [ "listen", "all" ],
+    "sourceSha256" : "60db9f27073f5865349e096b2996fc170ceac6d4feafdb6bdd3bbd86f0a13b43",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/awaitEvents/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/awaitEvents/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/awaitEvents/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "listen-foreach-until",
+    "features" : [ "listen", "listen.until", "foreach" ],
+    "sourceSha256" : "35b25b923c9810eb558c955636c929e28ae7b17cfa60264fccb6dcb478743b28",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/consume/listen/read",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/consume/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/consume/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/consume/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/consume/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/consume/listen/read",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/consume/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/consume/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/consume/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/consume/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "emit-event",
+    "features" : [ "emit", "CloudEvents" ],
+    "sourceSha256" : "ecf78064df7f35a280ba3034ec8036a87bf83183b32ef715b1dbd597ebc76e45",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "INVALID",
+      "issues" : [ "/do/0/announce/emit/event/with/source:oneOf", "/do/0/announce/emit/event/with/source:pattern", "/do/0/announce:oneOf", "/do/0/announce:required", "/do/0/announce:unevaluatedProperties" ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "INVALID",
+          "issues" : [ "/do/0/announce/emit/event/with/source:oneOf", "/do/0/announce/emit/event/with/source:pattern", "/do/0/announce:oneOf", "/do/0/announce:required", "/do/0/announce:unevaluatedProperties" ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "INVALID",
+          "issues" : [ "/do/0/announce/emit/event/with/source:oneOf", "/do/0/announce/emit/event/with/source:pattern", "/do/0/announce:oneOf", "/do/0/announce:required", "/do/0/announce:unevaluatedProperties" ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "call-http",
+    "features" : [ "call", "http" ],
+    "sourceSha256" : "a936e21da6f245b000e801101061cfb27bb8e299cf8178d232df029522ed4064",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/call",
+      "kind" : "CALL_PROVIDER_OR_SERVICE"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/redirect",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/redirect",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "call-openapi",
+    "features" : [ "call", "openapi" ],
+    "sourceSha256" : "367cb200bcd2f2c3c537a65102870bc614553b3db7cd1665d0212a231cbf89bc",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/call",
+      "kind" : "CALL_PROVIDER_OR_SERVICE"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/redirect",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/redirect",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "call-grpc",
+    "features" : [ "call", "grpc" ],
+    "sourceSha256" : "298b3352c7b2c024e8dc5bc146b325241670b49f4d8a3f8b052f84c59b4af087",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "INVALID",
+      "issues" : [ "/do/0/invoke/call:const", "/do/0/invoke/call:not", "/do/0/invoke/with/service/host:pattern", "/do/0/invoke/with:oneOf", "/do/0/invoke/with:required", "/do/0/invoke/with:unevaluatedProperties", "/do/0/invoke:oneOf", "/do/0/invoke:required", "/do/0/invoke:unevaluatedProperties" ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/call",
+      "kind" : "CALL_PROVIDER_OR_SERVICE"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "INVALID",
+          "issues" : [ "/do/0/invoke/call:const", "/do/0/invoke/call:not", "/do/0/invoke/with/service/host:pattern", "/do/0/invoke/with:oneOf", "/do/0/invoke/with:required", "/do/0/invoke/with:unevaluatedProperties", "/do/0/invoke:oneOf", "/do/0/invoke:required", "/do/0/invoke:unevaluatedProperties" ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "INVALID",
+          "issues" : [ "/do/0/invoke/call:const", "/do/0/invoke/call:not", "/do/0/invoke/with/service/host:pattern", "/do/0/invoke/with:oneOf", "/do/0/invoke/with:required", "/do/0/invoke/with:unevaluatedProperties", "/do/0/invoke:oneOf", "/do/0/invoke:required", "/do/0/invoke:unevaluatedProperties" ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "call-asyncapi",
+    "features" : [ "call", "asyncapi" ],
+    "sourceSha256" : "ef8ac05f133c7ac9bbc2545535c3c9cccc806c300c1cd739759b0ce0667ff5d9",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/call",
+      "kind" : "CALL_PROVIDER_OR_SERVICE"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "call-mcp",
+    "features" : [ "call", "mcp" ],
+    "sourceSha256" : "ec5eff6ac481ea41c4f724f0a86f1147edb3a417d52bb963de0effaf337c1982",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/call",
+      "kind" : "CALL_PROVIDER_OR_SERVICE"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/timeout/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/timeout/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/timeout/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/timeout/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/timeout/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/timeout/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/timeout/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/with/timeout/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "call-a2a",
+    "features" : [ "call", "a2a" ],
+    "sourceSha256" : "c0a91843ff4cc7aeb4b5177f5bfa9a4f26d47ee0a7d07ba8a3d600d37fb7ed31",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/call",
+      "kind" : "CALL_PROVIDER_OR_SERVICE"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "run-script",
+    "features" : [ "run", "script" ],
+    "sourceSha256" : "68652ab09ad8f01d83b9de9389539288b3b4c676bbed52cc1643f385abdc01a2",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/run",
+      "kind" : "EXECUTION_PROVIDER"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/run/await",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/run/return",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/run/await",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/run/return",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "run-shell",
+    "features" : [ "run", "shell" ],
+    "sourceSha256" : "d9ebb8599d90fcd885b21ec17ed6f41ffab9e5a1e00f44676d2f30ef37f54ae3",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "INVALID",
+      "issues" : [ "/do/0/invoke/run/shell/arguments:type", "/do/0/invoke/run:oneOf", "/do/0/invoke/run:required", "/do/0/invoke/run:unevaluatedProperties", "/do/0/invoke:oneOf", "/do/0/invoke:required", "/do/0/invoke:unevaluatedProperties" ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/run",
+      "kind" : "EXECUTION_PROVIDER"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "INVALID",
+          "issues" : [ "/do/0/invoke/run/shell/arguments:type", "/do/0/invoke/run:oneOf", "/do/0/invoke/run:required", "/do/0/invoke/run:unevaluatedProperties", "/do/0/invoke:oneOf", "/do/0/invoke:required", "/do/0/invoke:unevaluatedProperties" ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/run/await",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/run/return",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "INVALID",
+          "issues" : [ "/do/0/invoke/run/shell/arguments:type", "/do/0/invoke/run:oneOf", "/do/0/invoke/run:required", "/do/0/invoke/run:unevaluatedProperties", "/do/0/invoke:oneOf", "/do/0/invoke:required", "/do/0/invoke:unevaluatedProperties" ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/run/await",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/run/return",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "run-container",
+    "features" : [ "run", "container" ],
+    "sourceSha256" : "83afa01e1f730c00dde5af4cd875c59f86e8c474881a834863b71a93a47868a1",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/run",
+      "kind" : "EXECUTION_PROVIDER"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/run/await",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/run/return",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/run/await",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/run/return",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "run-workflow",
+    "features" : [ "run", "workflow" ],
+    "sourceSha256" : "1ff40403dd2c4d9e751c8b61a4bd6e0cff0b4c09080e7840181001926815881e",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/invoke/run",
+      "kind" : "EXECUTION_PROVIDER"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/run/await",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/run/return",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/invoke/run/await",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/run/return",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/invoke/timeout/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "reusable-components",
+    "features" : [ "use", "use.functions", "use.authentications", "use.secrets", "use.timeouts", "use.retries", "call.custom" ],
+    "sourceSha256" : "d24e156d5be716e9d72c83ad2ed620753f3f15bd38b34148ac0e26a36ea3ea23",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/use/secrets",
+      "kind" : "SECRET_PROVISIONING"
+    }, {
+      "path" : "/do/0/invoke/call",
+      "kind" : "CALL_PROVIDER_OR_SERVICE"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/use/retries/twice/delay/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/retries/twice/delay/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/retries/twice/delay/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/retries/twice/delay/seconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/timeouts/short/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/timeouts/short/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/timeouts/short/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/timeouts/short/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/use/retries/twice/delay/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/retries/twice/delay/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/retries/twice/delay/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/retries/twice/delay/seconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/timeouts/short/after/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/timeouts/short/after/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/timeouts/short/after/milliseconds",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/use/timeouts/short/after/minutes",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "schedule-and-metadata",
+    "features" : [ "schedule", "metadata" ],
+    "sourceSha256" : "5ad884ed53766c934481a4bc66abf40afca73435bfbe76118198ea4844e0ea02",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/copy/metadata/vendor.example.review",
+      "kind" : "APPLICATION_METADATA"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "FAILED",
+        "failure" : {
+          "status" : "REJECTED",
+          "exception" : "JsonMappingException",
+          "cause" : "JsonGenerationException"
+        }
+      },
+      "YAML" : {
+        "serializationStatus" : "FAILED",
+        "failure" : {
+          "status" : "REJECTED",
+          "exception" : "JsonMappingException",
+          "cause" : "JsonGenerationException"
+        }
+      }
+    }
+  }, {
+    "id" : "standard-extensions",
+    "features" : [ "use.extensions" ],
+    "sourceSha256" : "94bc67a05d71f38f3466424d198847d3635a4d298064d70d8a4d6f6fa947dd31",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/use/extensions",
+      "kind" : "STANDARD_EXTENSION_HOOK"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "unknown-field",
+    "features" : [ "negative", "unknown-property" ],
+    "sourceSha256" : "a8d7c7c293059128a9e4ac2844e00b376384d115aa61f594482bbbaa9feef115",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "INVALID",
+    "sourceSchema" : {
+      "status" : "INVALID",
+      "issues" : [ "/document:unevaluatedProperties" ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "INVALID",
+      "issues" : [ "/document:unevaluatedProperties" ]
+    },
+    "defaultImport" : {
+      "status" : "REJECTED",
+      "exception" : "IllegalArgumentException",
+      "cause" : "IllegalArgumentException"
+    },
+    "validatedImport" : {
+      "status" : "REJECTED",
+      "exception" : "IllegalArgumentException",
+      "cause" : "IllegalArgumentException"
+    },
+    "definitionDependencies" : [ ],
+    "exports" : "UNAVAILABLE",
+    "execution" : "NOT_MEASURED"
+  }, {
+    "id" : "missing-task-type",
+    "features" : [ "negative", "missing-task-type" ],
+    "sourceSha256" : "b970c7e3422b2a2daa4bdc82a81b75872efbf54426c0ad34b97b28af878a2f01",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "INVALID",
+    "sourceSchema" : {
+      "status" : "INVALID",
+      "issues" : [ "/do/0/copy:oneOf", "/do/0/copy:required", "/do/0/copy:unevaluatedProperties" ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "INVALID",
+      "issues" : [ "/do/0/copy:oneOf", "/do/0/copy:required", "/do/0/copy:unevaluatedProperties" ]
+    },
+    "defaultImport" : {
+      "status" : "REJECTED",
+      "exception" : "IllegalArgumentException",
+      "cause" : "IllegalArgumentException"
+    },
+    "validatedImport" : {
+      "status" : "REJECTED",
+      "exception" : "IllegalArgumentException",
+      "cause" : "IllegalArgumentException"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/copy/metadata/vendor.example.fixture",
+      "kind" : "APPLICATION_METADATA"
+    } ],
+    "exports" : "UNAVAILABLE",
+    "execution" : "NOT_MEASURED"
+  }, {
+    "id" : "invalid-schema-format",
+    "features" : [ "negative", "schema-format" ],
+    "sourceSha256" : "ddbb11598b5e2520985443d5d62cf6b2dd7927d4a7b8f0914f5a04bc418b305e",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "INVALID",
+    "sourceSchema" : {
+      "status" : "INVALID",
+      "issues" : [ "/input/schema/format:type" ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "INVALID",
+      "issues" : [ "/input/schema/format:type" ]
+    },
+    "defaultImport" : {
+      "status" : "REJECTED",
+      "exception" : "IllegalArgumentException",
+      "cause" : "IllegalArgumentException"
+    },
+    "validatedImport" : {
+      "status" : "REJECTED",
+      "exception" : "IllegalArgumentException",
+      "cause" : "IllegalArgumentException"
+    },
+    "definitionDependencies" : [ ],
+    "exports" : "UNAVAILABLE",
+    "execution" : "NOT_MEASURED"
+  }, {
+    "id" : "shipped-lifecycle-probe",
+    "features" : [ "shipped", "http", "listen" ],
+    "sourceSha256" : "ab2ca26dc83f773e3fe0eca628746e0373a8d690e7209ea15753f5f3266d5de7",
+    "declaredDsl" : "1.0.0",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/effect/call",
+      "kind" : "CALL_PROVIDER_OR_SERVICE"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/effect/with/redirect",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/1/awaitDecision/listen/read",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/effect/with/redirect",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/1/awaitDecision/listen/read",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "shipped-research-and-approve",
+    "features" : [ "shipped", "http", "listen" ],
+    "sourceSha256" : "03d1deebcb8aa75afe698fbebe1f3b6920dee82667d9731696853fc02b04e5df",
+    "declaredDsl" : "1.0.0",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ {
+      "path" : "/do/0/runAgent/call",
+      "kind" : "CALL_PROVIDER_OR_SERVICE"
+    } ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/runAgent/with/redirect",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/1/waitForApproval/listen/read",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/runAgent/with/redirect",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/1/waitForApproval/listen/read",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "root-unrecognized-field",
+    "features" : [ "schema-versus-model-boundary" ],
+    "sourceSha256" : "87a376cdadfa1b2230c8a1db8487b85cf9507cdced1fde444787f679383e842f",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "REJECTED",
+      "exception" : "UnrecognizedPropertyException",
+      "cause" : "UnrecognizedPropertyException"
+    },
+    "validatedImport" : {
+      "status" : "REJECTED",
+      "exception" : "UnrecognizedPropertyException",
+      "cause" : "UnrecognizedPropertyException"
+    },
+    "definitionDependencies" : [ ],
+    "exports" : "UNAVAILABLE",
+    "execution" : "NOT_MEASURED"
+  }, {
+    "id" : "unregistered-schema-format",
+    "features" : [ "schema-versus-model-boundary" ],
+    "sourceSha256" : "c3a082c5456fe2a524681397c356ef8873897c40e4e7e2c6af5eb6cd4c1722f7",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "ctk-for",
+    "features" : [ "upstream-ctk", "for" ],
+    "sourceSha256" : "8a8d5dabb18b42575f2fbc6a4e7833521bdea5700e61c55a7ada3d217f5a90a3",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "upstream" : {
+      "path" : "ctk/features/for.feature",
+      "sha256" : "4a0f782d926781bfba9d85c7be4bce88d7555058b0f0a54245c27a9b820507b2"
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30",
+        "expectedFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30",
+        "expectedFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30",
+        "expectedFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/loopColors/for/at",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/loopColors/for/at",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "export-context",
+    "features" : [ "export.as", "output.as", "context-reduction" ],
+    "sourceSha256" : "37cd96c975f698e207d71ff53b137dcafd1d6e5756d6795491c9fd56b9d1e9fd",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "bcd1823fee2f3ade6f7f0fc53a0d4e6aa5822bfb2b694115bc49e198b063e56a",
+        "expectedFingerprint" : "ca796a31feab6b24c15af61fadaa3b470c8723b1ff57aea4b88b00eee6ec0f8f"
+      },
+      "JSON" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "bcd1823fee2f3ade6f7f0fc53a0d4e6aa5822bfb2b694115bc49e198b063e56a",
+        "expectedFingerprint" : "ca796a31feab6b24c15af61fadaa3b470c8723b1ff57aea4b88b00eee6ec0f8f"
+      },
+      "YAML" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "bcd1823fee2f3ade6f7f0fc53a0d4e6aa5822bfb2b694115bc49e198b063e56a",
+        "expectedFingerprint" : "ca796a31feab6b24c15af61fadaa3b470c8723b1ff57aea4b88b00eee6ec0f8f"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "comments-and-aliases",
+    "features" : [ "YAML-lexical-loss", "aliases", "comments" ],
+    "sourceSha256" : "14fd2d816c72b9f4a9a9c99166ba07af83aa804a41abf108c32fc13c7b5ff886",
+    "declaredDsl" : "1.0.3",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "status" : "NOT_MEASURED"
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "released-dataflow",
+    "features" : [ "released-1.0.1", "set", "input.from", "output.as", "export.as", "if" ],
+    "sourceSha256" : "50a43032312fac644338ac9ccba9d38fc4500cf5a6b4feae79a6809512616236",
+    "declaredDsl" : "1.0.1",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "derivedFrom" : "dataflow",
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "573ad2c0c3609bed11da2666b37d8ee8809fb74035b537e298eae811e6ed117a",
+        "expectedFingerprint" : "dffc0a93035692cb8d7f8c2262c36140991e830dcfa6e19c3742e4c943bccffb"
+      },
+      "JSON" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "573ad2c0c3609bed11da2666b37d8ee8809fb74035b537e298eae811e6ed117a",
+        "expectedFingerprint" : "dffc0a93035692cb8d7f8c2262c36140991e830dcfa6e19c3742e4c943bccffb"
+      },
+      "YAML" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "573ad2c0c3609bed11da2666b37d8ee8809fb74035b537e298eae811e6ed117a",
+        "expectedFingerprint" : "dffc0a93035692cb8d7f8c2262c36140991e830dcfa6e19c3742e4c943bccffb"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "released-branch",
+    "features" : [ "released-1.0.1", "do", "switch", "then" ],
+    "sourceSha256" : "7132731686812f7bb7857140d37134dcd4a65a14c26c5e59c226b0291ba033ab",
+    "declaredDsl" : "1.0.1",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "derivedFrom" : "branch",
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98",
+        "expectedFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98",
+        "expectedFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98",
+        "expectedFingerprint" : "2839d2cf6052cb04a76a1583484b215c2228be5c34698a47b3bbb9efce179b98"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "released-iteration",
+    "features" : [ "released-1.0.1", "for", "for.at" ],
+    "sourceSha256" : "cb257336749596e6c59205eb516c66c9b8efe6ca9c930d433d5104580e401ef2",
+    "declaredDsl" : "1.0.1",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "derivedFrom" : "iteration",
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f",
+        "expectedFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f",
+        "expectedFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f",
+        "expectedFingerprint" : "4febbdfa3a73d9572d725de83f31ae5c1cf4222ee887aa084862a4181191121f"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "released-parallel",
+    "features" : [ "released-1.0.1", "fork" ],
+    "sourceSha256" : "20dc83a2f69f8231bb28d0a22580ef214e4c30ef89201c36702b29ddc5668521",
+    "declaredDsl" : "1.0.1",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "derivedFrom" : "parallel",
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170",
+        "expectedFingerprint" : "49968289acf0b384c1c237b87fa3e0dd10dde6e3451318fc600f2a28c713364c"
+      },
+      "JSON" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170",
+        "expectedFingerprint" : "49968289acf0b384c1c237b87fa3e0dd10dde6e3451318fc600f2a28c713364c"
+      },
+      "YAML" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "e96aeda7ce5961220cf6408167097e1bb7c53f070100bfd44ce2d20c59dd0170",
+        "expectedFingerprint" : "49968289acf0b384c1c237b87fa3e0dd10dde6e3451318fc600f2a28c713364c"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/gather/fork/compete",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/gather/fork/compete",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "released-pause",
+    "features" : [ "released-1.0.1", "wait" ],
+    "sourceSha256" : "a08323879b14753676781cb535b0f4c411dc1a21268082bd21863d59f781bcc3",
+    "declaredDsl" : "1.0.1",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "derivedFrom" : "pause",
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba",
+        "expectedFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba",
+        "expectedFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba",
+        "expectedFingerprint" : "174231f9289ba869310884dfe4220c27bb8be71f4bd2f6a141ba9a13d3c55cba"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/pause/wait/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/seconds",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/pause/wait/days",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/hours",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/minutes",
+          "kind" : "ADDED"
+        }, {
+          "path" : "/do/0/pause/wait/seconds",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "released-catch-error",
+    "features" : [ "released-1.0.1", "try", "raise", "catch" ],
+    "sourceSha256" : "81c1e237c2b6311ac6042b83f879f472d6f19b5a133195f0fe2b46e83e130ea6",
+    "declaredDsl" : "1.0.1",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "derivedFrom" : "catch-error",
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c",
+        "expectedFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c",
+        "expectedFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c",
+        "expectedFingerprint" : "56f75eedb4107dad8b51dfb5336a52809a9462c536b6ddda7950c8f2f2fcf50c"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/recover/catch/errors/with/status",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/recover/catch/errors/with/status",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "released-ctk-for",
+    "features" : [ "released-1.0.1", "upstream-ctk", "for" ],
+    "sourceSha256" : "00c880949bc2715ce643e32faa9e4eb53736138bf2db922f3ac63b81893a3179",
+    "declaredDsl" : "1.0.1",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "derivedFrom" : "ctk-for",
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30",
+        "expectedFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30"
+      },
+      "JSON" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30",
+        "expectedFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30"
+      },
+      "YAML" : {
+        "status" : "MATCH",
+        "actualFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30",
+        "expectedFingerprint" : "c701e644cba558c50a80cfd71f292cef1f8c34e56dea51aedc80039800304a30"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/loopColors/for/at",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ {
+          "path" : "/do/0/loopColors/for/at",
+          "kind" : "ADDED"
+        } ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  }, {
+    "id" : "released-export-context",
+    "features" : [ "released-1.0.1", "export.as", "output.as", "context-reduction" ],
+    "sourceSha256" : "0b45ffdadc2e26f0d2d7b44df8c0df4a6f8009cc4ac17953978ca4577dd749f5",
+    "declaredDsl" : "1.0.1",
+    "expectedSchema" : "VALID",
+    "sourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "releasedSourceSchema" : {
+      "status" : "VALID",
+      "issues" : [ ]
+    },
+    "derivedFrom" : "export-context",
+    "defaultImport" : {
+      "status" : "ACCEPTED"
+    },
+    "validatedImport" : {
+      "status" : "ACCEPTED"
+    },
+    "definitionDependencies" : [ ],
+    "exportModelFrom" : "DEFAULT_READER",
+    "execution" : {
+      "source" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "bcd1823fee2f3ade6f7f0fc53a0d4e6aa5822bfb2b694115bc49e198b063e56a",
+        "expectedFingerprint" : "ca796a31feab6b24c15af61fadaa3b470c8723b1ff57aea4b88b00eee6ec0f8f"
+      },
+      "JSON" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "bcd1823fee2f3ade6f7f0fc53a0d4e6aa5822bfb2b694115bc49e198b063e56a",
+        "expectedFingerprint" : "ca796a31feab6b24c15af61fadaa3b470c8723b1ff57aea4b88b00eee6ec0f8f"
+      },
+      "YAML" : {
+        "status" : "DIVERGED",
+        "actualFingerprint" : "bcd1823fee2f3ade6f7f0fc53a0d4e6aa5822bfb2b694115bc49e198b063e56a",
+        "expectedFingerprint" : "ca796a31feab6b24c15af61fadaa3b470c8723b1ff57aea4b88b00eee6ec0f8f"
+      }
+    },
+    "exports" : {
+      "JSON" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      },
+      "YAML" : {
+        "serializationStatus" : "SUCCEEDED",
+        "lexicallyIdenticalToSource" : false,
+        "schema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "releasedSchema" : {
+          "status" : "VALID",
+          "issues" : [ ]
+        },
+        "structuralChanges" : [ ],
+        "validatedReimport" : {
+          "status" : "ACCEPTED"
+        },
+        "stableAfterFirstRoundtrip" : true
+      }
+    }
+  } ],
+  "summary" : {
+    "sources" : 42,
+    "developmentSchemaValid" : 39,
+    "releasedSchemaValid" : 36,
+    "defaultImportAccepted" : 38,
+    "exportAttempts" : 76,
+    "serializationSucceeded" : 74,
+    "serializationFailed" : 2,
+    "pureExecutions" : 48,
+    "matched" : 30,
+    "diverged" : 18
+  }
+}

@@ -1,0 +1,27 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: listen-foreach-until
+  version: '1.0.0'
+do:
+- consume:
+    listen:
+      to:
+        any:
+        - with:
+            type: example.item.v1
+        until:
+          one:
+            with:
+              type: example.stop.v1
+    foreach:
+      item: event
+      at: position
+      do:
+      - copy:
+          set:
+            event: ${ $event }
+            position: ${ $position }
+    timeout:
+      after:
+        seconds: 1

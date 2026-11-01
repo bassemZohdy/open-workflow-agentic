@@ -1,0 +1,68 @@
+{
+  "repository": "open-workflow-specification/specification",
+  "commit": "2dd2c84170d5f3e05d58e913e9ca298dcf8d543a",
+  "tree": "2987bb2d6df78261618e5633455bc563bd53faca",
+  "license": "Apache-2.0; original upstream license retained at ../../schema/LICENSE",
+  "files": [
+    {
+      "path": "features/branch.feature",
+      "sha256": "603ab76222332ae56a48618142fbdb1b4b05d648e01c5f49d63cd9c27711aeb0",
+      "bytes": 1028
+    },
+    {
+      "path": "features/call.feature",
+      "sha256": "4994d0d437a21cb2e026e6e3573111621309e774d3c106467c0b2d4df98ec0a2",
+      "bytes": 4615
+    },
+    {
+      "path": "features/data-flow.feature",
+      "sha256": "ed4a7f483203b265cbd84c506e934ecf2c34dde0a7592527100381d003d86893",
+      "bytes": 2564
+    },
+    {
+      "path": "features/do.feature",
+      "sha256": "f9a671d6be666d80ca8d47c84862f0483955a68b2f403a18fc4ad86cb6c91fa5",
+      "bytes": 919
+    },
+    {
+      "path": "features/emit.feature",
+      "sha256": "415e7745c7031479ea5fdfa034336eb6fa6693b339a618962e5566d97c3981c2",
+      "bytes": 1330
+    },
+    {
+      "path": "features/flow.feature",
+      "sha256": "8cbe3c793e97a8cd56815aa3e110119c8c3d86f752937e004d590a01fd11e4f4",
+      "bytes": 1670
+    },
+    {
+      "path": "features/for.feature",
+      "sha256": "4a0f782d926781bfba9d85c7be4bce88d7555058b0f0a54245c27a9b820507b2",
+      "bytes": 1030
+    },
+    {
+      "path": "features/raise.feature",
+      "sha256": "21dcd985f394c3537981d7b12f1cecfaffcc98e94461b9bc6e827edb987ae7de",
+      "bytes": 853
+    },
+    {
+      "path": "features/set.feature",
+      "sha256": "bdee08d7f22302134d763d657c9942d35b7e866c71cc0c781210d9825ef6355e",
+      "bytes": 944
+    },
+    {
+      "path": "features/switch.feature",
+      "sha256": "fecc436e8db6b5d4a3fcd55f64c1546a79e134a5e19da91b35d9dff3a2a369aa",
+      "bytes": 3584
+    },
+    {
+      "path": "features/try.feature",
+      "sha256": "bc3dfeaf8e68c9720ded4059ef00cfe051bdf648b4e1c4f286311cc058c5f3af",
+      "bytes": 2601
+    },
+    {
+      "path": "README.md",
+      "sha256": "ea07999dd78ce6a890e5242ca29d5dc2b47672e46fc16f6f4738e2219196e494",
+      "bytes": 11009
+    }
+  ]
+}
