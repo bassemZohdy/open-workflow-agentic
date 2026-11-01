@@ -49,8 +49,17 @@ public class ResearchAgent {
     @Inject
     ApprovedModelContext approvedContext;
 
-    @Inject
+    /** Set by {@link #useAuditTrail}; tests may set a recording sink directly. */
     AuditSink audit;
+
+    /**
+     * Injected by the unambiguous {@code AuditTrail} type: the audit producers publish more than one bean that is an
+     * {@code AuditSink}, so a field of that type would be an ambiguous dependency.
+     */
+    @Inject
+    void useAuditTrail(io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail trail) {
+        this.audit = trail;
+    }
 
     Clock clock = Clock.systemUTC();
 
