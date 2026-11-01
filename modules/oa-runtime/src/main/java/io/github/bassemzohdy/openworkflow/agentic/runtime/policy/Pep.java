@@ -7,6 +7,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.ArtifactR
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuthorizationRequest;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.HumanActionFacts;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.HumanTask;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.HumanTaskStatus;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyContext;
@@ -142,19 +143,63 @@ public final class Pep {
     }
 
     private static String humanActionRefusal(Subject actor, Set<String> scopes, HumanTask task, HumanAction action) {
+        return humanActionRefusal(actor, scopes, task.status(), task.assignee(), action);
+    }
+
+    private static String humanActionRefusal(Subject actor, Set<String> scopes, HumanTaskStatus status,
+                                             Subject assignee, HumanAction action) {
         if (actor.kind() != SubjectKind.USER) {
             return "only a person may act on a human task";
         }
-        if (task.status() != HumanTaskStatus.OPEN && task.status() != HumanTaskStatus.IN_PROGRESS) {
-            return "the task is " + task.status() + " and no longer accepts actions";
+        if (status != HumanTaskStatus.OPEN && status != HumanTaskStatus.IN_PROGRESS) {
+            return "the task is " + status + " and no longer accepts actions";
         }
         if (!scopes.contains(action.requiredScope())) {
             return "missing scope " + action.requiredScope();
         }
-        if (action == HumanAction.DECIDE && !actor.equals(task.assignee())) {
+        if (action == HumanAction.DECIDE && !actor.equals(assignee)) {
             return "only the task's assignee may decide it";
         }
         return null;
+    }
+
+    /**
+     * Boundary 3 with the retained facts of the task (WP-106). Everything {@link #humanTaskAction(Subject, Set, HumanTask,
+     * HumanAction)} refuses is refused here too, and in addition, before the policy engine and with zero engine calls:
+     * the actor's tenant must be the task's tenant, a task past its due time accepts no action, and when the approved
+     * risk policy attached {@link HumanActionFacts.SeparationObligation#INITIATOR_MUST_NOT_ACT} the initiator of the work
+     * may neither decide nor route the task. No obligation is invented: a task with {@code NONE} is not restricted
+     * by the initiator rule, and no rule here depends on the risk tier alone.
+     *
+     * <p>The facts are what the decision was made from. The caller must still check, after this call and before the
+     * durable mutation, that the task version, status, assignee and deadline are unchanged; an ALLOW is never reusable
+     * against changed facts.
+     */
+    public Decision humanTaskAction(Subject actor, String actorTenant, Set<String> actorScopes, HumanActionFacts facts,
+                                    HumanAction action) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(actorScopes, "actorScopes");
+        Objects.requireNonNull(facts, "facts");
+        Objects.requireNonNull(action, "action");
+        AuthorizationRequest request = new AuthorizationRequest(actor, ActionKind.HUMAN_TASK_ACTION,
+                "human-task:" + facts.taskId().value() + ":" + action.verb(), facts.agentTaskId(),
+                new PolicyContext(actorScopes, facts.riskTier(), null, null, null, null));
+        String refusal = humanActionRefusal(actor, actorScopes, facts.status(), facts.assignee(), action);
+        if (refusal == null && (actorTenant == null || !actorTenant.equals(facts.tenant()))) {
+            refusal = "the actor is not in the task's tenant";
+        }
+        if (refusal == null && facts.dueAt() != null && !clock.instant().isBefore(facts.dueAt())) {
+            refusal = "the task is past its due time";
+        }
+        if (refusal == null && facts.separation() == HumanActionFacts.SeparationObligation.INITIATOR_MUST_NOT_ACT
+                && action != HumanAction.CANCEL && actor.equals(facts.initiator())) {
+            refusal = "the initiator of the work may not act on this task";
+        }
+        if (refusal != null) {
+            return record(request, new Decision(DECIDED_BY, DecisionOutcome.DENY, refusal,
+                    PolicyRef.FAIL_CLOSED, clock.instant()), false);
+        }
+        return decide(request);
     }
 
     /** Boundary 4: a versioned artifact is published or activated. The digest is part of the resource. */
