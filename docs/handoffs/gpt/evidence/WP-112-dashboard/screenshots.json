@@ -1,0 +1,60 @@
+{
+  "screenshots": [
+    {
+      "file": "baseline-initial.png",
+      "sourceSha": "cc4d9481bbf9df8b8b4d2571584e7e03e153e2ea",
+      "sha256": "a0d3e286d505a380bf215e8a6e65ed16675402ec07639b6ba4c954c161230a1d",
+      "observedBy": "GPT via Playwright and image inspection",
+      "note": "Exact original screenshot; latest-value series colour, not per-event colouring. Synthetic samples only."
+    },
+    {
+      "file": "healthy.png",
+      "sourceSha": "86e1cb9f686a8a308ffb72f9aebb30020309801c",
+      "sha256": "0fd8085dd704778e9cb549eefc1873fd40bdc471864be46ffb1bd652bbe41180",
+      "observedBy": "GPT via Playwright and image inspection",
+      "note": "Exact original screenshot; latest-value series colour, not per-event colouring. Synthetic samples only."
+    },
+    {
+      "file": "initial.png",
+      "sourceSha": "86e1cb9f686a8a308ffb72f9aebb30020309801c",
+      "sha256": "c3e88c481ce4f86ac061b939363c9702c4aab287ae1fc531c3f57f9068687e9c",
+      "observedBy": "GPT via Playwright and image inspection",
+      "note": "Exact original screenshot; latest-value series colour, not per-event colouring. Synthetic samples only."
+    },
+    {
+      "file": "stale.png",
+      "sourceSha": "86e1cb9f686a8a308ffb72f9aebb30020309801c",
+      "sha256": "842c5a6724c5f61ac86b67b6a63de2f51c58f153487939be7710b4dcf0d4094c",
+      "observedBy": "GPT via Playwright and image inspection",
+      "note": "Exact original screenshot; latest-value series colour, not per-event colouring. Synthetic samples only."
+    },
+    {
+      "file": "exporter-down.png",
+      "sourceSha": "86e1cb9f686a8a308ffb72f9aebb30020309801c",
+      "sha256": "87e6de437b1b7d4856d1d2c54f1370b2775da38c43a32192ed42d85ef23dc1d3",
+      "observedBy": "GPT via Playwright and image inspection",
+      "note": "Exact original screenshot; latest-value series colour, not per-event colouring. Synthetic samples only."
+    },
+    {
+      "file": "collector-down.png",
+      "sourceSha": "86e1cb9f686a8a308ffb72f9aebb30020309801c",
+      "sha256": "1080b76a3e598f1b786e061c0d33b5bef86c53d091673439c0f2f7e3b7515272",
+      "observedBy": "GPT via Playwright and image inspection",
+      "note": "Exact original screenshot; latest-value series colour, not per-event colouring. Synthetic samples only."
+    },
+    {
+      "file": "recovered.png",
+      "sourceSha": "e80c5a96a889207c625b5b5f38ffe262c149a267",
+      "sha256": "f6f0c3462166d381f890ea1132d41ba70c480b944a99cab04c88ba97dcc52740",
+      "observedBy": "GPT via Playwright and image inspection",
+      "note": "Exact original screenshot; latest-value series colour, not per-event colouring. Synthetic samples only."
+    }
+  ],
+  "correctedDashboardSourceSha256": "8cfac2d65b996169ea488f7819d6021712175dba409e2470d52b17ebeb44b47d",
+  "sourceBytesEqual": [
+    "86e1cb9f686a8a308ffb72f9aebb30020309801c",
+    "e80c5a96a889207c625b5b5f38ffe262c149a267",
+    "5312221ee7f781914de8aadb53169db63026b343"
+  ],
+  "scope": "Original images retain their actual execution SHAs; no run approval transfer. Grafana scroll container can crop bottom of viewport."
+}

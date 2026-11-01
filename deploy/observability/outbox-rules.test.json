@@ -1,0 +1,534 @@
+{
+  "rule_files": [
+    "outbox-rules.json"
+  ],
+  "evaluation_interval": "1m",
+  "tests": [
+    {
+      "name": "healthy empty queue",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        },
+        {
+          "series": "agentic_outbox_observation_healthy{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        },
+        {
+          "series": "agentic_outbox_observation_age_seconds{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0x10"
+        },
+        {
+          "series": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxExporterUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationMissing",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxPoisonRows",
+          "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": [
+            {
+              "labels": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "reachable database failure with retained poison rows",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        },
+        {
+          "series": "agentic_outbox_observation_healthy{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0x10"
+        },
+        {
+          "series": "agentic_outbox_observation_age_seconds{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "200x10"
+        },
+        {
+          "series": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "4x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxExporterUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationMissing",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "open-workflow-agentic",
+                "instance": "runtime:8080",
+                "severity": "warning",
+                "owner": "runtime-operations"
+              },
+              "exp_annotations": {
+                "summary": "Outbox observation failed; retained lag is not current",
+                "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#observation-unavailable"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxPoisonRows",
+          "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": []
+        }
+      ]
+    },
+    {
+      "name": "missing instrumentation on reachable target",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxExporterUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationMissing",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "open-workflow-agentic",
+                "instance": "runtime:8080",
+                "severity": "warning",
+                "owner": "runtime-operations"
+              },
+              "exp_annotations": {
+                "summary": "Reachable runtime lacks the outbox observation signal",
+                "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#observation-missing"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxPoisonRows",
+          "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": []
+        }
+      ]
+    },
+    {
+      "name": "exporter down is distinct from observation failure",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0x10"
+        },
+        {
+          "series": "agentic_outbox_observation_healthy{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0x10"
+        },
+        {
+          "series": "agentic_outbox_observation_age_seconds{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "10x10"
+        },
+        {
+          "series": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "4x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxExporterUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "open-workflow-agentic",
+                "instance": "runtime:8080",
+                "severity": "warning",
+                "owner": "runtime-operations"
+              },
+              "exp_annotations": {
+                "summary": "Runtime scrape target is unreachable",
+                "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#exporter-unavailable"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationMissing",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxPoisonRows",
+          "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": []
+        }
+      ]
+    },
+    {
+      "name": "current poison rows need operator action",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        },
+        {
+          "series": "agentic_outbox_observation_healthy{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        },
+        {
+          "series": "agentic_outbox_observation_age_seconds{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0x10"
+        },
+        {
+          "series": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxExporterUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationMissing",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxPoisonRows",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "open-workflow-agentic",
+                "instance": "runtime:8080",
+                "severity": "warning",
+                "owner": "runtime-operations"
+              },
+              "exp_annotations": {
+                "summary": "Current outbox observation contains retained failed rows",
+                "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#poison-rows"
+              }
+            }
+          ]
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": [
+            {
+              "labels": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stale sample even when last read succeeded",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        },
+        {
+          "series": "agentic_outbox_observation_healthy{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        },
+        {
+          "series": "agentic_outbox_observation_age_seconds{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "200x10"
+        },
+        {
+          "series": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "4x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxExporterUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationMissing",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationStale",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "open-workflow-agentic",
+                "instance": "runtime:8080",
+                "severity": "warning",
+                "owner": "runtime-operations"
+              },
+              "exp_annotations": {
+                "summary": "Last successful outbox observation is stale",
+                "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#observation-stale"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxPoisonRows",
+          "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": []
+        }
+      ]
+    },
+    {
+      "name": "recovery before hold clears pending failure",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        },
+        {
+          "series": "agentic_outbox_observation_healthy{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0 0 1x8"
+        },
+        {
+          "series": "agentic_outbox_observation_age_seconds{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0x10"
+        },
+        {
+          "series": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxExporterUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationMissing",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxPoisonRows",
+          "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": [
+            {
+              "labels": "agentic_outbox_failed{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+              "value": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "unknown initial observation before any successful sample",
+      "interval": "1m",
+      "input_series": [
+        {
+          "series": "up{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "1x10"
+        },
+        {
+          "series": "agentic_outbox_observation_healthy{job=\"open-workflow-agentic\",instance=\"runtime:8080\"}",
+          "values": "0x10"
+        }
+      ],
+      "alert_rule_test": [
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxExporterUnavailable",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationMissing",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationUnavailable",
+          "exp_alerts": [
+            {
+              "exp_labels": {
+                "job": "open-workflow-agentic",
+                "instance": "runtime:8080",
+                "severity": "warning",
+                "owner": "runtime-operations"
+              },
+              "exp_annotations": {
+                "summary": "Outbox observation failed; retained lag is not current",
+                "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#observation-unavailable"
+              }
+            }
+          ]
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxObservationStale",
+          "exp_alerts": []
+        },
+        {
+          "eval_time": "5m",
+          "alertname": "OutboxPoisonRows",
+          "exp_alerts": []
+        }
+      ],
+      "promql_expr_test": [
+        {
+          "expr": "vector(0/0) > 0",
+          "eval_time": "5m",
+          "exp_samples": []
+        },
+        {
+          "expr": "agentic_outbox_failed{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} and on(job,instance) (agentic_outbox_observation_healthy{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (up{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds{job=~\"open-workflow-agentic\",instance=~\"runtime:8080\"} <= 120)",
+          "eval_time": "5m",
+          "exp_samples": []
+        }
+      ]
+    }
+  ]
+}

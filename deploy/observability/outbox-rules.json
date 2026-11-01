@@ -1,0 +1,74 @@
+{
+  "groups": [
+    {
+      "name": "agentic-outbox-observation-v1",
+      "rules": [
+        {
+          "alert": "OutboxExporterUnavailable",
+          "expr": "up{job=\"open-workflow-agentic\"} == 0",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "owner": "runtime-operations"
+          },
+          "annotations": {
+            "summary": "Runtime scrape target is unreachable",
+            "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#exporter-unavailable"
+          }
+        },
+        {
+          "alert": "OutboxObservationMissing",
+          "expr": "up{job=\"open-workflow-agentic\"} == 1 unless on(job,instance) agentic_outbox_observation_healthy",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "owner": "runtime-operations"
+          },
+          "annotations": {
+            "summary": "Reachable runtime lacks the outbox observation signal",
+            "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#observation-missing"
+          }
+        },
+        {
+          "alert": "OutboxObservationUnavailable",
+          "expr": "(agentic_outbox_observation_healthy == 0) and on(job,instance) (up{job=\"open-workflow-agentic\"} == 1)",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "owner": "runtime-operations"
+          },
+          "annotations": {
+            "summary": "Outbox observation failed; retained lag is not current",
+            "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#observation-unavailable"
+          }
+        },
+        {
+          "alert": "OutboxObservationStale",
+          "expr": "(agentic_outbox_observation_age_seconds > 120) and on(job,instance) (up{job=\"open-workflow-agentic\"} == 1) and on(job,instance) (agentic_outbox_observation_healthy == 1)",
+          "for": "1m",
+          "labels": {
+            "severity": "warning",
+            "owner": "runtime-operations"
+          },
+          "annotations": {
+            "summary": "Last successful outbox observation is stale",
+            "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#observation-stale"
+          }
+        },
+        {
+          "alert": "OutboxPoisonRows",
+          "expr": "(agentic_outbox_failed > 0) and on(job,instance) (agentic_outbox_observation_healthy == 1) and on(job,instance) (up{job=\"open-workflow-agentic\"} == 1) and on(job,instance) (agentic_outbox_observation_age_seconds <= 120)",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "owner": "runtime-operations"
+          },
+          "annotations": {
+            "summary": "Current outbox observation contains retained failed rows",
+            "runbook_url": "https://github.com/bassemZohdy/open-workflow-agentic/blob/main/docs/operations-observability.md#poison-rows"
+          }
+        }
+      ]
+    }
+  ]
+}
