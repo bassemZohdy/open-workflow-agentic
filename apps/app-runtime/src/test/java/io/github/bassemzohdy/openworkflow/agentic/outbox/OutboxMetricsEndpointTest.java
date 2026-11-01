@@ -24,7 +24,7 @@ class OutboxMetricsEndpointTest {
             } else if(line.startsWith(name+"{")) fail("Outbox application labels must remain absent: "+name);
             else if(line.startsWith("# HELP "+name+" ") || line.startsWith("# TYPE "+name+" "))retained.add(line);
         }
-        assertEquals(names,observed.keySet());assertEquals(1,observed.get("agentic_outbox_observation_healthy"));
+        assertEquals(names,observed.keySet(),"scrape had "+response.lines().count()+" lines; agentic lines: "+response.lines().filter(l->l.contains("agentic")).limit(30).toList());assertEquals(1,observed.get("agentic_outbox_observation_healthy"));
         assertTrue(observed.values().stream().allMatch(Double::isFinite));
         for(String name:List.of("agentic_outbox_unpublished","agentic_outbox_failed","agentic_outbox_observation_age_seconds"))
             assertTrue(observed.get(name)>=0,name);
