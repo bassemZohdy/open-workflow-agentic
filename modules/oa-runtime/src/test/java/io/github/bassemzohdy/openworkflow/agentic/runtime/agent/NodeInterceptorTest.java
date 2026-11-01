@@ -7,6 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ExecutionLimits;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -165,5 +170,101 @@ class NodeInterceptorTest {
     @Test
     void theLimitMustBeAtLeastOne() {
         assertThrows(IllegalArgumentException.class, () -> interceptor(new Audit(), 0));
+    }
+
+    // ---------------------------------------------------------------- wall-clock limit
+
+    /** A clock the test moves. */
+    static final class MovingClock extends Clock {
+        Instant now = GovernedLlmClientTest.NOW;
+        @Override public ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) { return this; }
+        @Override public Instant instant() { return now; }
+    }
+
+    @Test
+    void aNodeAfterTheDeadlineIsRefusedWithZeroRunsAndAnAuditRecord() throws Exception {
+        var clock = new MovingClock();
+        var audit = new Audit();
+        var node = new Counting();
+        var interceptor = new NodeInterceptor(GovernedLlmClientTest.AGENT, "run-1", 10, Duration.ofMinutes(5), audit, clock);
+        var wrapped = interceptor.wrap("plan", node);
+
+        wrapped.apply(STATE);
+        clock.now = clock.now.plus(Duration.ofMinutes(5)); // exactly at the deadline is already too late
+        var refused = assertThrows(NodeRefused.class, () -> wrapped.apply(STATE));
+
+        assertEquals(1, node.runs.get());
+        assertEquals(1, interceptor.stepsCounted(), "a refused node does not use a step");
+        assertEquals(List.of("agent.node.started", "agent.node.completed", "agent.node.refused"), audit.actions());
+        assertEquals(true, refused.getMessage().contains("wall-clock"));
+    }
+
+    @Test
+    void justBeforeTheDeadlineStillRuns() throws Exception {
+        var clock = new MovingClock();
+        var node = new Counting();
+        var wrapped = new NodeInterceptor(GovernedLlmClientTest.AGENT, "run-1", 10, Duration.ofMinutes(5), new Audit(), clock)
+                .wrap("plan", node);
+        clock.now = clock.now.plus(Duration.ofMinutes(5)).minusNanos(1);
+        wrapped.apply(STATE);
+        assertEquals(1, node.runs.get());
+    }
+
+    @Test
+    void aNodeThatOutlastsTheDeadlineCompletesButTheNextOneIsRefused() throws Exception {
+        var clock = new MovingClock();
+        var audit = new Audit();
+        var slow = new NodeAction<AgentState>() {
+            @Override public Map<String, Object> apply(AgentState state) {
+                clock.now = clock.now.plus(Duration.ofMinutes(10));
+                return Map.of("out", "late");
+            }
+        };
+        var interceptor = new NodeInterceptor(GovernedLlmClientTest.AGENT, "run-1", 10, Duration.ofMinutes(5), audit, clock);
+        assertEquals(Map.of("out", "late"), interceptor.wrap("slow", slow).apply(STATE));
+        var next = new Counting();
+        assertThrows(NodeRefused.class, () -> interceptor.wrap("next", next).apply(STATE));
+        assertEquals(0, next.runs.get());
+    }
+
+    @Test
+    void aFailedRefusalRecordStillRefusesTheNode() {
+        var clock = new MovingClock();
+        var audit = new Audit();
+        audit.failOn.add("agent.node.refused");
+        var node = new Counting();
+        var wrapped = new NodeInterceptor(GovernedLlmClientTest.AGENT, "run-1", 10, Duration.ofSeconds(1), audit, clock)
+                .wrap("plan", node);
+        clock.now = clock.now.plusSeconds(2);
+        assertThrows(NodeRefused.class, () -> wrapped.apply(STATE));
+        assertEquals(0, node.runs.get());
+    }
+
+    @Test
+    void forLimitsAppliesBothTheIterationAndTheWallClockBound() throws Exception {
+        var clock = new MovingClock();
+        var limits = new ExecutionLimits(2, Duration.ofMinutes(1), 1_000L);
+        var interceptor = NodeInterceptor.forLimits(GovernedLlmClientTest.AGENT, "run-1", limits, new Audit(), clock);
+        var node = new Counting();
+        var wrapped = interceptor.wrap("plan", node);
+        wrapped.apply(STATE);
+        wrapped.apply(STATE);
+        assertThrows(NodeRefused.class, () -> wrapped.apply(STATE)); // iterations
+        var again = NodeInterceptor.forLimits(GovernedLlmClientTest.AGENT, "run-2", limits, new Audit(), clock)
+                .wrap("plan", node);
+        clock.now = clock.now.plus(Duration.ofMinutes(1));
+        assertThrows(NodeRefused.class, () -> again.apply(STATE)); // wall clock
+        assertEquals(2, node.runs.get());
+    }
+
+    @Test
+    void anInvalidDeadlineOrMissingLimitsAreRefusedAtConstruction() {
+        assertThrows(IllegalArgumentException.class, () -> new NodeInterceptor(GovernedLlmClientTest.AGENT, "r", 1,
+                Duration.ZERO, new Audit(), GovernedLlmClientTest.CLOCK));
+        assertThrows(IllegalArgumentException.class, () -> new NodeInterceptor(GovernedLlmClientTest.AGENT, "r", 1,
+                Duration.ofSeconds(-1), new Audit(), GovernedLlmClientTest.CLOCK));
+        assertThrows(NullPointerException.class, () -> NodeInterceptor.forLimits(GovernedLlmClientTest.AGENT, "r", null,
+                new Audit(), GovernedLlmClientTest.CLOCK));
     }
 }
