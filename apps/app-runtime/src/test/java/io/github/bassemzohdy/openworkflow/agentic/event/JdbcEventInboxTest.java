@@ -76,6 +76,8 @@ class JdbcEventInboxTest {
         } catch (java.sql.SQLException e) { throw new IllegalStateException(e); }
     }
 
+    // The purge is global and the database is shared with other tests, so these assert on THIS tenant's rows only.
+
     @Test
     void purgeDeletesOnlyExpiredUnreferencedMessagesAndHonoursTheGrace() {
         InstanceRecord row = instance(true);
@@ -84,15 +86,27 @@ class JdbcEventInboxTest {
         inbox.receive(message(row, "fresh", "wait:3"), Instant.now().plus(Duration.ofHours(5)));
         assertEquals(3, messages(row.tenant()));
 
-        // before any retention ended: nothing is purged
-        assertEquals(0, inbox.purgeExpired(Duration.ZERO, 100));
+        // before any retention ended: nothing of ours is purged
+        inbox.purgeExpired(Duration.ZERO, 10_000);
+        assertEquals(3, messages(row.tenant()));
         // expired, but inside the grace window: kept
-        assertEquals(0, later(Duration.ofMinutes(10)).purgeExpired(Duration.ofMinutes(30), 100));
+        later(Duration.ofMinutes(10)).purgeExpired(Duration.ofMinutes(30), 10_000);
+        assertEquals(3, messages(row.tenant()));
         // expired past the grace: the two old ones go, the fresh one stays
-        assertEquals(2, later(Duration.ofMinutes(10)).purgeExpired(Duration.ZERO, 100));
+        drain(later(Duration.ofMinutes(10)), Duration.ZERO);
         assertEquals(1, messages(row.tenant()));
-        // idempotent: a second run finds nothing
-        assertEquals(0, later(Duration.ofMinutes(10)).purgeExpired(Duration.ZERO, 100));
+        // idempotent: another run changes nothing of ours
+        later(Duration.ofMinutes(10)).purgeExpired(Duration.ZERO, 10_000);
+        assertEquals(1, messages(row.tenant()));
+    }
+
+    /** Purges in bounded calls until a call deletes nothing; returns how many calls deleted something. */
+    private int drain(JdbcEventInbox inbox, Duration grace) {
+        int calls = 0;
+        while (inbox.purgeExpired(grace, 10_000) > 0) {
+            if (++calls > 50) fail("the purge never converged");
+        }
+        return calls;
     }
 
     @Test
@@ -103,18 +117,26 @@ class JdbcEventInboxTest {
         receive(message(row, "unmatched", "wait:9"));
         assertEquals(Optional.of(matched), inbox.match(row.tenant(), row.id(), "wait:1", matched.type()));
 
-        assertEquals(1, later(Duration.ofHours(1)).purgeExpired(Duration.ZERO, 100), "only the unmatched one");
-        assertEquals(1, messages(row.tenant()), "the matched message is part of the wait's record");
+        drain(later(Duration.ofHours(1)), Duration.ZERO);
+
+        assertEquals(1, messages(row.tenant()), "only the unmatched one went; the matched message is the wait's record");
+        // and the kept one is still the matched message
+        assertEquals(Optional.of(matched), inbox.match(row.tenant(), row.id(), "wait:1", matched.type()));
     }
 
     @Test
-    void purgeIsBoundedByTheLimitAndOldestFirst() {
+    void purgeIsBoundedByTheLimitPerCall() {
         InstanceRecord row = instance(true);
         for (int i = 0; i < 5; i++) receive(message(row, "bulk-" + i, "wait:" + i));
+        var future = later(Duration.ofHours(1));
 
-        assertEquals(2, later(Duration.ofHours(1)).purgeExpired(Duration.ZERO, 2));
-        assertEquals(3, messages(row.tenant()));
-        assertEquals(3, later(Duration.ofHours(1)).purgeExpired(Duration.ZERO, 100));
+        int calls = 0;
+        while (messages(row.tenant()) > 0) {
+            int deleted = future.purgeExpired(Duration.ZERO, 2);
+            assertTrue(deleted <= 2, "a call never deletes more than its limit: " + deleted);
+            if (++calls > 200) fail("the purge never converged");
+        }
+        assertTrue(calls >= 3, "5 rows at 2 per call need at least 3 calls, took " + calls);
     }
 
     @Test
@@ -124,8 +146,9 @@ class JdbcEventInboxTest {
         assertTrue(receive(event).created());
         assertFalse(receive(event).created(), "inside retention the duplicate is recognised");
 
-        later(Duration.ofHours(1)).purgeExpired(Duration.ZERO, 100);
+        drain(later(Duration.ofHours(1)), Duration.ZERO);
 
+        assertEquals(0, messages(row.tenant()));
         assertTrue(receive(event).created(), "the duplicate window is the retention period");
     }
 
