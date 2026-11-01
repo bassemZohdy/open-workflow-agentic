@@ -45,9 +45,20 @@ running is not interrupted (nothing here can stop it); the next node is refused.
 just-before, an overrunning node, a failing refusal record, `forLimits` and invalid input.
 `maxCostMicros` is not enforced by the interceptor: cost is charged where the model call is priced.
 
+## Node interceptor in the production graph
+
+`ResearchAgent` now builds a fresh `NodeInterceptor` per run (its counter and deadline belong to one run) from the
+approved context: the approved agent as actor, the approved task's `ExecutionLimits`, the thread id as run id, and the
+central `AuditSink`. The graph is compiled per such run with the interceptor wrapping `plan`, `draft` and `review`.
+Without an approved context, or with no audit sink set (tests that set fields directly), the shared unwrapped graph is
+used and behaviour is unchanged; with the default context a run still refuses at its first model call. The interceptor
+audit (`agent.node.*`) is mandatory for started/completed: a failed write refuses the node. Four database-backed tests
+(`ResearchAgentNodeLimitsTest`, CI only) cover audited nodes, the iteration limit stopping before the third provider
+call, per-run counters, and the unwrapped no-context path.
+
 ## Still open for WP-201
 
 - Governed graph/catalog patterns (tool use, plan-and-execute, supervision).
-- Using `NodeInterceptor` in a production graph (today only tests construct it), and versioned checkpoint state with
-  compatibility tests.
+- Versioned checkpoint state with compatibility tests, and the governed graph/catalog patterns (tool use,
+  plan-and-execute, supervision); only the plan/draft/review graph exists.
 - Moving agent code from `GovernedLlmClient` to this port, and the composition root that supplies context and cost.
