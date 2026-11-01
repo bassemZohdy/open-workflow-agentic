@@ -589,11 +589,11 @@ Deliverables:
 Implementation status: **partial**.
 - Implemented: db-scheduler is embedded and reconciliation stores absolute workflow wait deadlines.
 - Implemented: Optional persisted maximum instance lifetime landed (PR 138): agentic.reconciler.max-lifetime (unset by default) makes the reconciler cancel RUNNING/WAITING instances whose stored created_at is older than the limit, through the same cancel path as a passed wait deadline (request recorded first, refused cancel re-sent, engine-lost instance FAILED, repair kind lifetime); six database-backed reconciler tests pass in CI. Escalation timers, duplicate-timer-delivery proof, two-replica Kubernetes-lease failover and T12 remain open, so WP-109 stays partial.
+- Implemented: Duplicate delivery of a due timer is proven harmless (PR 139, database-backed, CI): a due wait deadline or maximum lifetime delivered twice writes one history row and leaves the row version unchanged; a late duplicate after the engine confirmed the cancel changes nothing on the terminal row; two reconcilers delivering the same due deadline at once admit exactly one transition.
 
 Remaining gates:
 
 - Complete persisted maximum lifetimes, escalation timers and deadline recovery across restart.
-- Prove duplicate due-timer delivery is harmless.
 - Run two execution replicas with durable Kubernetes lease mode; test node loss and post-warmup recovery.
 - Automate T12.
 
