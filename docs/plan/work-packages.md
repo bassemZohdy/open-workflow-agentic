@@ -588,6 +588,7 @@ Deliverables:
 
 Implementation status: **partial**.
 - Implemented: db-scheduler is embedded and reconciliation stores absolute workflow wait deadlines.
+- Implemented: Optional persisted maximum instance lifetime landed (PR 138): agentic.reconciler.max-lifetime (unset by default) makes the reconciler cancel RUNNING/WAITING instances whose stored created_at is older than the limit, through the same cancel path as a passed wait deadline (request recorded first, refused cancel re-sent, engine-lost instance FAILED, repair kind lifetime); six database-backed reconciler tests pass in CI. Escalation timers, duplicate-timer-delivery proof, two-replica Kubernetes-lease failover and T12 remain open, so WP-109 stays partial.
 
 Remaining gates:
 
@@ -596,7 +597,7 @@ Remaining gates:
 - Run two execution replicas with durable Kubernetes lease mode; test node loss and post-warmup recovery.
 - Automate T12.
 
-Evidence: [docs/lifecycle.md](../../docs/lifecycle.md), [docs/adr/0013-use-db-scheduler-for-time-based-triggers.md](../../docs/adr/0013-use-db-scheduler-for-time-based-triggers.md)
+Evidence: [docs/lifecycle.md](../../docs/lifecycle.md), [docs/adr/0013-use-db-scheduler-for-time-based-triggers.md](../../docs/adr/0013-use-db-scheduler-for-time-based-triggers.md), [docs/lifecycle.md](../../docs/lifecycle.md)
 
 Reuse: quarkus-flow-durable-kubernetes, quarkus-db-scheduler
 

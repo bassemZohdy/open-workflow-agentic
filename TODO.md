@@ -10,7 +10,7 @@ A checked deliverable records implemented scope. A work package closes only when
 
 ## Two-agent delivery plan
 
-WP-108 remains partial: opt-in manual resolution, audit recovery and test-created managed-pool coverage are merged; deployed datasource and role grants, governed adapter/Flow re-execution and T03 remain open. PR99 head faad8091f4de2f596c982e81ffd9681f1c831672 remains open with GPT REQUEST_CHANGES: rebase, request-body authorization order and failing Cedar provider checks require fixes. V78/V79 remain proposals; approved model sources/roles, occurrence/task/lease/PDP/audit/Flow/physical async and supported identity-profile gates remain. Issue75 stays open and issue76 supported-only implementation/proof is open; defaults refuse and package counts and acceptance are unchanged. 2026-11-01 consolidation: main fast-forwarded to origin/main (PR127) and merged claude/WP-102-bound-credential-pairing, claude/WP-103-instance-policy and gpt/WP-108-bound-credential-lookup; twelve stale branches that conflict with current main are not merged and need per-branch triage. Local run had no Postgres/native Cedar, so DB-backed tests are CI-gated; counts and acceptance are unchanged. 2026-11-01: WP-605 assessment (PR128) and WP-112 operational signals (PR129) merged; WP-605 is now partial, WP-112 stays partial. Remaining stacked WP-103/108 branches were verified superseded by reworked code on main. PRs 130 (WP-108 composite fence) and 131 (WP-102 governed async dispatch) merged as unwired building blocks; package statuses and acceptance are unchanged. PRs 132 (WP-102 task guard) and 133 (WP-108 registry fence) merged; statuses and acceptance unchanged. WP-201 runtime increments merged (PRs 134-137); status stays partial..
+WP-108 remains partial: opt-in manual resolution, audit recovery and test-created managed-pool coverage are merged; deployed datasource and role grants, governed adapter/Flow re-execution and T03 remain open. PR99 head faad8091f4de2f596c982e81ffd9681f1c831672 remains open with GPT REQUEST_CHANGES: rebase, request-body authorization order and failing Cedar provider checks require fixes. V78/V79 remain proposals; approved model sources/roles, occurrence/task/lease/PDP/audit/Flow/physical async and supported identity-profile gates remain. Issue75 stays open and issue76 supported-only implementation/proof is open; defaults refuse and package counts and acceptance are unchanged. 2026-11-01 consolidation: main fast-forwarded to origin/main (PR127) and merged claude/WP-102-bound-credential-pairing, claude/WP-103-instance-policy and gpt/WP-108-bound-credential-lookup; twelve stale branches that conflict with current main are not merged and need per-branch triage. Local run had no Postgres/native Cedar, so DB-backed tests are CI-gated; counts and acceptance are unchanged. 2026-11-01: WP-605 assessment (PR128) and WP-112 operational signals (PR129) merged; WP-605 is now partial, WP-112 stays partial. Remaining stacked WP-103/108 branches were verified superseded by reworked code on main. PRs 130 (WP-108 composite fence) and 131 (WP-102 governed async dispatch) merged as unwired building blocks; package statuses and acceptance are unchanged. PRs 132 (WP-102 task guard) and 133 (WP-108 registry fence) merged; statuses and acceptance unchanged. WP-201 runtime increments merged (PRs 134-137); status stays partial. WP-109 maximum lifetime merged (PR 138); status stays partial..
 
 Assignment baseline: `e23471d40e8eb4b57a06950a89233b8c0a5a971b` (2026-10-27).
 
@@ -614,6 +614,7 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-04. Shared pat
 Implemented scope:
 
 - db-scheduler is embedded and reconciliation stores absolute workflow wait deadlines.
+- Optional persisted maximum instance lifetime landed (PR 138): agentic.reconciler.max-lifetime (unset by default) makes the reconciler cancel RUNNING/WAITING instances whose stored created_at is older than the limit, through the same cancel path as a passed wait deadline (request recorded first, refused cancel re-sent, engine-lost instance FAILED, repair kind lifetime); six database-backed reconciler tests pass in CI. Escalation timers, duplicate-timer-delivery proof, two-replica Kubernetes-lease failover and T12 remain open, so WP-109 stays partial.
 
 Additional closure/integration tasks:
 
@@ -626,7 +627,7 @@ Acceptance gates:
 
 - [ ] T12: implement, run in CI and record passing evidence
 
-Evidence: [docs/lifecycle.md](docs/lifecycle.md), [docs/adr/0013-use-db-scheduler-for-time-based-triggers.md](docs/adr/0013-use-db-scheduler-for-time-based-triggers.md)
+Evidence: [docs/lifecycle.md](docs/lifecycle.md), [docs/adr/0013-use-db-scheduler-for-time-based-triggers.md](docs/adr/0013-use-db-scheduler-for-time-based-triggers.md), [docs/lifecycle.md](docs/lifecycle.md)
 
 ### WP-110 Resilience and overload — partial
 
