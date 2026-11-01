@@ -132,7 +132,11 @@ public class ResearchAgent {
         // before any node (and so any provider call): the store may have drifted since the graph was built
         verifyStore();
         var config = RunnableConfig.builder().threadId(threadId).build();
-        return runGraph(threadId).invoke(Map.of(ResearchState.TOPIC, topic), config)
+        var runGraph = runGraph(threadId);
+        // a stored run of a state shape this build cannot continue is refused before any node or provider call
+        runGraph.lastStateOf(config).ifPresent(snapshot -> ResearchStateVersion.requireContinuable(snapshot.state().data()));
+        return runGraph.invoke(Map.of(ResearchState.TOPIC, topic,
+                        ResearchStateVersion.KEY, ResearchStateVersion.CURRENT), config)
                 .orElseThrow(() -> new IllegalStateException("Agent graph produced no state"));
     }
 

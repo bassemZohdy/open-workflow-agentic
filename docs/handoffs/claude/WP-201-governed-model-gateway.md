@@ -56,9 +56,21 @@ audit (`agent.node.*`) is mandatory for started/completed: a failed write refuse
 (`ResearchAgentNodeLimitsTest`, CI only) cover audited nodes, the iteration limit stopping before the third provider
 call, per-run counters, and the unwrapped no-context path.
 
+## Versioned checkpoint state
+
+The checkpoint TABLES were pinned (`CheckpointProfileVerifier`), but the STATE a run keeps between nodes had no version.
+`ResearchStateVersion` adds `state.version` (current 1, oldest supported 1). A new run records the current version; before
+a stored run is continued, `ResearchAgent.run` reads the last checkpoint and refuses (`CheckpointStateIncompatibleException`,
+fixed codes `newer` / `too-old` / `malformed`, no state values in the message) before any node or provider call. A state
+with no marker was written before versioning and is version 1, so existing checkpoints stay continuable. Nine DB-free
+tests cover the rule, including explicit bounds for a future bump; three database-backed tests
+(`ResearchAgentStateVersionTest`, CI only) cover the written marker and the newer and unreadable refusals.
+Rule for the next bump: raise `CURRENT`, keep `OLDEST_SUPPORTED` only as far back as a test proves, and add a
+compatibility test per supported version first.
+
 ## Still open for WP-201
 
 - Governed graph/catalog patterns (tool use, plan-and-execute, supervision).
-- Versioned checkpoint state with compatibility tests, and the governed graph/catalog patterns (tool use,
-  plan-and-execute, supervision); only the plan/draft/review graph exists.
+- The governed graph/catalog patterns (tool use, plan-and-execute, supervision); only the plan/draft/review graph
+  exists. Restore-time migration between state versions (today a different version is only refused, not converted).
 - Moving agent code from `GovernedLlmClient` to this port, and the composition root that supplies context and cost.
