@@ -51,6 +51,11 @@ public class OutboxMetrics {
     }
 
     void onStart(@Observes StartupEvent event) {
+        // A registry that outlives a previous application lifecycle (a shared JVM) would otherwise hand back the old gauges,
+        // which watch a dead instance and read NaN forever. Re-register so this instance owns every outbox gauge.
+        for (String name : new String[]{UNPUBLISHED, OLDEST_AGE, FAILED, HEALTHY, AGE}) {
+            registry.find(name).meters().forEach(registry::remove);
+        }
         Gauge.builder(UNPUBLISHED, this, m -> {var o=m.current();return o.succeeded()?o.lag().unpublished():Double.NaN;})
                 .description("Outbox rows not yet published, failed ones included").register(registry);
         Gauge.builder(OLDEST_AGE, this, m -> {var o=m.current();return o.succeeded()?o.lag().oldestUnpublishedAgeSeconds():Double.NaN;})
