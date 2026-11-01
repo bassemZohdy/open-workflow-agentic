@@ -48,11 +48,53 @@ public class JdbcEventInbox {
         this.clock = Objects.requireNonNull(clock);
     }
 
+    /** The payload a redacted message keeps: valid JSON, so every column constraint and reader still holds. */
+    public static final String REDACTED_DATA = "null";
+
+    /**
+     * First retention stage: replaces the payload of messages whose retention ended more than {@code grace} ago and that
+     * nothing refers to with {@link #REDACTED_DATA}, keeping the row. The row (tenant, source, event id, type, route and
+     * fingerprint) is then a tombstone: a redelivery of the same event is still recognised as a duplicate and a
+     * redelivery with different content or routing is still refused, long after the payload is gone. A message a wait
+     * signal or listen item refers to keeps its payload. Expired messages never match, so nothing reads a payload this
+     * removes. Rows are deleted by {@link #purgeExpired} after the (much longer) tombstone period.
+     *
+     * <p>Bounded, oldest first, idempotent and safe on several replicas at once.
+     *
+     * @return the number of payloads redacted
+     */
+    public int redactExpired(Duration grace, int limit) {
+        Objects.requireNonNull(grace, "grace");
+        if (grace.isNegative()) throw new IllegalArgumentException("grace must not be negative");
+        if (limit < 1 || limit > 10_000) throw new IllegalArgumentException("limit must be 1..10000");
+        Instant cutoff = clock.instant().minus(grace);
+        return Transactions.inTransaction(dataSource, c -> {
+            try (PreparedStatement s = c.prepareStatement("""
+                    update inbox.message set data_json = ? where (tenant, source, event_id) in (
+                        select m.tenant, m.source, m.event_id from inbox.message m
+                         where m.retain_until < ? and m.data_json <> ?
+                           and not exists (select 1 from inbox.signal g where g.tenant = m.tenant
+                                            and g.source = m.source and g.event_id = m.event_id)
+                           and not exists (select 1 from inbox.listen_item i where i.tenant = m.tenant
+                                            and i.source = m.source and i.event_id = m.event_id)
+                         order by m.retain_until limit ?
+                         for update of m skip locked)
+                    """)) {
+                s.setString(1, REDACTED_DATA);
+                s.setTimestamp(2, java.sql.Timestamp.from(cutoff));
+                s.setString(3, REDACTED_DATA);
+                s.setInt(4, limit);
+                return s.executeUpdate();
+            }
+        });
+    }
+
     /**
      * Deletes messages whose retention ended more than {@code grace} ago and that nothing refers to: a message that a
      * wait signal or a listen group item points at is part of that wait's record and is kept. A stored event can no
-     * longer match once its retention ends (reads filter on it), so this only reclaims space. The duplicate-receipt
-     * window is the retention: an event id redelivered after its message was purged is a new receipt.
+     * longer match once its retention ends (reads filter on it), so this only reclaims space. This is the SECOND stage:
+     * call it with the tombstone period as {@code grace}, after {@link #redactExpired} has dropped the payloads. The
+     * duplicate-receipt window ends when the row is deleted: an event id redelivered after that is a new receipt.
      *
      * <p>Bounded and idempotent: at most {@code limit} rows per call, oldest first, safe to run on several replicas at
      * once (a row already deleted by another run is simply not deleted twice).

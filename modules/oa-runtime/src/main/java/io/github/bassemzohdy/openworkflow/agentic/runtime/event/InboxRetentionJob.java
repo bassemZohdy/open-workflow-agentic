@@ -4,13 +4,16 @@ import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Duration;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 /**
- * Periodic sweep that deletes expired, unreferenced inbox messages. Off unless {@code agentic.inbox.retention-sweep-cron}
- * is set to a cron expression, so enabling it is a deliberate choice about the duplicate-receipt window (an event id
- * redelivered after its message was purged is a new receipt). It runs as a db-scheduler job (one run per schedule across
- * replicas) and does bounded batches, so a late or failed sweep only delays space reclamation.
+ * Periodic two-stage retention of the event inbox. Off unless {@code agentic.inbox.retention-sweep-cron} is set to a
+ * cron expression. Stage one redacts the payload of expired, unreferenced messages shortly after their retention ended
+ * and keeps the row as a tombstone, so duplicate and conflicting redeliveries are still recognised. Stage two deletes
+ * the tombstone after {@code agentic.inbox.tombstone-retention} (default 90 days), which is when the duplicate-receipt
+ * window finally ends. It runs as a db-scheduler job (one run per schedule across replicas) in bounded batches, so a
+ * late or failed sweep only delays space reclamation.
  */
 @ApplicationScoped
 public class InboxRetentionJob {
@@ -23,25 +26,37 @@ public class InboxRetentionJob {
     @Inject
     JdbcEventInbox inbox;
 
+    @ConfigProperty(name = "agentic.inbox.tombstone-retention", defaultValue = "P90D")
+    Duration tombstoneRetention;
+
     @Scheduled(cron = "{agentic.inbox.retention-sweep-cron:off}", identity = "inbox-retention",
             concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
     public void sweep() {
         try {
-            int total = sweepOnce();
-            LOG.debugf("inbox retention sweep deleted %d expired messages", total);
+            int[] done = sweepOnce();
+            LOG.debugf("inbox retention sweep redacted %d payloads and deleted %d tombstones", done[0], done[1]);
         } catch (RuntimeException e) {
-            LOG.warnf(e, "inbox retention sweep failed; expired messages stay unmatchable and are deleted by a later run");
+            LOG.warnf(e, "inbox retention sweep failed; expired messages stay unmatchable and are handled by a later run");
         }
     }
 
-    /** Runs bounded batches until one deletes fewer than a full batch; returns the total deleted. */
-    int sweepOnce() {
-        int total = 0;
-        for (int i = 0; i < MAX_BATCHES; i++) {
-            int deleted = inbox.purgeExpired(GRACE, BATCH);
-            total += deleted;
-            if (deleted < BATCH) break;
+    /** Runs both stages in bounded batches; returns {redacted, deleted}. */
+    int[] sweepOnce() {
+        if (tombstoneRetention == null || tombstoneRetention.compareTo(GRACE) <= 0) {
+            throw new IllegalStateException("agentic.inbox.tombstone-retention must be longer than " + GRACE);
         }
-        return total;
+        int redacted = 0;
+        for (int i = 0; i < MAX_BATCHES; i++) {
+            int n = inbox.redactExpired(GRACE, BATCH);
+            redacted += n;
+            if (n < BATCH) break;
+        }
+        int deleted = 0;
+        for (int i = 0; i < MAX_BATCHES; i++) {
+            int n = inbox.purgeExpired(tombstoneRetention, BATCH);
+            deleted += n;
+            if (n < BATCH) break;
+        }
+        return new int[]{redacted, deleted};
     }
 }
