@@ -66,6 +66,11 @@
     <!-- Effect spans (WP-108/WP-112), managed by the existing Quarkus BOM. -->
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-opentelemetry</artifactId></dependency>
 
+    <!-- Offline source import/export validates against locally pinned OWS schemas. Existing BOM-managed version. -->
+    <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><scope>compile</scope></dependency>
+    <!-- Already transitively present at the managed version; compose YAML nodes without Java object construction. -->
+    <dependency><groupId>org.yaml</groupId><artifactId>snakeyaml</artifactId></dependency>
+
     <!-- Tests (plain JUnit and ArchUnit; Quarkus boot tests live in app-runtime) -->
     <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
     <dependency><groupId>io.opentelemetry</groupId><artifactId>opentelemetry-sdk-testing</artifactId><scope>test</scope></dependency>

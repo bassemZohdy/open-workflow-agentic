@@ -1,0 +1,12 @@
+{
+  "source": "https://petstore.swagger.io/v2/swagger.json",
+  "retrievedAtUtc": "2026-10-20T18:18:08.359724+00:00",
+  "bytes": 13843,
+  "sha256": "bb116730d391e330119c691f9b124d07b9afdea61b5a252345b577e9a4c2f98b",
+  "license": {
+    "name": "Apache 2.0",
+    "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+  },
+  "version": "1.0.7",
+  "scope": "Unmodified public schema snapshot; tests load only these bytes through an exact-URI resource loader. No public-service invocation."
+}

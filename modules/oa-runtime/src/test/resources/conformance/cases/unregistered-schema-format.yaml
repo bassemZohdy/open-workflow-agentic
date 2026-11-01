@@ -1,0 +1,14 @@
+document:
+  dsl: 1.0.3
+  namespace: portability
+  name: unregistered-schema-format
+  version: 1.0.0
+do:
+- copy:
+    set:
+      value: 1
+input:
+  schema:
+    format: not-a-registered-format
+    document:
+      type: object

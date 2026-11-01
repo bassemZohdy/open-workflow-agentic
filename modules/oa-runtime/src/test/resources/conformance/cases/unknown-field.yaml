@@ -1,0 +1,11 @@
+document:
+  dsl: 1.0.3
+  namespace: portability
+  name: unknown-field
+  version: 1.0.0
+  unexpectedVendorField:
+    enabled: true
+do:
+- copy:
+    set:
+      value: 1

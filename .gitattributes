@@ -6,3 +6,10 @@ modules/oa-runtime/src/test/resources/audit/proposed/V75__audit_source_binding.s
 modules/oa-runtime/src/main/resources/db/migration/V75_1__research_checkpoint_profile.sql text eol=lf
 # New execution-fact evidence compares exact migration bytes across platforms.
 modules/oa-runtime/src/main/resources/db/migration/V76__resource_execution_facts.sql text eol=lf
+
+# Pinned upstream conformance schema/licence bytes stay identical on Windows and Linux.
+modules/oa-runtime/src/test/resources/conformance/schema/* text eol=lf
+modules/oa-runtime/src/test/resources/conformance/upstream/* text eol=lf
+modules/oa-runtime/src/test/resources/conformance/upstream/ctk/** text eol=lf
+modules/oa-runtime/src/main/resources/conformance/schema/* text eol=lf
+modules/oa-runtime/src/test/resources/conformance/providers/petstore-swagger.json -text

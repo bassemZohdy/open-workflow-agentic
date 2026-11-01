@@ -1,0 +1,57 @@
+name: ows-conformance
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/ows-conformance.yml'
+      - 'pom.xml'
+      - 'modules/oa-runtime/pom.xml'
+      - 'modules/oa-runtime/src/test/**/conformance/**'
+      - 'modules/oa-runtime/src/main/**/adapter/source/**'
+      - 'modules/oa-runtime/src/test/**/adapter/source/**'
+      - 'modules/oa-runtime/src/main/resources/conformance/**'
+      - 'modules/oa-runtime/src/main/resources/META-INF/services/io.serverlessworkflow.impl.resources.URITemplateResolver'
+      - 'apps/app-runtime/src/main/resources/flow/**'
+      - 'docs/conformance/**'
+  push:
+    branches: [main, 'gpt/**', 'claude/**']
+    paths:
+      - '.github/workflows/ows-conformance.yml'
+      - 'pom.xml'
+      - 'modules/oa-runtime/pom.xml'
+      - 'modules/oa-runtime/src/test/**/conformance/**'
+      - 'modules/oa-runtime/src/main/**/adapter/source/**'
+      - 'modules/oa-runtime/src/test/**/adapter/source/**'
+      - 'modules/oa-runtime/src/main/resources/conformance/**'
+      - 'modules/oa-runtime/src/main/resources/META-INF/services/io.serverlessworkflow.impl.resources.URITemplateResolver'
+      - 'apps/app-runtime/src/main/resources/flow/**'
+      - 'docs/conformance/**'
+permissions:
+  contents: read
+jobs:
+  assess:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_DB: agentic, POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21', cache: maven }
+      - name: Run affected module tests and verify the recorded assessment and controls
+        run: mvn -B -pl modules/oa-runtime -am test
+      - name: Retain actual assessment and model exports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ows-portability-assessment
+          path: |
+            modules/oa-runtime/target/conformance/
+            modules/oa-runtime/target/surefire-reports/
+            modules/oa-contracts/target/surefire-reports/
+          if-no-files-found: error

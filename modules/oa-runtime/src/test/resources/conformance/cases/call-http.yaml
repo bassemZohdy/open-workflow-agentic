@@ -1,0 +1,20 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: call-http
+  version: '1.0.0'
+do:
+- invoke:
+    call: http
+    with:
+      method: get
+      endpoint:
+        uri: https://example.invalid/items/{id}
+      headers:
+        Accept: application/json
+      query:
+        limit: '1'
+      output: response
+    timeout:
+      after:
+        seconds: 1

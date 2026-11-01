@@ -1,0 +1,449 @@
+{
+  "specCommit" : "2dd2c84170d5f3e05d58e913e9ca298dcf8d543a",
+  "sdkVersion" : "7.35.3.Final",
+  "fullSemanticConformance" : "NOT_ESTABLISHED",
+  "scope" : "All pinned development CTK scenarios attempted unchanged with pure or controlled HTTP/OpenAPI/event providers",
+  "publicProviderInteroperability" : "NOT_ESTABLISHED: loopback transport substitution, pinned document and in-memory event delivery",
+  "scenarios" : [ {
+    "feature" : "features/branch.feature",
+    "scenario" : "Fork Task With Competing Concurrent Sub Tasks",
+    "definitionSha256" : "f566524f3b07f376e6fb0fd68ee0b574a380c0039faf3a1afe4f7ee2f4c3295b",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete",
+      "status" : "MATCH"
+    }, {
+      "step" : "And the workflow output should have a 'colors' property containing 1 items",
+      "status" : "MATCH"
+    } ],
+    "provider" : "PURE",
+    "status" : "MATCH",
+    "observation" : "scenario-01.json"
+  }, {
+    "feature" : "features/call.feature",
+    "scenario" : "Call HTTP With Content Output",
+    "definitionSha256" : "df3df8bd46fc05e7471cb064de402c6d879463189ce2e39f2248ffe93bbd8060",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete",
+      "status" : "DIVERGED"
+    }, {
+      "step" : "And the workflow output should have properties 'id', 'name', 'status'",
+      "status" : "DIVERGED"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 0,
+      "resourceOpens" : 0,
+      "deliveredEvents" : 0,
+      "requests" : [ ],
+      "resources" : [ ],
+      "refusals" : [ "HTTP_ROUTE_REFUSED" ],
+      "refusedRequests" : [ {
+        "originalUri" : "https://petstore.swagger.io/v2/pet/findByStatus%3Fstatus=available",
+        "method" : "GET"
+      } ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "DIVERGED",
+    "observation" : "scenario-02.json"
+  }, {
+    "feature" : "features/call.feature",
+    "scenario" : "Call HTTP With Response Output",
+    "definitionSha256" : "15086eaa4105e159191099cd610cdbc163089efee673d22a5f52654648e120a3",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete",
+      "status" : "MATCH"
+    }, {
+      "step" : "And the workflow output should have properties 'request', 'request.method', 'request.uri', 'request.headers', 'headers', 'statusCode', 'content'",
+      "status" : "DIVERGED"
+    }, {
+      "step" : "And the workflow output should have properties 'content.id', 'content.name', 'content.status'",
+      "status" : "DIVERGED"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 1,
+      "resourceOpens" : 0,
+      "deliveredEvents" : 0,
+      "requests" : [ {
+        "originalUri" : "https://petstore.swagger.io/v2/pet/1",
+        "method" : "GET",
+        "basicAuthMatched" : false
+      } ],
+      "resources" : [ ],
+      "refusals" : [ ],
+      "refusedRequests" : [ ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "DIVERGED",
+    "observation" : "scenario-03.json"
+  }, {
+    "feature" : "features/call.feature",
+    "scenario" : "Call HTTP Using Basic Authentication",
+    "definitionSha256" : "1ed34de97ef302d66a33aa0dcb8937d2b28548aca17fa33c9697e7d075f7297a",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete",
+      "status" : "MATCH"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 1,
+      "resourceOpens" : 0,
+      "deliveredEvents" : 0,
+      "requests" : [ {
+        "originalUri" : "https://httpbin.org/basic-auth/serverless-workflow/conformance-test",
+        "method" : "GET",
+        "basicAuthMatched" : true
+      } ],
+      "resources" : [ ],
+      "refusals" : [ ],
+      "refusedRequests" : [ ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "MATCH",
+    "observation" : "scenario-04.json"
+  }, {
+    "feature" : "features/call.feature",
+    "scenario" : "Call OpenAPI With Content Output",
+    "definitionSha256" : "f0178a6a1f1bca639d9689e8de6342ab75accceb1c30f85efd47adabc3c4bcfd",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete",
+      "status" : "MATCH"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 1,
+      "resourceOpens" : 1,
+      "deliveredEvents" : 0,
+      "requests" : [ {
+        "originalUri" : "https://petstore.swagger.io/v2/pet/findByStatus?status=available",
+        "method" : "GET",
+        "basicAuthMatched" : false
+      } ],
+      "resources" : [ "https://petstore.swagger.io/v2/swagger.json" ],
+      "refusals" : [ ],
+      "refusedRequests" : [ ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "MATCH",
+    "observation" : "scenario-05.json"
+  }, {
+    "feature" : "features/call.feature",
+    "scenario" : "Call OpenAPI With Response Output",
+    "definitionSha256" : "74bb4b0c4d7995f493e111975279f85624151f80ce4e943c6fa0151bf5e07d4a",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete",
+      "status" : "MATCH"
+    }, {
+      "step" : "And the workflow output should have properties 'request', 'request.method', 'request.uri', 'request.headers', 'headers', 'statusCode', 'content'",
+      "status" : "DIVERGED"
+    }, {
+      "step" : "And the workflow output should have properties 'content.id', 'content.name', 'content.status'",
+      "status" : "DIVERGED"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 1,
+      "resourceOpens" : 1,
+      "deliveredEvents" : 0,
+      "requests" : [ {
+        "originalUri" : "https://petstore.swagger.io/v2/pet/1",
+        "method" : "GET",
+        "basicAuthMatched" : false
+      } ],
+      "resources" : [ "https://petstore.swagger.io/v2/swagger.json" ],
+      "refusals" : [ ],
+      "refusedRequests" : [ ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "DIVERGED",
+    "observation" : "scenario-06.json"
+  }, {
+    "feature" : "features/data-flow.feature",
+    "scenario" : "Input Filtering",
+    "definitionSha256" : "b0d0b729c301b5466ac15ec8cc6ec4ac796e3798183ad4890c3d368033ffd136",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    } ],
+    "provider" : "PURE",
+    "status" : "MATCH",
+    "observation" : "scenario-07.json"
+  }, {
+    "feature" : "features/data-flow.feature",
+    "scenario" : "Output Filtering",
+    "definitionSha256" : "d94248d8d51699b930f82ce3acdb0d24ac650d9176b020e8a92d5ea5c9413aa4",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 1,
+      "resourceOpens" : 0,
+      "deliveredEvents" : 0,
+      "requests" : [ {
+        "originalUri" : "https://petstore.swagger.io/v2/pet/1",
+        "method" : "GET",
+        "basicAuthMatched" : false
+      } ],
+      "resources" : [ ],
+      "refusals" : [ ],
+      "refusedRequests" : [ ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "MATCH",
+    "observation" : "scenario-08.json"
+  }, {
+    "feature" : "features/data-flow.feature",
+    "scenario" : "Use Non-object Output",
+    "definitionSha256" : "5b7828b1f74a875c4d5d8269993c400d9fd939de5b983a220c8519375211187e",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 2,
+      "resourceOpens" : 0,
+      "deliveredEvents" : 0,
+      "requests" : [ {
+        "originalUri" : "https://petstore.swagger.io/v2/pet/1",
+        "method" : "GET",
+        "basicAuthMatched" : false
+      }, {
+        "originalUri" : "https://petstore.swagger.io/v2/pet/2",
+        "method" : "GET",
+        "basicAuthMatched" : false
+      } ],
+      "resources" : [ ],
+      "refusals" : [ ],
+      "refusedRequests" : [ ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "MATCH",
+    "observation" : "scenario-09.json"
+  }, {
+    "feature" : "features/do.feature",
+    "scenario" : "Task With Sequential Sub Tasks",
+    "definitionSha256" : "1d8fcef2ebb5315eed1a1512f92410b4ae53d8b60867607d7f4fd3ff4c381044",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    } ],
+    "provider" : "PURE",
+    "status" : "MATCH",
+    "observation" : "scenario-10.json"
+  }, {
+    "feature" : "features/emit.feature",
+    "scenario" : "Emit Task",
+    "definitionSha256" : "085142b2e80b0a2bbde33e519bb753c5445de68d00a3969ad7527624b5e645dd",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete",
+      "status" : "MATCH"
+    }, {
+      "step" : "And the workflow output should have properties 'id', 'specversion', 'time', 'source', 'type', 'data'",
+      "status" : "DIVERGED"
+    }, {
+      "step" : "And the workflow output should have a 'source' property with value:",
+      "status" : "DIVERGED"
+    }, {
+      "step" : "And the workflow output should have a 'type' property with value:",
+      "status" : "DIVERGED"
+    }, {
+      "step" : "And the workflow output should have a 'data' property with value:",
+      "status" : "DIVERGED"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 0,
+      "resourceOpens" : 0,
+      "deliveredEvents" : 1,
+      "requests" : [ ],
+      "resources" : [ ],
+      "refusals" : [ ],
+      "refusedRequests" : [ ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "DIVERGED",
+    "observation" : "scenario-11.json"
+  }, {
+    "feature" : "features/flow.feature",
+    "scenario" : "Implicit Sequence Flow",
+    "definitionSha256" : "d7ea78e32b95d37490b695fb278430135884202c88b20046303578d03852b402",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    }, {
+      "step" : "And setRed should run first",
+      "status" : "MATCH"
+    }, {
+      "step" : "And setGreen should run after setRed",
+      "status" : "MATCH"
+    }, {
+      "step" : "And setBlue should run after setGreen",
+      "status" : "MATCH"
+    } ],
+    "provider" : "PURE",
+    "status" : "MATCH",
+    "observation" : "scenario-12.json"
+  }, {
+    "feature" : "features/flow.feature",
+    "scenario" : "Explicit Sequence Flow",
+    "definitionSha256" : "2a42121bf375fe92fd2f0977a860c4d239103f0fbca03ee841bc35a04041dc0a",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    }, {
+      "step" : "And setRed should run first",
+      "status" : "MATCH"
+    }, {
+      "step" : "And setGreen should run after setRed",
+      "status" : "MATCH"
+    }, {
+      "step" : "And setBlue should run after setGreen",
+      "status" : "MATCH"
+    } ],
+    "provider" : "PURE",
+    "status" : "MATCH",
+    "observation" : "scenario-13.json"
+  }, {
+    "feature" : "features/for.feature",
+    "scenario" : "For Task",
+    "definitionSha256" : "fcd5ca3af6bf687d79e6149ade4f716a6b1311ca4a4eb61fe765d3e3fe2dc26a",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    } ],
+    "provider" : "PURE",
+    "status" : "MATCH",
+    "observation" : "scenario-14.json"
+  }, {
+    "feature" : "features/raise.feature",
+    "scenario" : "Raise task with inline error",
+    "definitionSha256" : "d93150f0901aa1e128f86372d68c495cdea26f8206de990d2bbcd1e4f242a6e2",
+    "assertions" : [ {
+      "step" : "Then the workflow should fault with error:",
+      "status" : "DIVERGED"
+    } ],
+    "provider" : "PURE",
+    "status" : "DIVERGED",
+    "observation" : "scenario-15.json"
+  }, {
+    "feature" : "features/set.feature",
+    "scenario" : "Set Task",
+    "definitionSha256" : "ac8e4e43a435fc80349ae0d25a9eef77266d6ca5664eedc4ed514702f1afe261",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    } ],
+    "provider" : "PURE",
+    "status" : "MATCH",
+    "observation" : "scenario-16.json"
+  }, {
+    "feature" : "features/switch.feature",
+    "scenario" : "Switch task with matching case",
+    "definitionSha256" : "0e9b9bf2a130469fc05a02d5a4a3cd9f7a40573c11238bd6aadb488a0e1f8c3c",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    }, {
+      "step" : "And switchColor should run first",
+      "status" : "MATCH"
+    }, {
+      "step" : "And setRed should run last",
+      "status" : "MATCH"
+    } ],
+    "provider" : "PURE",
+    "status" : "MATCH",
+    "observation" : "scenario-17.json"
+  }, {
+    "feature" : "features/switch.feature",
+    "scenario" : "Switch task with implicit default case",
+    "definitionSha256" : "ef009408a710c7569f11d7fcaf79358084667afeab34a1251530e5c2bf202a64",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "DIVERGED"
+    }, {
+      "step" : "And switchColor should run first",
+      "status" : "MATCH"
+    }, {
+      "step" : "And switchColor should run last",
+      "status" : "DIVERGED"
+    } ],
+    "provider" : "PURE",
+    "status" : "DIVERGED",
+    "observation" : "scenario-18.json"
+  }, {
+    "feature" : "features/switch.feature",
+    "scenario" : "Switch task with explicit default case",
+    "definitionSha256" : "38e14ddcc3049f37f0fbc884b3a7c726f0ee43a777cbcd785e6cc04478881e60",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete with output:",
+      "status" : "MATCH"
+    }, {
+      "step" : "And switchColor should run first",
+      "status" : "MATCH"
+    }, {
+      "step" : "And setCustomColor should run last",
+      "status" : "MATCH"
+    } ],
+    "provider" : "PURE",
+    "status" : "MATCH",
+    "observation" : "scenario-19.json"
+  }, {
+    "feature" : "features/try.feature",
+    "scenario" : "Try Handle Caught Error",
+    "definitionSha256" : "dbcd1acc51c4fe086ac42757119e90e6ca80b8334adeaa5e77bcbe2506df88f9",
+    "assertions" : [ {
+      "step" : "Then the workflow should complete",
+      "status" : "DIVERGED"
+    }, {
+      "step" : "And the workflow output should have properties 'error', 'error.type', 'error.status', 'error.title'",
+      "status" : "DIVERGED"
+    }, {
+      "step" : "And the workflow output should have a 'error.instance' property with value:",
+      "status" : "DIVERGED"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 1,
+      "resourceOpens" : 0,
+      "deliveredEvents" : 0,
+      "requests" : [ {
+        "originalUri" : "https://petstore.swagger.io/v2/pet/getPetByName/Milou",
+        "method" : "GET",
+        "basicAuthMatched" : false
+      } ],
+      "resources" : [ ],
+      "refusals" : [ ],
+      "refusedRequests" : [ ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "DIVERGED",
+    "observation" : "scenario-20.json"
+  }, {
+    "feature" : "features/try.feature",
+    "scenario" : "Try Raise Uncaught Error",
+    "definitionSha256" : "59cec76ed53c81735caddf2d956a153ba893601a97c27ebbac1b9ff823980e72",
+    "assertions" : [ {
+      "step" : "Then the workflow should fault",
+      "status" : "MATCH"
+    } ],
+    "providerSummary" : {
+      "httpResponses" : 1,
+      "resourceOpens" : 0,
+      "deliveredEvents" : 0,
+      "requests" : [ {
+        "originalUri" : "https://petstore.swagger.io/v2/pet/getPetByName/Milou",
+        "method" : "GET",
+        "basicAuthMatched" : false
+      } ],
+      "resources" : [ ],
+      "refusals" : [ ],
+      "refusedRequests" : [ ]
+    },
+    "provider" : "CONTROLLED_HTTP_OPENAPI_EVENT",
+    "status" : "MATCH",
+    "observation" : "scenario-21.json"
+  } ],
+  "summary" : {
+    "features" : 11,
+    "scenarios" : 21,
+    "executed" : 21,
+    "unmeasured" : 0,
+    "matched" : 14,
+    "diverged" : 7,
+    "measuredAssertions" : 45
+  }
+}

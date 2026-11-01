@@ -1,0 +1,15 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: emit-event
+  version: '1.0.0'
+do:
+- announce:
+    emit:
+      event:
+        with:
+          source: urn:conformance:fixture
+          type: example.ready.v1
+          datacontenttype: application/json
+          data:
+            value: ${ .value }

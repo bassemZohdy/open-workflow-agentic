@@ -1,0 +1,34 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: reusable-components
+  version: '1.0.0'
+use:
+  secrets:
+  - fixtureCredential
+  authentications:
+    fixtureAuth:
+      bearer:
+        use: fixtureCredential
+  timeouts:
+    short:
+      after:
+        seconds: 1
+  retries:
+    twice:
+      delay:
+        milliseconds: 1
+      backoff:
+        constant: {}
+      limit:
+        attempt:
+          count: 2
+  functions:
+    copy:
+      set:
+        copied: true
+do:
+- invoke:
+    call: copy
+    with: {}
+    timeout: short

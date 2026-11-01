@@ -1,0 +1,17 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: run-workflow
+  version: '1.0.0'
+do:
+- invoke:
+    run:
+      workflow:
+        namespace: portability
+        name: child
+        version: '1.0.0'
+        input:
+          id: ${ .id }
+    timeout:
+      after:
+        seconds: 1

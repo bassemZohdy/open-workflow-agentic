@@ -1,0 +1,16 @@
+document:
+  dsl: '1.0.3'
+  namespace: portability
+  name: iteration
+  version: '1.0.0'
+do:
+- collect:
+    for:
+      each: item
+      in: ${ .items }
+      at: position
+    do:
+    - project:
+        set:
+          value: ${ $item * 2 }
+          position: ${ $position }
