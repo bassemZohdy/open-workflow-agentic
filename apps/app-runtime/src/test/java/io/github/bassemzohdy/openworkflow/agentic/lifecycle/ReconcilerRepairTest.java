@@ -499,4 +499,93 @@ class ReconcilerRepairTest {
                 + " and payload->>'status' = 'FAILED' and payload->>'reason' = 'reconciler.deadline.no-engine-instance'",
                 failed.id().value(), failedAfter.version()), "outbox row of the failure, same version");
     }
+
+    // ---- duplicate delivery of a due timer is harmless (WP-109, T12) -------------------------------------------
+
+    private long events(String instanceId, String reason) {
+        return count(dataSource, "select count(*) from task.instance_event where instance_id = ? and reason = ?",
+                instanceId, reason);
+    }
+
+    @Test
+    void aDueDeadlineDeliveredTwiceCancelsOnceAndWritesOneHistoryRow() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String engineId = "dup-deadline-" + RUN;
+        engine.report(engineId, EngineStatus.WAITING);
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.WAITING, engineId, Instant.now().minus(Duration.ofMinutes(1)));
+        var reconciler = reconciler(engine, tenant, 3);
+
+        reconciler.reconcileOnce();
+        long versionAfterFirst = reload(tenant, row).version();
+        reconciler.reconcileOnce(); // the same due timer delivered again, as after a replica restart
+
+        assertEquals(1L, events(row.id().value(), "reconciler.deadline.passed"), "one deadline transition, not two");
+        InstanceRecord after = reload(tenant, row);
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, after.status());
+        assertEquals(versionAfterFirst, after.version(), "the duplicate changed nothing");
+    }
+
+    @Test
+    void aDueLifetimeDeliveredTwiceCancelsOnceAndWritesOneHistoryRow() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String engineId = "dup-lifetime-" + RUN;
+        engine.report(engineId, EngineStatus.RUNNING);
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        var reconciler = lifetimeReconciler(engine, tenant, Duration.ofMinutes(10), Duration.ofMinutes(11));
+
+        reconciler.reconcileOnce();
+        long versionAfterFirst = reload(tenant, row).version();
+        reconciler.reconcileOnce();
+
+        assertEquals(1L, events(row.id().value(), "reconciler.lifetime.exceeded"));
+        assertEquals(versionAfterFirst, reload(tenant, row).version(), "the duplicate changed nothing");
+    }
+
+    @Test
+    void aDeadlineDeliveredAfterTheEngineConfirmedTheCancelChangesNothing() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String engineId = "dup-after-cancel-" + RUN;
+        engine.report(engineId, EngineStatus.WAITING);
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.WAITING, engineId, Instant.now().minus(Duration.ofMinutes(1)));
+        var reconciler = reconciler(engine, tenant, 3);
+        reconciler.reconcileOnce();
+        sync.observe(engineId, EngineStatus.CANCELLED, "observed");
+        InstanceRecord cancelled = reload(tenant, row);
+        assertEquals(InstanceStatus.CANCELLED, cancelled.status());
+
+        reconciler.reconcileOnce(); // a late duplicate of the same due timer
+
+        InstanceRecord after = reload(tenant, row);
+        assertEquals(InstanceStatus.CANCELLED, after.status());
+        assertEquals(cancelled.version(), after.version(), "a terminal row never changes");
+        assertEquals(1L, events(row.id().value(), "reconciler.deadline.passed"));
+    }
+
+    @Test
+    void twoReconcilersDeliveringTheSameDueDeadlineAtOnceCancelOnce() throws Exception {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String engineId = "dup-concurrent-" + RUN;
+        engine.report(engineId, EngineStatus.WAITING);
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.WAITING, engineId, Instant.now().minus(Duration.ofMinutes(1)));
+        var first = reconciler(engine, tenant, 3);
+        var second = reconciler(engine, tenant, 3);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var a = pool.submit(first::reconcileOnce);
+            var b = pool.submit(second::reconcileOnce);
+            a.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            b.get(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(1L, events(row.id().value(), "reconciler.deadline.passed"), "optimistic versioning admits one");
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+    }
 }
