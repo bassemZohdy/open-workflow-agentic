@@ -1,5 +1,7 @@
 # Changelog
 
+- Report provider-thrown refusal-shaped errors as failed calls, since the provider was already reached; never expose provider error details.
+
 - Fail closed when the model approval source is unavailable, preserving whether a model call was actually made and avoiding disclosure of source errors.
 
 - Withhold a model gateway response if its approved context disappears or changes while the provider is running. The already-started call can still incur cost; durable accounting remains open.
