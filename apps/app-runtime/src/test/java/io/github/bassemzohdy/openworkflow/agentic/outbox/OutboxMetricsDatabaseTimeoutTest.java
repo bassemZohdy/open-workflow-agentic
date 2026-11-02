@@ -22,6 +22,9 @@ class OutboxMetricsDatabaseTimeoutTest {
     private double value(String name) { return registry.get(name).gauge().value(); }
 
     @Test void lockedOutboxTimesOutAndLaterObservationRecovers() throws Exception {
+        assertTimeoutPreemptively(Duration.ofSeconds(8), () -> {
+            while (value(OutboxMetrics.HEALTHY) != 1) Thread.sleep(10);
+        });
         double previous = value(OutboxMetrics.UNPUBLISHED);
         assertFalse(Double.isNaN(previous));
         assertEquals(1, value(OutboxMetrics.HEALTHY));
@@ -30,13 +33,16 @@ class OutboxMetricsDatabaseTimeoutTest {
             try {
                 try (var lock = c.createStatement()) { lock.execute("lock table task.outbox in access exclusive mode"); }
                 Thread.sleep(1100); // allow the one-second observation cache to expire
-                assertTimeoutPreemptively(Duration.ofSeconds(8), () ->
-                        assertEquals(previous, value(OutboxMetrics.UNPUBLISHED)));
-                assertEquals(0, value(OutboxMetrics.HEALTHY));
+                assertTimeoutPreemptively(Duration.ofSeconds(8), () -> {
+                    while (value(OutboxMetrics.HEALTHY) != 0) Thread.sleep(10);
+                });
+                assertEquals(previous, value(OutboxMetrics.UNPUBLISHED));
             } finally { c.rollback(); }
         }
         Thread.sleep(1100);
+        assertTimeoutPreemptively(Duration.ofSeconds(8), () -> {
+            while (value(OutboxMetrics.HEALTHY) != 1) Thread.sleep(10);
+        });
         assertFalse(Double.isNaN(value(OutboxMetrics.UNPUBLISHED)));
-        assertEquals(1, value(OutboxMetrics.HEALTHY));
     }
 }

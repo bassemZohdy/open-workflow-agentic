@@ -6,9 +6,14 @@ import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import org.jboss.logging.Logger;
@@ -34,6 +39,9 @@ public class OutboxMetrics {
     private final Supplier<OutboxAdmin.Lag> read;
     private final MeterRegistry registry;
     private final LongSupplier nanos;
+    private final Executor executor;
+    private final ExecutorService ownedExecutor;
+    private final AtomicBoolean closed = new AtomicBoolean();
     private final AtomicBoolean reading = new AtomicBoolean();
     private record Observation(OutboxAdmin.Lag lag, long attemptedAt, long succeededAt,
                                boolean attempted, boolean succeeded, boolean healthy) {}
@@ -41,13 +49,24 @@ public class OutboxMetrics {
 
     @Inject
     public OutboxMetrics(OutboxAdmin admin, MeterRegistry registry) {
-        this(Objects.requireNonNull(admin, "admin")::lagForMetrics, registry, System::nanoTime);
+        this(Objects.requireNonNull(admin, "admin")::lagForMetrics, registry, System::nanoTime,
+                Executors.newSingleThreadExecutor(r -> {
+                    var thread = new Thread(r, "outbox-metrics-observer");
+                    thread.setDaemon(true);
+                    return thread;
+                }));
     }
 
     OutboxMetrics(Supplier<OutboxAdmin.Lag> read, MeterRegistry registry, LongSupplier nanos) {
+        this(read, registry, nanos, Runnable::run);
+    }
+
+    OutboxMetrics(Supplier<OutboxAdmin.Lag> read, MeterRegistry registry, LongSupplier nanos, Executor executor) {
         this.read = Objects.requireNonNull(read, "read");
         this.registry = Objects.requireNonNull(registry, "registry");
         this.nanos = Objects.requireNonNull(nanos, "nanos");
+        this.executor = Objects.requireNonNull(executor, "executor");
+        this.ownedExecutor = executor instanceof ExecutorService service ? service : null;
     }
 
     void onStart(@Observes StartupEvent event) {
@@ -69,13 +88,32 @@ public class OutboxMetrics {
                 .baseUnit("seconds").register(registry);
     }
 
-    /** One shared observation; cache limits attempt frequency, not connection acquisition or maximum data age. */
+    @PreDestroy void stop() {
+        closed.set(true);
+        if (ownedExecutor != null) ownedExecutor.shutdownNow();
+    }
+
+    /** Scrapes return the last completed observation without waiting for database or pool operations. */
     private Observation current() {
         var observed=last;
-        if (cached(observed) || !reading.compareAndSet(false,true)) return observed;
+        if (closed.get() || cached(observed) || !reading.compareAndSet(false,true)) return observed;
+        try {
+            executor.execute(this::observe);
+        } catch (RejectedExecutionException rejected) {
+            reading.set(false);
+            if (!closed.get()) {
+                last = new Observation(observed.lag(), nanos.getAsLong(), observed.succeededAt(),
+                        true, observed.succeeded(), false);
+            }
+        }
+        return last;
+    }
+
+    private void observe() {
+        var observed=last;
         try {
             observed=last;
-            if (cached(observed)) return observed;
+            if (closed.get() || cached(observed)) return;
             var lag=Objects.requireNonNull(read.get(),"lag");
             long completed=nanos.getAsLong();
             last=new Observation(lag,completed,completed,true,true,true);
@@ -83,7 +121,6 @@ public class OutboxMetrics {
             last=new Observation(observed.lag(),nanos.getAsLong(),observed.succeededAt(),true,observed.succeeded(),false);
             LOG.warnf("outbox lag could not be read: %s", e.getClass().getName());
         } finally {reading.set(false);}
-        return last;
     }
 
     private boolean cached(Observation observed) {
