@@ -129,7 +129,7 @@ class PinnedHttpEffectLedgerTest {
             exchange.getRequestBody().readAllBytes();exchange.sendResponseHeaders(202,-1);} finally {exchange.close();}});
         server.createContext("/lookup",exchange->{try {int attempt=lookups.incrementAndGet();
             boolean same="GET".equals(exchange.getRequestMethod()) && key.get().equals(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
-            exchange.sendResponseHeaders(same && attempt>1 ? 200 : 404,-1);} finally {exchange.close();}});
+            exchange.sendResponseHeaders(same && attempt>20 ? 200 : 404,-1);} finally {exchange.close();}});
         server.start();
         try {
             String base="http://127.0.0.1:"+server.getAddress().getPort();var grant=UlidGenerator.shared().next();
@@ -143,11 +143,11 @@ class PinnedHttpEffectLedgerTest {
             var command=EffectCommand.of(thread,"send","occurrence-1","tool:orders","{}");
             assertEquals(EffectState.INTENDED,effects.execute(command,target).state());
             assertEquals(1,ledger.manualQueue(thread,10).size());
-            assertEquals(EffectState.INTENDED,effects.execute(command,target).state());
-            assertEquals(1,posts.get());assertEquals(1,lookups.get());
+            for(int attempt=0;attempt<20;attempt++) assertEquals(EffectState.INTENDED,effects.execute(command,target).state());
+            assertEquals(1,posts.get());assertEquals(20,lookups.get());
             assertEquals(EffectState.CONFIRMED,effects.execute(command,target).state());
             assertEquals(EffectState.CONFIRMED,effects.execute(command,target).state());
-            assertEquals(1,posts.get());assertEquals(2,lookups.get());assertTrue(ledger.manualQueue(thread,10).isEmpty());
+            assertEquals(1,posts.get());assertEquals(21,lookups.get());assertTrue(ledger.manualQueue(thread,10).isEmpty());
         } finally {server.stop(0);}
     }
 

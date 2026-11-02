@@ -74,8 +74,11 @@ An optional trusted lookup contract can query a fixed same-origin endpoint with 
 the same scoped credential and fresh authority checks. Only explicitly selected 200/204 responses establish CONFIRMED;
 404 and all other responses remain UNKNOWN, including when the original request may still be in flight. The lookup
 contract is supplied separately and is not inferred or approved from the OpenAPI document. A service must guarantee
-that selected statuses prove completion for that exact key; the same audience and scopes must authorize lookup. An
-uncertain lookup also reserves transport capacity. This is a candidate, not proof of a real provider's behavior.
+that selected statuses prove completion for that exact key, and that GET is read-only; the same audience and scopes
+must authorize lookup. Lookup bodies are discarded after fully draining at most 64 KiB within the operation deadline.
+A completed read releases its slot even when the business outcome is unknown; a timeout, oversized or incomplete body
+keeps its slot quarantined. This bounds local exchanges, not work that a remote server continues after responding.
+This is a candidate, not proof of a real provider's behavior.
 Alternatively, trusted composition can select a unique fixed-path GET operation from the same pinned OpenAPI document.
 The selector requires one declared required `Idempotency-Key` string header, supported security compatible with the
 pinned credential, and explicitly documented confirmation statuses. It refuses other parameters and operation-level
@@ -84,8 +87,9 @@ original effect completed; that semantic guarantee still requires a service cont
 
 Sixteen slots are shared by candidate instances in one classloader and are acquired before credential acquisition.
 A completed refusal before target dispatch releases its slot; the supplier must independently bound any physical
-provider work that can outlive its return. Once HTTP dispatch starts, a selected terminal response releases the slot;
-an unresolved response, interruption or transport failure permanently reserves it because physical work may continue.
+provider work that can outlive its return. For POST, a selected terminal response releases the slot; an unresolved
+response, interruption or transport failure permanently reserves it because physical work may continue. A read-only
+lookup releases its slot only after its bounded response has completed; an incomplete lookup keeps its slot reserved.
 Capacity exhaustion returns UNKNOWN, with no queue. A blocked supplier holds a slot but cannot be forcibly stopped;
 this can exhaust availability. Other classloaders, previous processes and remote work after restart are not bounded.
 
@@ -96,9 +100,11 @@ escaped or repeated callbacks, using a fixture exchanger and policy. A PostgreSQ
 identity dispatcher and ledger with a fixture exchanger and local service: revocation during a confirmed call retains
 the CONFIRMED fact while withholding the result; a selected rejection is retained as FAILED, and a non-confirming
 response under the same revocation remains INTENDED and enters reconciliation without returning an outcome. PostgreSQL
-fixtures exercise a 404 that remains unresolved followed by lookup recovery without a second POST, and revocation during lookup: the confirmation is retained
-but withheld from the revoked caller. Separate cases cover withheld authoritative lookup and compensation;
-a later authorized compensation retry reuses the retained confirmation. Another ledger case checks that a genuinely
+fixtures exercise 20 completed 404 responses that remain unresolved followed by lookup recovery without a second POST,
+and revocation during lookup: the confirmation is retained but withheld from the revoked caller. A control using the
+prior transport exhausted capacity after 16 completed unknown lookups. Isolated saturation tests also keep unfinished
+lookup bodies quarantined and refuse confirmation from oversized responses. Separate cases cover withheld authoritative
+lookup and compensation; a later authorized compensation retry reuses the retained confirmation. Another ledger case checks that a genuinely
 lost acknowledgement remains INTENDED and is not resent by the ledger. A separate PostgreSQL gateway fixture checks
 that an observed-outcome refusal propagates through the registered tool path, the ledger retains its confirmation,
 and an authorized retry does not dispatch twice. It uses a fixture target and does not establish the end-to-end HTTP

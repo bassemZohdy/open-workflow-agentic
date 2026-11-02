@@ -30,13 +30,16 @@ import java.util.concurrent.Flow;
  * target-scoped authority, and enforce policy/audit and network egress. The target must atomically deduplicate any
  * physical retries by the HTTP implementation; this candidate has not proven that transport behavior. No ledger-level
  * replay or real provider lookup contract is claimed.
- * Credential acquisition occupies a shared slot and must independently bound any detached provider work. Once HTTP
- * dispatch begins, a nonconfirmed call permanently reserves its slot: timeout/cancellation does not prove that remote
- * work stopped. Restarting the process or using another classloader is outside this bound.
+ * Credential acquisition occupies a shared slot and must independently bound detached provider work. An unresolved
+ * POST or an incomplete lookup permanently reserves its slot: timeout/cancellation does not prove physical work stopped.
+ * A completed bounded lookup response releases the slot even if its business status is unknown. The service must
+ * guarantee lookup is read-only. Restarting the process or using another classloader is outside this bound.
  */
 public final class PinnedHttpEffectTarget implements EffectTarget {
     static final int CAPACITY = 16;
     private static final Semaphore SLOTS = new Semaphore(CAPACITY);
+    private static final int MAX_LOOKUP_BODY = 65_536;
+    private static final ScheduledThreadPoolExecutor LOOKUP_TIMER = lookupTimer();
     private static final Set<Integer> TERMINAL_STATUSES = Set.of(200, 201, 204);
     private static final Set<Integer> REJECTION_STATUSES = Set.of(400, 404, 409, 422);
     private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
@@ -50,6 +53,13 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     };
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
             .followRedirects(HttpClient.Redirect.NEVER).proxy(DIRECT).build();
+
+    private static ScheduledThreadPoolExecutor lookupTimer() {
+        var timer = new ScheduledThreadPoolExecutor(1, task -> {
+            Thread thread = new Thread(task,"effect-lookup-deadline"); thread.setDaemon(true); return thread;
+        });
+        timer.setRemoveOnCancelPolicy(true); return timer;
+    }
 
     /** Executes once, synchronously, inside the verified exchange scope; provider must bound its own physical work. */
     @FunctionalInterface public interface CredentialProvider {
@@ -67,7 +77,7 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
             for(String scope:scopes){Checks.requireText("scope",scope,256);CanonicalEncoder.strictUtf8(scope);}
         }
     }
-    /** The service must guarantee that selected responses prove completion for the supplied idempotency key. */
+    /** The service must guarantee read-only lookup and that selected responses prove completion for the supplied key. */
     public record Lookup(URI endpoint, Set<Integer> confirmed) {
         public Lookup {
             Objects.requireNonNull(endpoint); confirmed=Set.copyOf(confirmed);
@@ -236,7 +246,14 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
         if(beforeSend<0 || beforeSend>=timeout.toNanos())return new Reply(Outcome.UNKNOWN,"transport deadline elapsed");
         if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
         state.dispatched=true;
-        var response=CLIENT.send(request,headersOnly());
+        HttpResponse<Void> response;
+        if(lookupCall) {
+            var drain=new BoundedLookupBody();
+            var deadline=LOOKUP_TIMER.schedule(drain::expire,Math.max(1,timeout.toNanos()-beforeSend),TimeUnit.NANOSECONDS);
+            try {response=CLIENT.send(request,ignored->drain);}
+            finally {deadline.cancel(false);}
+            state.finished=true; // The bounded lookup response was completely consumed, even if its status is unknown.
+        } else response=CLIENT.send(request,headersOnly());
         if((lookupCall ? lookup.confirmed() : confirmed).contains(response.statusCode())) {
             state.finished=true;
             return new Reply(Outcome.CONFIRMED,lookupCall ? "lookup confirmed" : "target confirmed");
@@ -253,6 +270,32 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
                 || !expectation.grantId().equals(issued.grantId()) || !expectation.scopes().equals(issued.scopes())
                 || issued.tokenId().isBlank() || !issued.usableAt(Instant.now()))
             throw new IllegalStateException("target-scoped credential unavailable");
+    }
+
+    /** Drains a bounded read-only lookup response; timeout, oversize and read errors remain physically uncertain. */
+    private static final class BoundedLookupBody implements HttpResponse.BodySubscriber<Void> {
+        private final CompletableFuture<Void> body=new CompletableFuture<>();
+        private final java.util.concurrent.atomic.AtomicReference<Flow.Subscription> subscription=new java.util.concurrent.atomic.AtomicReference<>();
+        private long size;
+        public CompletionStage<Void> getBody(){return body;}
+        public void onSubscribe(Flow.Subscription next) {
+            if(!subscription.compareAndSet(null,next)){next.cancel();return;}
+            if(body.isDone())next.cancel();else next.request(1);
+        }
+        public void onNext(List<ByteBuffer> buffers) {
+            if(body.isDone())return;
+            for(ByteBuffer buffer:buffers) {
+                size+=buffer.remaining();
+                if(size>MAX_LOOKUP_BODY){fail(new IOException("lookup body exceeds limit"));return;}
+            }
+            Flow.Subscription active=subscription.get();if(active!=null && !body.isDone())active.request(1);
+        }
+        public void onError(Throwable failure){body.completeExceptionally(failure);}
+        public void onComplete(){body.complete(null);}
+        void expire(){fail(new java.net.http.HttpTimeoutException("lookup body deadline elapsed"));}
+        private void fail(Throwable error){
+            if(body.completeExceptionally(error)){Flow.Subscription active=subscription.get();if(active!=null)active.cancel();}
+        }
     }
 
     /** Discard/cancel the body immediately: no unbounded response body is retained or returned. */

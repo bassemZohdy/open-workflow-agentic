@@ -95,6 +95,24 @@ class PinnedHttpEffectTargetTest {
                     new PinnedHttpEffectTarget.Lookup(URI.create("http://127.0.0.1:1/lookup"),Set.of(200))));
         } finally {server.stop(0);}
     }
+    @Test void oversizedLookupBodyCannotConfirmAnEffect() throws Exception {
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/small",exchange->{try {byte[] body="private response".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200,body.length);exchange.getResponseBody().write(body);}finally{exchange.close();}});
+        server.createContext("/lookup",exchange->{try {byte[] body=new byte[65_537];exchange.sendResponseHeaders(200,body.length);
+            exchange.getResponseBody().write(body);}catch(java.io.IOException ignored){}finally{exchange.close();}});server.start();
+        try {
+            var small=new PinnedHttpEffectTarget("tool:orders",uri(server,"/orders"),"audience:orders","trace-1","{}",TIMEOUT,
+                    Set.of(200),Set.of(),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false,
+                    new PinnedHttpEffectTarget.Lookup(uri(server,"/small"),Set.of(200)));
+            var reply=small.lookup("key");assertEquals(Outcome.CONFIRMED,reply.outcome());
+            assertFalse(reply.detail().contains("private response"));
+            var target=new PinnedHttpEffectTarget("tool:orders",uri(server,"/orders"),"audience:orders","trace-1","{}",TIMEOUT,
+                    Set.of(200),Set.of(),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false,
+                    new PinnedHttpEffectTarget.Lookup(uri(server,"/lookup"),Set.of(200)));
+            assertEquals(Outcome.UNKNOWN,target.lookup("key").outcome());
+        } finally {server.stop(0);}
+    }
     @Test void timeoutIsUnknownAndNeverARefusalOrSuccess() throws Exception {
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);var entered=new CountDownLatch(1);
         var executor=Executors.newSingleThreadExecutor();server.setExecutor(executor);
@@ -108,6 +126,8 @@ class PinnedHttpEffectTargetTest {
     }
     @Test void unresolvedCallsReserveSharedCapacityAcrossTargets() throws Exception { runProbe(SaturationProbe.class); }
     @Test void blockedCredentialAcquisitionSharesCapacityAcrossTargets() throws Exception { runProbe(ProviderSaturationProbe.class); }
+    @Test void completedUnknownLookupsDoNotExhaustCapacity() throws Exception { runProbe(LookupCompletionProbe.class); }
+    @Test void unfinishedLookupBodiesRemainCapacityBounded() throws Exception { runProbe(LookupTimeoutProbe.class); }
     private static void runProbe(Class<?> probe) throws Exception {
         String classpath=System.getProperty("surefire.test.class.path",System.getProperty("java.class.path"));
         var arguments=java.nio.file.Files.createTempFile("http-capacity-", ".args");
@@ -162,6 +182,42 @@ class PinnedHttpEffectTargetTest {
                         throw new AssertionError("capacity did not bound credential acquisition");
                 } finally {release.countDown();}
             }
+        }
+    }
+
+    public static final class LookupCompletionProbe {
+        public static void main(String[] args) throws Exception {
+            var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);var calls=new AtomicInteger();
+            server.createContext("/lookup",exchange->{try {int n=calls.incrementAndGet();
+                exchange.sendResponseHeaders(n<=PinnedHttpEffectTarget.CAPACITY*2 ? 404 : 200,-1);}finally{exchange.close();}});
+            server.start();
+            try {
+                var target=new PinnedHttpEffectTarget("tool:orders",uri(server,"/orders"),"audience:orders","trace-1","{}",TIMEOUT,
+                        Set.of(200),Set.of(),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false,
+                        new PinnedHttpEffectTarget.Lookup(uri(server,"/lookup"),Set.of(200)));
+                for(int i=0;i<PinnedHttpEffectTarget.CAPACITY*2;i++)
+                    if(target.lookup("key").outcome()!=Outcome.UNKNOWN)throw new AssertionError("404 should remain unknown");
+                if(target.lookup("key").outcome()!=Outcome.CONFIRMED || calls.get()!=PinnedHttpEffectTarget.CAPACITY*2+1)
+                    throw new AssertionError("completed lookup responses exhausted capacity: "+calls.get());
+            } finally {server.stop(0);}
+        }
+    }
+
+    public static final class LookupTimeoutProbe {
+        public static void main(String[] args) throws Exception {
+            var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);var calls=new AtomicInteger();
+            var release=new CountDownLatch(1);var workers=Executors.newVirtualThreadPerTaskExecutor();server.setExecutor(workers);
+            server.createContext("/lookup",exchange->{try {calls.incrementAndGet();exchange.sendResponseHeaders(200,1);
+                release.await();exchange.getResponseBody().write(1);}catch(InterruptedException e){Thread.currentThread().interrupt();}
+                catch(java.io.IOException ignored){}finally{exchange.close();}});server.start();
+            try {
+                var target=new PinnedHttpEffectTarget("tool:orders",uri(server,"/orders"),"audience:orders","trace-1","{}",Duration.ofMillis(350),
+                        Set.of(200),Set.of(),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false,
+                        new PinnedHttpEffectTarget.Lookup(uri(server,"/lookup"),Set.of(200)));
+                for(int i=0;i<PinnedHttpEffectTarget.CAPACITY+1;i++)
+                    if(target.lookup("key").outcome()!=Outcome.UNKNOWN)throw new AssertionError("incomplete response was accepted");
+                if(calls.get()!=PinnedHttpEffectTarget.CAPACITY)throw new AssertionError("unfinished lookup capacity was not retained: "+calls.get());
+            } finally {release.countDown();server.stop(0);workers.shutdownNow();workers.awaitTermination(5,TimeUnit.SECONDS);}
         }
     }
 
