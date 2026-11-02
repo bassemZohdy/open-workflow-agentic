@@ -29,7 +29,7 @@ the holder of member 00, a replacement acquired that lease, restored one waiting
 workflow after warmup, and completed it after a test event. A graceful deletion
 also cleared its member lease. The database still held the scheduled
 `audit-chain-verification` and `identity-grant-expiry` jobs in this run. This
-local test does not prove node failure, network partitions, mixed versions,
+pod test does not prove node failure, network partitions, mixed versions,
 duplicate-effect prevention or T12. `verify_failover.py` automates the same
 scoped scenario against a prebuilt bridge-enabled image, using a unique cluster
 and private kubeconfig and removing that cluster afterward. It also installs the
@@ -37,7 +37,12 @@ proposed cancellation schema, enables the test-only reader, stops an owner
 container and prevents its replacement from scheduling until the deadline
 passes while the other replica stays ready. The replacement then cancels the
 workflow without a resume or post-takeover effect, and a receipt is retained.
-This is a single-node kind test, not a node-loss or split-brain proof.
+This deadline case is a single-node kind test, not a node-loss or split-brain proof.
+A separate `verify_node_failover.py` run placed the two replicas on separate kind
+workers, killed the waiting workflow owner’s worker, and observed its member
+lease transfer to a replacement on the surviving worker. That replacement
+restored and completed the workflow after an event. This node test does not
+cover a deadline, network partition, duplicate-effect prevention or T12.
 
 The Maven profile `wp109-kube-experiment` adds the Kubernetes extension only to
 an explicitly selected experimental build. Build the app with that profile and
@@ -67,8 +72,9 @@ kubectl --kubeconfig "$PWD/target/wp109-kubeconfig" -n owa-wp109 get pods,leases
 ```
 
 For the automated scenario, build and tag the bridge-enabled image as above,
-then run `python experiments/wp109-kubernetes/verify_failover.py`; it creates and
-cleans up a uniquely named kind cluster. For the manual setup, remove only the
+then run `python experiments/wp109-kubernetes/verify_failover.py` for pod and
+deadline cases or `python experiments/wp109-kubernetes/verify_node_failover.py`
+for the three-node case. Each creates and cleans up a uniquely named kind cluster. For the manual setup, remove only the
 dedicated experiment with `kind delete cluster --name owa-wp109-failover`. Do
 not reuse its namespace or credentials in a shared environment.
 
