@@ -1315,11 +1315,17 @@
       ],
       "notes": "T05 is closed in WP-207 once MCP and A2A exist.",
       "progress": {
-        "status": "not-started",
-        "implemented": [],
+        "status": "partial",
+        "implemented": [
+          "An explicitly composed pinned HTTPS JSON effect transport sends the ledger key and correlation, refuses redirects, returns UNKNOWN for nonconfirmed responses and timeouts, and provides no automatic ledger replay. Unresolved calls permanently reserve a shared classloader slot. Loopback and PostgreSQL ledger tests exercise the candidate; no OpenAPI parsing, approved endpoint, current credential verification or production wiring is provided."
+        ],
         "completed_deliverables": [],
-        "remaining_tasks": [],
-        "evidence": []
+        "remaining_tasks": [
+          "Integrate approved versioned OpenAPI operations, target-scoped verified credentials, policy and audit, exact occurrence binding, service-specific outcome/lookup semantics, idempotency and transport termination evidence, bounded credential acquisition and production egress; verify real services and recovery."
+        ],
+        "evidence": [
+          "docs/handoffs/gpt/WP-113-http-effect-candidate.md"
+        ]
       }
     },
     {
