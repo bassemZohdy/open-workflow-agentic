@@ -338,7 +338,11 @@ checking database work. PostgreSQL tests cover competing owners, expiry, stale g
 rollback after expiry, including a successor waiting for the earlier transaction. A post-work check can still precede
 commit by enough time for a lease to expire; the locks prevent a successor from taking over until that transaction
 ends. The proposed schema and primitive are not deployed or connected to start, restore, checkpointing or external
-calls. They cannot stop an in-flight external effect or establish split-brain safety.
+calls. An explicit JTA fence has also been tested around the SDK's actual JPA workflow-status operation: it takes the
+existing checkpoint advisory lock before the registry and owner locks, and an expired owner's flushed write rolls
+back before the successor commits. This is not installed in the normal writer. The pinned SDK can suppress failed
+listener futures, so a rejected checkpoint alone does not stop subsequent execution. The primitives cannot stop an
+in-flight external effect or establish split-brain safety.
 
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`

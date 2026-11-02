@@ -43,6 +43,9 @@ public class CancellationAwareJpaOperations extends JpaInstanceOperations {
         } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
     }
 
+    /** Takes the SDK checkpoint advisory lock before registry/owner locks in the caller's active JTA transaction. */
+    public void lockForOwnerFence(WorkflowContextData workflow) { lock(workflow, true); }
+
     @Override public void writeInstanceData(WorkflowContextData w) { lock(w,false); super.writeInstanceData(w); }
     @Override public void writeCompletedTask(WorkflowContextData w, TaskContextData t) { lock(w,false); super.writeCompletedTask(w,t); }
     @Override public void writeRetryTask(WorkflowContextData w, TaskContextData t) { lock(w,false); super.writeRetryTask(w,t); }

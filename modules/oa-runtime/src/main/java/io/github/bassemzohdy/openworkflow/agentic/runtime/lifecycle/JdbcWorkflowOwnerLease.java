@@ -121,7 +121,7 @@ public final class JdbcWorkflowOwnerLease {
         });
     }
 
-    private static void requireCurrent(Connection c, Claim claim) throws SQLException {
+    static void requireCurrent(Connection c, Claim claim) throws SQLException {
         if (!registry(c, claim.binding(), true) || !current(read(c, claim.binding()), claim, databaseNow(c)))
             throw new IllegalStateException("workflow owner lease is not current");
     }
