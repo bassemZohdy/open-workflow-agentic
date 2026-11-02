@@ -192,6 +192,42 @@ class RegisteredHumanWaitFenceTest {
         }
     }
 
+    @Test void abruptWorkerExitAfterStagingCanBeRecoveredByANewOwner() throws Exception {
+        var f = fixture(Duration.ofMinutes(2)); var s = staging(f);
+        assertTrue(s.leases().release(s.claim()));
+        String classpath = System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
+        String javaBin = java.nio.file.Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        var arguments = java.nio.file.Files.createTempFile("human-wake-worker-", ".args");
+        try {
+            java.nio.file.Files.writeString(arguments, "-cp\n\"" + classpath.replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n", StandardCharsets.UTF_8);
+            Process child = new ProcessBuilder(javaBin, "@" + arguments, HumanWakeCrashWorker.class.getName(), database,
+                    f.decision().taskId().value(), f.registered().instanceId().value(), f.decision().id().value(),
+                    f.registered().engineInstanceId()).redirectErrorStream(true).start();
+            try {
+                assertTrue(child.waitFor(40, java.util.concurrent.TimeUnit.SECONDS), "the wake worker did not stop");
+                String output = new String(child.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                assertEquals(77, child.exitValue(), output);
+            } finally {
+                if (child.isAlive()) { child.destroyForcibly(); child.waitFor(10, java.util.concurrent.TimeUnit.SECONDS); }
+            }
+        } finally { java.nio.file.Files.deleteIfExists(arguments); }
+        assertEquals("STAGED", pendingState(f)); assertEquals(1, inboxCount(f));
+        assertEquals(Optional.of(HumanDecisionWake.message(f.decision(), f.registered())), s.inbox().boundSignal(f.registered()));
+        var replacement = new java.util.concurrent.atomic.AtomicReference<InboxTaskClaim>();
+        assertTimeoutPreemptively(Duration.ofSeconds(20), () -> {
+            while (replacement.get() == null) {
+                s.leases().acquire(f.registered().task(), "recovery-owner", Duration.ofSeconds(30))
+                        .ifPresent(lease -> replacement.set(lease.claim()));
+                if (replacement.get() == null) Thread.sleep(50);
+            }
+        });
+        try {
+            assertEquals(HumanWakeStage.Result.ALREADY_STAGED,
+                    s.stage().stage(f.decision(), f.registered(), replacement.get(), s.group(), SNAPSHOT));
+            assertEquals(1, inboxCount(f));
+        } finally { s.leases().release(replacement.get()); }
+    }
+
     @Test void staleOwnerRollsBackTheReceiptAndSignal() throws Exception {
         var f = fixture(Duration.ofMinutes(2)); var s = staging(f);
         assertTrue(s.leases().release(s.claim()));
