@@ -95,6 +95,16 @@ class EffectCrashRecoveryIT {
         assertEquals(EffectState.CONFIRMED,ledger.find(command.key()).orElseThrow().state());
         child(run,"scoped-recover",0,row.id().value());
         assertEquals(1,targetEffects(run));assertEquals(1,attempts(run));assertEquals(3,audits(row.id().value()));
+        child(run,"scoped-compensate-audit-fail",0,row.id().value());
+        assertEquals(EffectState.CONFIRMED,ledger.find(command.key()).orElseThrow().state());
+        assertEquals(1,targetEffects(run));assertEquals(1,attempts(run));assertEquals(4,audits(row.id().value()));
+        child(run,"scoped-compensate-crash",77,row.id().value());
+        assertEquals(EffectState.CONFIRMED,ledger.find(command.key()).orElseThrow().state());
+        assertEquals(2,targetEffects(run));assertEquals(2,attempts(run));assertEquals(5,audits(row.id().value()));
+        child(run,"scoped-compensate-recover",0,row.id().value());
+        assertEquals(EffectState.COMPENSATED,ledger.find(command.key()).orElseThrow().state());
+        child(run,"scoped-compensate-recover",0,row.id().value());
+        assertEquals(2,targetEffects(run));assertEquals(2,attempts(run));assertEquals(7,audits(row.id().value()));
     }
     private static long audits(String instance) throws Exception {
         try(var c=EffectCrashWorker.dataSource().getConnection();var q=c.prepareStatement(

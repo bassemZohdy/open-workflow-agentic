@@ -137,12 +137,22 @@ public class DurableEffects {
 
     /** Compensation has its own durable intent/key; loss of its acknowledgment is recovered like any other effect. */
     public Effect compensate(EffectKey original, EffectCommand compensation, EffectTarget target) {
-        Effect result=telemetry.effect(EffectTelemetry.Operation.COMPENSATE,()->compensateCommand(original,compensation,target));
+        Effect result=telemetry.effect(EffectTelemetry.Operation.COMPENSATE,()->compensateCommand(original,compensation,target,null,null));
         requireNotInterrupted();
         return result;
     }
 
-    private Effect compensateCommand(EffectKey original,EffectCommand compensation,EffectTarget target) {
+    /** Explicit audited compensation; current authority and a trustworthy target remain the caller's responsibility. */
+    public Effect compensateResourceScoped(ResourceCallScope scope,EffectKey original,EffectCommand compensation,
+                                           EffectTarget target,EffectAuditHistory history) {
+        Objects.requireNonNull(scope);Objects.requireNonNull(history);
+        if(!scope.threadId().equals(original.threadId()))throw new IllegalArgumentException("original effect belongs to another resource call");
+        Effect result=telemetry.effect(EffectTelemetry.Operation.COMPENSATE,
+                ()->compensateCommand(original,compensation,target,scope,history));
+        requireNotInterrupted();return result;
+    }
+    private Effect compensateCommand(EffectKey original,EffectCommand compensation,EffectTarget target,
+                                     ResourceCallScope scope,EffectAuditHistory history) {
         requireNotInterrupted();
         requireTarget(compensation, target);
         requireNotInterrupted();
@@ -153,6 +163,8 @@ public class DurableEffects {
         try {
             return ledger.exclusively(original, () -> {
                 requireNotInterrupted();
+                Runnable auditOriginal=scope==null?() -> { }:() -> {history.observedResourceHistory(scope,original,128);};
+                auditOriginal.run();requireNotInterrupted();
                 Effect before = ledger.find(original).orElseThrow();
                 requireNotInterrupted();
                 if (before.state() == EffectState.INTENDED) throw new IllegalStateException("resolve original first");
@@ -163,18 +175,25 @@ public class DurableEffects {
                     JdbcEffectLedger.Prepared prepared = ledger.prepareCompensation(original, compensation,
                             window, clock.instant());
                     requireNotInterrupted();
-                    if (before.state() == EffectState.COMPENSATED) return prepared.effect();
-                    return executePrepared(compensation, target, prepared);
+                    Runnable auditUndo=scope==null?() -> { }:() -> {history.observedResourceHistory(scope,compensation.key(),128);};
+                    if (before.state() == EffectState.COMPENSATED) {
+                        if(scope!=null && prepared.effect().state()!=EffectState.CONFIRMED)
+                            throw new IllegalStateException("compensation outcome differs from the original");
+                        auditUndo.run();requireNotInterrupted();return prepared.effect();
+                    }
+                    return executePrepared(compensation, target, prepared,auditUndo);
                 });
                 if (before.state() == EffectState.COMPENSATED) {requireNotInterrupted();return before;}
                 if (undo.state() == EffectState.CONFIRMED) {
                     Effect result = ledger.recordOutcome(original, EffectState.COMPENSATED, "compensation.confirmed");
                     count("compensated");
+                    requireNotInterrupted();auditOriginal.run();
                     requireNotInterrupted();
                     return result;
                 }
                 requireNotInterrupted();
                 ledger.requireManualResolution(original, "effect.compensation.unresolved");
+                requireNotInterrupted();auditOriginal.run();
                 requireNotInterrupted();
                 Effect pending=ledger.find(original).orElseThrow();
                 requireNotInterrupted();

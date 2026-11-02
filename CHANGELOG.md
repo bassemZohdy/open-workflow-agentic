@@ -1,5 +1,7 @@
 # Changelog
 
+- Gate resource-scoped compensation on retained central audit history.
+
 - Serialize manual effect decisions with automatic execution using the same bounded per-effect lock.
 
 - Verify process-loss recovery of resource-scoped audited effects.

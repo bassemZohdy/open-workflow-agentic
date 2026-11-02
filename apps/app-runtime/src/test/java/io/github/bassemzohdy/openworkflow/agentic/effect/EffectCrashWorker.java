@@ -85,7 +85,12 @@ public class EffectCrashWorker {
         var producer=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditProducer();
         var ledger=new JdbcEffectLedger(ds,manager,producer);
         var audit=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(ds);
-        var delivery=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditDelivery(ds,manager,producer,audit::appendOnce);
+        var delivery=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditDelivery(ds,manager,producer,(source,draft)->{
+            if(mode.equals("scoped-compensate-audit-fail") && source.transition().name().equals("DISPATCH")
+                    && "COMPENSATION".equals(draft.attributes().get("effect.purpose")))
+                throw new IllegalStateException("fixture audit unavailable");
+            return audit.appendOnce(source,draft);
+        });
         var history=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditHistory(ds,manager,producer,delivery);
         var target=new EffectTarget() {
             public String target(){return "test:payments";}
@@ -97,7 +102,7 @@ public class EffectCrashWorker {
                 try(var c=ds.getConnection();var q=c.prepareStatement("insert into "+targetSchema+".test_target(run_id,effect_key) values(?,?) on conflict do nothing")) {
                     q.setString(1,run);q.setString(2,key);q.executeUpdate();
                 }
-                if(mode.equals("scoped-crash"))Runtime.getRuntime().halt(77);
+                if(mode.equals("scoped-crash") || mode.equals("scoped-compensate-crash"))Runtime.getRuntime().halt(77);
                 return new Reply(Outcome.CONFIRMED,"confirmed");
             }
             public Reply lookup(String key) throws Exception {
@@ -108,7 +113,20 @@ public class EffectCrashWorker {
                 }
             }
         };
-        if(new DurableEffects(ledger,Clock.systemUTC()).executeResourceScoped(call,command,target,history).state()!=EffectState.CONFIRMED)
+        var effects=new DurableEffects(ledger,Clock.systemUTC());
+        if(mode.startsWith("scoped-compensate")) {
+            var undo=EffectCommand.of(call.threadId(),"tool:refund",call.key(),"test:payments","refund=10");
+            if(mode.equals("scoped-compensate-audit-fail")) {
+                try {effects.compensateResourceScoped(call,command.key(),undo,target,history);}
+                catch(IllegalStateException expected) {
+                    if("fixture audit unavailable".equals(expected.getMessage()))return;
+                    throw expected;
+                }
+                throw new IllegalStateException("audit failure was not enforced");
+            }
+            if(effects.compensateResourceScoped(call,command.key(),undo,target,history).state()!=EffectState.COMPENSATED)
+                throw new IllegalStateException("scoped compensation remained unresolved");
+        } else if(effects.executeResourceScoped(call,command,target,history).state()!=EffectState.CONFIRMED)
             throw new IllegalStateException("scoped effect remained unresolved");
     }
 
