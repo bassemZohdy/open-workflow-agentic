@@ -333,7 +333,9 @@ When a previously restored, running timed task is cancelled, the pinned SDK can 
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`
 transition, suppressing the following failure only if it is the SDK timeout wrapping a cancellation; it then waits
 for the engine's cancellation report. Genuine timeout and unrelated failure reports remain failures. If that report
-is lost, the registry is not assumed cancelled and still requires reconciliation.
+is lost, the registry is not assumed cancelled. The reconciler can poll the SDK's `FAULTED` state and record
+`FAILED` instead, so a missed cancellation report is not yet safely recoverable. This risk follows from the adapter
+and polling paths; a dedicated failure-injection regression and durable outcome recovery are still needed.
 
 SDK characterization narrows the options: a synchronous workflow-start callback can cancel before a task on a new
 in-memory instance, but the JPA-restored instance does not emit that callback. A task-start callback cancelled one
