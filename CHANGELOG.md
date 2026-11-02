@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an unwired human-decision preflight that checks verified non-delegated caller authority, task facts, policy and post-policy expiry. Storage, commit-time rechecks, audit delivery and workflow wakeup remain open.
+
 - Start WP-106 decision identity: exact retries have a stable fingerprint and changed decision facts conflict. The contract is data only; durable tasks, authorization, audit, wakeup and T02 remain open.
 
 - Update delivery sequencing at the user's request: complete and test remaining implementation first, then conduct independent project review and resolve its findings. Existing security, dependency and acceptance gates remain; package and acceptance counts do not change.

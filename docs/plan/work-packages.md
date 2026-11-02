@@ -422,14 +422,14 @@ Deliverables:
 - Audit of every transition
 
 Implementation status: **partial**.
-- Implemented: Human-action facts and policy rules exist; an immutable decision identity distinguishes exact retries from changed actor, task, version, outcome or content. It is data only, not authorization or a durable decision.
+- Implemented: Human-action facts and policy rules exist; an immutable decision identity distinguishes exact retries from changed actor, task, version, outcome or content. A non-wired preflight checks verified non-delegated caller authority and task facts before and after policy evaluation. Neither is a durable decision or commit-time authorization.
 
 Remaining gates:
 
 - Implement durable tenant-scoped task lifecycle, current-facts authorization and atomic decision/audit/wakeup persistence.
 - Implement assignment, delegation, reassignment, escalation and authorized decision APIs, plus restart-safe delivery and T02 end-to-end proof.
 
-Evidence: [modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java](../../modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java](../../modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java)
+Evidence: [modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java](../../modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/HumanDecisionAdmissionTest.java](../../modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/HumanDecisionAdmissionTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java](../../modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java)
 
 Reuse: Flow listen/emit
 

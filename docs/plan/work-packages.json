@@ -769,7 +769,7 @@
       "progress": {
         "status": "partial",
         "implemented": [
-          "Human-action facts and policy rules exist; an immutable decision identity distinguishes exact retries from changed actor, task, version, outcome or content. It is data only, not authorization or a durable decision."
+          "Human-action facts and policy rules exist; an immutable decision identity distinguishes exact retries from changed actor, task, version, outcome or content. A non-wired preflight checks verified non-delegated caller authority and task facts before and after policy evaluation. Neither is a durable decision or commit-time authorization."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -778,6 +778,7 @@
         ],
         "evidence": [
           "modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/HumanDecisionAdmissionTest.java",
           "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java"
         ]
       }
