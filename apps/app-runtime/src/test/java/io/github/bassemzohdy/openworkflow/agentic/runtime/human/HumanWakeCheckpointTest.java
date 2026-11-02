@@ -76,10 +76,11 @@ class HumanWakeCheckpointTest {
     private InstanceRecord move(InstanceRecord row, InstanceStatus status, String engine) {
         return registry.replace(row.successor(now(), status, engine, row.startAttempts(), null, null), row.version(), "test.human", row.owner());
     }
-    @Test void stagedWakeCommitsRealSdkCheckpointAndReceiptTogether() throws Exception { execute(false, false); }
-    @Test void stagedWakeWithLostOwnerCannotCommitRealSdkCheckpoint() throws Exception { execute(true, false); }
-    @Test void stagedWakeRecoversFromPersistedWorkflowWithoutRedelivery() throws Exception { execute(false, true); }
-    private void execute(boolean loseOwner, boolean restore) throws Exception {
+    @Test void stagedWakeCommitsRealSdkCheckpointAndReceiptTogether() throws Exception { execute(false, false, false); }
+    @Test void stagedWakeWithLostOwnerCannotCommitRealSdkCheckpoint() throws Exception { execute(true, false, false); }
+    @Test void stagedWakeRecoversFromPersistedWorkflowWithoutRedelivery() throws Exception { execute(false, true, false); }
+    @Test void separateRecoveryProcessesRepairRealCheckpointWithoutRepeatingAcknowledgement() throws Exception { execute(false, true, true); }
+    private void execute(boolean loseOwner, boolean restore, boolean processRecovery) throws Exception {
         try (var gate = new PersistenceCommitGate(Duration.ofSeconds(15), Clock.systemUTC()); var broker = new Broker()) {
             var next = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();
             var guarded = new CheckpointingWriter(borrowed(), gate, (op,id) -> {});
@@ -147,6 +148,14 @@ class HumanWakeCheckpointTest {
                     assertTrue(proof.consumed(wait, message));
                     if (restore) {
                         gate.close(); // Stop the old workflow component before reconstructing it from JPA.
+                        if (processRecovery) {
+                            assertEquals(0, acknowledgementAudits(row));
+                            recoveryProcess(row, app.id(), "halt", 77);
+                            assertEquals(1, acknowledgementAudits(row));
+                            recoveryProcess(row, app.id(), "repeat", 0);
+                            assertEquals(1, acknowledgementAudits(row));
+                            assertTrue(owned.reserve(claim, wait).isEmpty());
+                        }
                         restoreCheckpoint(row, app.id(), wait, message);
                         return;
                     }
@@ -165,6 +174,29 @@ class HumanWakeCheckpointTest {
                 } finally { release.complete(null); leases.release(claim); }
             }
         }
+    }
+    private long acknowledgementAudits(InstanceRecord row) throws Exception {
+        try (var c=dataSource.getConnection(); var q=c.prepareStatement("select count(*) from audit.event where event_type='event.checkpoint.observed' and attributes->>'oa.instance'=?")) {
+            q.setString(1,row.id().value());try(var r=q.executeQuery()){r.next();return r.getLong(1);}
+        }
+    }
+    private void recoveryProcess(InstanceRecord row,String appId,String mode,int expectedExit) throws Exception {
+        String url;try(var c=dataSource.getConnection()){url=c.getMetaData().getURL();}
+        String classpath=System.getProperty("surefire.test.class.path",System.getProperty("java.class.path"));
+        var args=java.nio.file.Files.createTempFile("human-checkpoint-recovery-", ".args");
+        var output=java.nio.file.Files.createTempFile("human-checkpoint-recovery-", ".log");
+        try {
+            java.nio.file.Files.writeString(args,"-cp\n\""+classpath.replace("\\","\\\\").replace("\"","\\\"")+"\"\n");
+            var builder=new ProcessBuilder(java.nio.file.Path.of(System.getProperty("java.home"),"bin","java").toString(),
+                    "@"+args,HumanCheckpointRecoveryWorker.class.getName(),row.id().value(),appId,mode)
+                    .redirectErrorStream(true).redirectOutput(output.toFile());
+            builder.environment().put("HUMAN_CHECKPOINT_TEST_URL",url);
+            var child=builder.start();
+            try {
+                assertTrue(child.waitFor(45,TimeUnit.SECONDS),"recovery process did not stop");
+                assertEquals(expectedExit,child.exitValue(),java.nio.file.Files.readString(output));
+            } finally {if(child.isAlive()){child.destroyForcibly();child.waitFor(10,TimeUnit.SECONDS);}}
+        } finally {java.nio.file.Files.deleteIfExists(args);java.nio.file.Files.deleteIfExists(output);}
     }
     private void restoreCheckpoint(InstanceRecord row, String appId, InboxWait wait, InboxMessage message) throws Exception {
         var resumed = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();

@@ -787,7 +787,8 @@
           "An isolated real-SDK and JPA test stages the audited human decision, reserves its exact wait and commits the SDK task checkpoint with the inbox receipt proof. A lost owner prevents both checkpoint and proof. Its targeted callback is test-only; process restart, authorized replay, production policy and dispatcher activation remain open.",
           "External event ingress rejects the internal human-decision source at configuration and receipt, preventing configured producers from impersonating that source through this route; internal producer authorization and dispatch remain open.",
           "An unactivated staging prototype atomically records the reference-only inbox receipt, exact wait binding and staged decision under a live task owner, after checking retained decision and audit facts. Tests cover concurrent retries, forged decisions, corrupted retained audit bindings, stale owners and lease expiry at commit. Production dispatch, authorized replay and checkpoint proof remain open.",
-          "A reference-only canonical CloudEvent binds a decision identity to the exact wait digest and keeps private decision content out of event data. An unactivated selector combines that exact occurrence check with the supported literal-filter subset, refusing stop matches and unsupported filters. The pinned SDK accepts the envelope in memory, but a negative control shows its raw broadcast also reaches another occurrence. A test-only targeted callback reaches only the selected instance and handles concurrent attempts once in that process; it is not a durable or authorized dispatcher. No producer or consumer is wired; full SDK predicate evaluation, production schema, lease fencing, authorized replay, wakeup delivery and whole-chain verification remain open."
+          "A reference-only canonical CloudEvent binds a decision identity to the exact wait digest and keeps private decision content out of event data. An unactivated selector combines that exact occurrence check with the supported literal-filter subset, refusing stop matches and unsupported filters. The pinned SDK accepts the envelope in memory, but a negative control shows its raw broadcast also reaches another occurrence. A test-only targeted callback reaches only the selected instance and handles concurrent attempts once in that process; it is not a durable or authorized dispatcher. No producer or consumer is wired; full SDK predicate evaluation, production schema, lease fencing, authorized replay, wakeup delivery and whole-chain verification remain open.",
+          "A separate recovery process repairs an actual SDK/JPA human-wake checkpoint, halts after acknowledgement, and a second process retries without a second acknowledgement audit. The same-process workflow reader then resumes past the saved listen without redelivery. The original checkpoint writer process remains alive in this test; process death before or during the checkpoint, crash after audit before acknowledgement, production dispatch and full T02 remain open."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -803,7 +804,8 @@
           "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/HumanDecisionWakeCloudEventTest.java",
           "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/HumanWakeSelectionTest.java",
           "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/HumanWakeSdkBehaviorTest.java",
-          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java"
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java",
+          "docs/handoffs/gpt/WP-106-checkpoint-process-recovery.md"
         ]
       }
     },

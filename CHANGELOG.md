@@ -1,5 +1,7 @@
 # Changelog
 
+- Exercise human-wake checkpoint acknowledgement and retry in separate recovery processes.
+
 - Mask author-chosen object names in workflow source validation and runtime-capability diagnostic paths.
 
 - Link authenticated agent requests to research graph tracing, with inbound traceparent acceptance disabled by default.
