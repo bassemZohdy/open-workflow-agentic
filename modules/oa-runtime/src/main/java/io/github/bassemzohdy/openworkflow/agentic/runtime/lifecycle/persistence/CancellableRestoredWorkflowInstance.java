@@ -120,7 +120,10 @@ public final class CancellableRestoredWorkflowInstance extends WorkflowMutableIn
   @Override
   public boolean cancel() {
     synchronized (lifecycle) {
-      if (pendingCancellationRequested) return !pendingCancellation.isCompletedExceptionally();
+      if (pendingCancellationRequested) {
+        if (pendingCancellation.isCompletedExceptionally() && !removalAcknowledged) beginPendingCancellation();
+        return !pendingCancellation.isCompletedExceptionally();
+      }
       if (started || status() != WorkflowStatus.PENDING) return super.cancel();
       beginPendingCancellation();
       return !pendingCancellation.isCompletedExceptionally();
@@ -130,7 +133,10 @@ public final class CancellableRestoredWorkflowInstance extends WorkflowMutableIn
   @Override
   public CompletableFuture<Boolean> cancelFuture() {
     synchronized (lifecycle) {
-      if (pendingCancellationRequested) return pendingCancellation.copy();
+      if (pendingCancellationRequested) {
+        if (pendingCancellation.isCompletedExceptionally() && !removalAcknowledged) beginPendingCancellation();
+        return pendingCancellation.copy();
+      }
       if (started || status() != WorkflowStatus.PENDING) return super.cancelFuture();
       beginPendingCancellation();
       return pendingCancellation.copy();
