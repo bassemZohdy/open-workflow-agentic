@@ -145,6 +145,8 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         private final Attempt attempt;
         private Running(Attempt attempt) { this.attempt = attempt; }
         public ResourceExecutionEntry entry() { return attempt.entry; }
+        /** Executor identity is retained data, not a capability; the handle remains the authority. */
+        public UUID executor() { return attempt.executor; }
         public void requireCurrent() {
             if (attempt.phase.get() != 1) throw new RefusedException("run is not executing");
             attempt.check();
@@ -152,6 +154,11 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         public void requireCurrent(ResourceExecutionEntry expected) {
             if (!attempt.entry.equals(Objects.requireNonNull(expected))) throw new RefusedException("run entry differs");
             requireCurrent();
+        }
+        /** Also binds work to the executor of this exact private-minted attempt. */
+        public void requireCurrent(ResourceExecutionEntry expected, UUID expectedExecutor) {
+            if (!attempt.executor.equals(Objects.requireNonNull(expectedExecutor))) throw new RefusedException("run executor differs");
+            requireCurrent(expected);
         }
         @Override public void close() { attempt.close(); }
         @Override public String toString() { return "RunningResourceExecution[redacted]"; }
