@@ -385,6 +385,16 @@ public class Reconciler {
     }
 
     private void prepareAndStart(InstanceRecord row, Instant now) {
+        // A committed STARTING row is not itself authority to begin work after a crash.
+        var decision = gateDecision(row);
+        if (!decision.proceeds()) { holdResume(row, decision, clock.instant()); return; }
+        var ref = new RegistryScan.Ref(row.id().value(), row.tenant());
+        repairLifetime(ref, clock.instant());
+        var current = store.find(row.tenant(), row.id()).orElseThrow();
+        if (current.status() != InstanceStatus.STARTING || current.version() != row.version()
+                || current.engineInstanceId() != null) return;
+        decision = gateDecision(current); // Registry and lifetime I/O may have outlasted the prior check.
+        if (!decision.proceeds()) { holdResume(current, decision, clock.instant()); return; }
         WorkflowEngine.EngineLaunch launch;
         try {
             launch = engine.prepare(row.definition(), row.input());
@@ -413,6 +423,18 @@ public class Reconciler {
             repairs.record("start", row.id().value(), "superseded", "row changed while prepared; not started");
             return;
         }
+        // Preparing and persisting the engine id can block. Recheck authority, pending receipts, lifetime and
+        // registry state before the first execution; leave a denied prepared instance pending for a later pass.
+        if (!prepareResume(prepared, clock.instant())) return;
+        var latest = store.find(prepared.tenant(), prepared.id()).orElseThrow();
+        if (latest.status() != InstanceStatus.STARTING || latest.version() != prepared.version()
+                || !Objects.equals(latest.engineInstanceId(), prepared.engineInstanceId())) return;
+        decision = gateDecision(latest);
+        if (!decision.proceeds()) { holdResume(latest, decision, clock.instant()); return; }
+        repairLifetime(ref, clock.instant());
+        latest = store.find(prepared.tenant(), prepared.id()).orElseThrow();
+        if (latest.status() != InstanceStatus.STARTING || latest.version() != prepared.version()
+                || !Objects.equals(latest.engineInstanceId(), prepared.engineInstanceId())) return;
         try {
             launch.start();
         } catch (RuntimeException failed) {

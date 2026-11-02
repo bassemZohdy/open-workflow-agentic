@@ -237,9 +237,14 @@ Not observable with Flow 1.2.0: whether a side effect inside a task completed wh
 
 ### 9.2 Repairs
 
+A recovered unprepared start checks the existing resume-authority gate before engine preparation and again after the
+engine id and pending checkpoint repairs are committed. Revocation or an unavailable gate leaves the row pending;
+a previously prepared instance can be adopted when authority returns. These checks do not make authority and engine
+execution atomic, fence in-flight effects, or supply the missing event-start admission and audit contract.
+
 | Condition | Action | Test |
 |---|---|---|
-| `STARTING`, no engine id, unchanged for `start-stale-after` | Prepare, record the engine id, start, record RUNNING | `ReconcilerRepairTest.aStartingRowWithNoEngineIdIsPreparedAndStarted`; process scenario B (kill after the insert) |
+| `STARTING`, no engine id, unchanged for `start-stale-after` | Check authority, prepare and record the engine id, then recheck authority, checkpoint repair and lifetime before starting; denied work remains pending | `ReconcilerRepairTest.aStartingRowWithNoEngineIdIsPreparedAndStarted`; `ReconcilerRestoreGateTest` |
 | `STARTING`, engine start threw | Count the attempt, keep the engine id, retry after backoff (doubling, capped at 10 minutes); the engine's instance is adopted if it exists | `ReconcilerRepairTest.aStartThatFailedOnceIsRetriedAndThenAccepted` |
 | `STARTING`, engine holds the instance PENDING | Start it (no epoch change: the first start) | `ReconcilerRepairTest.aStartingRowTheEngineHoldsAsPendingIsStartedWithoutAnEpochChange` |
 | `STARTING`, engine holds nothing for the engine id | By default count the attempt and eventually fail; in multi-replica mode leave the recorded start unconfirmed without consuming attempts. Never prepare a second engine id. | `ReconcilerRepairTest.aStartingRowTheEngineNeverHeardOfIsFailedAfterTheLimit`, `remotePreparedStartIsNotFailedByNonOwningReplicaAndOwnerCanAdoptIt` |

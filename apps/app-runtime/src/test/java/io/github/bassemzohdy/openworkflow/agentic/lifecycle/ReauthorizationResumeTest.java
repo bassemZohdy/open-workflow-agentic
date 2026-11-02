@@ -117,6 +117,19 @@ class ReauthorizationResumeTest {
     }
 
     @Test
+    void revokedGrantPreventsRecoveryOfAnUnpreparedStart() {
+        String tenant=newTenant();FakeEngine engine=new FakeEngine();DelegationGrant grant=grant(tenant,Duration.ofHours(1));
+        var request=new StartRequest(tenant,alice,FakeEngine.PROBE,Map.of(),newKey());
+        var candidate=InstanceRecord.starting(UlidGenerator.shared().next(),request,Instant.now().truncatedTo(ChronoUnit.MICROS));
+        var row=store.insertIfAbsent(candidate,"test.insert",authorities.bindAtStart(tenant,alice,grant.id(),"corr-start")).record();
+        grants.revoke(grant.id(),alice,"withdrawn",null);
+        reconciler(engine,tenant,authorities).recover(tenant,row.id().value());
+        assertEquals(0,engine.prepares.get());assertEquals(0,engine.starts.get());
+        assertEquals(InstanceStatus.STARTING,reload(tenant,row).status());assertNull(reload(tenant,row).engineInstanceId());
+        assertEquals(InstanceAuthority.State.REAUTHORIZATION_REQUIRED,authorities.find(row.id()).orElseThrow().state());
+    }
+
+    @Test
     void anInstanceWithAnActiveGrantIsResumedAsBefore() {
         String tenant = newTenant();
         FakeEngine engine = new FakeEngine();

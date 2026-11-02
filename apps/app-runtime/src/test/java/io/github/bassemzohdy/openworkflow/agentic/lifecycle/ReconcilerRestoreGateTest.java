@@ -36,6 +36,55 @@ class ReconcilerRestoreGateTest {
                 Duration.ofMillis(1),Duration.ofMillis(1),Duration.ofHours(24),100,Optional.empty());
         return new Reconciler(store,engine,sync,scan,repairs,settings,dataSource,Clock.systemUTC(),row.tenant()::equals,authority,checkpoint);
     }
+    private InstanceRecord unprepared() {
+        var request=new StartRequest("starting-gate-"+UUID.randomUUID(),new Subject(SubjectKind.USER,"alice"),FakeEngine.PROBE,
+                Map.of(),UUID.randomUUID().toString());
+        return store.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(),request,now()),"test.insert").record();
+    }
+    @Test void unpreparedStartRefusesWhenAuthorityIsUnavailableOrRevoked() {
+        for(var outcome:List.of(ResumeGate.Outcome.UNAVAILABLE,ResumeGate.Outcome.REAUTHORIZATION_REQUIRED)) {
+            var engine=new FakeEngine();var row=unprepared();var checkpointCalls=new AtomicInteger();
+            var reconciler=reconciler(engine,row,r->new ResumeGate.Decision(outcome,"grant.unavailable"),
+                    r->{checkpointCalls.incrementAndGet();return true;});
+            reconciler.recover(row.tenant(),row.id().value());
+            assertEquals(0,engine.prepares.get());assertEquals(0,engine.starts.get());assertEquals(0,checkpointCalls.get());
+            var retained=store.find(row.tenant(),row.id()).orElseThrow();
+            assertEquals(InstanceStatus.STARTING,retained.status());assertNull(retained.engineInstanceId());
+        }
+    }
+    @Test void unpreparedStartRechecksAuthorityAfterEnginePreparationAndCanRecoverLater() {
+        var engine=new FakeEngine();var row=unprepared();var revoked=new AtomicBoolean();
+        engine.duringPrepare=()->revoked.set(true);
+        ResumeGate authority=r->revoked.get()?new ResumeGate.Decision(ResumeGate.Outcome.REAUTHORIZATION_REQUIRED,"grant.revoked")
+                :ResumeGate.Decision.proceed();
+        var reconciler=reconciler(engine,row,authority,r->true);
+        reconciler.recover(row.tenant(),row.id().value());
+        assertEquals(1,engine.prepares.get());assertEquals(0,engine.starts.get());
+        var pending=store.find(row.tenant(),row.id()).orElseThrow();
+        assertEquals(InstanceStatus.STARTING,pending.status());assertNotNull(pending.engineInstanceId());
+        revoked.set(false);engine.duringPrepare=null;
+        reconciler.recover(row.tenant(),row.id().value());
+        assertEquals(1,engine.prepares.get(),"a permitted recovery uses the already prepared instance");
+        assertEquals(1,engine.restarts.get());
+    }
+    @Test void unpreparedStartCannotExecuteWhenCheckpointRepairFails() {
+        var engine=new FakeEngine();var row=unprepared();
+        var reconciler=reconciler(engine,row,ResumeGate.ALLOW,r->false);
+        reconciler.recover(row.tenant(),row.id().value());
+        assertEquals(1,engine.prepares.get());assertEquals(0,engine.starts.get());
+        assertNotNull(store.find(row.tenant(),row.id()).orElseThrow().engineInstanceId());
+    }
+
+    @Test void unpreparedStartRechecksAuthorityAfterCheckpointRepair() {
+        var engine=new FakeEngine();var row=unprepared();var revoked=new AtomicBoolean();
+        ResumeGate authority=r->revoked.get()?new ResumeGate.Decision(ResumeGate.Outcome.REAUTHORIZATION_REQUIRED,"grant.revoked")
+                :ResumeGate.Decision.proceed();
+        var reconciler=reconciler(engine,row,authority,r->{revoked.set(true);return true;});
+        reconciler.recover(row.tenant(),row.id().value());
+        assertEquals(1,engine.prepares.get());assertEquals(0,engine.starts.get());
+        assertEquals(InstanceStatus.STARTING,store.find(row.tenant(),row.id()).orElseThrow().status());
+    }
+
     @Test void pendingRepairHoldsRestoredWorkWithoutIncrementingEpochThenACompleteBatchPermitsIt() {
         var engine=new FakeEngine();String id="resume-"+UUID.randomUUID();engine.report(id,EngineStatus.PENDING);
         var row=fixture(InstanceStatus.WAITING,id);var complete=new AtomicBoolean();
