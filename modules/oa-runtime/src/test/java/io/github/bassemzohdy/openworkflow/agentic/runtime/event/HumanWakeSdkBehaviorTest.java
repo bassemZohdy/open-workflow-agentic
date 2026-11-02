@@ -32,10 +32,27 @@ class HumanWakeSdkBehaviorTest {
             "tenant", TASK, 0, new Subject(SubjectKind.USER, "alice"), HumanDecision.Outcome.APPROVE, "private answer");
     private static final class Broker extends InMemoryEvents {
         final CountDownLatch registrations;
+        final ConcurrentMap<String, TypeEventRegistration> byInstance = new ConcurrentHashMap<>();
         Broker(int count) { registrations = new CountDownLatch(count); }
         @Override public TypeEventRegistration register(TypeEventRegistrationBuilder builder, Consumer<CloudEvent> callback,
                 WorkflowContext workflow, TaskContext task) {
-            var result = super.register(builder, callback, workflow, task); registrations.countDown(); return result;
+            var result = super.register(builder, callback, workflow, task);
+            byInstance.put(workflow.instanceData().id(), result); registrations.countDown(); return result;
+        }
+        /** Test-only, one-process targeted dispatch. It is not an ownership lease or a durable checkpoint. */
+        boolean deliverTargeted(HumanDecision decision, InboxWait wait, InboxMessage message) {
+            var registration = byInstance.get(wait.engineInstanceId());
+            if (registration == null || registration.task().isCompleted()
+                    || !registration.task().position().jsonPointer().equals(wait.taskPosition())
+                    || registration.task().iteration() != wait.iteration()
+                    || !registration.correlationPredicates().isEmpty()
+                    || !HumanDecisionWake.matches(decision, wait, message)) return false;
+            var event = StoredCloudEventDecoder.decode(message);
+            if (!event.getType().equals(registration.type())
+                    || !registration.predicate().test(event, registration.workflow(), registration.task())) return false;
+            if (!byInstance.remove(wait.engineInstanceId(), registration)) return false;
+            registration.consumer().accept(event);
+            return true;
         }
     }
     private static InboxWait waitFor(WorkflowInstance instance, String position) {
@@ -78,6 +95,35 @@ class HumanWakeSdkBehaviorTest {
             assertEquals(1, result.size());
             assertEquals(firstWait.digest(), result.iterator().next().asMap().orElseThrow().get("waitDigest").toString(),
                     "negative control: the bare SDK filter broadcasts the wrong occurrence too");
+        }
+    }
+
+    @Test void targetedInMemoryCallbackReachesOnlyTheSelectedSdkOccurrence() throws Exception {
+        var broker = new Broker(2);
+        try (var app = WorkflowApplication.builder().withEventConsumer(broker).disableLifeCycleCEPublishing()
+                .disableStatusChangePublishing().build()) {
+            var definition = app.workflowDefinition(WorkflowReader.readWorkflowFromString(DOCUMENT, WorkflowFormat.YAML));
+            var first = definition.instance(Map.of()); var second = definition.instance(Map.of());
+            var firstDone = first.start(); var secondDone = second.start();
+            assertTrue(broker.registrations.await(5, TimeUnit.SECONDS));
+            var registration = broker.byInstance.get(first.id());
+            var identity = registration.workflow().definition().id();
+            var wait = new InboxWait("tenant", Ulid.parse("01ARZ3NDEKTSV4RRFFQ69G5FAX"),
+                    registration.workflow().definition().application().id(), first.id(), identity.namespace(), identity.name(),
+                    identity.version(), registration.task().position().jsonPointer(), registration.task().iteration(),
+                    HumanDecisionWake.route(TASK), HumanDecisionWake.TYPE, "0".repeat(64), Duration.ofSeconds(30));
+            var message = HumanDecisionWake.message(DECISION, wait);
+            var start = new CountDownLatch(1);
+            var pool = Executors.newFixedThreadPool(2);
+            try {
+                Callable<Boolean> delivery = () -> { start.await(); return broker.deliverTargeted(DECISION, wait, message); };
+                var left = pool.submit(delivery); var right = pool.submit(delivery); start.countDown();
+                assertNotEquals(left.get(5, TimeUnit.SECONDS), right.get(5, TimeUnit.SECONDS),
+                        "concurrent attempts use the captured callback at most once");
+            } finally { pool.shutdownNow(); }
+            firstDone.get(5, TimeUnit.SECONDS);
+            assertFalse(secondDone.isDone(), "no broadcast reaches the other waiting instance");
+            assertFalse(broker.deliverTargeted(DECISION, wait, message), "a captured callback is used at most once in this process");
         }
     }
 }
