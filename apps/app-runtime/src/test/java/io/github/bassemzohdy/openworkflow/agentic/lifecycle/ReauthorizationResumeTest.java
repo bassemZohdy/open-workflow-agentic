@@ -75,6 +75,9 @@ class ReauthorizationResumeTest {
     @Inject
     InstanceAuthorities authorities;
 
+    @Inject
+    InstanceService applicationStarts;
+
     private final Subject alice = new Subject(SubjectKind.USER, "alice");
     private final Subject planner = new Subject(SubjectKind.AGENT, "planner");
 
@@ -114,6 +117,44 @@ class ReauthorizationResumeTest {
     private long held(InstanceRecord row) {
         return count(dataSource, "select count(*) from task.repair_event where subject = ? and kind = 'resume' "
                 + "and outcome = 'held'", row.id().value());
+    }
+
+    @Test
+    void applicationStartInjectsTheAuthorityGate() {
+        String tenant=newTenant();DelegationGrant grant=grant(tenant,Duration.ofHours(1));
+        var request=new StartRequest(tenant,alice,FakeEngine.PROBE,Map.of(),newKey());
+        var bind=authorities.bindAtStart(tenant,alice,grant.id(),"corr-cdi");
+        var result=applicationStarts.start(request,(connection,id)->{
+            bind.afterInsert(connection,id);grants.revoke(grant.id(),alice,"withdrawn before launch",null);
+        });
+        assertEquals(InstanceStatus.STARTING,result.record().status());assertNull(result.record().engineInstanceId());
+        assertEquals(InstanceAuthority.State.REAUTHORIZATION_REQUIRED,authorities.find(result.record().id()).orElseThrow().state());
+    }
+
+    @Test
+    void revokedGrantDuringRegistryInsertPreventsInitialEnginePreparation() {
+        String tenant=newTenant();FakeEngine engine=new FakeEngine();DelegationGrant grant=grant(tenant,Duration.ofHours(1));
+        var request=new StartRequest(tenant,alice,FakeEngine.PROBE,Map.of(),newKey());
+        var bind=authorities.bindAtStart(tenant,alice,grant.id(),"corr-insert");
+        var service=new InstanceService(store,engine,io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.LifecycleFaults.none(),authorities);
+        var result=service.start(request,(connection,id)->{
+            bind.afterInsert(connection,id);grants.revoke(grant.id(),alice,"withdrawn during insert",null);
+        });
+        assertEquals(0,engine.prepares.get());assertEquals(0,engine.starts.get());
+        assertEquals(InstanceStatus.STARTING,result.record().status());assertNull(result.record().engineInstanceId());
+        assertEquals(InstanceAuthority.State.REAUTHORIZATION_REQUIRED,authorities.find(result.record().id()).orElseThrow().state());
+    }
+
+    @Test
+    void revokedGrantDuringEnginePreparationPreventsInitialExecution() {
+        String tenant=newTenant();FakeEngine engine=new FakeEngine();DelegationGrant grant=grant(tenant,Duration.ofHours(1));
+        var request=new StartRequest(tenant,alice,FakeEngine.PROBE,Map.of(),newKey());
+        engine.duringPrepare=()->grants.revoke(grant.id(),alice,"withdrawn during prepare",null);
+        var service=new InstanceService(store,engine,io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.LifecycleFaults.none(),authorities);
+        var result=service.start(request,authorities.bindAtStart(tenant,alice,grant.id(),"corr-prepare"));
+        assertEquals(1,engine.prepares.get());assertEquals(0,engine.starts.get());
+        assertEquals(InstanceStatus.STARTING,result.record().status());assertNotNull(result.record().engineInstanceId());
+        assertEquals(InstanceAuthority.State.REAUTHORIZATION_REQUIRED,authorities.find(result.record().id()).orElseThrow().state());
     }
 
     @Test

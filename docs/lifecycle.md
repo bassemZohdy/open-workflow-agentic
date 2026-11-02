@@ -237,8 +237,11 @@ Not observable with Flow 1.2.0: whether a side effect inside a task completed wh
 
 ### 9.2 Repairs
 
-A recovered unprepared start checks the existing resume-authority gate before engine preparation and again after the
-engine id and pending checkpoint repairs are committed. Revocation or an unavailable gate leaves the row pending;
+The application start path checks the existing instance-authority gate after registry insertion and after engine
+preparation, then rechecks that the prepared row is still current before execution. An unavailable or revoked grant
+leaves a committed start pending for later reconciliation. Explicit non-CDI callers must supply a gate if they require
+this protection. A recovered unprepared start also checks the existing resume-authority gate before engine preparation
+and again after the engine id and pending checkpoint repairs are committed. Revocation or an unavailable gate leaves the row pending;
 a previously prepared instance can be adopted when authority returns. These checks do not make authority and engine
 execution atomic, fence in-flight effects, or supply the missing event-start admission and audit contract.
 

@@ -80,6 +80,25 @@ class InstanceLifetimePinTest {
                 Clock.fixed(now, ZoneOffset.UTC), request.tenant()::equals);
     }
 
+    @Test void unavailableStartAuthorityKeepsTheCommittedStartPending() {
+        var engine=new Engine();var service=service(engine,Optional.empty());
+        service.startAuthority=row->{throw new IllegalStateException("identity unavailable");};
+        var result=service.start(request());
+        assertEquals(0,engine.starts.get());assertEquals(InstanceStatus.STARTING,result.record().status());
+        assertNull(result.record().engineInstanceId());
+    }
+
+    @Test void cancellationDuringAuthorityRecheckPreventsInitialExecution() {
+        var engine=new Engine();var service=service(engine,Optional.empty());
+        service.startAuthority=row->{
+            if(row.engineInstanceId()!=null) store.replace(row.successor(start,InstanceStatus.CANCEL_REQUESTED,
+                    row.engineInstanceId(),row.startAttempts(),null,null),row.version(),"test.cancel",owner);
+            return ResumeGate.Decision.proceed();
+        };
+        var result=service.start(request());
+        assertEquals(0,engine.starts.get());assertEquals(InstanceStatus.CANCEL_REQUESTED,result.record().status());
+    }
+
     @Test void admissionBoundsStartsAndStillRecognizesDuplicates() throws Exception {
         assertThrows(IllegalArgumentException.class, () -> new StartAdmission(0));
         var entered = new CountDownLatch(1); var release = new CountDownLatch(1);

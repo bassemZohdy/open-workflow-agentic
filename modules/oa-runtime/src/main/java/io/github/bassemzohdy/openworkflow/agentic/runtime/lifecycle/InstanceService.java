@@ -67,6 +67,8 @@ public class InstanceService {
     private final Clock clock;
     private final UlidGenerator ids;
     @Inject PersistenceCommitGate checkpoints;
+    // Explicit non-CDI callers retain their supplied/test behavior; the application injects the identity gate.
+    @Inject ResumeGate startAuthority = ResumeGate.ALLOW;
     private final LifecycleSettings lifetimeSettings;
     private final DataSource launchLocks;
     private final StartAdmission admission;
@@ -83,6 +85,12 @@ public class InstanceService {
     /** Explicit callers without a configured limit retain the documented unbounded default. */
     public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults) {
         this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared(), LifecycleSettings.defaults(), locksFor(store));
+    }
+
+    /** Explicit composition with a current-authority gate; production CDI supplies the same gate automatically. */
+    public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, ResumeGate gate) {
+        this(store, engine, faults);
+        this.startAuthority = Objects.requireNonNull(gate, "gate");
     }
 
     InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, Clock clock,
@@ -306,6 +314,8 @@ public class InstanceService {
     }
 
     private StartResult launch(InstanceRecord row, StartRequest request) {
+        // A committed registry row is not authority to execute if its grant changed during insertion.
+        if (!currentStartAuthority(row)) return pendingStart(row);
         WorkflowEngine.EngineLaunch launch;
         try {
             launch = engine.prepare(request.definition(), request.input());
@@ -335,6 +345,13 @@ public class InstanceService {
             return new StartResult(store.find(row.tenant(), row.id()).orElse(row), true);
         }
         faults.hit(LifecycleFaults.AFTER_PREPARE);
+        // Preparation and registry persistence can block. A denied prepared engine remains pending for reconciliation.
+        if (!currentStartAuthority(prepared)) return pendingStart(prepared);
+        InstanceRecord current = store.find(prepared.tenant(), prepared.id()).orElseThrow();
+        if (!samePendingStart(prepared,current)) return new StartResult(current,true);
+        if (!currentStartAuthority(current)) return pendingStart(current);
+        current = store.find(prepared.tenant(), prepared.id()).orElseThrow();
+        if (!samePendingStart(prepared,current)) return new StartResult(current,true);
         try {
             launch.start();
         } catch (RuntimeException e) {
@@ -343,6 +360,24 @@ public class InstanceService {
         faults.hit(LifecycleFaults.BEFORE_ACCEPT);
         InstanceRecord running = recordAccepted(prepared);
         return new StartResult(running, true);
+    }
+
+    private boolean currentStartAuthority(InstanceRecord row) {
+        try { return Objects.requireNonNull(startAuthority.check(row)).proceeds(); }
+        catch (RuntimeException unavailable) {
+            LOG.warnf("start authority unavailable for instance %s (%s); execution is held", row.id(),
+                    unavailable.getClass().getSimpleName());
+            return false;
+        }
+    }
+
+    private StartResult pendingStart(InstanceRecord row) {
+        return new StartResult(store.find(row.tenant(), row.id()).orElse(row), true);
+    }
+
+    private static boolean samePendingStart(InstanceRecord expected,InstanceRecord current) {
+        return current.status()==InstanceStatus.STARTING && current.version()==expected.version()
+                && Objects.equals(current.engineInstanceId(),expected.engineInstanceId());
     }
 
     /**
