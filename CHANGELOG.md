@@ -1,5 +1,7 @@
 # Changelog
 
+- Reconstruct verified retained human-wake data for explicit recovery.
+
 - Retain and verify complete wait profiles for recovery without extending existing deadlines.
 
 - Capture and revoke targeted human-wake SDK listeners for explicitly composed recovery.

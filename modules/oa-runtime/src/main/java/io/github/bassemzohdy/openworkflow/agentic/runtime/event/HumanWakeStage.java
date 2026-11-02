@@ -79,7 +79,7 @@ public final class HumanWakeStage {
         }
     }
 
-    private static String requireDecision(Connection c, HumanDecision decision, InboxWait wait) throws SQLException {
+    static String requireDecision(Connection c, HumanDecision decision, InboxWait wait) throws SQLException {
         try (var q = c.prepareStatement("select d.task_id,d.expected_version,d.actor_id,d.outcome,d.content,d.fingerprint,"
                 + "d.instance_id,d.wait_key,t.status,t.version,t.assignee_id,p.audit_state,p.wake_state,p.audit_event_id,p.audit_occurred_at,"
                 + "t.instance_id,t.wait_key "
@@ -104,7 +104,7 @@ public final class HumanWakeStage {
         }
     }
 
-    private static void requireExistingStage(Connection c, HumanDecision decision, InboxWait wait, InboxMessage message)
+    static void requireExistingStage(Connection c, HumanDecision decision, InboxWait wait, InboxMessage message)
             throws SQLException {
         try (var q = c.prepareStatement("select instance_id,wait_key,source,event_id,receipt_fingerprint,task_digest "
                 + "from human_proposal.wake_stage where tenant=? and decision_id=?")) {

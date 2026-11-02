@@ -120,6 +120,11 @@ class RegisteredHumanWaitFenceTest {
         var f = fixture(Duration.ofSeconds(30));
         coordinator(f.registered()).recordNew(f.authority(), f.decision());
         assertEquals(1, decisionCount(f));
+        var reader=new HumanWakeRecovery(owned);
+        assertTrue(reader.load("other-tenant",f.decision().id()).isEmpty());
+        var retained=reader.load("tenant",f.decision().id()).orElseThrow();
+        assertEquals(HumanWakeRecovery.State.BLOCKED,retained.state());assertEquals(f.decision(),retained.decision());
+        assertEquals(f.registered(),retained.waitProfile());assertFalse(retained.toString().contains("private"));
         try (var c = owned.getConnection(); var q = c.prepareStatement("select wake_state from human_proposal.pending where tenant=? and decision_id=?")) {
             q.setString(1, "tenant"); q.setString(2, f.decision().id().value());
             try (var r = q.executeQuery()) { assertTrue(r.next()); assertEquals("BLOCKED", r.getString(1)); }
@@ -179,6 +184,8 @@ class RegisteredHumanWaitFenceTest {
         try {
             var message = HumanDecisionWake.message(f.decision(), f.registered());
             assertEquals(HumanWakeStage.Result.STAGED, s.stage().stage(f.decision(), f.registered(), s.claim(), s.group(), SNAPSHOT));
+            var retained=new HumanWakeRecovery(owned).load("tenant",f.decision().id()).orElseThrow();
+            assertEquals(HumanWakeRecovery.State.STAGED,retained.state());assertEquals(f.decision(),retained.decision());
             assertEquals("STAGED", pendingState(f)); assertEquals(1, inboxCount(f));
             assertEquals(Optional.of(message), s.inbox().boundSignal(f.registered()));
             assertEquals(HumanWakeStage.Result.ALREADY_STAGED, s.stage().stage(f.decision(), f.registered(), s.claim(), s.group(), SNAPSHOT));
@@ -227,6 +234,38 @@ class RegisteredHumanWaitFenceTest {
             assertEquals(1, inboxCount(f));
         } finally { s.leases().release(replacement.get()); }
     }
+    @Test void cancelledStagedWakeIsReportedAsTerminalData() throws Exception {
+        var f=fixture(Duration.ofMinutes(2));var s=staging(f);
+        try {
+            s.stage().stage(f.decision(),f.registered(),s.claim(),s.group(),SNAPSHOT);
+            try(var c=owned.getConnection();var q=c.prepareStatement("update inbox.delivery set state='CANCELLED' where tenant=? and instance_id=? and wait_key=?")) {
+                q.setString(1,"tenant");q.setString(2,f.registered().instanceId().value());q.setString(3,f.registered().key());assertEquals(1,q.executeUpdate());
+            }
+            assertEquals(HumanWakeRecovery.State.TERMINAL,new HumanWakeRecovery(owned).load("tenant",f.decision().id()).orElseThrow().state());
+        } finally {s.leases().release(s.claim());}
+    }
+    @Test void recoveryRefusesAMissingWaitProfileRatherThanGuessingIt() throws Exception {
+        var f=fixture(Duration.ofMinutes(2));coordinator(f.registered()).recordNew(f.authority(),f.decision());
+        try(var c=owned.getConnection();var s=c.createStatement()) {
+            s.execute("alter table inbox.wait_profile disable trigger wait_profile_immutable");
+            try(var q=c.prepareStatement("delete from inbox.wait_profile where tenant=? and instance_id=? and wait_key=?")) {
+                q.setString(1,"tenant");q.setString(2,f.registered().instanceId().value());q.setString(3,f.registered().key());assertEquals(1,q.executeUpdate());
+            } finally {s.execute("alter table inbox.wait_profile enable trigger wait_profile_immutable");}
+        }
+        var error=assertThrows(IllegalStateException.class,()->new HumanWakeRecovery(owned).load("tenant",f.decision().id()));
+        assertFalse(error.toString().contains("private"));
+    }
+    @Test void recoveryRefusesChangedDecisionContentWithoutExposingIt() throws Exception {
+        var f=fixture(Duration.ofMinutes(2));coordinator(f.registered()).recordNew(f.authority(),f.decision());
+        try(var c=owned.getConnection();var s=c.createStatement()) {
+            s.execute("alter table human_proposal.decision disable trigger human_decision_no_change");
+            try(var q=c.prepareStatement("update human_proposal.decision set content='private-tampered' where tenant=? and decision_id=?")) {
+                q.setString(1,"tenant");q.setString(2,f.decision().id().value());assertEquals(1,q.executeUpdate());
+            } finally {s.execute("alter table human_proposal.decision enable trigger human_decision_no_change");}
+        }
+        var error=assertThrows(IllegalStateException.class,()->new HumanWakeRecovery(owned).load("tenant",f.decision().id()));
+        assertFalse(error.toString().contains("private"));
+    }
 
     @Test void staleOwnerRollsBackTheReceiptAndSignal() throws Exception {
         var f = fixture(Duration.ofMinutes(2)); var s = staging(f);
@@ -262,6 +301,7 @@ class RegisteredHumanWaitFenceTest {
                 }
             }
             assertThrows(IllegalStateException.class, () -> s.stage().stage(f.decision(), f.registered(), s.claim(), s.group(), SNAPSHOT));
+            assertThrows(IllegalStateException.class, () -> new HumanWakeRecovery(owned).load("tenant",f.decision().id()));
             assertEquals("BLOCKED", pendingState(f)); assertEquals(0, inboxCount(f));
             assertTrue(s.inbox().boundSignal(f.registered()).isEmpty());
         } finally { s.leases().release(s.claim()); }
