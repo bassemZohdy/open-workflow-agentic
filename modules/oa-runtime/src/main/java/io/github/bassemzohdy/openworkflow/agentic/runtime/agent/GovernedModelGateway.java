@@ -81,6 +81,13 @@ public final class GovernedModelGateway implements ModelGateway {
             return new ModelResult.Failed("the cost of the model call could not be determined");
         }
         if (micros < 0) return new ModelResult.Failed("the cost of the model call could not be determined");
+        // Cost calculation can block after the governed client's post-provider check. Recheck before output release.
+        try {
+            if (context.current().filter(approved::equals).isEmpty())
+                return new ModelResult.Failed("model output withheld after approval changed");
+        } catch (RuntimeException unavailable) {
+            return new ModelResult.Failed("model output withheld after approval changed");
+        }
         return new ModelResult.Completed(text, micros);
     }
 

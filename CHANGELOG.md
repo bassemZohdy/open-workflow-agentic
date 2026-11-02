@@ -1,5 +1,7 @@
 # Changelog
 
+- Withhold model gateway output if the approved context changes or becomes unavailable while cost is calculated.
+
 - Recheck the approved model context around research graph provider calls, withholding answers when the context changes; live identity and durable reservations remain separate gates.
 
 - Provide a tested, opt-in budget-table grant template separating allocator insertion from executor consumption; deployed identities and datasource wiring remain open.
