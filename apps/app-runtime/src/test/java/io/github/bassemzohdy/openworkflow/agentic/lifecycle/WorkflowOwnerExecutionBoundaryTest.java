@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.OwnerFencedJpaWriter;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.CancellablePersistenceReader;
@@ -93,6 +94,106 @@ class WorkflowOwnerExecutionBoundaryTest {
         var row = store.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(), request, now), "test.insert").record();
         row = store.replace(row.successor(now, InstanceStatus.RUNNING, instance.id(), 0, null, null), row.version(), "test.running", actor);
         return new JdbcWorkflowOwnerLease.Binding(tenant, row.id(), appId, instance.id(), definition);
+    }
+
+    @Test void resourceEntryReleasesOutputOnlyWhileOwnerRemainsCurrent() throws Exception {
+        exerciseOwnedResourceEntry(0);
+        exerciseOwnedResourceEntry(1);
+        exerciseOwnedResourceEntry(2);
+    }
+
+    // 0: current owner; 1: takeover during callback; 2: takeover during post-commit audit.
+    private void exerciseOwnedResourceEntry(int scenario) throws Exception {
+        String appId = "resource-entry-owner-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
+        String document = """
+                document: { dsl: '1.0.3', namespace: agentic-test, name: owner-boundary, version: '1.0.0' }
+                do:
+                  - wait:
+                      listen:
+                        to:
+                          one:
+                            with: { type: io.openworkflow.owner.resume }
+                """;
+        var waiting = new CountDownLatch(1);
+        var context = new AtomicReference<WorkflowContextData>();
+        var claim = new AtomicReference<JdbcWorkflowOwnerLease.Claim>();
+        try (var broker = broker(waiting);
+             var app = WorkflowApplication.builder().withId(appId).withEventConsumer(broker)
+                     .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                     .withListener(new WorkflowExecutionListener() {
+                         @Override public void onWorkflowStarted(WorkflowStartedEvent event) {
+                             context.set(event.workflowContext()); bindings.bind(event.workflowContext(), claim.get());
+                         }
+                     }).build()) {
+            var instance = app.workflowDefinition(WorkflowReader.readWorkflowFromString(document, WorkflowFormat.YAML))
+                    .instance(Map.of());
+            var binding = register(appId, tenant, instance);
+            var leases = new JdbcWorkflowOwnerLease(data);
+            claim.set(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(25)).orElseThrow().claim());
+            instance.start();
+            assertTrue(waiting.await(10, TimeUnit.SECONDS));
+            var row = store.find(tenant, binding.instanceId()).orElseThrow();
+            var scope = new ResourceCallScope(tenant, row.id(), row.owner(), appId, instance.id(),
+                    "agentic-test", "owner-boundary", "1.0.0", "do/0/wait", 1, "root", "agent-run", "run",
+                    "a".repeat(64), ResourceCallScope.requestFingerprint("{}"));
+            var ids = UlidGenerator.shared(); var clock = Clock.systemUTC();
+            var now = clock.instant().truncatedTo(ChronoUnit.MICROS);
+            var workload = new Subject(SubjectKind.WORKFLOW, "resource-owner-fixture");
+            var grants = new DelegationGrants(new DelegationGrantStore(data),
+                    new IdentityAudit(event -> {}, clock, ids), clock, ids, Duration.ofHours(2));
+            var grant = grants.grant(tenant, row.owner(), row.owner(), workload, Set.of("oa.agent.run"),
+                    now.plusSeconds(3600), null);
+            String issuer = "https://resource-owner.test", token = UUID.randomUUID().toString();
+            var issued = now.minusSeconds(2); var expires = now.plusSeconds(120);
+            new JdbcIssuedTokenBindings(data, transactions).bind(issuer, token,
+                    new IssuedTokenBindings.Binding(grant.id(), tenant, expires));
+            var credential = new ResourceCallBinding(issuer, token, grant.id(), scope, issued, expires);
+            new JdbcResourceCallBindings(data, transactions).bind(credential);
+            var entry = new ResourceExecutionEntry(scope, 1);
+            var callbacks = new AtomicInteger();
+            var auditChecks = new AtomicInteger();
+            try (var ownerCheck = new WorkflowOwnerResourceFence(entry, context.get(), bindings,
+                         InstanceRegistryFence.over(store), ownerFence);
+                 var gate = new JdbcResourceExecutionGate(data, transactions, 1)) {
+                var builder = CompositeExecutionFence.builder();
+                for (var check : CompositeExecutionFence.Check.values()) {
+                    if (check == CompositeExecutionFence.Check.OWNER_AND_LEASE) builder.with(check, ownerCheck);
+                    else if (check == CompositeExecutionFence.Check.AUDIT) builder.with(check, ignored -> {
+                        if (scenario == 2 && auditChecks.incrementAndGet() == 2) {
+                            assertTrue(leases.release(claim.get()));
+                            assertTrue(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(15)).isPresent());
+                        }
+                    });
+                    else builder.with(check, ignored -> {});
+                }
+                // The other checks are fixture-only. This does not prove production authority or audit.
+                var paired = JdbcResourceExecutionGate.CredentialFence.pair(credential, builder.build());
+                var attempt = gate.openGoverned(credential, entry, UUID.randomUUID(), paired);
+                java.util.function.Function<JdbcResourceExecutionGate.Running, String> callback = running -> {
+                    callbacks.incrementAndGet(); running.requireCurrent(entry);
+                    if (scenario == 1) {
+                        assertTrue(leases.release(claim.get()));
+                        assertTrue(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(15)).isPresent());
+                    }
+                    return "private output";
+                };
+                if (scenario != 0) {
+                    assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> attempt.executeGoverned(callback));
+                    assertTrue(gate.find(scope).isPresent(), "the committed entry must remain after lost ownership");
+                    var retry = gate.openGoverned(credential, entry, UUID.randomUUID(), paired);
+                    assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> retry.executeGoverned(callback));
+                } else {
+                    var result = attempt.executeGoverned(callback);
+                    assertEquals(JdbcResourceExecutionGate.Kind.CALLED, result.kind());
+                    assertEquals("private output", result.value());
+                    var retry = gate.openGoverned(credential, entry, UUID.randomUUID(), paired).executeGoverned(callback);
+                    assertEquals(JdbcResourceExecutionGate.Kind.RETAINED, retry.kind());
+                    assertNull(retry.value());
+                }
+                assertEquals(scenario == 2 ? 0 : 1, callbacks.get(),
+                        "callback must not start after takeover or run twice for a retained entry");
+            }
+        }
     }
 
     @Test void resourceOwnerCheckBindsExactEntryAndRejectsTakeover() throws Exception {

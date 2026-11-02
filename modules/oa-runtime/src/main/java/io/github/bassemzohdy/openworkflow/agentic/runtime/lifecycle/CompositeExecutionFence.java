@@ -12,7 +12,9 @@ import java.util.Objects;
  * authority: every category must be supplied by the trusted composition root, and a missing category, a refusal, any
  * unexpected failure or an interrupted thread refuses. There is no default allowance and no partial composition.
  *
- * <p>Checks run in the fixed {@link Check} order and stop at the first refusal. The result is only as strong as the
+ * <p>Checks run in the fixed {@link Check} order, then ownership is checked again after potentially blocking audit
+ * I/O. They stop at the first refusal. Even the final check can immediately become stale; it is not a lock on later
+ * work. The result is only as strong as the
  * delegates: identity must be the pairing-aware check on the SAME admitted credential, and the gate (not this class)
  * still owns the single fresh durable entry transition. Never build one from HTTP or workflow fields.
  */
@@ -51,22 +53,25 @@ public final class CompositeExecutionFence implements ResourceExecutionFence {
 
     @Override public void requireCurrent(ResourceExecutionEntry entry) {
         Objects.requireNonNull(entry, "entry");
-        for (Check check : Check.values()) {
-            if (Thread.currentThread().isInterrupted())
-                throw new JdbcResourceExecutionGate.RefusedException("interrupted before " + check + " check");
-            try {
-                checks.get(check).requireCurrent(entry);
-            } catch (JdbcResourceExecutionGate.RefusedException e) {
-                throw e;
-            } catch (RuntimeException e) {
-                // Unavailable or failing dependencies refuse; detail stays in the cause, not in the message.
-                var refused = new JdbcResourceExecutionGate.RefusedException(check + " check did not pass");
-                refused.initCause(e);
-                throw refused;
-            }
-        }
+        for (Check check : Check.values()) check(entry, check);
+        check(entry, Check.OWNER_AND_LEASE);
         if (Thread.currentThread().isInterrupted())
             throw new JdbcResourceExecutionGate.RefusedException("interrupted after checks");
+    }
+
+    private void check(ResourceExecutionEntry entry, Check check) {
+        if (Thread.currentThread().isInterrupted())
+            throw new JdbcResourceExecutionGate.RefusedException("interrupted before " + check + " check");
+        try {
+            checks.get(check).requireCurrent(entry);
+        } catch (JdbcResourceExecutionGate.RefusedException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            // Unavailable or failing dependencies refuse; detail stays in the cause, not in the message.
+            var refused = new JdbcResourceExecutionGate.RefusedException(check + " check did not pass");
+            refused.initCause(e);
+            throw refused;
+        }
     }
 
     @Override public String toString() { return "CompositeExecutionFence[redacted]"; }

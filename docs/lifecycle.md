@@ -370,7 +370,11 @@ An explicit owner-resource fence can bind one complete resource execution entry 
 both its live lease and full-owner registry. Same-process SDK/PostgreSQL tests cover takeover and mismatched entry
 and application, interruption, closure during a blocked registry lookup and serialization refusal. Its composite-test identity, policy, task/target
 and audit delegates are permissive fixtures. It neither creates an execution entry nor installs production dispatch,
-and cannot fence an in-flight external call or establish safety across process failures or partitions.
+and cannot fence an in-flight external call or establish safety across process failures or partitions. The composite rechecks ownership after its audit delegate returns, so an owner lost during that
+potentially blocking step refuses the next work. A same-process SDK/PostgreSQL test exercises the actual entry gate:
+current ownership returns output; takeover during a callback refuses output; takeover during post-commit audit refuses
+the callback while retaining the committed entry. Other authority and audit checks in the test are fixtures. A lease
+can still expire immediately after any check, and this does not prove cross-process or external-effect safety.
 
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`

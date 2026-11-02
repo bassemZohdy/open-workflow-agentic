@@ -38,7 +38,22 @@ class CompositeExecutionFenceTest {
     @Test void everyCheckRunsInFixedOrderAndTheEntryIsPassedThrough() {
         var seen = new ArrayList<Check>();
         recording(seen, null, null).build().requireCurrent(ENTRY);
-        assertEquals(List.of(Check.values()), seen);
+        assertEquals(List.of(Check.IDENTITY, Check.POLICY, Check.TASK_AND_TARGET, Check.OWNER_AND_LEASE,
+                Check.AUDIT, Check.OWNER_AND_LEASE), seen);
+    }
+
+    @Test void ownerIsRecheckedAfterAuditBlocksOrChangesOwnership() {
+        var live = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var checks = new java.util.concurrent.atomic.AtomicInteger();
+        var builder = CompositeExecutionFence.builder();
+        for (Check check : Check.values()) builder.with(check, entry -> {
+            if (check == Check.OWNER_AND_LEASE) {
+                checks.incrementAndGet();
+                if (!live.get()) throw new RefusedException("owner lost");
+            } else if (check == Check.AUDIT) live.set(false);
+        });
+        assertThrows(RefusedException.class, () -> builder.build().requireCurrent(ENTRY));
+        assertEquals(2, checks.get());
     }
 
     @Test void aMissingCategoryCannotBuildAndThereIsNoDefaultAllowance() {
