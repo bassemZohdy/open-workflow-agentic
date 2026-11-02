@@ -115,8 +115,9 @@ public class GovernedLlmClient {
      * Controlled variant: the same boundary as {@link #complete(String, String)}, additionally bound to the SAME
      * private {@link JdbcResourceExecutionGate.Running} handle minted for a fresh, acknowledged gate callback. The
      * handle is rechecked against {@code expected} (its exact entry, live fence and invalidation) at four points:
-     * before the approved-context lookup, after the lookup and before the policy question, after an audited ALLOW
-     * immediately before the physical provider, and after the provider returns before its output is released.
+     * before and after each potentially blocking approval lookup, after an audited ALLOW, immediately before the
+     * physical provider, and after the provider returns before its output is released. The approved context is pinned
+     * across policy and provider work, just as in the ordinary path.
      * A missing, closed, mismatched or interrupted control throws and the provider is not reached, or its output is
      * withheld.
      *
@@ -151,8 +152,21 @@ public class GovernedLlmClient {
             control.requireCurrent(expected);
             requireProviderModel(approved.modelId());
             control.requireCurrent(expected);
-            String output = provider.complete(system, user);
-            control.requireCurrent(expected); // private output is withheld if permission was lost meanwhile
+            requireSameApproval(approved);
+            control.requireCurrent(expected); // approval lookup can itself block
+            final String output;
+            try {
+                output = provider.complete(system, user);
+            } catch (RuntimeException providerFailure) {
+                throw new ProviderCallFailed();
+            }
+            control.requireCurrent(expected);
+            try {
+                requireSameApproval(approved);
+            } catch (ModelCallRefused lost) {
+                throw new ApprovalLostAfterCall();
+            }
+            control.requireCurrent(expected); // the final approval lookup can itself block
             return output;
         });
     }
