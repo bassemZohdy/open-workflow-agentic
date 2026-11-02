@@ -107,6 +107,49 @@ class ResourceTaskAllocationStoreTest {
         assertThrows(NodeRefused.class, () -> budget.admit(approval));
     }
 
+    private ApprovedToolProfile toolProfile(String version) {
+        return new ApprovedToolProfile("tool-profile", version, "e".repeat(64), a.modelProfile().agent(),
+                a.contract().permittedTools(), 2, Duration.ofSeconds(3));
+    }
+
+    @Test void freshToolProfileIsRetainedWithAllocationAndExactRetries() throws Exception {
+        var profile = toolProfile("1");
+        var first = store.allocateWithToolProfile(a, profile);
+        assertEquals(first, store.allocateWithToolProfile(a, profile));
+        assertThrows(IllegalStateException.class, () -> store.allocateWithToolProfile(a, toolProfile("2")));
+        assertEquals(1, rows());
+        assertEquals(1, count(data, "select count(*) from task.agent_tool_budget"));
+        assertEquals(1, count(data, "select count(*) from task.agent_tool_profile"));
+        try (var c=data.getConnection(); var q=c.prepareStatement("update task.agent_tool_profile set profile_version='forged' where task_id=?")) {
+            q.setString(1,a.contract().id().value()); assertThrows(SQLException.class,q::executeUpdate);
+        }
+    }
+
+    @Test void aLegacyToolBudgetIsNotSilentlyGivenAProfile() throws Exception {
+        store.allocateWithToolBudget(a, 2);
+        assertThrows(IllegalStateException.class, () -> store.allocateWithToolProfile(a, toolProfile("1")));
+        assertEquals(0, count(data, "select count(*) from task.agent_tool_profile"));
+    }
+
+    @Test void failureRetainingToolProfileRollsBackBothBudgetsAndAllocation() throws Exception {
+        try (var c=data.getConnection(); var s=c.createStatement()) {
+            s.execute("create function task.reject_tool_profile_test() returns trigger language plpgsql as $$ begin raise exception 'test failure'; end $$");
+            s.execute("create trigger reject_tool_profile_test before insert on task.agent_tool_profile for each row execute function task.reject_tool_profile_test()");
+        }
+        assertThrows(RuntimeException.class, () -> store.allocateWithToolProfile(a, toolProfile("1")));
+        assertEquals(0, rows());
+        assertEquals(0, count(data, "select count(*) from task.agent_node_budget"));
+        assertEquals(0, count(data, "select count(*) from task.agent_tool_budget"));
+        assertEquals(0, count(data, "select count(*) from task.agent_tool_profile"));
+    }
+
+    @Test void profiledAllocationRejectsToolsOutsideTheApprovedTaskBeforeWriting() throws Exception {
+        var profile = new ApprovedToolProfile("tool-profile", "1", "e".repeat(64), a.modelProfile().agent(),
+                Set.of("tool:unapproved"), 2, Duration.ofSeconds(3));
+        assertThrows(IllegalArgumentException.class, () -> store.allocateWithToolProfile(a, profile));
+        assertEquals(0, rows());
+    }
+
     @Test void failureCreatingToolBudgetRollsBackAllocationAndNodeBudget() throws Exception {
         try (var c=data.getConnection(); var s=c.createStatement()) {
             s.execute("create function task.reject_tool_budget_test() returns trigger language plpgsql as $$ begin raise exception 'test failure'; end $$");

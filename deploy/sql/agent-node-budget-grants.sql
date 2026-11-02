@@ -12,3 +12,8 @@ revoke all on task.agent_tool_budget from public;
 grant select, insert on task.agent_tool_budget to __BUDGET_ALLOCATOR_ROLE__;
 grant select on task.agent_tool_budget to __BUDGET_EXECUTOR_ROLE__;
 grant update (calls) on task.agent_tool_budget to __BUDGET_EXECUTOR_ROLE__;
+
+-- V77.5: the allocator retains approved profile data; execution may read but never alter it.
+revoke all on task.agent_tool_profile from public;
+grant select, insert on task.agent_tool_profile to __BUDGET_ALLOCATOR_ROLE__;
+grant select on task.agent_tool_profile to __BUDGET_EXECUTOR_ROLE__;

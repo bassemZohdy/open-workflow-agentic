@@ -31,7 +31,7 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
     }
 
     @Override public AllocatedResourceTask allocate(ResourceTaskAllocation candidate) {
-        return allocate(candidate, null);
+        return allocate(candidate, null, null);
     }
 
     /**
@@ -41,10 +41,17 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
      */
     public AllocatedResourceTask allocateWithToolBudget(ResourceTaskAllocation candidate, int maxToolCalls) {
         if (maxToolCalls < 1 || maxToolCalls > 100_000) throw new IllegalArgumentException("invalid tool-call ceiling");
-        return allocate(candidate, maxToolCalls);
+        return allocate(candidate, maxToolCalls, null);
     }
 
-    private AllocatedResourceTask allocate(ResourceTaskAllocation candidate, Integer maxToolCalls) {
+    /** Retains immutable profile data with the fresh task and budget; a constructed profile is not an approval source. */
+    public AllocatedResourceTask allocateWithToolProfile(ResourceTaskAllocation candidate, ApprovedToolProfile profile) {
+        Objects.requireNonNull(candidate, "candidate"); Objects.requireNonNull(profile, "profile");
+        profile.requireWithin(candidate.contract(), candidate.modelProfile().agent());
+        return allocate(candidate, profile.maxCalls(), profile);
+    }
+
+    private AllocatedResourceTask allocate(ResourceTaskAllocation candidate, Integer maxToolCalls, ApprovedToolProfile toolProfile) {
         Objects.requireNonNull(candidate, "candidate");
         // Existing stored-task wire form is whole seconds. Refuse lossy precision BEFORE I/O.
         String contract = ResourceTaskAllocationCodec.contract(candidate.contract());
@@ -52,13 +59,13 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
         new DefinitionRef(candidate.scope().namespace() + "/" + candidate.scope().definition(), candidate.scope().version());
         return isolated(connection -> {
             var existing = read(connection, candidate.scope());
-            if (existing.isPresent()) return matchingBudget(connection, same(existing.get(), candidate), maxToolCalls);
+            if (existing.isPresent()) return matchingBudget(connection, same(existing.get(), candidate), maxToolCalls, toolProfile);
             try (var lock = connection.prepareStatement("select id from task.instance where id=? for update")) {
                 lock.setString(1, candidate.scope().instanceId().value());
                 try (var row = lock.executeQuery()) { if (!row.next()) throw conflict(); }
             }
             existing = read(connection, candidate.scope());
-            if (existing.isPresent()) return matchingBudget(connection, same(existing.get(), candidate), maxToolCalls);
+            if (existing.isPresent()) return matchingBudget(connection, same(existing.get(), candidate), maxToolCalls, toolProfile);
             int inserted;
             try (var insert = connection.prepareStatement("""
                     insert into task.resource_task_allocation(allocation_key,call_key,call_fingerprint,parent_task_id,
@@ -77,16 +84,18 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
             if (inserted == 1) {
                 JdbcNodeBudget.insertForFreshAllocation(connection, allocated);
                 if (maxToolCalls != null) JdbcToolCallBudget.insertForFreshAllocation(connection, allocated, maxToolCalls);
+                if (toolProfile != null) JdbcToolCallBudget.insertProfileForFreshAllocation(connection, allocated, toolProfile);
             } else {
-                matchingBudget(connection, allocated, maxToolCalls);
+                matchingBudget(connection, allocated, maxToolCalls, toolProfile);
             }
             return allocated;
         });
     }
 
     private static AllocatedResourceTask matchingBudget(Connection connection, AllocatedResourceTask allocated,
-                                                         Integer maxToolCalls) throws SQLException {
-        if (maxToolCalls != null) JdbcToolCallBudget.requireForAllocation(connection, allocated, maxToolCalls);
+                                                         Integer maxToolCalls, ApprovedToolProfile profile) throws SQLException {
+        if (profile != null) JdbcToolCallBudget.requireProfileForAllocation(connection, allocated, profile);
+        else if (maxToolCalls != null) JdbcToolCallBudget.requireForAllocation(connection, allocated, maxToolCalls);
         return allocated;
     }
 
