@@ -645,6 +645,7 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-06. Shared pat
 Implemented scope:
 
 - Policy calls have timeout and concurrency bounds; unintended Flow HTTP-client retries are disabled.
+- The runtime token exchanger bounds HTTP response-body time and physical concurrency, and its production producer configures a circuit breaker without automatic token-request retries. Focused local tests cover stalled bodies, retained worker capacity and producer wiring; the latest integration branch CI is pending.
 
 Additional closure/integration tasks:
 
