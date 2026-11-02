@@ -51,7 +51,7 @@ public final class CancellableRestoredWorkflowInstance extends WorkflowMutableIn
   private final PersistenceInstanceWriter cancellationWriter;
   private final CancellablePersistenceReader reader;
   private boolean started;
-  private boolean pendingCancellationRequested;
+  private volatile boolean pendingCancellationRequested;
   private boolean removalAcknowledged;
   private CompletableFuture<Boolean> pendingCancellation;
 
@@ -136,6 +136,9 @@ public final class CancellableRestoredWorkflowInstance extends WorkflowMutableIn
       return pendingCancellation.copy();
     }
   }
+
+  /** Data for the explicitly composed JPA receipt writer; not an execution capability. */
+  boolean pendingCancellationRequested() { return pendingCancellationRequested; }
 
   /** Called under lifecycle; the pending flag is set before any checkpoint I/O can block. */
   private void beginPendingCancellation() {

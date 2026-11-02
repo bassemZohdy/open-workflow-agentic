@@ -1,0 +1,192 @@
+package io.github.bassemzohdy.openworkflow.agentic.lifecycle;
+
+import static org.junit.jupiter.api.Assertions.*;
+import io.cloudevents.CloudEvent;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.*;
+import io.quarkiverse.flow.persistence.jpa.*;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.serverlessworkflow.api.*;
+import io.serverlessworkflow.impl.*;
+import io.serverlessworkflow.impl.events.*;
+import io.serverlessworkflow.impl.persistence.*;
+import jakarta.inject.Inject;
+import java.lang.reflect.*;
+import java.nio.charset.StandardCharsets;
+import java.sql.*;
+import java.time.*;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.function.Consumer;
+import javax.sql.DataSource;
+import org.junit.jupiter.api.*;
+
+/** Real JPA writer/JTA tests in a disposable database; candidate is not installed in the application reader. */
+@QuarkusTest
+@QuarkusTestResource(value = PendingCancellationDatabase.class, restrictToAnnotatedClass = true)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class PendingCancellationReceiptTest {
+    private static final String DOCUMENT = """
+        document: { dsl: '1.0.3', namespace: agentic-test, name: receipt-case, version: '1.0.0' }
+        do:
+          - wait:
+              listen:
+                to:
+                  one:
+                    with: { type: io.openworkflow.test.never }
+        """;
+    @Inject DataSource data;
+    @Inject JpaInstanceWriter standardWriter;
+    @Inject PendingCancellationReceiptWriter receiptWriter;
+    @Inject JpaInstanceOperations operations;
+    @Inject JdbcInstanceStore store;
+
+    @BeforeAll void applyProposal() throws Exception {
+        try (var in = getClass().getClassLoader().getResourceAsStream("db/proposed/V81__pending_cancellation_receipt.sql")) {
+            assertNotNull(in);
+            try (var c = data.getConnection(); var s = c.createStatement()) {
+                s.execute(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        }
+    }
+    PersistenceInstanceWriter borrowed(PersistenceInstanceWriter source) {
+        return (PersistenceInstanceWriter) Proxy.newProxyInstance(PersistenceInstanceWriter.class.getClassLoader(),
+                new Class<?>[]{PersistenceInstanceWriter.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("close")) return null;
+                    try { return method.invoke(source, args); }
+                    catch (InvocationTargetException e) { throw e.getCause(); }
+                });
+    }
+    interface Scenario { void run(WorkflowInstance instance, InstanceRecord row, String appId,
+                                   PersistenceCommitGate gate) throws Exception; }
+    void withRestored(Scenario scenario) throws Exception {
+        String appId = "receipt-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
+        var listening = new CountDownLatch(1);
+        var broker = new InMemoryEvents() {
+            @Override public TypeEventRegistration register(TypeEventRegistrationBuilder builder,
+                    Consumer<CloudEvent> callback, WorkflowContext workflow, TaskContext task) {
+                var result = super.register(builder, callback, workflow, task); listening.countDown(); return result;
+            }
+        };
+        try (var firstGate = new PersistenceCommitGate(Duration.ofSeconds(15), Clock.systemUTC());
+             var cancelGate = new PersistenceCommitGate(Duration.ofSeconds(15), Clock.systemUTC());
+             var first = WorkflowApplication.builder().withId(appId).withEventConsumer(broker)
+                     .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                     .withListener(new WorkflowPersistenceListener(new CheckpointingWriter(borrowed(standardWriter), firstGate, (op,id)->{}))).build()) {
+            var workflow = WorkflowReader.readWorkflowFromString(DOCUMENT, WorkflowFormat.YAML);
+            var original = first.workflowDefinition(workflow).instance(Map.of()); original.start();
+            assertTrue(listening.await(10, TimeUnit.SECONDS));
+            var actor = new Subject(SubjectKind.USER, "receipt-user");
+            var request = new StartRequest(tenant, actor, new DefinitionRef("agentic-test/receipt-case", "1.0.0"),
+                    Map.of(), "receipt-" + UUID.randomUUID());
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            var row = store.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(), request, now), "test.insert").record();
+            row = store.replace(row.successor(now, InstanceStatus.RUNNING, original.id(), 0, null, null), row.version(), "test.running", actor);
+            row = store.replace(row.successor(now, InstanceStatus.WAITING, original.id(), 0, null, now.plusSeconds(60)), row.version(), "test.waiting", actor);
+            row = store.replace(row.successor(now, InstanceStatus.CANCEL_REQUESTED, original.id(), 0, null, null), row.version(), "test.cancel", actor);
+            try (var restored = WorkflowApplication.builder().withId(appId)
+                    .disableLifeCycleCEPublishing().disableStatusChangePublishing().build()) {
+                var definition = restored.workflowDefinition(workflow);
+                var guardedWriter = new CheckpointingWriter(borrowed(receiptWriter), cancelGate, (op,id)->{});
+                var reader = new CancellablePersistenceReader(operations, guardedWriter);
+                var instance = reader.find(definition, original.id()).orElseThrow();
+                scenario.run(instance, row, appId, cancelGate);
+            }
+        }
+    }
+    long count(String sql, String value) throws Exception {
+        try (var c = data.getConnection(); var q = c.prepareStatement(sql)) {
+            q.setString(1, value); try (var r = q.executeQuery()) { r.next(); return r.getLong(1); }
+        }
+    }
+    @Test void actualJpaDeleteAndExactReceiptCommitTogether() throws Exception {
+        withRestored((instance, row, appId, gate) -> {
+            assertTrue(instance.cancelFuture().get(10, TimeUnit.SECONDS));
+            assertEquals(0, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+            assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+            try (var c = data.getConnection(); var q = c.prepareStatement("""
+                    select application_id,engine_instance_id,definition_id,definition_version
+                    from task.pending_cancellation_receipt where instance_id=?
+                    """)) {
+                q.setString(1, row.id().value()); try (var r = q.executeQuery()) {
+                    assertTrue(r.next()); assertEquals(appId, r.getString(1)); assertEquals(instance.id(), r.getString(2));
+                    assertEquals("agentic-test/receipt-case", r.getString(3)); assertEquals("1.0.0", r.getString(4));
+                }
+            }
+            assertThrows(CancellationException.class, () -> instance.start().join());
+            for (String sql : List.of("update task.pending_cancellation_receipt set recorded_at=clock_timestamp() where instance_id=?",
+                    "delete from task.pending_cancellation_receipt where instance_id=?")) {
+                try (var c = data.getConnection(); var q = c.prepareStatement(sql)) {
+                    q.setString(1, row.id().value()); assertThrows(SQLException.class, q::executeUpdate);
+                }
+            }
+            assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+        });
+    }
+    @Test void receiptCannotCommitWithoutRemovingTheMatchingCheckpoint() throws Exception {
+        withRestored((instance, row, appId, gate) -> {
+            try (var c = data.getConnection()) {
+                c.setAutoCommit(false);
+                try (var q = c.prepareStatement("""
+                        insert into task.pending_cancellation_receipt
+                        (instance_id,application_id,engine_instance_id,definition_id,definition_version)
+                        values (?,?,?,?,?)
+                        """)) {
+                    q.setString(1, row.id().value()); q.setString(2, appId); q.setString(3, instance.id());
+                    q.setString(4, "agentic-test/receipt-case"); q.setString(5, "1.0.0"); q.executeUpdate();
+                    assertThrows(SQLException.class, c::commit); c.rollback();
+                }
+            }
+            assertEquals(0, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+            assertEquals(1, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+        });
+    }
+    @Test void failedJpaDeletionRollsBackTheReceiptAndDoesNotConfirmCancellation() throws Exception {
+        withRestored((instance, row, appId, gate) -> {
+            assertTrue(appId.matches("receipt-[0-9a-f-]{36}"));
+            try (var c = data.getConnection(); var s = c.createStatement()) {
+                s.execute("create function task.test_reject_receipt_delete() returns trigger language plpgsql as $$ "
+                        + "begin raise exception 'fixture deletion failure'; end $$");
+                s.execute("create trigger test_reject_receipt_delete before delete on public.workflowinstanceentity "
+                        + "for each row when (old.applicationid = '" + appId + "') "
+                        + "execute function task.test_reject_receipt_delete()");
+            }
+            try {
+                var pending = instance.cancelFuture();
+                assertTimeoutPreemptively(Duration.ofSeconds(15), () -> {
+                    while (gate.status().failure().isEmpty()) Thread.sleep(10);
+                });
+                assertFalse(pending.isDone());
+                assertEquals(WorkflowStatus.PENDING, instance.status());
+                assertEquals(0, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+                assertEquals(1, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+                assertThrows(CancellationException.class, () -> instance.start().join());
+            } finally {
+                try (var c = data.getConnection(); var s = c.createStatement()) {
+                    s.execute("drop trigger test_reject_receipt_delete on public.workflowinstanceentity");
+                    s.execute("drop function task.test_reject_receipt_delete()");
+                }
+            }
+        });
+    }
+
+    @Test void mismatchCannotCreateAReceipt() throws Exception {
+        withRestored((instance, row, appId, gate) -> {
+            try (var c = data.getConnection(); var q = c.prepareStatement("""
+                    insert into task.pending_cancellation_receipt
+                    (instance_id,application_id,engine_instance_id,definition_id,definition_version)
+                    values (?,?,?,?,?)
+                    """)) {
+                q.setString(1, row.id().value()); q.setString(2, appId + "-different"); q.setString(3, instance.id());
+                q.setString(4, "agentic-test/receipt-case"); q.setString(5, "1.0.0");
+                assertThrows(SQLException.class, q::executeUpdate);
+            }
+            assertEquals(0, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+            assertEquals(1, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+        });
+    }
+}

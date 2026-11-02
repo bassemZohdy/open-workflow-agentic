@@ -50,6 +50,37 @@ public class CancellationAwareJpaOperations extends JpaInstanceOperations {
     @Override public void clearStatus(WorkflowContextData w) { lock(w,false); super.clearStatus(w); }
     @Override public void removeProcessInstance(WorkflowContextData w) { lock(w,true); super.removeProcessInstance(w); }
 
+    /**
+     * Opt-in pending-cancellation writer hook. The receipt and SDK deletion join the SAME active JPA transaction;
+     * the proposed schema's deferred constraint refuses a commit unless the exact checkpoint was removed.
+     */
+    public void removePendingWithReceipt(WorkflowContextData workflow) {
+        if (!(workflow.instanceData() instanceof CancellableRestoredWorkflowInstance guarded)
+                || !guarded.pendingCancellationRequested())
+            throw new IllegalStateException("pending cancellation evidence requires a guarded restored instance");
+        lock(workflow, true);
+        var definition = workflow.definition().id();
+        String definitionId = definition.namespace() + "/" + definition.name();
+        try (var c = checkpointDataSource.getConnection();
+             var q = c.prepareStatement("""
+                     insert into task.pending_cancellation_receipt
+                         (instance_id, application_id, engine_instance_id, definition_id, definition_version)
+                     select i.id, ?, i.engine_instance_id, i.definition_id, i.definition_version
+                       from task.instance i where i.engine_instance_id = ? and i.status = 'CANCEL_REQUESTED'
+                         and i.definition_id = ? and i.definition_version = ?
+                     """)) {
+            q.setQueryTimeout(5);
+            q.setString(1, workflow.definition().application().id());
+            q.setString(2, workflow.instanceData().id());
+            q.setString(3, definitionId);
+            q.setString(4, definition.version());
+            if (q.executeUpdate() != 1) throw new IllegalStateException("pending cancellation registry binding unavailable");
+            super.removeProcessInstance(workflow);
+        } catch (SQLException unavailable) {
+            throw new StoreUnavailableException("pending cancellation receipt unavailable", unavailable);
+        }
+    }
+
     /** Never interpreted as successful persistence; the gate holds only when trusted SDK state confirms cancellation. */
     static final class CancelledCheckpoint extends IllegalStateException {
         CancelledCheckpoint() { super("SDK workflow cancelled before checkpoint"); }
