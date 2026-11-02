@@ -1,5 +1,7 @@
 # Changelog
 
+- Link authenticated agent requests to research graph tracing, with inbound traceparent acceptance disabled by default.
+
 - Trace governed research graph nodes while preserving deadline, budget, and mandatory audit checks around telemetry.
 
 - Allow explicit governed tool tracing, carrying span context across isolated workers without baggage or caller thread-local values.

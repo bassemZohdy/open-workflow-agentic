@@ -1,0 +1,9 @@
+# WP-112: authenticated agent entry tracing
+
+The research-agent HTTP resource creates an optional `oa.agent.request` server span after caller verification, policy authorization and request parsing. It checks current authority again after tracing setup and after the span completes, before releasing the result. The span records only a fixed schema version and outcome; it does not record request bodies, bearer tokens, caller identity, output or exception details. Research node and model spans can be descendants of this entry span.
+
+Inbound W3C `traceparent` acceptance is disabled by default. Set `agentic.observability.accept-agent-traceparent=true` only where the ingress and sampling policy are trusted: a caller who selects the parent can also select trace identifiers and sampling flags. The resource accepts at most one bounded header and ignores invalid or duplicate values. It starts from a clean context and does not propagate inbound or ambient baggage or tracestate. When span creation fails, execution continues under the sanitized context, and authority checks remain in force. An unavailable context implementation may prevent this isolation; a blocking telemetry implementation can delay execution.
+
+The tracing SDK remains disabled by default. Enabling collection requires separately configured, approved telemetry infrastructure; this change does not deploy a collector or establish production sampling and retention policies.
+
+Tests cover authentication, trace input, context restoration, failed instrumentation, authority expiration during tracing setup and completion, and a PostgreSQL-checkpointed research graph with fixture approval and model provider. The graph test verifies entry-to-node-to-model span parentage, but does not exercise a network listener or production issuer and provider. Workflow-to-agent linkage, restart continuity, tool integration, production collection, and the complete WP-112 acceptance criteria remain open.

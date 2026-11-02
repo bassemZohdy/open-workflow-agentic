@@ -82,6 +82,9 @@ public class AgentResource {
     @Inject
     AgentResourceAdmission admission;
 
+    @Inject
+    AgentRequestTelemetry telemetry = AgentRequestTelemetry.noop();
+
     public AgentResource() {
     }
 
@@ -93,6 +96,13 @@ public class AgentResource {
         this.pep = pep;
         this.json = json;
         this.admission = admission;
+    }
+
+    /** Explicit composition for tests and non-CDI runtimes. */
+    public AgentResource(ResearchAgent agent, CallerContextResolver callers, Pep pep, ObjectMapper json,
+                         AgentResourceAdmission admission, AgentRequestTelemetry telemetry) {
+        this(agent, callers, pep, json, admission);
+        this.telemetry = java.util.Objects.requireNonNull(telemetry, "telemetry");
     }
 
     /** A caller and, for a delegated token, the admission handle whose authority is re-checked before the run. */
@@ -128,7 +138,11 @@ public class AgentResource {
         current(admitted.who(), "the agent was not run");
         ResearchState state;
         try {
-            state = agent.run(thread.value(), request.topic());
+            state = telemetry.call(headers, () -> {
+                // Tracing setup can block; the caller must still be current before graph work begins.
+                current(admitted.who(), "the agent was not run");
+                return agent.run(thread.value(), request.topic());
+            });
         } catch (CheckpointProfileException notReady) {
             // checked before any node: no model call was made. Only the fixed reason code is shown, never database text
             throw new ProblemException(Response.Status.SERVICE_UNAVAILABLE,

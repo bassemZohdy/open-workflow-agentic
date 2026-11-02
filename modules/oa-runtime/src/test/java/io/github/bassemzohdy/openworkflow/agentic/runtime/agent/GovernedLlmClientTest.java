@@ -466,4 +466,48 @@ class GovernedLlmClientTest {
             for(var model:models) {assertFalse(model.toString().contains("private-topic"));assertTrue(model.getEvents().isEmpty());}
         }
     }
+
+    @Test
+    void verifiedAgentEntryLinksIncomingTraceToTheCheckpointedGraphAndModel() throws Exception {
+        var exporter=io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter.create();
+        try(var sdk=io.opentelemetry.sdk.trace.SdkTracerProvider.builder()
+                .addSpanProcessor(io.opentelemetry.sdk.trace.export.SimpleSpanProcessor.create(exporter)).build()) {
+            DataSource ds=AgentTestDatabase.dataSource();var provider=new CountingProvider();var context=freshGraphApproval();
+            var client=new GovernedLlmClient(provider,pep(new Engine(DecisionOutcome.ALLOW),new Audit()),context);
+            client.telemetry=new ModelCallTelemetry(sdk.get("model"));
+            var agent=agent(ds,client);agent.nodeTelemetry=new AgentNodeTelemetry(sdk.get("nodes"));
+            var token=new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.VerifiedToken("issuer",USER,Set.of("oa-api"),
+                    Set.of(io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AgentResourceAdmission.SCOPE),"tenant",NOW,
+                    NOW.plusSeconds(60),"jti",List.of());
+            var resolver=new io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerContextResolver(
+                    (bearer,audience)->token,"oa-api",false,Set.of("test"),Set.of("test"),CLOCK);
+            var admission=new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AgentResourceAdmission(null,null,null,null,CLOCK);
+            var resource=new io.github.bassemzohdy.openworkflow.agentic.runtime.api.AgentResource(agent,resolver,
+                    pep(new Engine(DecisionOutcome.ALLOW),new Audit()),new ObjectMapper(),admission,
+                    new io.github.bassemzohdy.openworkflow.agentic.runtime.api.AgentRequestTelemetry(sdk.get("entry"),true));
+            String visibleThread="trace-"+UUID.randomUUID();
+            String thread=io.github.bassemzohdy.openworkflow.agentic.runtime.api.AgentResource.threadOf("tenant",USER,"direct:"+visibleThread).value();
+            prepareGraph(agent,ds,context,thread);
+            var headers=(jakarta.ws.rs.core.HttpHeaders)java.lang.reflect.Proxy.newProxyInstance(
+                    jakarta.ws.rs.core.HttpHeaders.class.getClassLoader(),new Class<?>[]{jakarta.ws.rs.core.HttpHeaders.class},(p,m,a)->{
+                        if(m.getName().equals("getRequestHeader")) {
+                            if("Authorization".equalsIgnoreCase((String)a[0]))return List.of("Bearer fixture");
+                            if("traceparent".equalsIgnoreCase((String)a[0]))return List.of("00-0123456789abcdef0123456789abcdef-0123456789abcdef-01");
+                            return null;
+                        }
+                        throw new UnsupportedOperationException(m.getName());
+                    });
+            var response=resource.run(headers,"{\"topic\":\"private-topic\",\"threadId\":\""+visibleThread+"\"}");
+            assertEquals("private-topic",response.get("topic"));assertEquals(3,provider.calls.get());
+            var spans=exporter.getFinishedSpanItems();
+            var entry=spans.stream().filter(s->s.getName().equals("oa.agent.request")).findFirst().orElseThrow();
+            var nodes=spans.stream().filter(s->s.getName().equals("oa.agent.node")).toList();
+            var models=spans.stream().filter(s->s.getName().equals("oa.model.call")).toList();
+            assertEquals("0123456789abcdef0123456789abcdef",entry.getTraceId());assertEquals("0123456789abcdef",entry.getParentSpanId());
+            assertEquals(3,nodes.size());assertEquals(3,models.size());
+            for(var node:nodes) {assertEquals(entry.getSpanId(),node.getParentSpanId());
+                assertEquals(1,models.stream().filter(model->model.getParentSpanId().equals(node.getSpanId())).count());}
+            assertTrue(spans.stream().noneMatch(span->span.toString().contains("private-topic")));
+        }
+    }
 }
