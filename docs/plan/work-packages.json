@@ -1119,7 +1119,7 @@
           "Complete deployed role grants and verify mixed-version rollout; implement escalation timers and prove deadline recovery across restart and replicas.",
           "Make the test-only restored PENDING cancellation path safe for production, including receipt recovery, deployed grants and cross-replica execution fencing. A real-process restart test passes using the proposed schema and test-only reader; it does not cover a crash after receipt commit.",
           "Establish scan fairness across restart and replicas, and verify shared-pool and cluster capacity under load.",
-          "Resolve the pinned Kubernetes lease extension incompatibility with db-scheduler programmatic jobs, then run two execution replicas and verify node loss and post-warmup recovery. An isolated kind experiment reaches PostgreSQL but both replicas remain unready before acquiring leases; enabling the composite scheduler alone still routes the lease job to db-scheduler. See experiments/wp109-kubernetes/README.md.",
+          "Harden and deploy the experimental lease scheduler bridge; verify node loss, deadline failover and stale-owner fencing. In kind, two replicas acquired member leases, and a replacement restored and completed one waiting workflow after a forced pod deletion; this is not node-loss or T12 proof. See experiments/wp109-kubernetes/README.md.",
           "Automate T12."
         ],
         "evidence": [

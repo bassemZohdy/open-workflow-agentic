@@ -21,6 +21,17 @@ with `quarkus.scheduler.use-composite-scheduler=true` also failed: the actual
 stack passed through `CompositeJobDefinition.schedule` into
 `DbSchedulerSchedulerImpl.newJob`, where the same exception was raised.
 
+An experimental CDI scheduler bridge, enabled only at build time, selects the
+local scheduler for the pinned Flow lease-job names and leaves other jobs on the
+existing scheduler. With that bridge and the composite scheduler enabled, two
+replicas became ready and acquired distinct member leases. After force-deleting
+the holder of member 00, a replacement acquired that lease, restored one waiting
+workflow after warmup, and completed it after a test event. A graceful deletion
+also cleared its member lease. The database still held the scheduled
+`audit-chain-verification` and `identity-grant-expiry` jobs in this run. This
+local test does not prove node failure, network partitions, mixed versions,
+duplicate-effect prevention or T12.
+
 The Maven profile `wp109-kube-experiment` adds the Kubernetes extension only to
 an explicitly selected experimental build. Build the app with that profile and
 copy the resulting `apps/app-runtime/target/quarkus-app` directory into this
@@ -34,7 +45,8 @@ For example, from a clean checkout on a machine with Java 21, Docker, kind and
 kubectl, the following uses a dedicated cluster and kubeconfig:
 
 ```sh
-mvn -B -pl apps/app-runtime -am package -Pwp109-kube-experiment -DskipTests
+mvn -B -pl apps/app-runtime -am package -Pwp109-kube-experiment -DskipTests \
+  -Dquarkus.scheduler.use-composite-scheduler=true -Dagentic.kube.scheduler-bridge=true
 mkdir -p target/wp109-image
 cp -R apps/app-runtime/target/quarkus-app target/wp109-image/
 cp experiments/wp109-kubernetes/Dockerfile target/wp109-image/
@@ -52,6 +64,6 @@ After collecting evidence, remove only the dedicated experiment with
 credentials in a shared environment.
 
 The cluster resources, test profile and embedded credentials are intentionally
-isolated and are not a production-ready Kubernetes configuration. Scheduled
-lease compatibility, actual takeover, deadline enforcement and in-flight side
-effect fencing all remain open.
+isolated and are not a production-ready Kubernetes configuration. The bridge is not enabled in the default build. Production rollout, compatibility
+across extension versions, deadline failover and in-flight side-effect fencing
+remain open.
