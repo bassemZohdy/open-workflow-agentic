@@ -105,6 +105,7 @@ public class Reconciler {
     private final RepairStore repairs;
     private final LifecycleSettings settings;
     private final DataSource dataSource;
+    private final StartAdmission coordinationBudget;
     private final Clock clock;
     private final Predicate<String> tenantScope;
     private RegistryScan.DeadlineRef lifetimeCursor;
@@ -119,8 +120,17 @@ public class Reconciler {
 
     @Inject
     public Reconciler(InstanceStore store, WorkflowEngine engine, EngineStatusSync sync, RegistryScan scan,
-                      RepairStore repairs, LifecycleSettings settings, DataSource dataSource, ResumeGate gate,RestoreCheckpointGate checkpoints) {
-        this(store, engine, sync, scan, repairs, settings, dataSource, Clock.systemUTC(), tenant -> true, gate,checkpoints);
+                      RepairStore repairs, LifecycleSettings settings, DataSource dataSource, ResumeGate gate,
+                      RestoreCheckpointGate checkpoints, StartAdmission coordinationBudget) {
+        this(store, engine, sync, scan, repairs, settings, dataSource, Clock.systemUTC(), tenant -> true, gate,
+                checkpoints, Objects.requireNonNull(coordinationBudget, "coordinationBudget"));
+    }
+
+    /** Existing explicit callers can provide a shared budget via the full constructor. */
+    public Reconciler(InstanceStore store, WorkflowEngine engine, EngineStatusSync sync, RegistryScan scan,
+                      RepairStore repairs, LifecycleSettings settings, DataSource dataSource, ResumeGate gate,
+                      RestoreCheckpointGate checkpoints) {
+        this(store, engine, sync, scan, repairs, settings, dataSource, Clock.systemUTC(), tenant -> true, gate, checkpoints);
     }
 
     public Reconciler(InstanceStore store,WorkflowEngine engine,EngineStatusSync sync,RegistryScan scan,
@@ -148,6 +158,13 @@ public class Reconciler {
     public Reconciler(InstanceStore store,WorkflowEngine engine,EngineStatusSync sync,RegistryScan scan,
                       RepairStore repairs,LifecycleSettings settings,DataSource dataSource,Clock clock,
                       Predicate<String> tenantScope,ResumeGate gate,RestoreCheckpointGate checkpoints) {
+        this(store, engine, sync, scan, repairs, settings, dataSource, clock, tenantScope, gate, checkpoints, null);
+    }
+
+    public Reconciler(InstanceStore store,WorkflowEngine engine,EngineStatusSync sync,RegistryScan scan,
+                      RepairStore repairs,LifecycleSettings settings,DataSource dataSource,Clock clock,
+                      Predicate<String> tenantScope,ResumeGate gate,RestoreCheckpointGate checkpoints,
+                      StartAdmission coordinationBudget) {
         this.gate = Objects.requireNonNull(gate, "gate");
         this.checkpoints=Objects.requireNonNull(checkpoints,"checkpoints");
         this.store = Objects.requireNonNull(store, "store");
@@ -157,6 +174,7 @@ public class Reconciler {
         this.repairs = Objects.requireNonNull(repairs, "repairs");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
+        this.coordinationBudget = coordinationBudget;
         this.clock = Objects.requireNonNull(clock, "clock");
         this.tenantScope = Objects.requireNonNull(tenantScope, "tenantScope");
         this.state = settings.reconcilerEnabled ? State.AWAITING_WARMUP : State.DISABLED;
@@ -775,20 +793,23 @@ public class Reconciler {
      * lock lives on its own connection; the work takes its own connections, so the lock never blocks the work.
      */
     private boolean withInstance(String instanceId, Runnable work) {
-        Optional<AdvisoryLock> lock;
+        if (coordinationBudget != null && !coordinationBudget.tryAcquire()) return false;
         try {
-            lock = AdvisoryLock.tryAcquire(dataSource, "instance:" + instanceId);
-        } catch (SQLException e) {
-            throw new StoreUnavailableException("the registry database failed while taking a repair lock", e);
-        }
-        if (lock.isEmpty()) {
-            return false;
-        }
-        try (AdvisoryLock held = lock.get()) {
-            work.run();
-            return true;
-        } catch (SQLException e) {
-            throw new StoreUnavailableException("the registry database failed while releasing a repair lock", e);
+            Optional<AdvisoryLock> lock;
+            try {
+                lock = AdvisoryLock.tryAcquire(dataSource, "instance:" + instanceId);
+            } catch (SQLException e) {
+                throw new StoreUnavailableException("the registry database failed while taking a repair lock", e);
+            }
+            if (lock.isEmpty()) return false;
+            try (AdvisoryLock held = lock.get()) {
+                work.run();
+                return true;
+            } catch (SQLException e) {
+                throw new StoreUnavailableException("the registry database failed while releasing a repair lock", e);
+            }
+        } finally {
+            if (coordinationBudget != null) coordinationBudget.release();
         }
     }
 

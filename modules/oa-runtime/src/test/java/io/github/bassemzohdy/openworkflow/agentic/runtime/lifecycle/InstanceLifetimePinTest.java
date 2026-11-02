@@ -151,8 +151,17 @@ class InstanceLifetimePinTest {
             try {
                 var first = executor.submit(() -> service.start(firstRequest));
                 assertTrue(entered.await(10, TimeUnit.SECONDS));
-                assertFalse(service.start(firstRequest).created());
+                var duplicate = service.start(firstRequest);
+                assertFalse(duplicate.created());
                 assertThrows(StartCapacityException.class, () -> service.start(other));
+                var config = settings(Optional.empty());
+                var pooledScan = new RegistryScan(pool);
+                var repair = new Reconciler(new JdbcInstanceStore(pool), engine,
+                        new EngineStatusSync(new JdbcInstanceStore(pool), pooledScan, config, Clock.fixed(start, ZoneOffset.UTC)),
+                        pooledScan, new RepairStore(pool), config, pool, Clock.fixed(start, ZoneOffset.UTC),
+                        firstRequest.tenant()::equals, ResumeGate.ALLOW, RestoreCheckpointGate.ALLOW, admission);
+                assertTimeoutPreemptively(Duration.ofSeconds(2), () ->
+                        assertEquals(1, repair.retry(firstRequest.tenant(), duplicate.record().id().value()).count("busy")));
                 release.countDown(); assertTrue(first.get(10, TimeUnit.SECONDS).created());
                 assertTrue(service.start(other).created());
             } finally { release.countDown(); executor.shutdownNow(); }
@@ -165,6 +174,44 @@ class InstanceLifetimePinTest {
         try (var pool = io.agroal.api.AgroalDataSource.from(one)) {
             assertThrows(IllegalArgumentException.class, () -> new StartAdmission(4, pool));
         }
+    }
+
+    @Test void activeRepairSharesItsCoordinationBudgetWithNewStarts() throws Exception {
+        var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        var initial = request(); var other = request(); var admission = new StartAdmission(1);
+        var row = InstanceRecord.starting(UlidGenerator.shared().next(), initial, start);
+        store.insertIfAbsent(row, "test.start");
+        WorkflowEngine engine = new WorkflowEngine() {
+            public boolean hasDefinition(DefinitionRef ignored) { return true; }
+            public EngineLaunch prepare(DefinitionRef ignored, Map<String, Object> input) {
+                entered.countDown();
+                try { if (!release.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("timed out"); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                return new EngineLaunch() {
+                    public String engineInstanceId() { return "repair-budget-" + UUID.randomUUID(); }
+                    public void start() { }
+                };
+            }
+        };
+        var config = settings(Optional.empty());
+        var repair = new Reconciler(store, engine, new EngineStatusSync(store, scan, config, Clock.fixed(start, ZoneOffset.UTC)),
+                scan, new RepairStore(db), config, db, Clock.fixed(start, ZoneOffset.UTC), initial.tenant()::equals,
+                ResumeGate.ALLOW, RestoreCheckpointGate.ALLOW, admission);
+        var service = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start, ZoneOffset.UTC),
+                UlidGenerator.shared(), config, db, admission);
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var pending = executor.submit(() -> repair.retry(initial.tenant(), row.id().value()));
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            assertThrows(StartCapacityException.class, () -> service.start(other));
+            assertTrue(store.findByKey(other.tenant(), other.idempotencyKey()).isEmpty());
+            release.countDown(); pending.get(10, TimeUnit.SECONDS);
+            assertTrue(service.start(other).created());
+            try (var held = Reconciler.AdvisoryLock.tryAcquire(db, "instance:" + row.id().value()).orElseThrow()) {
+                assertEquals(1, repair.retry(initial.tenant(), row.id().value()).count("busy"));
+                assertTrue(service.start(request()).created(), "a failed lock attempt must release the budget");
+            }
+        } finally { release.countDown(); executor.shutdownNow(); }
     }
 
     @Test void simultaneousSameKeyWaitsForTheCreatingTransactionEvenWhenCapacityIsFull() throws Exception {
