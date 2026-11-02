@@ -1,5 +1,7 @@
 # Changelog
 
+- Support bounded string path parameters in pinned OpenAPI effect registrations, binding the resolved path and JSON body to the governed occurrence.
+
 - Require a declared supported OpenAPI bearer or OAuth2 security scheme, matching OAuth operation scopes to pinned credentials; real token verification and production approval remain separate.
 
 - Support bounded local OpenAPI request-body and response references in the governed effect selector, and verify a ledger-backed loopback request and retry.

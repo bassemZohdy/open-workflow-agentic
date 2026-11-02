@@ -10,22 +10,27 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEnco
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedToolGateway;
 import java.net.URI;
 import java.time.Duration;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
 /** Explicit, trusted composition of a digest-pinned OpenAPI 3.1 JSON POST with the governed effect gateway.
  * This narrow subset is not a general OpenAPI validator, approval source, credential verifier or CDI wiring.
- * The trusted base URI overrides document servers; parameters, remote references and path templates are unsupported.
+ * The trusted base URI overrides document servers; only bounded string path parameters are supported.
  */
 public final class PinnedOpenApiEffect {
     private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64)
                     .maxStringLength(262_144).maxNumberLength(128).build()).build())
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS, DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS,
+                    DeserializationFeature.USE_BIG_INTEGER_FOR_INTS);
     private static final Set<String> METHODS = Set.of("get", "put", "post", "delete", "options", "head", "patch", "trace");
     private final String documentDigest, operationId, schema;
     private final URI endpoint;
+    private final String endpointTemplate;
+    private final List<String> pathParameters;
     private final Set<Integer> documentedResponses;
     private final boolean loopbackTest;
     private final Set<String> oauthScopes;
@@ -70,10 +75,11 @@ public final class PinnedOpenApiEffect {
                 }
             }
         }
-        if (matches != 1 || path == null || !path.matches("/(?:[A-Za-z0-9_~-]+(?:\\.[A-Za-z0-9_~-]+)*/?)+")
-                || selectedPath.has("$ref") || selectedPath.has("parameters") || selected.has("parameters")
+        if (matches != 1 || path == null
+                || selectedPath.has("$ref") || selectedPath.has("parameters")
                 || selectedPath.has("servers") || selected.has("servers"))
-            throw new IllegalArgumentException("operation must be unique, fixed-path and parameter-free");
+            throw new IllegalArgumentException("operation must be unique without path-level overrides");
+        this.pathParameters = pathParameters(path);
         this.oauthScopes = securityScopes(root, selected);
         JsonNode request = resolveObject(selected.path("requestBody"), root.path("components").path("requestBodies"), "requestBodies");
         JsonNode input = request.path("content").path("application/json").path("schema");
@@ -81,7 +87,7 @@ public final class PinnedOpenApiEffect {
             throw new IllegalArgumentException("required JSON object schema is required");
         JsonNode resolved = resolveSchema(input, root.path("components").path("schemas"), new java.util.HashSet<>(), new int[]{0}, 0);
         if (!"object".equals(resolved.path("type").asText())) throw new IllegalArgumentException("JSON object schema required");
-        this.schema = resolved.toString();
+        this.schema = requestSchema(resolved, selected.get("parameters"), root.path("components").path("schemas"), pathParameters);
         if (CanonicalEncoder.strictUtf8(schema).length > 65_536) throw new IllegalArgumentException("resolved schema exceeds 64 KiB");
         JsonNode responses = selected.path("responses");
         if (!responses.isObject()) throw new IllegalArgumentException("documented responses required");
@@ -96,7 +102,10 @@ public final class PinnedOpenApiEffect {
             }
         }
         this.documentedResponses = Set.copyOf(allowed);
-        this.endpoint = URI.create(trustedOrigin.toString().replaceAll("/$", "") + path);
+        this.endpointTemplate = trustedOrigin.toString().replaceAll("/$", "") + path;
+        String example = endpointTemplate;
+        for (String parameter : pathParameters) example = example.replace("{" + parameter + "}", "x");
+        this.endpoint = URI.create(example);
     }
 
     /** Trusted composition only. Gateway validation occurs before target binding and no network I/O occurs here. */
@@ -108,7 +117,7 @@ public final class PinnedOpenApiEffect {
             throw new IllegalArgumentException("credential scopes differ from the OpenAPI operation");
         if (!documentedResponses.containsAll(statuses)) throw new IllegalArgumentException("confirmation response is not documented");
         var encoder = new CanonicalEncoder("oa.openapi.effect.v1").text(documentDigest).text(operationId)
-                .text(endpoint.toASCIIString()).text(target).text(audience).text(correlation)
+                .text(endpointTemplate).text(target).text(audience).text(correlation)
                 .number(timeout.getSeconds()).number(timeout.getNano()).text(expectation.issuer())
                 .text(expectation.grantId().toString()).number(expectation.scopes().size());
         expectation.scopes().stream().sorted().forEach(encoder::text);
@@ -117,8 +126,86 @@ public final class PinnedOpenApiEffect {
         // Construct once at registration to reject malformed pinned configuration before any tool call.
         new PinnedHttpEffectTarget(target, endpoint, audience, correlation, "{}", timeout, statuses, expectation, credentials, fence, loopbackTest);
         return GovernedToolGateway.Registration.effectful(schema, "{}", timeout, fingerprint, target,
-                body -> new PinnedHttpEffectTarget(target, endpoint, audience, correlation, body, timeout,
-                        statuses, expectation, credentials, fence, loopbackTest));
+                arguments -> {
+                    BoundRequest bound = bind(arguments);
+                    return new PinnedHttpEffectTarget(target, bound.endpoint(), audience, correlation, bound.body(), timeout,
+                            statuses, expectation, credentials, fence, loopbackTest);
+                });
+    }
+
+    private record BoundRequest(URI endpoint, String body) { }
+
+    private BoundRequest bind(String arguments) {
+        if (pathParameters.isEmpty()) return new BoundRequest(endpoint, arguments);
+        try {
+            JsonNode input = JSON.readTree(arguments);
+            if (input == null || !input.isObject() || input.size() != 2 || !input.path("path").isObject()
+                    || !input.path("body").isObject() || input.path("path").size() != pathParameters.size())
+                throw new IllegalArgumentException("invalid path and body arguments");
+            String target = endpointTemplate;
+            for (String name : pathParameters) {
+                JsonNode value = input.path("path").get(name);
+                if (value == null || !value.isTextual() || !value.textValue().matches("[A-Za-z0-9_-]{1,128}"))
+                    throw new IllegalArgumentException("invalid path parameter");
+                target = target.replace("{" + name + "}", value.textValue());
+            }
+            return new BoundRequest(URI.create(target), input.path("body").toString());
+        } catch (java.io.IOException invalid) { throw new IllegalArgumentException("invalid path and body arguments", invalid); }
+    }
+
+    private static List<String> pathParameters(String path) {
+        if (!path.startsWith("/") || path.length() > 2048) throw new IllegalArgumentException("invalid operation path");
+        var names = new LinkedHashSet<String>();
+        String[] parts = path.substring(1).split("/", -1);
+        for (int i = 0; i < parts.length; i++) {
+            String segment = parts[i];
+            if (segment.isEmpty() && i == parts.length - 1 && i > 0) continue;
+            if (segment.matches("\\{[A-Za-z][A-Za-z0-9_-]{0,63}\\}")) {
+                if (!names.add(segment.substring(1, segment.length() - 1)) || names.size() > 16)
+                    throw new IllegalArgumentException("duplicate or excessive path parameters");
+            } else if (!segment.matches("[A-Za-z0-9_~-]+(?:\\.[A-Za-z0-9_~-]+)*"))
+                throw new IllegalArgumentException("unsupported operation path");
+        }
+        return List.copyOf(names);
+    }
+
+    private static String requestSchema(JsonNode body, JsonNode parameters, JsonNode components, List<String> names) {
+        if (names.isEmpty()) {
+            if (parameters != null) throw new IllegalArgumentException("parameters without path templates are unsupported");
+            return body.toString();
+        }
+        if (parameters == null || !parameters.isArray() || parameters.size() != names.size())
+            throw new IllegalArgumentException("all path parameters must be declared exactly once");
+        var properties = JSON.createObjectNode();
+        var found = new java.util.HashSet<String>();
+        for (JsonNode parameter : parameters) {
+            if (parameter.isObject()) {
+                var fields = new java.util.HashSet<String>(); parameter.fieldNames().forEachRemaining(fields::add);
+                if (!Set.of("name", "in", "required", "schema", "description", "style", "explode", "deprecated").containsAll(fields))
+                    throw new IllegalArgumentException("unsupported path parameter field");
+            }
+            if (!parameter.isObject() || parameter.has("$ref") || !"path".equals(parameter.path("in").asText())
+                    || !parameter.path("required").isBoolean() || !parameter.path("required").asBoolean()
+                    || (parameter.has("style") && !"simple".equals(parameter.path("style").asText()))
+                    || (parameter.has("explode") && (!parameter.path("explode").isBoolean() || parameter.path("explode").asBoolean()))
+                    || parameter.has("content") || !parameter.path("name").isTextual())
+                throw new IllegalArgumentException("unsupported path parameter");
+            String name = parameter.path("name").asText();
+            if (!names.contains(name) || !found.add(name) || !parameter.path("schema").isObject())
+                throw new IllegalArgumentException("unknown or duplicate path parameter");
+            JsonNode paramSchema = resolveSchema(parameter.path("schema"), components, new java.util.HashSet<>(), new int[]{0}, 0);
+            if (!"string".equals(paramSchema.path("type").asText())) throw new IllegalArgumentException("string path parameter required");
+            var combined = JSON.createObjectNode(); var allOf = combined.putArray("allOf");
+            allOf.add(paramSchema); allOf.addObject().put("type", "string").put("pattern", "^[A-Za-z0-9_-]{1,128}$");
+            properties.set(name, combined);
+        }
+        var root = JSON.createObjectNode(); root.put("type", "object"); root.put("additionalProperties", false);
+        var required = root.putArray("required"); required.add("path"); required.add("body");
+        var fields = root.putObject("properties"); fields.set("body", body);
+        var pathObject = fields.putObject("path"); pathObject.put("type", "object"); pathObject.put("additionalProperties", false);
+        var requiredPath = pathObject.putArray("required"); names.forEach(requiredPath::add);
+        pathObject.set("properties", properties);
+        return root.toString();
     }
 
     private static JsonNode resolveObject(JsonNode node, JsonNode components, String category) {

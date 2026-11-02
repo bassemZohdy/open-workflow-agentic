@@ -889,10 +889,12 @@ class GovernedModelRunningControlTest {
     @Test void pinnedOpenApiToolSendsOneValidatedRequestThroughLedger() throws Exception {
         var calls = new AtomicInteger(); var payload = new AtomicReference<String>();
         var idempotency = new AtomicReference<String>(); var authorization = new AtomicReference<String>();
+        var requestPath = new AtomicReference<String>();
         var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/orders", exchange -> {
             try {
                 calls.incrementAndGet(); payload.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+                requestPath.set(exchange.getRequestURI().getRawPath());
                 idempotency.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
                 authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
                 exchange.sendResponseHeaders(200, -1);
@@ -904,10 +906,12 @@ class GovernedModelRunningControlTest {
                 var rig = new ToolEffectRig(entry);
                 String document = """
                         {"openapi":"3.1.0","security":[{"Bearer":[]}],"components":{"securitySchemes":{"Bearer":{"type":"http","scheme":"bearer"}},"schemas":{"Order":{"type":"object",
-                         "required":["amount"],"properties":{"amount":{"type":"integer","minimum":1}}}},
+                         "required":["amount"],"properties":{"amount":{"type":"number","minimum":1}}}},
                          "requestBodies":{"OrderBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}}},
                          "responses":{"Done":{"description":"done"}}},
-                         "paths":{"/orders":{"post":{"operationId":"createOrder","requestBody":{"$ref":"#/components/requestBodies/OrderBody"},
+                         "paths":{"/orders/{orderId}":{"post":{"operationId":"createOrder",
+                         "parameters":[{"name":"orderId","in":"path","required":true,"schema":{"type":"string"}}],
+                         "requestBody":{"$ref":"#/components/requestBodies/OrderBody"},
                          "responses":{"200":{"$ref":"#/components/responses/Done"}}}}}}
                         """;
                 String digest = io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder.sha256Hex(
@@ -933,11 +937,22 @@ class GovernedModelRunningControlTest {
                         event -> { }, Duration.ofSeconds(5), CLOCK);
                 var gateway = new GovernedToolGateway(registry, () -> Optional.of(rig.approved), profile, pep,
                         event -> { }, budget, CLOCK, new DurableEffects(rig.ledger, Clock.systemUTC()));
-                var call = rig.call("{\"amount\":10}");
+                for (String unsafe : List.of("../admin", "a/b", "%2f", ".", "x".repeat(129))) {
+                    var invalid = rig.call("{\"path\":{\"orderId\":\"" + unsafe + "\"},\"body\":{\"amount\":10}}");
+                    var invalidOccurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/invalid", invalid);
+                    assertThrows(ModelCallRefused.class, () -> gateway.invokeEffect(running, entry, rig.allocation, invalidOccurrence, invalid));
+                    assertTrue(rig.ledger.find(invalidOccurrence.effectCommand("registered:test").key()).isEmpty());
+                }
+                assertEquals(0, calls.get());
+                var call = rig.call("{\"path\":{\"orderId\":\"order_123\"},\"body\":{\"amount\":10.123456789012345678901}}");
                 var occurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/http", call);
                 assertEquals(EffectState.CONFIRMED, gateway.invokeEffect(running, entry, rig.allocation, occurrence, call).state());
                 assertEquals(EffectState.CONFIRMED, gateway.invokeEffect(running, entry, rig.allocation, occurrence, call).state());
-                assertEquals(1, calls.get()); assertEquals(call.argumentsJson(), payload.get());
+                var changed = rig.call("{\"path\":{\"orderId\":\"other\"},\"body\":{\"amount\":10.123456789012345678901}}");
+                var changedOccurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/http", changed);
+                assertThrows(IllegalStateException.class, () -> gateway.invokeEffect(running, entry, rig.allocation, changedOccurrence, changed));
+                assertEquals(1, calls.get()); assertEquals("{\"amount\":10.123456789012345678901}", payload.get());
+                assertEquals("/orders/order_123", requestPath.get());
                 assertEquals(occurrence.effectCommand("registered:test").key().idempotencyKey(), idempotency.get());
                 assertEquals("Bearer fixture-token", authorization.get());
                 return null;

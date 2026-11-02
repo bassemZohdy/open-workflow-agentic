@@ -137,4 +137,15 @@ class PinnedOpenApiEffectTest {
         String duplicate = oauth.replace("[{\"Bearer\":[\"orders:write\"]}]", "[{\"Bearer\":[\"orders:write\",\"orders:write\"]}]");
         assertThrows(IllegalArgumentException.class, () -> rawOperation(duplicate, "createOrder", ORIGIN));
     }
+
+    @Test void acceptsOnlyExplicitBoundedStringPathParameters() {
+        String templated = DOC.replace("/orders", "/orders/{orderId}")
+                .replace("\"operationId\":\"createOrder\"", "\"operationId\":\"createOrder\",\"parameters\":[{\"name\":\"orderId\",\"in\":\"path\",\"required\":true,\"schema\":{\"type\":\"string\"}}]");
+        assertNotNull(registration(operation(templated, "createOrder", ORIGIN), Set.of(200)));
+        assertThrows(IllegalArgumentException.class, () -> operation(templated.replace("\"required\":true,\"schema\":{\"type\":\"string\"}", "\"required\":false,\"schema\":{\"type\":\"string\"}"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(templated.replace("\"in\":\"path\"", "\"in\":\"query\""), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(templated.replace("\"name\":\"orderId\"", "\"name\":\"other\""), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(templated.replace("/orders/{orderId}", "/orders/{orderId}/{orderId}"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(templated.replace("\"style\":\"simple\"", "\"style\":\"label\"").replace("\"in\":\"path\"", "\"in\":\"path\",\"style\":\"label\""), "createOrder", ORIGIN));
+    }
 }
