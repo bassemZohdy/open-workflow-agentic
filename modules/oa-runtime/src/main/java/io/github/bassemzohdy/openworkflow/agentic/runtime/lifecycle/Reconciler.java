@@ -354,7 +354,16 @@ public class Reconciler {
                     row.version(), "reconciler.prepared", InstanceService.RUNTIME_ACTOR);
         } catch (StaleVersionException moved) {
             // An operator changed the row while the engine was prepared (for example a cancel, ADR 0019, amendment 4).
-            // The prepared engine instance is never started; the row says what the operator decided.
+            // The prepared engine instance is never started; ask the engine to remove it as the start path does.
+            try {
+                if (!launch.discard()) {
+                    LOG.warnf("prepared engine instance %s for %s could not be discarded after a registry race",
+                            launch.engineInstanceId(), row.id());
+                }
+            } catch (RuntimeException discardFailed) {
+                LOG.warnf(discardFailed, "could not discard prepared engine instance %s after a registry race",
+                        launch.engineInstanceId());
+            }
             repairs.record("start", row.id().value(), "superseded", "row changed while prepared; not started");
             return;
         }

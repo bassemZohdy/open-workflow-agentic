@@ -1,5 +1,7 @@
 # Changelog
 
+- Ask the engine to discard a prepared instance when a concurrent registry change supersedes a reconciler start; refused or failed discards are logged and never reverse the registry change.
+
 - Pin configured instance lifetime deadlines at creation so a later configuration increase or removal cannot extend them; stricter current settings still apply. Legacy starts, rolling upgrades and reconciliation requirements are documented.
 
 - Capture the original instance-start grant in additive migration V77.1 and require it for API retries, even after reauthorization. Older rows have unknown provenance and retry with a conflict; rolling replicas must all be upgraded to enforce the check.
