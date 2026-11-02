@@ -7,8 +7,9 @@ new approved resource-task allocation. The executor reads the existing budget an
 updates only its step or tool-call count. Neither role may own the tables or assume the other role.
 The opt-in proposed V78 allocation adapter can insert the tool budget in the same transaction as a fresh task and node
 budget. Its caller must supply the approved tool-call ceiling; this is not an approval source or production activation.
-The profiled variant also retains immutable tool profile data; the caller is responsible for obtaining real approval,
-and the local gateway does not yet enforce the retained profile.
+The profiled variant also retains immutable tool profile data; the caller is responsible for obtaining real approval.
+The local gateway checks that retained profile, but does not prove the supplied implementation digest identifies the
+deployed code; trusted registry composition must establish that binding.
 The separate preparation method must only be used when the caller has independently established that the task is new.
 Never backfill based on a missing row.
 

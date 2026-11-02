@@ -125,6 +125,71 @@ class ResourceTaskAllocationStoreTest {
         }
     }
 
+    @Test void retainedProfileAndBudgetGovernTheToolGateway() throws Exception {
+        var calls = new AtomicInteger();
+        var entry = new GovernedToolGateway.Registration("{\"type\":\"object\"}", "{\"type\":\"object\"}",
+                false, Duration.ofSeconds(2), "a".repeat(64), args -> { calls.incrementAndGet(); return "{}"; });
+        var registry = Map.of("tool:research", entry);
+        var profile = new ApprovedToolProfile("tool-profile", "1", GovernedToolGateway.configurationFingerprint(registry),
+                a.modelProfile().agent(), Set.of("tool:research"), 1, Duration.ofSeconds(2));
+        var allocated = store.allocateWithToolProfile(a, profile);
+        var budget = new JdbcToolCallBudget(data).openProfiled(allocated, profile);
+        var approved = new GovernedToolGateway.Approval(profile.agent(), a.contract(), 1000);
+        var pep = new io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep(request ->
+                new io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision("test",
+                        io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome.ALLOW, "allow",
+                        new io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef("test", "1"), Instant.now()), event -> { });
+        var gateway = new GovernedToolGateway(registry, () -> Optional.of(approved), profile, pep, event -> { }, budget, Clock.systemUTC());
+        var call = new io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall(a.contract().id(), "tool:research", "{}");
+        assertInstanceOf(io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult.Completed.class, gateway.invoke(call));
+        assertInstanceOf(io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult.Rejected.class, gateway.invoke(call));
+        assertEquals(1, calls.get());
+    }
+
+    @Test void retainedProfileCorruptionRefusesBeforeTheToolAndDoesNotConsumeBudget() throws Exception {
+        var calls = new AtomicInteger();
+        var entry = new GovernedToolGateway.Registration("{\"type\":\"object\"}", "{\"type\":\"object\"}",
+                false, Duration.ofSeconds(2), "a".repeat(64), args -> { calls.incrementAndGet(); return "{}"; });
+        var registry = Map.of("tool:research", entry);
+        var profile = new ApprovedToolProfile("tool-profile", "1", GovernedToolGateway.configurationFingerprint(registry),
+                a.modelProfile().agent(), Set.of("tool:research"), 1, Duration.ofSeconds(2));
+        var allocated = store.allocateWithToolProfile(a, profile);
+        var budget = new JdbcToolCallBudget(data).openProfiled(allocated, profile);
+        var approved = new GovernedToolGateway.Approval(profile.agent(), a.contract(), 1000);
+        var pep = new io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep(request ->
+                new io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision("test",
+                        io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome.ALLOW, "allow",
+                        new io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef("test", "1"), Instant.now()), event -> { });
+        var gateway = new GovernedToolGateway(registry, () -> Optional.of(approved), profile, pep, event -> { }, budget, Clock.systemUTC());
+        corrupt("update task.agent_tool_profile set profile_version='forged'");
+        var call = new io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall(a.contract().id(), "tool:research", "{}");
+        assertInstanceOf(io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult.Rejected.class, gateway.invoke(call));
+        assertEquals(0, calls.get());
+        assertEquals("0", scalar("select calls::text from task.agent_tool_budget"));
+    }
+
+    @Test void profileCorruptedDuringToolExecutionWithholdsTheOutput() throws Exception {
+        var calls = new AtomicInteger();
+        var entry = new GovernedToolGateway.Registration("{\"type\":\"object\"}", "{\"type\":\"object\"}",
+                true, Duration.ofSeconds(3), "a".repeat(64), args -> {
+                    calls.incrementAndGet(); corrupt("update task.agent_tool_profile set profile_version='forged'"); return "{}";
+                });
+        var registry = Map.of("tool:research", entry);
+        var profile = new ApprovedToolProfile("tool-profile", "1", GovernedToolGateway.configurationFingerprint(registry),
+                a.modelProfile().agent(), Set.of("tool:research"), 1, Duration.ofSeconds(3));
+        var allocated = store.allocateWithToolProfile(a, profile);
+        var budget = new JdbcToolCallBudget(data).openProfiled(allocated, profile);
+        var approved = new GovernedToolGateway.Approval(profile.agent(), a.contract(), 1000);
+        var pep = new io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep(request ->
+                new io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision("test",
+                        io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome.ALLOW, "allow",
+                        new io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef("test", "1"), Instant.now()), event -> { });
+        var gateway = new GovernedToolGateway(registry, () -> Optional.of(approved), profile, pep, event -> { }, budget, Clock.systemUTC());
+        var call = new io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall(a.contract().id(), "tool:research", "{}");
+        var result = assertInstanceOf(io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult.Failed.class, gateway.invoke(call));
+        assertTrue(result.effectMayHaveHappened()); assertEquals(1, calls.get());
+    }
+
     @Test void aLegacyToolBudgetIsNotSilentlyGivenAProfile() throws Exception {
         store.allocateWithToolBudget(a, 2);
         assertThrows(IllegalStateException.class, () -> store.allocateWithToolProfile(a, toolProfile("1")));
