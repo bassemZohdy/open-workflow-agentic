@@ -42,12 +42,15 @@ import org.bsc.langgraph4j.state.AgentState;
  * attempt remains counted and the action is refused before it runs.
  *
  * <p>Every attempt counts, including retries and failures, so a loop cannot run past the limit by failing. One
- * interceptor is made for one run; its counter is not shared. Policy checks for what a node does (tool, model) stay
+ * interceptor is made for one run; its local counter is not shared. When provided, a durable budget also counts
+ * across runtimes. Policy checks for what a node does (tool, model) stay
  * in the PEP boundaries the node calls, which this class does not replace.
  *
  * <p>The audit event carries the node name, run id and step number only. It never carries node input or output.
  */
 public final class NodeInterceptor {
+    /** Private, per-approved-task persistent admission and deadline checks. */
+    public interface DurableBudget { void admit(); void requireCurrent(); }
 
     private final Subject actor;
     private final String runId;
@@ -57,6 +60,7 @@ public final class NodeInterceptor {
     private final AtomicInteger steps = new AtomicInteger();
     private final Instant deadline;
     private final Duration maxWallClock;
+    private DurableBudget durable;
 
     /** Step limit only, no wall-clock limit. */
     public NodeInterceptor(Subject actor, String runId, int maxSteps, AuditSink audit, Clock clock) {
@@ -68,6 +72,14 @@ public final class NodeInterceptor {
                                             Clock clock) {
         Objects.requireNonNull(limits, "limits");
         return new NodeInterceptor(actor, runId, limits.maxIterations(), limits.maxWallClock(), audit, clock);
+    }
+
+    /** Uses the durable budget in addition to this interceptor's local bounds. */
+    public static NodeInterceptor forLimits(Subject actor, String runId, ExecutionLimits limits, AuditSink audit,
+                                            Clock clock, DurableBudget durable) {
+        var interceptor = forLimits(actor, runId, limits, audit, clock);
+        interceptor.durable = Objects.requireNonNull(durable, "durable");
+        return interceptor;
     }
 
     /** @param maxWallClock the time from now after which no node is admitted, or null for none */
@@ -85,7 +97,7 @@ public final class NodeInterceptor {
         this.deadline = maxWallClock == null ? null : clock.instant().plus(maxWallClock);
     }
 
-    /** Steps counted so far. Attempts refused at the limit are not counted. */
+    /** Local attempts counted so far; a refusal by a durable budget may occur after this local count increments. */
     public int stepsCounted() {
         return steps.get();
     }
@@ -120,6 +132,13 @@ public final class NodeInterceptor {
                 throw new NodeRefused("step limit " + maxSteps + " reached before node " + node);
             }
             if (steps.compareAndSet(current, current + 1)) {
+                if (durable != null) {
+                    try { durable.admit(); }
+                    catch (RuntimeException failure) {
+                        record("agent.node.refused", node, current, "durable budget refused or unavailable", false);
+                        throw failure;
+                    }
+                }
                 return current + 1;
             }
         }
@@ -130,6 +149,13 @@ public final class NodeInterceptor {
     }
 
     private void requireCurrentDeadline(String node, int step, boolean result) {
+        if (durable != null) {
+            try { durable.requireCurrent(); }
+            catch (RuntimeException failure) {
+                record("agent.node.refused", node, step, "durable deadline refused or unavailable", false);
+                throw failure;
+            }
+        }
         if (deadline != null && !clock.instant().isBefore(deadline)) {
             record("agent.node.refused", node, step, "wall-clock limit " + maxWallClock + " reached", false);
             throw new NodeRefused("wall-clock limit " + maxWallClock + (result ? " reached before releasing result of node " : " reached before node ") + node);
