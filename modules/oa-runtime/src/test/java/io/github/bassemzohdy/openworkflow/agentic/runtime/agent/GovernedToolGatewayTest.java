@@ -37,8 +37,9 @@ class GovernedToolGatewayTest {
         DecisionOutcome outcome = DecisionOutcome.ALLOW;
         Runnable duringAudit = () -> { };
         boolean mutating;
+        Duration timeout = Duration.ofSeconds(2);
         GovernedToolGateway gateway() {
-            var registration = new GovernedToolGateway.Registration(INPUT, OUTPUT, mutating, tool);
+            var registration = new GovernedToolGateway.Registration(INPUT, OUTPUT, mutating, timeout, tool);
             var pep = new Pep(request -> { decisions.incrementAndGet(); return new Decision("test", outcome, "test", POLICY, NOW); },
                     event -> { audits.incrementAndGet(); duringAudit.run(); }, Duration.ofSeconds(5), CLOCK);
             return new GovernedToolGateway(Map.of("search", registration), () -> Optional.ofNullable(approval.get()), pep,
@@ -107,7 +108,7 @@ class GovernedToolGatewayTest {
         for (String key : new String[] {"$ref", "$dynamicRef", "$recursiveRef", "$id", "$schema"}) {
             String schema = "{\"" + key + "\":\"https://example.invalid/schema\"}";
             assertThrows(IllegalArgumentException.class,
-                    () -> new GovernedToolGateway.Registration(schema, OUTPUT, false, args -> "{}"));
+                    () -> new GovernedToolGateway.Registration(schema, OUTPUT, false, Duration.ofSeconds(1), args -> "{}"));
         }
     }
 
@@ -140,7 +141,7 @@ class GovernedToolGatewayTest {
         var rig = new Rig();
         var reg = new GovernedToolGateway.Registration(
                 "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"format\":\"email\"}}}",
-                OUTPUT, false, rig.tool);
+                OUTPUT, false, Duration.ofSeconds(1), rig.tool);
         var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
                 event -> { }, Duration.ofSeconds(5), CLOCK);
         var gateway = new GovernedToolGateway(Map.of("search", reg), () -> Optional.of(APPROVAL), pep, event -> { }, CLOCK);
@@ -148,12 +149,106 @@ class GovernedToolGatewayTest {
         assertEquals(0, rig.calls.get());
     }
 
-    @Test void interruptionIsPreservedAndMutatingOutcomeIsUncertain() {
+    @Test void interruptionOfTheCallerIsPreservedAndMutatingOutcomeIsUncertain() throws Exception {
         var rig = new Rig(); rig.mutating = true;
-        rig.tool = args -> { throw new InterruptedException("private"); };
+        var started = new java.util.concurrent.CountDownLatch(1);
+        rig.tool = args -> { started.countDown(); new java.util.concurrent.CountDownLatch(1).await(); return "{}"; };
+        var result = new AtomicReference<ToolResult>();
+        var interrupted = new java.util.concurrent.atomic.AtomicBoolean();
+        var thread = new Thread(() -> {
+            result.set(rig.gateway().invoke(CALL));
+            interrupted.set(Thread.currentThread().isInterrupted());
+        });
+        thread.start();
+        assertTrue(started.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        thread.interrupt(); thread.join(5000);
+        assertFalse(thread.isAlive());
+        assertTrue(assertInstanceOf(ToolResult.Failed.class, result.get()).effectMayHaveHappened());
+        assertTrue(interrupted.get());
+    }
+
+    @Test void timeoutWithholdsLateOutputAndDoesNotAssumeTheToolStopped() throws Exception {
+        var rig = new Rig(); rig.mutating = true; rig.timeout = Duration.ofMillis(100);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var finished = new java.util.concurrent.CountDownLatch(1);
+        rig.tool = args -> {
+            rig.calls.incrementAndGet();
+            try {
+                while (true) try { release.await(); break; } catch (InterruptedException ignored) { }
+                return "{\"result\":\"late private output\"}";
+            } finally { finished.countDown(); }
+        };
         try {
-            assertTrue(assertInstanceOf(ToolResult.Failed.class, rig.gateway().invoke(CALL)).effectMayHaveHappened());
-            assertTrue(Thread.currentThread().isInterrupted());
-        } finally { Thread.interrupted(); }
+            var result = assertInstanceOf(ToolResult.Failed.class, rig.gateway().invoke(CALL));
+            assertTrue(result.effectMayHaveHappened());
+            assertEquals(1, rig.calls.get());
+            assertEquals(1, finished.getCount(), "cancellation is not proof that the tool stopped");
+            assertFalse(result.reason().contains("private"));
+        } finally { release.countDown(); assertTrue(finished.await(5, java.util.concurrent.TimeUnit.SECONDS)); }
+    }
+
+    @Test void stalledTimedOutToolsCannotCreateUnboundedWorkers() throws Exception {
+        var rig = new Rig(); rig.mutating = true; rig.timeout = Duration.ofMillis(100);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var started = new java.util.concurrent.CountDownLatch(GovernedToolGateway.MAX_IN_FLIGHT);
+        var finished = new java.util.concurrent.CountDownLatch(GovernedToolGateway.MAX_IN_FLIGHT);
+        rig.tool = args -> {
+            rig.calls.incrementAndGet(); started.countDown();
+            try { while (true) try { release.await(); break; } catch (InterruptedException ignored) { } }
+            finally { finished.countDown(); }
+            return "{\"result\":\"late\"}";
+        };
+        try {
+            var gateway = rig.gateway();
+            for (int i = 0; i < GovernedToolGateway.MAX_IN_FLIGHT; i++)
+                assertInstanceOf(ToolResult.Failed.class, gateway.invoke(CALL));
+            assertTrue(started.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(CALL));
+            assertEquals(GovernedToolGateway.MAX_IN_FLIGHT, rig.calls.get());
+        } finally { release.countDown(); assertTrue(finished.await(5, java.util.concurrent.TimeUnit.SECONDS)); }
+    }
+
+    @Test void registrationRequiresABoundedPositiveTimeout() {
+        for (Duration timeout : new Duration[] {Duration.ZERO, Duration.ofNanos(1), Duration.ofMinutes(2)})
+            assertThrows(IllegalArgumentException.class,
+                    () -> new GovernedToolGateway.Registration(INPUT, OUTPUT, false, timeout, args -> "{}"));
+    }
+
+    @Test void approvalUnavailableOnTheWorkerRefusesBeforeCallingTheTool() {
+        var rig = new Rig();
+        var registration = new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofSeconds(1), rig.tool);
+        var caller = Thread.currentThread();
+        var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
+                event -> { }, Duration.ofSeconds(5), CLOCK);
+        var gateway = new GovernedToolGateway(Map.of("search", registration),
+                () -> Thread.currentThread() == caller ? Optional.of(APPROVAL) : Optional.empty(), pep, event -> { }, CLOCK);
+        assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(CALL));
+        assertEquals(0, rig.calls.get());
+    }
+
+    @Test void aTimedOutWorkerCannotStartTheToolAfterAStalledApprovalLookup() throws Exception {
+        var caller = Thread.currentThread();
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var lookupFinished = new java.util.concurrent.CountDownLatch(1);
+        var invoked = new java.util.concurrent.CountDownLatch(1);
+        var reg = new GovernedToolGateway.Registration(INPUT, OUTPUT, true, Duration.ofMillis(150),
+                args -> { invoked.countDown(); return "{\"result\":\"late\"}"; });
+        var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
+                event -> { }, Duration.ofSeconds(5), CLOCK);
+        var gateway = new GovernedToolGateway(Map.of("search", reg), () -> {
+            if (Thread.currentThread() != caller) {
+                entered.countDown();
+                try { while (true) try { release.await(); break; } catch (InterruptedException ignored) { } }
+                finally { lookupFinished.countDown(); }
+            }
+            return Optional.of(APPROVAL);
+        }, pep, event -> { }, CLOCK);
+        try {
+            assertTrue(assertInstanceOf(ToolResult.Failed.class, gateway.invoke(CALL)).effectMayHaveHappened());
+            assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS));
+        } finally { release.countDown(); }
+        assertTrue(lookupFinished.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertFalse(invoked.await(300, java.util.concurrent.TimeUnit.MILLISECONDS));
     }
 }
