@@ -1463,7 +1463,7 @@
       "progress": {
         "status": "partial",
         "implemented": [
-          "An explicitly composed local tool gateway validates registered input/output schemas, the approved task allow-list and an audited policy decision. It rechecks approval around policy, audit and tool execution, including on the worker; start and completion audit records are mandatory, with refusal/failure records attempted best effort. Registered tool callbacks have an explicit bounded wait and a shared eight-worker, no-queue bulkhead. A timed-out callback may continue and occupies capacity until it stops; its output is withheld and mutating effects remain uncertain. It does not activate any tool or provide MCP, durable call budget, trusted approval source, transport-level cancellation or effect-ledger integration."
+          "An explicitly composed local tool gateway validates registered input/output schemas, the approved task allow-list and an audited policy decision. It rechecks approval around policy, audit and tool execution, including on the worker; start and completion audit records are mandatory, with refusal/failure records attempted best effort. Registered callbacks have an explicit bounded wait and a shared eight-worker, no-queue bulkhead. Each call uses a fresh thread without inheritable caller thread-locals. A timed-out callback may continue and occupies capacity until it stops; its output is withheld and mutating effects remain uncertain. It does not activate any tool or provide MCP, durable call budget, trusted approval source, transport-level cancellation or effect-ledger integration."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [

@@ -28,10 +28,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -43,14 +41,9 @@ import java.util.concurrent.TimeoutException;
  */
 public final class GovernedToolGateway implements ToolGateway {
     private static final int MAX_JSON = 65_536;
-    /** No queue: a stuck tool retains its worker, limiting the number of unfinished physical calls. */
+    /** No queue: a stuck tool retains its slot, limiting the number of unfinished physical calls. */
     static final int MAX_IN_FLIGHT = 8;
-    private static final ThreadPoolExecutor WORKERS = new ThreadPoolExecutor(0, MAX_IN_FLIGHT, 30, TimeUnit.SECONDS,
-            new SynchronousQueue<>(), task -> {
-                var thread = new Thread(task, "governed-tool");
-                thread.setDaemon(true);
-                return thread;
-            }, new ThreadPoolExecutor.AbortPolicy());
+    private static final Semaphore WORKER_SLOTS = new Semaphore(MAX_IN_FLIGHT);
     private static final ObjectMapper JSON = new ObjectMapper();
     static {
         JSON.getFactory().setStreamReadConstraints(StreamReadConstraints.builder()
@@ -128,12 +121,23 @@ public final class GovernedToolGateway implements ToolGateway {
         if (!same(approved)) return reject(call, approved, attempt, "tool approval changed");
         if (Thread.currentThread().isInterrupted()) return reject(call, approved, attempt, "tool caller was interrupted");
         var mayStart = new java.util.concurrent.atomic.AtomicBoolean(true);
-        final Future<String> future;
-        try { future = WORKERS.submit(() -> {
+        if (!WORKER_SLOTS.tryAcquire()) return reject(call, approved, attempt, "tool capacity is unavailable");
+        var future = new FutureTask<String>(() -> {
             if (!same(approved) || !mayStart.compareAndSet(true, false)) throw new ApprovalExpired();
             return entry.tool.invoke(call.argumentsJson());
-        }); }
-        catch (RejectedExecutionException saturated) { return reject(call, approved, attempt, "tool capacity is unavailable"); }
+        });
+        try {
+            // A new thread prevents ordinary thread-local values from leaking between tool calls; inheritable caller
+            // locals are disabled too. The slot belongs to the physical worker, not the cancellable Future.
+            Thread.ofPlatform().name("governed-tool").daemon(true).inheritInheritableThreadLocals(false)
+                    .unstarted(() -> { try { future.run(); } finally { WORKER_SLOTS.release(); } }).start();
+        } catch (RuntimeException cannotStart) {
+            WORKER_SLOTS.release();
+            return reject(call, approved, attempt, "tool worker could not start");
+        } catch (Error cannotStart) {
+            WORKER_SLOTS.release();
+            throw cannotStart;
+        }
         final String answer;
         try { answer = future.get(entry.timeout.toNanos(), TimeUnit.NANOSECONDS); }
         catch (InterruptedException interrupted) {
