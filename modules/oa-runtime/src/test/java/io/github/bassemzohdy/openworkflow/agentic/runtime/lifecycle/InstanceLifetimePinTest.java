@@ -121,6 +121,52 @@ class InstanceLifetimePinTest {
         } finally { release.countDown(); executor.shutdownNow(); }
     }
 
+    @Test void smallAgroalPoolKeepsOneConnectionAvailableForRegistryWork() throws Exception {
+        var configuration = new io.agroal.api.configuration.supplier.AgroalDataSourceConfigurationSupplier();
+        var poolConfig = configuration.connectionPoolConfiguration();
+        poolConfig.maxSize(2).acquisitionTimeout(Duration.ofSeconds(3));
+        poolConfig.connectionFactoryConfiguration().connectionProviderClass(org.postgresql.Driver.class)
+                .jdbcUrl(db.getURL()).principal(new io.agroal.api.security.NamePrincipal(db.getUser()))
+                .credential(new io.agroal.api.security.SimplePassword(db.getPassword()));
+        try (var pool = io.agroal.api.AgroalDataSource.from(configuration)) {
+            var admission = new StartAdmission(4, pool);
+            assertEquals(1, admission.capacity());
+            var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+            WorkflowEngine engine = new WorkflowEngine() {
+                public boolean hasDefinition(DefinitionRef ignored) { return true; }
+                public EngineLaunch prepare(DefinitionRef ignored, Map<String, Object> input) {
+                    return new EngineLaunch() {
+                        public String engineInstanceId() { return "pooled-" + UUID.randomUUID(); }
+                        public void start() {
+                            entered.countDown();
+                            try { if (!release.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("timed out"); }
+                            catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                        }
+                    };
+                }
+            };
+            var service = new InstanceService(new JdbcInstanceStore(pool), engine, LifecycleFaults.none(),
+                    Clock.fixed(start, ZoneOffset.UTC), UlidGenerator.shared(), settings(Optional.empty()), pool, admission);
+            var firstRequest = request(); var other = request(); var executor = Executors.newSingleThreadExecutor();
+            try {
+                var first = executor.submit(() -> service.start(firstRequest));
+                assertTrue(entered.await(10, TimeUnit.SECONDS));
+                assertFalse(service.start(firstRequest).created());
+                assertThrows(StartCapacityException.class, () -> service.start(other));
+                release.countDown(); assertTrue(first.get(10, TimeUnit.SECONDS).created());
+                assertTrue(service.start(other).created());
+            } finally { release.countDown(); executor.shutdownNow(); }
+        }
+        var one = new io.agroal.api.configuration.supplier.AgroalDataSourceConfigurationSupplier();
+        one.connectionPoolConfiguration().maxSize(1).connectionFactoryConfiguration()
+                .connectionProviderClass(org.postgresql.Driver.class).jdbcUrl(db.getURL())
+                .principal(new io.agroal.api.security.NamePrincipal(db.getUser()))
+                .credential(new io.agroal.api.security.SimplePassword(db.getPassword()));
+        try (var pool = io.agroal.api.AgroalDataSource.from(one)) {
+            assertThrows(IllegalArgumentException.class, () -> new StartAdmission(4, pool));
+        }
+    }
+
     @Test void simultaneousSameKeyWaitsForTheCreatingTransactionEvenWhenCapacityIsFull() throws Exception {
         var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
         var engine = new Engine(); var request = request();

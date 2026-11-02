@@ -17,7 +17,7 @@ class StartCapacityApiTest {
     public static final class Profile implements QuarkusTestProfile {
         public Map<String, String> getConfigOverrides() {
             return Map.of("agentic.dev.trust-caller-headers", "true", "agentic.reconciler.enabled", "false",
-                    "agentic.lifecycle.max-concurrent-starts", "1");
+                    "agentic.lifecycle.max-concurrent-starts", "4", "quarkus.datasource.jdbc.max-size", "2");
         }
     }
     @Inject CountingWorkflowEngine engine;

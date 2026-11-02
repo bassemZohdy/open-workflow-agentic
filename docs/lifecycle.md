@@ -284,7 +284,7 @@ No sleep. The reconciler's startup pass is started by Flow's `WorkflowApplicatio
 | `agentic.reconciler.max-lifetime` | unset (no limit) | Maximum age from creation for `RUNNING` or `WAITING` instances; minimum one microsecond. New instances started with a limit retain an immutable absolute deadline, rounded down to database precision. A later tighter setting applies too, but a larger or removed setting cannot extend that original deadline. After the effective deadline, the reconciler requests cancellation or marks a missing engine instance `FAILED` (repair kind `lifetime`). |
 | `agentic.reconciler.starting-lifetime-enabled` | `false` | Enable lifetime expiry for `STARTING` only after every start writer is upgraded to use the same instance advisory lock. An expired start with no engine id is cancelled; with an engine id, cancellation is requested even if this replica cannot see it. |
 | `agentic.reconciler.batch-size` | `100` | Rows per page of the scans |
-| `agentic.lifecycle.max-concurrent-starts` | `4` | Maximum concurrent starts admitted by one process; must be positive. A new key is rejected with 503 before insertion when full; a matching existing key remains readable. |
+| `agentic.lifecycle.max-concurrent-starts` | `4` | Maximum concurrent starts admitted by one process; must be positive. For a recognized Agroal datasource the effective limit is at most its maximum pool size minus one; a one-connection pool is rejected. A new key is rejected with 503 before insertion when full; a matching existing key remains readable. |
 | `agentic.dev.fault.crash-at` | unset | Dev only: halt the process (`137`) at `after-insert`, `after-prepare` or `before-accept` |
 | `agentic.dev.lifecycle-probes` | `false` | Dev only: expose `/dev/lifecycle/*` (probe effect, event injection). Never in a deployment. |
 
@@ -294,9 +294,11 @@ pin: the current setting applies to them. Update every replica before relying on
 older reconcilers do not read them. The runtime database role needs access to `task.instance_lifetime`. To roll out
 starting-state expiry, keep `starting-lifetime-enabled` false until all replicas and other start writers have been
 upgraded and use the shared advisory lock, then enable it on reconcilers. The start holds a dedicated database
-connection for this lock while preparing and launching. The process-local start limit bounds these connections, but
-the pool must still have room beyond that limit for registry operations, other components, and reconciler locks;
-shared load can otherwise cause connection timeouts. The limit is per process, not a cluster-wide reservation.
+connection for this lock while preparing and launching. The process-local start limit bounds these connections and,
+for a recognized Agroal pool, leaves one slot outside the start-lock limit at initialization. It is not a reserved
+connection: registry operations, other components, and reconciler locks share the remaining pool and may still time
+out under load. Other datasource types use the configured limit without pool-size detection. Do not shrink the pool
+while the process is running; restart to recalculate the limit. The limit is per process, not a cluster-wide reservation.
 An in-flight start can pass its deadline while holding the lock: expiry waits until a later reconciliation pass and
 does not interrupt engine work. A request with an unconfirmed engine id can remain `CANCEL_REQUESTED` until the
 engine confirms cancellation; absence from one replica's engine is not proof of termination. Enforcement depends on
