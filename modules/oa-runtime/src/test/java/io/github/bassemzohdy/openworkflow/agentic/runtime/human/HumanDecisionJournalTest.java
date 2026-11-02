@@ -270,10 +270,14 @@ class HumanDecisionJournalTest {
         record(f, f.decision(), "wait");
         try (var c = owned.getConnection(); var s = c.createStatement()) {
             s.execute("alter table human_proposal.pending disable trigger human_pending_no_change");
+            s.execute("alter table human_proposal.pending disable trigger human_pending_update_complete");
             try (var q = c.prepareStatement("update human_proposal.pending "
                     + "set audit_occurred_at=audit_occurred_at + interval '1 second' where tenant=? and decision_id=?")) {
                 q.setString(1, "tenant"); q.setString(2, f.decision().id().value()); q.executeUpdate();
-            } finally { s.execute("alter table human_proposal.pending enable trigger human_pending_no_change"); }
+            } finally {
+                s.execute("alter table human_proposal.pending enable trigger human_pending_update_complete");
+                s.execute("alter table human_proposal.pending enable trigger human_pending_no_change");
+            }
         }
         assertThrows(HumanDecisionJournal.Conflict.class, () -> record(f, f.decision(), "wait"));
     }

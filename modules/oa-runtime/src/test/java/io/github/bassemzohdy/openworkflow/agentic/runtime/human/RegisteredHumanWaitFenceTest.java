@@ -1,13 +1,14 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.human;
 
 import static org.junit.jupiter.api.Assertions.*;
-import io.github.bassemzohdy.openworkflow.agentic.contracts.event.InboxWait;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.event.*;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
-import io.github.bassemzohdy.openworkflow.agentic.runtime.event.JdbcInboxDispatch;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.event.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.VerifiedToken;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.*;
@@ -21,6 +22,10 @@ import org.postgresql.ds.PGSimpleDataSource;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class RegisteredHumanWaitFenceTest {
     private static final Subject ALICE = new Subject(SubjectKind.USER, "alice");
+    private static final String FILTER = "{\"with\":{\"source\":\"" + HumanDecisionWake.SOURCE
+            + "\",\"type\":\"" + HumanDecisionWake.TYPE + "\"}}";
+    private static final String SNAPSHOT = "{\"format\":\"oa.inbox.listen-snapshot.v1\",\"task\":{\"listen\":{\"to\":{\"one\":" + FILTER + "}}}}";
+    private static final String FILTER_HASH = CanonicalEncoder.sha256Hex(new CanonicalEncoder("oa.inbox.event-filter.v1").text(FILTER).toBytes());
     private PGSimpleDataSource admin, owned;
     private String database;
     private boolean created;
@@ -58,11 +63,12 @@ class RegisteredHumanWaitFenceTest {
         var start = new StartRequest("tenant", ALICE, new DefinitionRef("agentic/human-test", "1"), Map.of(), UUID.randomUUID().toString());
         var initial = registry.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(), start, now), "test.start").record();
         String engine = "engine-" + initial.id().value();
-        registry.replace(initial.successor(now, InstanceStatus.RUNNING, engine, 1, null, null), initial.version(), "test.running", ALICE);
-        var wait = new InboxWait("tenant", initial.id(), "app", engine, "agentic", "human-test", "1",
-                "do/0/human", 1, "human", "human.decision", "0".repeat(64), duration);
-        new JdbcInboxDispatch(owned, (AuditSink) event -> { }).register(wait);
+        var running = registry.replace(initial.successor(now, InstanceStatus.RUNNING, engine, 1, null, null), initial.version(), "test.running", ALICE);
+        registry.replace(running.successor(now, InstanceStatus.WAITING, engine, 1, null, null), running.version(), "test.waiting", ALICE);
         Ulid task = UlidGenerator.shared().next();
+        var wait = new InboxWait("tenant", initial.id(), "app", engine, "agentic", "human-test", "1",
+                "do/0/human", 1, HumanDecisionWake.route(task), HumanDecisionWake.TYPE, FILTER_HASH, duration);
+        new JdbcInboxDispatch(owned, (AuditSink) event -> { }).register(wait);
         var decision = new HumanDecision(UlidGenerator.shared().next(), "tenant", task, 0, ALICE,
                 HumanDecision.Outcome.APPROVE, "private");
         try (var c = owned.getConnection(); var q = c.prepareStatement("insert into human_proposal.task "
@@ -83,6 +89,30 @@ class RegisteredHumanWaitFenceTest {
     private long decisionCount(Fixture f) throws SQLException {
         try (var c = owned.getConnection(); var q = c.prepareStatement("select count(*) from human_proposal.decision where tenant=? and decision_id=?")) {
             q.setString(1, "tenant"); q.setString(2, f.decision().id().value());
+            try (var r = q.executeQuery()) { r.next(); return r.getLong(1); }
+        }
+    }
+    private record Staging(JdbcEventInbox inbox, JdbcInboxTaskLease leases, HumanWakeStage stage,
+                           InboxTaskClaim claim, InboxListenGroup group) { }
+    private Staging staging(Fixture f) {
+        coordinator(f.registered()).recordNew(f.authority(), f.decision());
+        var inbox = new JdbcEventInbox(owned);
+        var leases = new JdbcInboxTaskLease(owned, event -> { }, Clock.systemUTC());
+        var matcher = new JdbcOwnedInbox(owned, leases, inbox, new JdbcInboxCheckpointProof(owned), event -> { }, Clock.systemUTC());
+        var claim = leases.acquire(f.registered().task(), "test-owner-" + UUID.randomUUID(), Duration.ofSeconds(30)).orElseThrow().claim();
+        var group = new InboxListenGroup(f.registered().task(), InboxListenGroup.Strategy.ONE, List.of(FILTER_HASH),
+                InboxListenGroup.Stop.NONE, List.of(), null, InboxListenGroup.snapshotFingerprint(SNAPSHOT));
+        return new Staging(inbox, leases, new HumanWakeStage(owned, inbox, matcher, Clock.systemUTC()), claim, group);
+    }
+    private String pendingState(Fixture f) throws SQLException {
+        try (var c = owned.getConnection(); var q = c.prepareStatement("select wake_state from human_proposal.pending where tenant=? and decision_id=?")) {
+            q.setString(1, "tenant"); q.setString(2, f.decision().id().value());
+            try (var r = q.executeQuery()) { assertTrue(r.next()); return r.getString(1); }
+        }
+    }
+    private long inboxCount(Fixture f) throws SQLException {
+        try (var c = owned.getConnection(); var q = c.prepareStatement("select count(*) from inbox.message where tenant=? and source=? and event_id=?")) {
+            q.setString(1, "tenant"); q.setString(2, HumanDecisionWake.SOURCE); q.setString(3, f.decision().id().value());
             try (var r = q.executeQuery()) { r.next(); return r.getLong(1); }
         }
     }
@@ -139,6 +169,102 @@ class RegisteredHumanWaitFenceTest {
             try (var c = owned.getConnection(); var s = c.createStatement()) {
                 s.execute("drop trigger human_decision_delay on human_proposal.decision");
                 s.execute("drop function human_proposal.test_delay()");
+            }
+        }
+    }
+
+    @Test void auditedDecisionStagesOneExactReceiptAndReplaysUnderANewOwner() throws Exception {
+        var f = fixture(Duration.ofMinutes(2)); var s = staging(f);
+        InboxTaskClaim replacement = null;
+        try {
+            var message = HumanDecisionWake.message(f.decision(), f.registered());
+            assertEquals(HumanWakeStage.Result.STAGED, s.stage().stage(f.decision(), f.registered(), s.claim(), s.group(), SNAPSHOT));
+            assertEquals("STAGED", pendingState(f)); assertEquals(1, inboxCount(f));
+            assertEquals(Optional.of(message), s.inbox().boundSignal(f.registered()));
+            assertEquals(HumanWakeStage.Result.ALREADY_STAGED, s.stage().stage(f.decision(), f.registered(), s.claim(), s.group(), SNAPSHOT));
+            assertTrue(s.leases().release(s.claim()));
+            replacement = s.leases().acquire(f.registered().task(), "replacement-" + UUID.randomUUID(), Duration.ofSeconds(30)).orElseThrow().claim();
+            assertEquals(HumanWakeStage.Result.ALREADY_STAGED, s.stage().stage(f.decision(), f.registered(), replacement, s.group(), SNAPSHOT));
+            assertEquals(1, inboxCount(f));
+        } finally {
+            if (replacement != null) s.leases().release(replacement);
+            s.leases().release(s.claim());
+        }
+    }
+
+    @Test void staleOwnerRollsBackTheReceiptAndSignal() throws Exception {
+        var f = fixture(Duration.ofMinutes(2)); var s = staging(f);
+        assertTrue(s.leases().release(s.claim()));
+        assertThrows(IllegalStateException.class, () -> s.stage().stage(f.decision(), f.registered(), s.claim(), s.group(), SNAPSHOT));
+        assertEquals("BLOCKED", pendingState(f)); assertEquals(0, inboxCount(f));
+        assertTrue(s.inbox().boundSignal(f.registered()).isEmpty());
+    }
+
+    @Test void forgedDecisionContentCannotStageAReferenceOnlyEvent() throws Exception {
+        var f = fixture(Duration.ofMinutes(2)); var s = staging(f);
+        try {
+            var changed = new HumanDecision(f.decision().id(), "tenant", f.decision().taskId(), 0, ALICE,
+                    HumanDecision.Outcome.REJECT, "changed");
+            assertThrows(IllegalStateException.class, () -> s.stage().stage(changed, f.registered(), s.claim(), s.group(), SNAPSHOT));
+            assertEquals("BLOCKED", pendingState(f)); assertEquals(0, inboxCount(f));
+            assertTrue(s.inbox().boundSignal(f.registered()).isEmpty());
+        } finally { s.leases().release(s.claim()); }
+    }
+
+    @Test void pendingCannotBeForgedDirectlyIntoStagedState() throws Exception {
+        var f = fixture(Duration.ofMinutes(2));
+        coordinator(f.registered()).recordNew(f.authority(), f.decision());
+        try (var c = owned.getConnection()) {
+            try (var q = c.prepareStatement("insert into human_proposal.pending "
+                    + "(tenant,decision_id,audit_event_id,audit_occurred_at,audit_state,wake_state) "
+                    + "select tenant,decision_id,audit_event_id,audit_occurred_at,audit_state,'STAGED' "
+                    + "from human_proposal.pending where tenant=? and decision_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.decision().id().value());
+                assertEquals("23514", assertThrows(SQLException.class, q::executeUpdate).getSQLState());
+            }
+            try (var q = c.prepareStatement("update human_proposal.pending set wake_state='STAGED' where tenant=? and decision_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.decision().id().value());
+                assertEquals("23514", assertThrows(SQLException.class, q::executeUpdate).getSQLState());
+            }
+        }
+        assertEquals("BLOCKED", pendingState(f)); assertEquals(0, inboxCount(f));
+    }
+
+    @Test void concurrentStageAttemptsRetainOneReceiptAndOneBinding() throws Exception {
+        var f = fixture(Duration.ofMinutes(2)); var s = staging(f);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<HumanWakeStage.Result> work = () -> {
+                start.await(); return s.stage().stage(f.decision(), f.registered(), s.claim(), s.group(), SNAPSHOT);
+            };
+            var left = pool.submit(work); var right = pool.submit(work); start.countDown();
+            assertEquals(Set.of(HumanWakeStage.Result.STAGED, HumanWakeStage.Result.ALREADY_STAGED),
+                    Set.of(left.get(10, java.util.concurrent.TimeUnit.SECONDS), right.get(10, java.util.concurrent.TimeUnit.SECONDS)));
+            assertEquals("STAGED", pendingState(f)); assertEquals(1, inboxCount(f));
+        } finally { pool.shutdownNow(); s.leases().release(s.claim()); }
+    }
+
+    @Test void leaseExpiryDuringCommitRollsBackReceiptSignalAndStage() throws Exception {
+        var f = fixture(Duration.ofMinutes(2)); var s = staging(f);
+        assertTrue(s.leases().release(s.claim()));
+        try (var c = owned.getConnection(); var sql = c.createStatement()) {
+            sql.execute("create function human_proposal.test_stage_delay() returns trigger language plpgsql as $$ "
+                    + "begin perform pg_sleep(6); return null; end $$");
+            sql.execute("create constraint trigger human_stage_delay after insert on human_proposal.wake_stage "
+                    + "deferrable initially deferred for each row execute function human_proposal.test_stage_delay()");
+        }
+        var shortClaim = s.leases().acquire(f.registered().task(), "short-" + UUID.randomUUID(), Duration.ofSeconds(5)).orElseThrow().claim();
+        try {
+            assertThrows(StoreUnavailableException.class,
+                    () -> s.stage().stage(f.decision(), f.registered(), shortClaim, s.group(), SNAPSHOT));
+            assertEquals("BLOCKED", pendingState(f)); assertEquals(0, inboxCount(f));
+            assertTrue(s.inbox().boundSignal(f.registered()).isEmpty());
+        } finally {
+            s.leases().release(shortClaim);
+            try (var c = owned.getConnection(); var sql = c.createStatement()) {
+                sql.execute("drop trigger human_stage_delay on human_proposal.wake_stage");
+                sql.execute("drop function human_proposal.test_stage_delay()");
             }
         }
     }

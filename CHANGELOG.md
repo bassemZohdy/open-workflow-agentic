@@ -1,5 +1,7 @@
 # Changelog
 
+- Test unactivated atomic staging of a human decision wake with its inbox receipt and exact wait binding under a live task owner. Production dispatch, authorized replay and checkpoint proof remain open.
+
 - Add an internal transaction seam for task-owned inbox matching, retaining the live-owner checks before and after matching. Callback reservation and checkpoint proof remain separate.
 
 - Add an internal transaction seam for inbox receipts and test atomic wait binding, rollback and duplicate receipt behavior. Producer authorization and delivery remain open.

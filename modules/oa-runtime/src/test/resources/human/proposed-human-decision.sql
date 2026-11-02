@@ -26,7 +26,7 @@ create table human_proposal.pending (
   audit_event_id char(26) not null references audit.event(event_id),
   audit_occurred_at timestamptz not null,
   audit_state text not null check (audit_state = 'RECORDED'),
-  wake_state text not null check (wake_state = 'BLOCKED'),
+  wake_state text not null check (wake_state in ('BLOCKED', 'STAGED')),
   primary key (tenant, decision_id),
   foreign key (tenant, decision_id) references human_proposal.decision (tenant, decision_id)
 );
@@ -58,10 +58,63 @@ create trigger human_decision_no_change before update or delete on human_proposa
   for each row execute function human_proposal.reject_history_change();
 create trigger human_decision_no_truncate before truncate on human_proposal.decision
   for each statement execute function human_proposal.reject_history_change();
-create trigger human_pending_no_change before update or delete on human_proposal.pending
-  for each row execute function human_proposal.reject_history_change();
 create trigger human_pending_no_truncate before truncate on human_proposal.pending
   for each statement execute function human_proposal.reject_history_change();
+
+create table human_proposal.wake_stage (
+  tenant text not null, decision_id char(26) not null, instance_id char(26) not null, wait_key text not null,
+  source text not null, event_id text not null, receipt_fingerprint char(64) not null,
+  task_digest char(64) not null, claim_owner text not null, claim_epoch bigint not null check (claim_epoch>0),
+  primary key (tenant, decision_id),
+  foreign key (tenant,decision_id) references human_proposal.pending(tenant,decision_id),
+  foreign key (tenant,instance_id,wait_key) references inbox.signal(tenant,instance_id,wait_key),
+  foreign key (tenant,source,event_id) references inbox.message(tenant,source,event_id),
+  foreign key (tenant,instance_id,task_digest) references inbox.task_claim(tenant,instance_id,task_digest),
+  check (source='urn:openworkflow:human-decision'), check (event_id=decision_id)
+);
+create trigger human_wake_stage_no_change before update or delete on human_proposal.wake_stage
+  for each row execute function human_proposal.reject_history_change();
+create trigger human_wake_stage_no_truncate before truncate on human_proposal.wake_stage
+  for each statement execute function human_proposal.reject_history_change();
+
+create function human_proposal.guard_pending() returns trigger language plpgsql as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.wake_state <> 'BLOCKED' then
+      raise exception 'a human wake must start blocked' using errcode='check_violation';
+    end if;
+    return new;
+  end if;
+  if tg_op <> 'UPDATE' or row(new.tenant,new.decision_id,new.audit_event_id,new.audit_occurred_at,new.audit_state)
+      is distinct from row(old.tenant,old.decision_id,old.audit_event_id,old.audit_occurred_at,old.audit_state)
+      or old.wake_state <> 'BLOCKED' or new.wake_state <> 'STAGED' then
+    raise exception 'invalid human wake transition' using errcode='insufficient_privilege';
+  end if;
+  if not exists (
+    select 1 from human_proposal.wake_stage w
+      join human_proposal.decision d on d.tenant=w.tenant and d.decision_id=w.decision_id
+      join human_proposal.task t on t.tenant=d.tenant and t.task_id=d.task_id
+      join inbox.signal s on s.tenant=w.tenant and s.instance_id=w.instance_id and s.wait_key=w.wait_key
+      join inbox.message m on m.tenant=w.tenant and m.source=w.source and m.event_id=w.event_id
+      join inbox.delivery l on l.tenant=w.tenant and l.instance_id=w.instance_id and l.wait_key=w.wait_key
+      join inbox.task_claim k on k.tenant=w.tenant and k.instance_id=w.instance_id and k.task_digest=w.task_digest
+      join task.instance i on i.tenant=w.tenant and i.id=w.instance_id
+    where w.tenant=new.tenant and w.decision_id=new.decision_id
+      and w.instance_id=d.instance_id and w.wait_key=d.wait_key and s.source=w.source and s.event_id=w.event_id
+      and m.fingerprint=w.receipt_fingerprint and m.instance_id=w.instance_id and m.retain_until>clock_timestamp()
+      and m.correlation_key='human:' || d.task_id and m.type='io.openworkflow.human.decision.v1'
+      and m.data_json::jsonb=jsonb_build_object('specversion','1.0','id',d.decision_id,'source',w.source,
+        'type',m.type,'datacontenttype','application/json','data',jsonb_build_object('decisionId',d.decision_id,
+        'taskId',d.task_id,'waitDigest',split_part(w.wait_key,'~',2)))
+      and l.state='REGISTERED' and l.deadline>clock_timestamp() and l.identity_digest=split_part(w.wait_key,'~',2)
+      and i.status='WAITING' and (i.wait_deadline is null or i.wait_deadline>clock_timestamp())
+      and k.state='ACTIVE' and k.owner=w.claim_owner and k.epoch=w.claim_epoch and k.expires_at>clock_timestamp()
+      and t.status='COMPLETED' and t.instance_id=w.instance_id and t.wait_key=w.wait_key
+  ) then raise exception 'human wake is not an audited owned wait binding' using errcode='check_violation'; end if;
+  return new;
+end $$;
+create trigger human_pending_no_change before insert or update or delete on human_proposal.pending
+  for each row execute function human_proposal.guard_pending();
 
 -- At commit, a completed task, its one decision, its real audit event and its blocked wakeup must all agree.
 -- These retained facts are not a policy decision or permission to deliver.
@@ -91,7 +144,7 @@ begin
     where t.tenant=task_tenant and t.task_id=task_identifier
       and t.version=d.expected_version+1 and t.instance_id=d.instance_id and t.wait_key=d.wait_key
       and t.assignee_id=d.actor_id and p.audit_event_id=d.decision_id and p.audit_occurred_at=e.occurred_at
-      and p.audit_state='RECORDED' and p.wake_state='BLOCKED'
+      and p.audit_state='RECORDED' and p.wake_state in ('BLOCKED','STAGED')
       and e.actor_kind='USER' and e.actor_id=d.actor_id and e.event_type='human.decision.recorded'
       and e.resource_type='human-task' and e.resource_id=d.task_id
       and e.attributes->>'oa.chain'='human' and e.attributes->>'oa.tenant'=t.tenant
@@ -106,3 +159,22 @@ create constraint trigger human_decision_complete after insert on human_proposal
   deferrable initially deferred for each row execute function human_proposal.require_complete_decision();
 create constraint trigger human_pending_complete after insert on human_proposal.pending
   deferrable initially deferred for each row execute function human_proposal.require_complete_decision();
+create constraint trigger human_pending_update_complete after update on human_proposal.pending
+  deferrable initially deferred for each row execute function human_proposal.require_complete_decision();
+
+create function human_proposal.staged_wake_is_live() returns trigger language plpgsql as $$
+begin
+  if not exists (
+    select 1 from human_proposal.pending p
+    join inbox.task_claim k on k.tenant=new.tenant and k.instance_id=new.instance_id and k.task_digest=new.task_digest
+    join inbox.delivery d on d.tenant=new.tenant and d.instance_id=new.instance_id and d.wait_key=new.wait_key
+    join task.instance i on i.tenant=new.tenant and i.id=new.instance_id
+    where p.tenant=new.tenant and p.decision_id=new.decision_id and p.wake_state='STAGED'
+      and k.state='ACTIVE' and k.owner=new.claim_owner and k.epoch=new.claim_epoch and k.expires_at>clock_timestamp()
+      and d.state='REGISTERED' and d.deadline>clock_timestamp()
+      and i.status='WAITING' and (i.wait_deadline is null or i.wait_deadline>clock_timestamp())
+  ) then raise exception 'human wake lost its task owner or wait' using errcode='check_violation'; end if;
+  return null;
+end $$;
+create constraint trigger human_staged_wake_live after insert on human_proposal.wake_stage
+  deferrable initially deferred for each row execute function human_proposal.staged_wake_is_live();
