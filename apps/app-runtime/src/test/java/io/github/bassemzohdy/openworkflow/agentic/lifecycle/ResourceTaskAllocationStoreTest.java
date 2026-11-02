@@ -11,6 +11,8 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceTaskAllocations;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcNodeBudget;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcToolCallBudget;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedToolGateway;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.NodeRefused;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.quarkus.test.junit.QuarkusTest;
@@ -91,6 +93,86 @@ class ResourceTaskAllocationStoreTest {
         assertEquals(0,count(data,"select count(*) from task.agent_node_budget"));
     }
 
+    @Test void freshToolBudgetCommitsWithAllocationAndRetryNeverResetsIt() throws Exception {
+        var allocated = store.allocateWithToolBudget(a, 2);
+        var budget = new JdbcToolCallBudget(data).openExisting(a.scope().threadId().value(), a.modelProfile().agent(), a.contract());
+        var approval = new GovernedToolGateway.Approval(a.modelProfile().agent(), a.contract(), 1000);
+        budget.admit(approval);
+        assertEquals(allocated, store.allocateWithToolBudget(a, 2));
+        assertEquals(1, rows());
+        assertEquals(1, count(data, "select count(*) from task.agent_node_budget"));
+        assertEquals(1, count(data, "select count(*) from task.agent_tool_budget"));
+        assertThrows(IllegalStateException.class, () -> store.allocateWithToolBudget(a, 3));
+        budget.admit(approval);
+        assertThrows(NodeRefused.class, () -> budget.admit(approval));
+    }
+
+    @Test void failureCreatingToolBudgetRollsBackAllocationAndNodeBudget() throws Exception {
+        try (var c=data.getConnection(); var s=c.createStatement()) {
+            s.execute("create function task.reject_tool_budget_test() returns trigger language plpgsql as $$ begin raise exception 'test failure'; end $$");
+            s.execute("create trigger reject_tool_budget_test before insert on task.agent_tool_budget for each row execute function task.reject_tool_budget_test()");
+        }
+        assertThrows(RuntimeException.class, () -> store.allocateWithToolBudget(a, 2));
+        assertEquals(0, rows());
+        assertEquals(0, count(data, "select count(*) from task.agent_node_budget"));
+        assertEquals(0, count(data, "select count(*) from task.agent_tool_budget"));
+    }
+
+    @Test void anOlderAllocationIsNeverBackfilledWithAToolBudget() throws Exception {
+        var original = store.allocate(a);
+        assertThrows(IllegalStateException.class, () -> store.allocateWithToolBudget(a, 2));
+        assertEquals(original, store.allocate(a));
+        assertEquals(0, count(data, "select count(*) from task.agent_tool_budget"));
+    }
+
+    @Test void exactConcurrentToolAllocationRetriesRetainOneBudget() throws Exception {
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(4)) {
+            var results = java.util.stream.IntStream.range(0, 4).mapToObj(i -> pool.submit(() -> {
+                start.await(); return store.allocateWithToolBudget(a, 2);
+            })).toList();
+            start.countDown();
+            var first = results.getFirst().get(15, TimeUnit.SECONDS);
+            for (var result : results) assertEquals(first, result.get(15, TimeUnit.SECONDS));
+        }
+        assertEquals(1, rows());
+        assertEquals(1, count(data, "select count(*) from task.agent_tool_budget"));
+    }
+
+    @Test void concurrentDifferentToolCeilingsCannotBothBeAccepted() throws Exception {
+        var start = new CountDownLatch(1);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var two = pool.submit(() -> { start.await(); return store.allocateWithToolBudget(a, 2); });
+            var three = pool.submit(() -> { start.await(); return store.allocateWithToolBudget(a, 3); });
+            start.countDown();
+            int successes = 0;
+            for (var result : List.of(two, three)) {
+                try { result.get(15, TimeUnit.SECONDS); successes++; }
+                catch (ExecutionException conflict) { assertInstanceOf(IllegalStateException.class, conflict.getCause()); }
+            }
+            assertEquals(1, successes);
+        }
+        assertEquals(1, rows());
+        assertEquals(1, count(data, "select count(*) from task.agent_tool_budget"));
+    }
+
+    @Test void lostCommitReplyRecoversTheSameToolBudgetWithoutReset() throws Exception {
+        var fail = new AtomicBoolean(true);
+        var lost = wrapping(data, c -> (Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),
+                new Class[]{Connection.class}, (p, m, args) -> {
+                    Object result = invoke(m, c, args);
+                    if (m.getName().equals("commit") && fail.getAndSet(false)) throw new SQLException("lost reply", "08006");
+                    return result;
+                }));
+        assertThrows(StoreUnavailableException.class,
+                () -> new JdbcResourceTaskAllocations(lost, manager).allocateWithToolBudget(a, 1));
+        var budget = new JdbcToolCallBudget(data).openExisting(a.scope().threadId().value(), a.modelProfile().agent(), a.contract());
+        var approval = new GovernedToolGateway.Approval(a.modelProfile().agent(), a.contract(), 1000);
+        budget.admit(approval);
+        assertEquals(a, store.allocateWithToolBudget(a, 1).allocation());
+        assertThrows(NodeRefused.class, () -> budget.admit(approval));
+    }
+
     @Test void anExistingAllocationWithoutABudgetIsNeverBackfilled() throws Exception {
         var first=store.allocate(a);
         corrupt("delete from task.agent_node_budget"); // Simulates a legacy allocation in this disposable fixture.
@@ -126,7 +208,7 @@ class ResourceTaskAllocationStoreTest {
         var now=databaseNow(data);var root=new DelegationGrantStore(data).find(f.binding().issuingGrantId()).orElseThrow();
         var child=grants(Clock.fixed(now,ZoneOffset.UTC)).delegate(root.id(),root.agent(),a.modelProfile().agent(),Set.of("oa.agent.run"),now.plusSeconds(5),null);
         var t=a.contract();var contract=new AgentTaskContract(t.id(),t.goal(),t.permittedTools(),t.permittedDataScopes(),t.riskTier(),t.limits(),t.requestingSubject(),child.id());
-        var candidate=new ResourceTaskAllocation(a.scope(),null,contract,a.modelProfile());var first=store.allocate(candidate);
+        var candidate=new ResourceTaskAllocation(a.scope(),null,contract,a.modelProfile());var first=store.allocateWithToolBudget(candidate,2);
         long bound=System.nanoTime()+Duration.ofSeconds(10).toNanos();
         try(var c=data.getConnection();var q=c.createStatement()) {
             while(true) {
@@ -135,6 +217,9 @@ class ResourceTaskAllocationStoreTest {
             }
         }
         assertEquals(first,store.allocate(candidate));assertEquals(first,store.find(candidate.scope()).orElseThrow());assertEquals(1,rows());
+        assertEquals(first,store.allocateWithToolBudget(candidate,2),"historical retry does not extend deadline");
+        assertThrows(NodeRefused.class, () -> new JdbcToolCallBudget(data).openExisting(
+                candidate.scope().threadId().value(),candidate.modelProfile().agent(),candidate.contract()));
     }
     @Test void actualCommitThenLostReplyReopensTheSameStoredTaskWithoutRenewal() throws Exception {
         var fail=new AtomicBoolean(true);var lost=wrapping(data,c->(Connection)Proxy.newProxyInstance(Connection.class.getClassLoader(),new Class[]{Connection.class},(p,m,args)->{
