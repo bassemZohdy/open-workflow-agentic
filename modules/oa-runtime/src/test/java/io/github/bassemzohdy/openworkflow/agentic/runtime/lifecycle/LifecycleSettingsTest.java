@@ -48,7 +48,7 @@ class LifecycleSettingsTest {
                 Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1), 1, Optional.empty(),
                 Optional.of(Duration.ofDays(7)));
         assertEquals(Optional.of(Duration.ofDays(7)), ok.maxLifetime);
-        for (Duration bad : new Duration[]{Duration.ZERO, Duration.ofSeconds(-1)})
+        for (Duration bad : new Duration[]{Duration.ZERO, Duration.ofSeconds(-1), Duration.ofNanos(999)})
             assertThrows(IllegalArgumentException.class, () -> new LifecycleSettings(true, Duration.ofSeconds(1),
                     Duration.ofSeconds(1), Duration.ofSeconds(1), 3, Duration.ofSeconds(1), Duration.ofSeconds(1),
                     Duration.ofSeconds(1), 1, Optional.empty(), Optional.of(bad)));

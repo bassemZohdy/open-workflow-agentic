@@ -78,8 +78,12 @@ public class LifecycleSettings {
         }
         this.batchSize = batchSize;
         this.crashAt = Objects.requireNonNull(crashAt, "crashAt");
-        this.maxLifetime = Objects.requireNonNull(maxLifetime, "maxLifetime")
-                .map(value -> positive("agentic.reconciler.max-lifetime", value));
+        this.maxLifetime = Objects.requireNonNull(maxLifetime, "maxLifetime").map(value -> {
+            Duration limit = positive("agentic.reconciler.max-lifetime", value);
+            if (limit.compareTo(Duration.ofNanos(1_000)) < 0)
+                throw new IllegalArgumentException("agentic.reconciler.max-lifetime must be at least one microsecond");
+            return limit;
+        });
     }
 
     /** The defaults of docs/lifecycle.md, with the fault point off. */
