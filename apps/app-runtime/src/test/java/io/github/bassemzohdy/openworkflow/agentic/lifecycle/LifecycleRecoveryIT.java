@@ -366,6 +366,58 @@ class LifecycleRecoveryIT {
     }
 
     @Test
+    void committedPendingCancellationReceiptSurvivesProcessLoss() throws Exception {
+        String tenant = newTenant(), key = "receipt-crash-" + UUID.randomUUID();
+        int port = ManagedProcess.freePort();
+        ManagedProcess first = app("receipt-crash-run1", port, true,
+                Map.of("agentic.reconciler.wait-deadline", "PT45S"));
+        String id = startInstance(first, tenant, key, "ok");
+        String engineId = await(first, id, tenant, "WAITING");
+        await("the pre-wait checkpoint to be stored", Duration.ofSeconds(20), () -> {
+            try { return count("select count(*) from public.taskinfoentity where workflowinstanceid = ? "
+                    + "and jsonpointer = 'do/0/effect'", engineId) > 0; }
+            catch (Exception e) { return false; }
+        });
+        first.kill();
+        applyPendingCancellationSchema();
+        await("the deadline to pass while stopped", Duration.ofSeconds(60), () -> {
+            try { return count("select count(*) from task.instance where id = ? and status = 'WAITING' "
+                    + "and wait_deadline < clock_timestamp()", id) == 1; }
+            catch (Exception e) { return false; }
+        });
+        try (var connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
+             var statement = connection.createStatement()) {
+            statement.execute("create function task.reject_receipt_crash_report() returns trigger language plpgsql as $$ "
+                    + "begin if new.id = '" + id + "' and new.status = 'CANCELLED' then "
+                    + "raise exception 'injected post-receipt report failure'; end if; return new; end $$");
+            statement.execute("create trigger reject_receipt_crash_report before update on task.instance "
+                    + "for each row execute function task.reject_receipt_crash_report()");
+        }
+        ManagedProcess second = app("receipt-crash-run2", port, true,
+                Map.of("agentic.reconciler.wait-deadline", "PT45S", "agentic.test.pending-cancellation-reader", "true"));
+        await("the receipt to commit before process loss", Duration.ofSeconds(30), () -> {
+            try { return count("select count(*) from task.pending_cancellation_receipt where instance_id = ?", id) == 1
+                    && "CANCEL_REQUESTED".equals(status(second, id, tenant)); }
+            catch (Exception e) { return false; }
+        });
+        second.kill();
+        assertEquals(0L, count("select count(*) from public.workflowinstanceentity where instanceid = ?", engineId));
+        try (var connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
+             var statement = connection.createStatement()) {
+            statement.execute("drop trigger reject_receipt_crash_report on task.instance");
+            statement.execute("drop function task.reject_receipt_crash_report()");
+        }
+        ManagedProcess third = app("receipt-crash-run3", port, true,
+                Map.of("agentic.reconciler.wait-deadline", "PT45S", "agentic.test.pending-cancellation-reader", "true",
+                       "agentic.test.pending-cancellation-receipt-recovery", "true"));
+        await(third, id, tenant, "CANCELLED");
+        assertEquals(1L, count("select count(*) from task.instance_event where instance_id = ? "
+                + "and reason = 'engine.receipt.CANCELLED'", id));
+        assertEquals(0L, count("select resume_epoch from task.instance where id = ?", id));
+        assertFalse(read(third.logFile()).contains("probe-effect received instance=" + engineId));
+    }
+
+    @Test
     void cancellationReportIsRecoveredAfterTheRegistryIsUnavailable() throws Exception {
         String tenant = newTenant(), key = "lost-cancellation-" + UUID.randomUUID();
         int port = ManagedProcess.freePort();

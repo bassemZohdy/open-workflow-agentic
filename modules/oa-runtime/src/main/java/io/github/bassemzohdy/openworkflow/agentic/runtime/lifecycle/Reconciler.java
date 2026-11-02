@@ -3,10 +3,12 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.quarkiverse.flow.internal.WorkflowApplicationReadyEvent;
 import io.quarkus.runtime.Startup;
+import io.serverlessworkflow.impl.WorkflowApplication;
 import jakarta.annotation.Priority;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.event.Observes;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.nio.ByteBuffer;
@@ -35,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import javax.sql.DataSource;
 import org.jboss.logging.Logger;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * The startup and periodic reconciler (ADR 0019, Resume and Retries; ADR 0023, decision 7; WP-105c).
@@ -100,6 +103,14 @@ public class Reconciler {
 
     @Inject
     FlowEngineObserver observer;
+    @Inject
+    PendingCancellationReceiptRecovery testReceiptRecovery;
+    @Inject
+    Instance<WorkflowApplication> application;
+    @ConfigProperty(name = "agentic.test.pending-cancellation-receipt-recovery", defaultValue = "false")
+    boolean receiptRecoveryEnabled;
+    @ConfigProperty(name = "quarkus.profile", defaultValue = "prod")
+    String profile;
 
     private final InstanceStore store;
     private final WorkflowEngine engine;
@@ -191,6 +202,8 @@ public class Reconciler {
     /** Arms the warm-up watchdog. The reconciler is a startup bean, so this runs when the application starts. */
     @PostConstruct
     void armWatchdog() {
+        if (receiptRecoveryEnabled && !"itest".equals(profile))
+            throw new IllegalStateException("pending cancellation receipt recovery requires the itest profile");
         if (state == State.AWAITING_WARMUP) {
             executor.schedule(this::warmupWatchdog, settings.warmupTimeout.toMillis(), TimeUnit.MILLISECONDS);
         }
@@ -809,7 +822,9 @@ public class Reconciler {
         }
         Optional<WorkflowEngine.ActiveInstance> view = engine.activeInstance(row.definition(), engineId);
         if (view.isEmpty()) {
-            // Only the engine's own report may complete the cancel (ADR 0019). Until then the row waits.
+            // Test-only: an exact receipt proves guarded checkpoint removal, but not absence of a remote owner.
+            if (receiptRecoveryEnabled && testReceiptRecovery.recover(row.tenant(), row.id(), application.get().id())) return;
+            // Without enabled receipt evidence, only the engine's own report may complete the cancel (ADR 0019).
             auditOnce("cancel.unconfirmed", row.id().value(), "awaiting-engine-report",
                     "the engine holds no instance; CANCELLED waits for its report", now);
             return;

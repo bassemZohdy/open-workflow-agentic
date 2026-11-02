@@ -43,6 +43,23 @@ class FlowEngineObserverCancellationTest {
         });
     }
 
+    @Test void receiptRecoveryCannotBeEnabledOutsideIntegrationTestProfile() {
+        var data = proxy(DataSource.class);
+        var store = proxy(InstanceStore.class);
+        var settings = new LifecycleSettings(false, Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1),
+                1, Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1), 10, Optional.empty());
+        var scan = new RegistryScan(data);
+        var reconciler = new Reconciler(store, proxy(WorkflowEngine.class), new EngineStatusSync(store, scan, settings),
+                scan, new RepairStore(data), settings, data, java.time.Clock.systemUTC(), tenant -> true);
+        try {
+            reconciler.receiptRecoveryEnabled = true;
+            reconciler.profile = "prod";
+            assertThrows(IllegalStateException.class, reconciler::armWatchdog);
+            reconciler.profile = "itest";
+            assertDoesNotThrow(reconciler::armWatchdog);
+        } finally { reconciler.stop(); }
+    }
+
     @Test void cancelledTaskWrappedAsTimeoutWaitsForTheCancellationEvent() {
         var sync = new RecordingSync(); var observer = new FlowEngineObserver(sync);
         var context = proxy(WorkflowContextData.class);

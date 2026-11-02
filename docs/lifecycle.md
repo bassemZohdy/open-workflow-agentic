@@ -326,8 +326,11 @@ deadline scan has not reached it; a cancellation request is not proof that the e
 **Open recovery defect:** the pinned Flow SDK refuses cancellation of a restored `PENDING` instance. The default
 production reader can therefore leave an expired workflow in `CANCEL_REQUESTED` after restart. A test-only reader,
 proposed receipt schema and writer pass the process and Kubernetes failover scenarios described in the
-[recovery handoff](handoffs/WP-109-pending-cancellation-reproduction.md), but production activation, crash recovery
-after receipt commit and replica fencing remain open. Do not start expired work merely to make cancellation succeed.
+[recovery handoff](handoffs/WP-109-pending-cancellation-reproduction.md). An integration-test-only consumer also
+recovers a committed receipt after process loss, checking the application and registry binding and using the normal
+registry history and outbox path. Its `agentic.test.pending-cancellation-receipt-recovery` switch defaults off and
+is refused outside the `itest` profile. Production activation, cross-replica recovery and fencing remain open. Do not
+start expired work merely to make cancellation succeed.
 
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`

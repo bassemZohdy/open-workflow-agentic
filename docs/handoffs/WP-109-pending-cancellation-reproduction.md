@@ -4,8 +4,10 @@ The process-level regression `LifecycleRecoveryIT#aWaitWhoseDeadlinePassesWhileS
 originally failed because the restored SDK instance was `PENDING` and refused cancellation. It now passes with an
 explicit test-only reader, proposed receipt schema and receipt writer: the packaged application is stopped across the
 deadline, then restarted, and the registry reaches `CANCELLED` without restarting the expired workflow. This is not
-production wiring; it does not establish safe mixed-version deployment, live replica fencing or recovery from a crash
-after receipt commit. Each test-class run uses its own process-log filenames so readiness and effect assertions cannot read a previous run’s output. The lifecycle process-recovery scenarios use these isolated logs. A separate real-process regression also verifies cancellation when a restored timed wait starts before its deadline.
+production wiring; it does not establish safe mixed-version deployment or live replica fencing. A separate test
+kills a process after receipt commit and uses an explicitly enabled test-only consumer in a fresh process to recover
+the matching cancellation through the normal registry history and outbox path. This single-owner experiment does not
+establish production or cross-replica crash recovery. Each test-class run uses its own process-log filenames so readiness and effect assertions cannot read a previous run’s output. The lifecycle process-recovery scenarios use these isolated logs. A separate real-process regression also verifies cancellation when a restored timed wait starts before its deadline.
 
 The pinned SDK's `WorkflowMutableInstance.internalCancel` checks whether the current status is active and refuses a
 `PENDING` instance. Starting the expired workflow merely to cancel it could execute work after its deadline; it is not

@@ -201,6 +201,44 @@ class PendingCancellationReceiptTest {
             q.setString(1, value); try (var r = q.executeQuery()) { r.next(); return r.getLong(1); }
         }
     }
+    @Test void committedReceiptRecoversOnlyItsExactPendingCancellationOnce() throws Exception {
+        withRestored((instance, row, appId, gate, engine) -> {
+            var recovery = new PendingCancellationReceiptRecovery(data, store, Clock.systemUTC());
+            assertFalse(recovery.recover(row.tenant(), row.id(), appId), "a request alone is not a receipt");
+            assertTrue(instance.cancelFuture().get(10, TimeUnit.SECONDS));
+            assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(row.tenant(), row.id()).orElseThrow().status(),
+                    "without an observer the committed receipt must be needed");
+            assertFalse(recovery.recover(row.tenant(), row.id(), appId + "-other"));
+            assertFalse(recovery.recover("other-tenant", row.id(), appId));
+            var workers = Executors.newFixedThreadPool(2);
+            try {
+                var start = new CountDownLatch(1);
+                var a = workers.submit(() -> { start.await(); return recovery.recover(row.tenant(), row.id(), appId); });
+                var b = workers.submit(() -> { start.await(); return recovery.recover(row.tenant(), row.id(), appId); });
+                start.countDown();
+                assertNotEquals(a.get(10, TimeUnit.SECONDS), b.get(10, TimeUnit.SECONDS),
+                        "only one recovery may advance the registry");
+            } finally { workers.shutdownNow(); }
+            assertEquals(InstanceStatus.CANCELLED, store.find(row.tenant(), row.id()).orElseThrow().status());
+            assertFalse(recovery.recover(row.tenant(), row.id(), appId));
+            assertEquals(1, count("select count(*) from task.instance_event where instance_id=? "
+                    + "and reason='engine.receipt.CANCELLED'", row.id().value()));
+        });
+    }
+
+    @Test void committedReceiptDoesNotOverrideACompetingTerminalOutcome() throws Exception {
+        withRestored((instance, row, appId, gate, engine) -> {
+            assertTrue(instance.cancelFuture().get(10, TimeUnit.SECONDS));
+            var current = store.find(row.tenant(), row.id()).orElseThrow();
+            var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+            store.replace(current.successor(now, InstanceStatus.FAILED, current.engineInstanceId(),
+                    current.startAttempts(), null, null), current.version(), "test.competing-failure", current.owner());
+            var recovery = new PendingCancellationReceiptRecovery(data, store, Clock.systemUTC());
+            assertFalse(recovery.recover(row.tenant(), row.id(), appId));
+            assertEquals(InstanceStatus.FAILED, store.find(row.tenant(), row.id()).orElseThrow().status());
+        });
+    }
+
     @Test void actualJpaDeleteAndExactReceiptCommitTogether() throws Exception {
         withRestored((instance, row, appId, gate, engine) -> {
             assertTrue(instance.cancelFuture().get(10, TimeUnit.SECONDS));
