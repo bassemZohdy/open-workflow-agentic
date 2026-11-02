@@ -474,7 +474,7 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-02. Shared pat
 
 Implemented scope:
 
-- An internal transaction seam lets an inbox receipt and its exact wait binding share a caller-owned PostgreSQL transaction; rollback, duplicate and concurrent-receipt tests pass. It is not a producer, dispatch permission or T13 completion.
+- Internal transaction seams let an inbox receipt and its exact task-owned wait binding share a caller-owned PostgreSQL transaction; rollback, duplicate, concurrent-receipt and released-owner tests pass. This is not a producer, callback reservation, checkpoint proof or T13 completion.
 - JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.
 - Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied.
 - Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.
