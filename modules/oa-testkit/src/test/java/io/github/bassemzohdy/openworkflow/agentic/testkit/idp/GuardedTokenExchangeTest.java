@@ -50,7 +50,8 @@ class GuardedTokenExchangeTest {
 
     @AfterEach
     void stop() {
-        fx.close();
+        if (exchanger != null) exchanger.close();
+        if (fx != null) fx.close();
     }
 
     private ExchangeRequest request(String audience) {
@@ -122,5 +123,37 @@ class GuardedTokenExchangeTest {
             assertEquals(Code.UNAVAILABLE, assertThrows(ExchangeException.class, () -> plain.exchange(request(AUDIENCE))).code());
         }
         assertEquals(5, fx.as.received().size(), "every request reaches the server when there is no guard");
+    }
+    @Test
+    void stalledResponseBodyTimesOutWithoutIssuingOrRetrying() throws Exception {
+        var received = new java.util.concurrent.atomic.AtomicInteger();
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/token", exchange -> {
+            received.incrementAndGet();
+            exchange.sendResponseHeaders(200, 0);
+            exchange.getResponseBody().flush();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        try (var stalled = new Rfc8693TokenExchanger("http://127.0.0.1:" + server.getAddress().getPort() + "/token",
+                CLIENT_ID, CLIENT_SECRET_NAME, fx.secrets, fx.grants, fx.bindings, fx.verifier, fx.audit(), fx.clock,
+                Duration.ofSeconds(1), guard, 1)) {
+            long start = System.nanoTime();
+            var failure = assertThrows(ExchangeException.class, () -> stalled.exchange(request(AUDIENCE)));
+            assertEquals(Code.UNAVAILABLE, failure.code());
+            assertTrue(Duration.ofNanos(System.nanoTime() - start).compareTo(Duration.ofSeconds(5)) < 0);
+            assertEquals(1, received.get(), "a timed-out issuance must never be retried");
+            assertTrue(fx.sink.byAction(Rfc8693TokenExchanger.ISSUED).isEmpty());
+        } finally {
+            release.countDown();
+            server.stop(0);
+        }
     }
 }
