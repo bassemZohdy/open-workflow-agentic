@@ -28,6 +28,8 @@ class EffectCrashRecoveryIT {
             s.execute("create schema " + TARGET_SCHEMA);
             s.execute("create table " + TARGET_SCHEMA + ".test_target "
                     + "(run_id varchar(64) not null, effect_key varchar(200) primary key)");
+            s.execute("create table " + TARGET_SCHEMA + ".test_attempt "
+                    + "(run_id varchar(64) not null, effect_key varchar(200) not null)");
         }
     }
 
@@ -57,6 +59,26 @@ class EffectCrashRecoveryIT {
         assertEquals(EffectState.COMPENSATED, ledger.find(original.key()).orElseThrow().state());
         child(run, "compensate-recover", 0);
         assertEquals(2, targetEffects(run), "one charge and one refund, even after process death and repeated recovery");
+    }
+
+    @Test
+    void processRestartWithClockSkewDoesNotResendAfterOriginalWindow() throws Exception {
+        String run = UUID.randomUUID().toString();
+        ThreadId thread = ThreadId.derive("effect-process-test", "alice", run);
+        EffectCommand original = EffectCommand.of(thread, "charge", "line-1", "test:payments", "amount=10");
+        JdbcEffectLedger ledger = new JdbcEffectLedger(EffectCrashWorker.dataSource());
+        child(run, "skew-crash", 77);
+        assertEquals(EffectState.INTENDED, ledger.find(original.key()).orElseThrow().state());
+        Thread.sleep(500); // The original 200 ms replay guarantee has expired on the database clock.
+        child(run, "skew-recover", 0);
+        assertEquals(EffectState.INTENDED, ledger.find(original.key()).orElseThrow().state());
+        assertEquals(1, targetEffects(run));
+        try (Connection c = EffectCrashWorker.dataSource().getConnection(); var s = c.prepareStatement(
+                "select count(*) from " + TARGET_SCHEMA + ".test_attempt where run_id = ?")) {
+            s.setString(1, run);
+            try (var r = s.executeQuery()) { r.next(); assertEquals(1, r.getLong(1), "recovery must not resend"); }
+        }
+        assertEquals(1, ledger.manualQueue(thread, 10).size());
     }
 
     private static long targetEffects(String run) throws Exception {

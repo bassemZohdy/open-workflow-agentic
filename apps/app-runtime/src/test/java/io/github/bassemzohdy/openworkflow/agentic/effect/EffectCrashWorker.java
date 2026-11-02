@@ -8,6 +8,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.JdbcEffectLedger;
 import java.sql.Connection;
 import java.time.Duration;
+import java.time.Clock;
 import org.postgresql.ds.PGSimpleDataSource;
 
 /** Test-only child JVM. halting after the target commit skips all finally blocks and loses the acknowledgment. */
@@ -26,13 +27,23 @@ public class EffectCrashWorker {
         if (!targetSchema.matches("effect_crash_[0-9a-f]{32}")) throw new IllegalArgumentException("invalid test schema");
         PGSimpleDataSource ds = dataSource();
         JdbcEffectLedger ledger = new JdbcEffectLedger(ds);
-        DurableEffects effects = new DurableEffects(ledger);
+        boolean skew = mode.startsWith("skew-");
+        Clock clock = skew ? Clock.offset(Clock.systemUTC(), mode.endsWith("crash")
+                ? Duration.ofHours(1) : Duration.ofHours(-1)) : Clock.systemUTC();
+        DurableEffects effects = new DurableEffects(ledger, clock);
         ThreadId thread = ThreadId.derive("effect-process-test", "alice", run);
         EffectCommand original = EffectCommand.of(thread, "charge", "line-1", "test:payments", "amount=10");
         EffectTarget target = new EffectTarget() {
             public String target() { return "test:payments"; }
-            public Duration replayWindow() { return Duration.ofHours(1); }
+            public Duration replayWindow() {
+                return skew && mode.endsWith("crash") ? Duration.ofMillis(200)
+                        : Duration.ofHours(skew ? 2 : 1);
+            }
             public Reply execute(String key) throws Exception {
+                try (Connection c = ds.getConnection(); var s = c.prepareStatement(
+                        "insert into " + targetSchema + ".test_attempt (run_id, effect_key) values (?, ?)")) {
+                    s.setString(1, run); s.setString(2, key); s.executeUpdate();
+                }
                 try (Connection c = ds.getConnection(); var s = c.prepareStatement(
                         "insert into " + targetSchema + ".test_target (run_id, effect_key) values (?, ?) on conflict do nothing")) {
                     s.setString(1, run); s.setString(2, key); s.executeUpdate(); // Auto-commit in the target database.
@@ -46,8 +57,9 @@ public class EffectCrashWorker {
             if (effects.compensate(original.key(), undo, target).state() != EffectState.COMPENSATED) {
                 throw new IllegalStateException("compensation unresolved");
             }
-        } else if (effects.execute(original, target).state() != EffectState.CONFIRMED) {
-            throw new IllegalStateException("effect unresolved");
+        } else {
+            EffectState expected = mode.equals("skew-recover") ? EffectState.INTENDED : EffectState.CONFIRMED;
+            if (effects.execute(original, target).state() != expected) throw new IllegalStateException("unexpected effect state");
         }
     }
 }
