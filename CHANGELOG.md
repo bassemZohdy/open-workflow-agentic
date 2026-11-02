@@ -1,5 +1,7 @@
 # Changelog
 
+- Rotate overdue wait scans across passes so a held lock on an older wait does not block later waits.
+
 - Rotate lifetime expiry scans by deadline and instance id, so an older locked row does not monopolize every batch; the cursor resets on process restart.
 
 - Continue lifetime scans past out-of-scope tenants before applying the repair batch limit, so scoped recovery is not hidden by earlier rows.

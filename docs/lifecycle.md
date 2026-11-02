@@ -300,10 +300,9 @@ does not interrupt engine work. A request with an unconfirmed engine id can rema
 engine confirms cancellation; absence from one replica's engine is not proof of termination. Enforcement depends on
 reconciliation running. Escalation and two-replica failover evidence remain outside this limit's current scope.
 
-Lifetime scans rotate through a stable deadline and instance-id ordering across passes, so locked older rows do not
+Lifetime and overdue-wait scans rotate through a stable deadline and instance-id ordering across passes, so locked older rows do not
 permanently consume the whole batch while the reconciler continues running. The cursor is held in each reconciler's
-memory and resets on restart; it is not a durable failover guarantee. Other overdue and stale-row scans do not yet
-have this rotation.
+memory and resets on restart; it is not a durable failover guarantee. Stale-row scans do not yet have this rotation.
 
 ### 9.6 Entry points for 105d
 

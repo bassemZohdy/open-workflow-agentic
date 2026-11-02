@@ -51,6 +51,7 @@ class InstanceLifetimePinTest {
     }
     private static final class Engine implements WorkflowEngine {
         final AtomicInteger starts = new AtomicInteger(), cancels = new AtomicInteger();
+        EngineStatus status = EngineStatus.RUNNING;
         @Override public boolean hasDefinition(DefinitionRef definition) { return true; }
         @Override public EngineLaunch prepare(DefinitionRef definition, Map<String,Object> input) {
             String id = "engine-" + UUID.randomUUID();
@@ -60,7 +61,7 @@ class InstanceLifetimePinTest {
             };
         }
         @Override public Optional<ActiveInstance> activeInstance(DefinitionRef definition, String id) {
-            return Optional.of(new ActiveInstance(id, EngineStatus.RUNNING));
+            return Optional.of(new ActiveInstance(id, status));
         }
         @Override public boolean cancel(DefinitionRef definition, String id) { cancels.incrementAndGet(); return true; }
     }
@@ -103,6 +104,32 @@ class InstanceLifetimePinTest {
             assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(firstRequest.tenant(), original.id()).orElseThrow().status());
             assertEquals(2, engine.cancels.get());
         }
+    }
+
+    @Test void aLockedOverdueWaitDoesNotStarveLaterWaits() throws Exception {
+        var engine = new Engine(); var firstRequest = request();
+        var secondRequest = new StartRequest(firstRequest.tenant(), owner, definition, Map.of(), "second");
+        var first = service(engine, Optional.empty()).start(firstRequest).record();
+        var second = service(engine, Optional.empty()).start(secondRequest).record();
+        var earlier = start.minus(Duration.ofMinutes(2));
+        first = store.replace(first.successor(start, InstanceStatus.WAITING, first.engineInstanceId(), 0, null, earlier),
+                first.version(), "test.wait", owner);
+        second = store.replace(second.successor(start, InstanceStatus.WAITING, second.engineInstanceId(), 0, null, earlier.plusSeconds(1)),
+                second.version(), "test.wait", owner);
+        engine.status = EngineStatus.WAITING;
+        var now = start.plus(Duration.ofMinutes(1));
+        var config = new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120), Duration.ofSeconds(60),
+                3, Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofHours(24), 1, Optional.empty());
+        var repair = new Reconciler(store, engine, new EngineStatusSync(store, scan, config, Clock.fixed(now, ZoneOffset.UTC)),
+                scan, new RepairStore(db), config, db, Clock.fixed(now, ZoneOffset.UTC), firstRequest.tenant()::equals);
+        try (var held = Reconciler.AdvisoryLock.tryAcquire(db, "instance:" + first.id().value()).orElseThrow()) {
+            assertTrue(repair.reconcileOnce().count("busy") >= 1);
+            repair.reconcileOnce();
+            assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(firstRequest.tenant(), second.id()).orElseThrow().status());
+        }
+        repair.reconcileOnce();
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(firstRequest.tenant(), first.id()).orElseThrow().status());
+        assertEquals(2, engine.cancels.get());
     }
 
     @Test void expiredStartWithoutEngineIdIsCancelledBeforeRecoveryCanPrepareIt() {
