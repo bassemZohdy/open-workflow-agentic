@@ -67,6 +67,8 @@ class ExecutorCancellationGateTest {
         final Set<String> cancelled;
         final AtomicInteger entries = new AtomicInteger();
         ExperimentalExpressions(Set<String> cancelled) { this.cancelled = cancelled; }
+        // The SDK selects the lowest priority; avoid an order-dependent tie with its default jq factory.
+        @Override public int priority(ExpressionDescriptor expression) { return 999; }
         @Override public WorkflowFilter buildFilter(ExpressionDescriptor expression, WorkflowModelFactory models) {
             var next = super.buildFilter(expression, models);
             return (workflow, task, input) -> {
