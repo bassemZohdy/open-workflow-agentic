@@ -612,6 +612,7 @@ Deliverables:
 - Kubernetes lease durable mode; failover test with two replicas and verify restored work starts after warmup
 
 Implementation status: **partial**.
+- Implemented: An opt-in restored-instance and reader candidate blocks a stale holder from starting after pending cancellation, waits for acknowledged checkpoint removal before reporting CANCELLED, and guards stale snapshots with bounded per-reader tombstones. It is not installed in the application: single-reader composition, retained cancellation evidence across a crash, multi-replica fencing and the original process-level regression remain unresolved.
 - Implemented: Restored RUNNING/WAITING work rechecks retained wait/lifetime deadlines and current authority after the potentially blocking resume-epoch write; a deadline or lost authority refuses a restart. This does not resolve the SDK's refusal to cancel restored PENDING instances or prove the remaining cross-process and multi-replica gates.
 - Implemented: New starts with a configured maximum lifetime atomically pin their original absolute deadline; reconciliation applies the earlier of that pin and a stricter current setting, including after the setting is removed or increased. Legacy/unbounded starts use current configuration, and old replicas do not enforce pins. Opt-in STARTING expiry coordinates upgraded JDBC start writers with reconciliation; an unconfirmed engine start remains a cancellation request. Escalation, deployed role grants, real two-replica failover and T12 remain open.
 - Implemented: Lifetime, overdue-wait, stale-start and unconfirmed-cancellation scans rotate across passes, allowing progress past held locks or unresolved rows; per-reconciler cursors reset on restart.
@@ -633,7 +634,7 @@ Remaining gates:
 - Run two execution replicas with durable Kubernetes lease mode; test node loss and post-warmup recovery.
 - Automate T12.
 
-Evidence: [docs/lifecycle.md](../../docs/lifecycle.md), [docs/adr/0013-use-db-scheduler-for-time-based-triggers.md](../../docs/adr/0013-use-db-scheduler-for-time-based-triggers.md), [docs/lifecycle.md](../../docs/lifecycle.md)
+Evidence: [docs/lifecycle.md](../../docs/lifecycle.md), [docs/adr/0013-use-db-scheduler-for-time-based-triggers.md](../../docs/adr/0013-use-db-scheduler-for-time-based-triggers.md), [docs/lifecycle.md](../../docs/lifecycle.md), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/lifecycle/persistence/CancellableRestoredWorkflowInstance.java](../../modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/lifecycle/persistence/CancellableRestoredWorkflowInstance.java), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/lifecycle/persistence/CancellablePersistenceReader.java](../../modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/lifecycle/persistence/CancellablePersistenceReader.java), [apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/CancellableRestoredWorkflowInstanceTest.java](../../apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/CancellableRestoredWorkflowInstanceTest.java)
 
 Reuse: quarkus-flow-durable-kubernetes, quarkus-db-scheduler
 
