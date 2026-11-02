@@ -598,8 +598,12 @@ JSON envelope (`application/cloudevents+json`, maximum 64 KiB). The caller must
 have a verified bearer token and `oa.events.receive`, pass the dedicated event
 PEP, and match an explicit `agentic.events.producers.<name>` deployment binding
 for tenant, subject kind/id, source, event type, target definition and correlation
-occurrence. Without producer bindings ingress is denied. Development headers are
-accepted only through the existing explicit development/test caller seam.
+occurrence. Without producer bindings ingress is denied. The source
+`urn:openworkflow:human-decision` is reserved for internal human-decision events:
+external producer bindings using it are rejected at startup, and receipt through
+this endpoint is denied. The human-decision producer and dispatcher are not yet
+activated. Development headers are accepted only through the existing explicit
+development/test caller seam.
 
 The complete envelope is persisted before any listener wake. A new receipt is
 202, an identical source/id retry is 200, and changed content or routing is 409.
