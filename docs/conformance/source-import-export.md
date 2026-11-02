@@ -21,8 +21,9 @@ if (candidate.schemaAccepted()) {
 ```
 
 Every array crossing the API boundary is defensively copied. Diagnostics are
-immutable codes with bounded paths/keywords; parser/validator exception messages
-and caller values are not returned. Empty/over-1-MiB inputs are refused before
+immutable codes with bounded paths/keywords; paths retain fixed names from the
+pinned schemas and array positions, while other object keys are replaced with `*`.
+Parser/validator exception messages and caller values are not returned in diagnostics. Empty/over-1-MiB inputs are refused before
 copying. Invalid UTF-8 is never replaced. Duplicate keys, trailing documents,
 invalid Unicode, non-JSON values and bounded-depth/token/string/number violations
 refuse conversion. The exact original remains exportable for diagnosis/editing.

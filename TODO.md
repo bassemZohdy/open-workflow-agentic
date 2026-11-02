@@ -1280,6 +1280,7 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-20. Shared pat
 Implemented scope:
 
 - Executable OWS portability assessment of the pinned Java SDK landed (PR 128): official CTK feature, pinned 1.0.1/1.0.3 schemas, 42 curated sources, import/export/round-trip report, workflow-source codec/materializer and URI-template resolver, with the ows-conformance workflow. It is an assessment, not a conformance certificate or a product authoring/import/export API; reported divergences stay divergences.
+- The offline source codec masks author-chosen object names in schema and runtime-capability diagnostic paths, preserving fixed schema fields and array indexes; source values and task names are not returned in these diagnostic paths. This is not a durable authoring API or full portability certification.
 
 Additional closure/integration tasks:
 

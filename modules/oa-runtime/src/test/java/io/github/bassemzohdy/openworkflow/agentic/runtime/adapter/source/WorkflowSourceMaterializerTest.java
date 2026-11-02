@@ -34,6 +34,16 @@ class WorkflowSourceMaterializerTest {
         return node("{\"set\":{\"payload\":1},\"input\":{\"schema\":{\"format\":\"unregistered\",\"document\":{\"type\":\"object\"}}}}");
     }
 
+    @Test void capabilityDiagnosticsMaskAuthorChosenNames() throws Exception {
+        for(var profile:Profile.values()) {
+            var root=base(profile);root.putArray("do").add(json.createObjectNode().set("PRIVATE-KEY/with~escape",badLeaf()));
+            var diagnostics=codec.runtimeCapabilityDiagnostics(read(root,profile));
+            assertFalse(diagnostics.isEmpty());
+            assertFalse(diagnostics.toString().contains("PRIVATE-KEY"));
+            assertTrue(diagnostics.stream().anyMatch(d->d.path().startsWith("/do/0/*/input/schema/format")),diagnostics.toString());
+        }
+    }
+
     @Test void schemaAwareOverlayChecksRootTaskCompositeReusableAndExtensionDeclarationsInBothProfiles() throws Exception {
         var evidence = json.createObjectNode().put("scope", "Offline whole-source capability check before SDK definition construction");
         var observations = evidence.putArray("cases");

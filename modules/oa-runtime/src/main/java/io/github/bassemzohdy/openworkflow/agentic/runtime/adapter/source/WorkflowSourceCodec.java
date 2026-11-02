@@ -71,6 +71,7 @@ public final class WorkflowSourceCodec {
     private final ObjectMapper json,yaml;
     private final Map<Profile,Schema> schemas;
     private final Map<Profile,Schema> capabilitySchemas;
+    private final Set<String> schemaProperties;
 
     public WorkflowSourceCodec() throws IOException {
         // No service-loader modules, class binding, global SDK mapper or checkpoint serializer.
@@ -78,6 +79,7 @@ public final class WorkflowSourceCodec {
                 .enable(YAMLParser.Feature.PARSE_BOOLEAN_LIKE_WORDS_AS_STRINGS).build()));
         var pinned=new EnumMap<Profile,Schema>(Profile.class);
         var capabilities=new EnumMap<Profile,Schema>(Profile.class);
+        var properties=new HashSet<String>();
         for(var profile:Profile.values()) {
             byte[] bytes;
             try(var in=getClass().getResourceAsStream("/conformance/schema/workflow-"+profile.version+".yaml")) {
@@ -86,6 +88,7 @@ public final class WorkflowSourceCodec {
             if(!sha(bytes).equals(profile.sha))throw new IOException("Pinned source schema digest mismatch");
             // The pinned normative schemas are one self-contained document: external schema resolution is forbidden.
             JsonNode schema=yaml.readTree(bytes);requireInternalReferences(schema);
+            collectSchemaProperties(schema,properties);
             pinned.put(profile,SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12,b->b.schemaRegistryConfig(
                     SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build())).getSchema(json.writeValueAsString(schema)));
             // A separate capability overlay, never a modification of the pinned normative bytes.
@@ -101,6 +104,7 @@ public final class WorkflowSourceCodec {
         }
         schemas=Map.copyOf(pinned);
         capabilitySchemas=Map.copyOf(capabilities);
+        schemaProperties=Set.copyOf(properties);
     }
     private static ObjectMapper configure(ObjectMapper mapper) {
         mapper.getFactory().setStreamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64)
@@ -115,6 +119,40 @@ public final class WorkflowSourceCodec {
                 throw new IOException("Pinned schema contains a non-local reference");
         }
         if(node.isContainerNode())for(var child:node)requireInternalReferences(child);
+    }
+    private static void collectSchemaProperties(JsonNode node,Set<String> properties) {
+        if(node.isObject()) {
+            var declared=node.get("properties");
+            if(declared!=null&&declared.isObject())declared.fieldNames().forEachRemaining(properties::add);
+        }
+        if(node.isContainerNode())for(var child:node)collectSchemaProperties(child,properties);
+    }
+    /** Keep fixed schema field names and array positions, but never caller-selected object keys. */
+    private String safeLocation(String location,JsonNode data) {
+        if(location.isEmpty()||!location.startsWith("/"))return "";
+        var out=new StringBuilder();JsonNode current=data;
+        for(String encoded:location.substring(1).split("/",-1)) {
+            String part=encoded.replace("~1","/").replace("~0","~");
+            boolean array=current!=null&&current.isArray();
+            String safe="*";
+            if(array) {
+                try {
+                    int index=Integer.parseInt(part);
+                    if(index>=0&&index<current.size()&&part.equals(Integer.toString(index))) {
+                        safe=part;current=current.get(index);
+                    } else current=null;
+                } catch(NumberFormatException invalid) {current=null;}
+            } else {
+                if(current!=null&&current.isObject()) {
+                    if(schemaProperties.contains(part))safe=part;
+                    current=current.get(part);
+                } else current=null;
+            }
+            safe=safe.replace("~","~0").replace("/","~1");
+            if(out.length()+safe.length()+1>512)break;
+            out.append('/').append(safe);
+        }
+        return out.toString();
     }
     public Imported importSource(byte[] source,Format format,Profile profile) {
         Objects.requireNonNull(source);Objects.requireNonNull(format);Objects.requireNonNull(profile);
@@ -132,7 +170,8 @@ public final class WorkflowSourceCodec {
         if(data!=null) {
             var errors=schemas.get(profile).validate(data);
             // Never include validator messages: they can contain caller data or credentials.
-            errors.stream().map(e->new Diagnostic(Code.SCHEMA_INVALID,bounded(e.getInstanceLocation().toString(),512),
+            JsonNode parsed=data;
+            errors.stream().map(e->new Diagnostic(Code.SCHEMA_INVALID,safeLocation(e.getInstanceLocation().toString(),parsed),
                     bounded(e.getKeyword(),64))).distinct().sorted(Comparator.comparing(Diagnostic::path).thenComparing(Diagnostic::keyword))
                     .limit(32).forEach(diagnostics::add);
         }
@@ -146,7 +185,7 @@ public final class WorkflowSourceCodec {
         Objects.requireNonNull(document);
         if(!document.schemaAccepted())return document.diagnostics;
         return capabilitySchemas.get(document.profile).validate(document.data).stream()
-                .map(e->new Diagnostic(Code.UNSUPPORTED_SCHEMA_FORMAT,bounded(e.getInstanceLocation().toString(),512),
+                .map(e->new Diagnostic(Code.UNSUPPORTED_SCHEMA_FORMAT,safeLocation(e.getInstanceLocation().toString(),document.data),
                         bounded(e.getKeyword(),64))).distinct()
                 .sorted(Comparator.comparing(Diagnostic::path).thenComparing(Diagnostic::keyword)).limit(32).toList();
     }

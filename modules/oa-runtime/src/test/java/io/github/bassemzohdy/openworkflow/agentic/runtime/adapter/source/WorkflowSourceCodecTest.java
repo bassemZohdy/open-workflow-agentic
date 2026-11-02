@@ -97,6 +97,14 @@ class WorkflowSourceCodecTest {
         var malformed=read("document: ["+privateValue);rejected(malformed,Code.MALFORMED_SOURCE);assertFalse(malformed.diagnostics().toString().contains(privateValue));
         assertArrayEquals(bytes("document: ["+privateValue),codec.exportOriginal(malformed).bytes());
     }
+    @Test void diagnosticsDoNotExposeCallerChosenTaskNames() {
+        String secret="PRIVATE-KEY-DO-NOT-LOG";
+        var invalid=read(BASIC.replace("copy:",secret+":" ).replace("set: {message: 'é 😀'}", "set: 42"));
+        rejected(invalid,Code.SCHEMA_INVALID);
+        assertFalse(invalid.diagnostics().toString().contains(secret),invalid.diagnostics().toString());
+        assertTrue(invalid.diagnostics().stream().anyMatch(d->d.path().startsWith("/do/0/*")));
+        assertFalse(codec.export(invalid,Format.JSON,ConversionPolicy.ALLOW_FORMATTING_CHANGES).diagnostics().toString().contains(secret));
+    }
     @Test void callerSelectsReleasedOrDevelopmentSchemaWithoutRewritingDeclaredDialect() throws Exception {
         byte[] source=resource("cases/emit-event.yaml");var dev=codec.importSource(source,Format.YAML,Profile.DEVELOPMENT_1_0_3);
         assertTrue(dev.schemaAccepted(),dev.diagnostics().toString());var release=codec.importSource(source,Format.YAML,Profile.RELEASED_1_0_1);rejected(release,Code.SCHEMA_INVALID);

@@ -1,5 +1,7 @@
 # Changelog
 
+- Mask author-chosen object names in workflow source validation and runtime-capability diagnostic paths.
+
 - Link authenticated agent requests to research graph tracing, with inbound traceparent acceptance disabled by default.
 
 - Trace governed research graph nodes while preserving deadline, budget, and mandatory audit checks around telemetry.
