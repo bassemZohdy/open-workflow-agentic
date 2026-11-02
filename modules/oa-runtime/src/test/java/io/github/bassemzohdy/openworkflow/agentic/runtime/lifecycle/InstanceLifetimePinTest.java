@@ -78,6 +78,33 @@ class InstanceLifetimePinTest {
                 Clock.fixed(now, ZoneOffset.UTC), request.tenant()::equals);
     }
 
+    @Test void aLockedOldestLifetimeDoesNotStarveLaterRows() throws Exception {
+        for (boolean pinned : List.of(false, true)) {
+            var engine = new Engine(); var firstRequest = request();
+            var secondRequest = new StartRequest(firstRequest.tenant(), owner, definition, Map.of(), "second");
+            var limit = Optional.of(Duration.ofMinutes(10));
+            var original = new InstanceService(store, engine, LifecycleFaults.none(),
+                    Clock.fixed(start.minusSeconds(2), ZoneOffset.UTC), UlidGenerator.shared(),
+                    settings(pinned ? limit : Optional.empty()), db).start(firstRequest).record();
+            var later = service(engine, pinned ? limit : Optional.empty()).start(secondRequest).record();
+            var now = start.plus(Duration.ofMinutes(11));
+            var config = new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120), Duration.ofSeconds(60),
+                    3, Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofHours(24), 1, Optional.empty(),
+                    pinned ? Optional.empty() : limit, true);
+            var repair = new Reconciler(store, engine, new EngineStatusSync(store, scan, config, Clock.fixed(now, ZoneOffset.UTC)),
+                    scan, new RepairStore(db), config, db, Clock.fixed(now, ZoneOffset.UTC), firstRequest.tenant()::equals);
+            try (var held = Reconciler.AdvisoryLock.tryAcquire(db, "instance:" + original.id().value()).orElseThrow()) {
+                assertTrue(repair.reconcileOnce().count("busy") >= 1);
+                assertEquals(InstanceStatus.RUNNING, store.find(firstRequest.tenant(), original.id()).orElseThrow().status());
+                repair.reconcileOnce();
+                assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(firstRequest.tenant(), later.id()).orElseThrow().status());
+            }
+            repair.reconcileOnce();
+            assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(firstRequest.tenant(), original.id()).orElseThrow().status());
+            assertEquals(2, engine.cancels.get());
+        }
+    }
+
     @Test void expiredStartWithoutEngineIdIsCancelledBeforeRecoveryCanPrepareIt() {
         var request = request(); var attempts = new AtomicInteger();
         WorkflowEngine engine = new WorkflowEngine() {

@@ -106,6 +106,7 @@ public class Reconciler {
     private final DataSource dataSource;
     private final Clock clock;
     private final Predicate<String> tenantScope;
+    private RegistryScan.DeadlineRef lifetimeCursor;
     private final ResumeGate gate;
     private final RestoreCheckpointGate checkpoints;
     private final ScheduledExecutorService executor;
@@ -428,19 +429,28 @@ public class Reconciler {
 
     // ---- (vi-b) instances past their maximum lifetime --------------------------------------------------------------
 
-    private void lifetimesExceeded(ReconcileReport report, Instant now) {
+    private synchronized void lifetimesExceeded(ReconcileReport report, Instant now) {
         Optional<Instant> cutoff = settings.maxLifetime.map(now::minus);
-        // Select before mutating: repairs remove rows from this query and would shift subsequent offsets.
         var selected = new ArrayList<RegistryScan.Ref>();
-        int offset = 0;
+        var start = lifetimeCursor;
+        boolean wrapped = lifetimeCursor == null;
         while (selected.size() < settings.batchSize) {
-            var page = scan.livePastLifetime(now, cutoff, settings.batchSize, settings.startingLifetimeEnabled, offset);
+            var page = scan.lifetimePage(now, cutoff, settings.batchSize, settings.startingLifetimeEnabled, lifetimeCursor,
+                    wrapped ? start : null);
+            if (page.isEmpty()) {
+                if (lifetimeCursor != null && !wrapped) { lifetimeCursor = null; wrapped = true; continue; }
+                lifetimeCursor = null;
+                break;
+            }
             for (var ref : page) {
-                if (tenantScope.test(ref.tenant())) selected.add(ref);
+                lifetimeCursor = ref;
+                if (tenantScope.test(ref.tenant())) selected.add(ref.ref());
                 if (selected.size() == settings.batchSize) break;
             }
-            if (page.size() < settings.batchSize) break;
-            offset += page.size();
+            if (page.size() < settings.batchSize && selected.size() < settings.batchSize) {
+                if (wrapped) { lifetimeCursor = null; break; }
+                lifetimeCursor = null; wrapped = true;
+            }
         }
         for (RegistryScan.Ref ref : selected) {
             report.bump(withInstance(ref.id(), () -> repairLifetime(ref, now)) ? "lifetime.examined" : "busy");

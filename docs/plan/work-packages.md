@@ -611,6 +611,7 @@ Deliverables:
 
 Implementation status: **partial**.
 - Implemented: New starts with a configured maximum lifetime atomically pin their original absolute deadline; reconciliation applies the earlier of that pin and a stricter current setting, including after the setting is removed or increased. Legacy/unbounded starts use current configuration, and old replicas do not enforce pins. Opt-in STARTING expiry coordinates upgraded JDBC start writers with reconciliation; an unconfirmed engine start remains a cancellation request. Escalation, deployed role grants, real two-replica failover and T12 remain open.
+- Implemented: Lifetime expiry scans rotate by deadline and instance id across passes, allowing progress past held locks; the per-reconciler cursor resets on restart.
 - Implemented: db-scheduler is embedded and reconciliation stores absolute workflow wait deadlines.
 - Implemented: Optional persisted maximum instance lifetime landed (PR 138): agentic.reconciler.max-lifetime (unset by default) makes the reconciler cancel RUNNING/WAITING instances whose stored created_at is older than the limit, through the same cancel path as a passed wait deadline (request recorded first, refused cancel re-sent, engine-lost instance FAILED, repair kind lifetime); six database-backed reconciler tests pass in CI. Escalation timers, duplicate-timer-delivery proof, two-replica Kubernetes-lease failover and T12 remain open, so WP-109 stays partial.
 - Implemented: Duplicate delivery of a due timer is proven harmless (PR 139, database-backed, CI): a due wait deadline or maximum lifetime delivered twice writes one history row and leaves the row version unchanged; a late duplicate after the engine confirmed the cancel changes nothing on the terminal row; two reconcilers delivering the same due deadline at once admit exactly one transition.
@@ -618,7 +619,7 @@ Implementation status: **partial**.
 Remaining gates:
 
 - Complete deployed role grants and verify mixed-version rollout; implement escalation timers and prove deadline recovery across restart and replicas.
-- Prevent deadline scans from starving behind locked or unrepairable rows and bound start-lock connection use under load.
+- Prevent wait-deadline and stale-row scans from starving behind locked or unrepairable rows; establish restart and multi-replica fairness and bound start-lock connection use under load.
 - Run two execution replicas with durable Kubernetes lease mode; test node loss and post-warmup recovery.
 - Automate T12.
 
