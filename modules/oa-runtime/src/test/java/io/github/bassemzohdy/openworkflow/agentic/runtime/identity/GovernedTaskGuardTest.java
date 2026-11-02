@@ -38,6 +38,7 @@ class GovernedTaskGuardTest {
     private Optional<InstanceAuthority> registered;
     private RuntimeException registryFailure;
     private volatile Decision decision;
+    private Runnable onRecheck = () -> {};
     private final List<String> asked = Collections.synchronizedList(new ArrayList<>());
     private List<String> lastRan;
 
@@ -57,7 +58,7 @@ class GovernedTaskGuardTest {
                 if (registryFailure != null) throw registryFailure;
                 return registered;
             }
-            @Override public Decision recheck(Ulid id) { return decision; }
+            @Override public Decision recheck(Ulid id) { onRecheck.run(); return decision; }
             @Override public void requireReauthorization(InstanceAuthority a, String reason) { }
             @Override public Optional<DelegationGrant> grant(Ulid id) { return Optional.empty(); }
         };
@@ -136,6 +137,19 @@ class GovernedTaskGuardTest {
     @Test void anUnreadableRegistryRefusesEvenWhenUngovernedIsAllowed() throws Exception {
         registryFailure = new IllegalStateException("db down");
         assertEquals(Reason.UNAVAILABLE, reason(run(Ungoverned.ALLOW, null)));
+        assertTrue(lastRan.isEmpty());
+    }
+
+    @Test void aChangedGrantIsNotTreatedAsAnUngovernedInstance() throws Exception {
+        onRecheck = () -> registered = Optional.of(new InstanceAuthority(instanceId, "t1", USER,
+                UlidGenerator.shared().next(), "corr-1", InstanceAuthority.State.AUTHORIZED, null, NOW, NOW));
+        assertEquals(Reason.REVOKED, reason(run(Ungoverned.ALLOW, null)));
+        assertTrue(lastRan.isEmpty());
+    }
+
+    @Test void aDisappearingAuthorityIsNotTreatedAsAnUngovernedInstance() throws Exception {
+        onRecheck = () -> registered = Optional.empty();
+        assertEquals(Reason.REVOKED, reason(run(Ungoverned.ALLOW, null)));
         assertTrue(lastRan.isEmpty());
     }
 

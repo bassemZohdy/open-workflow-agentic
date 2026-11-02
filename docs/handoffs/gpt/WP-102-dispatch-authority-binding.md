@@ -10,6 +10,12 @@ token's expiry after the pre-work checks. The tests cover changed bindings durin
 as interruption during exchange. The database-backed tests use real stored authority rows and directly rebind them to
 simulate the change; their exchanger remains a test double.
 
+When the initial read found delegated authority, a changed, removed or newly undelegated authority during a later read
+is reported as revoked, not as an initially ungoverned instance. This matters for the task guard's optional
+`allow-ungoverned` mode: it must not swallow a change in an already-governed check. Real Flow-engine listener tests
+exercise both changed-grant and removed-authority cases. This mode can still allow an instance whose initial read finds
+no delegated authority; deployments requiring every instance to be delegated must use `require-delegated`.
+
 These are application-level observations across separate transactions. A grant can still change after the last check;
 this is not a commit-time or physical-effect fence. The Flow production dispatch, credential source, supported issuer
 contract, real-provider/restart proof and full WP-102 acceptance remain open.

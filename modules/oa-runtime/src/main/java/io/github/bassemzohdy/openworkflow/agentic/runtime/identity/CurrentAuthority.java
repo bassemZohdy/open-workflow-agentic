@@ -43,7 +43,7 @@ public final class CurrentAuthority {
 
     void requireCurrent(String engineInstanceId, InstanceAuthority authority) {
         refuseIfInterrupted();
-        if (!authority.equals(restore(engineInstanceId))) throw new AuthorityLostException(Reason.NOT_VERIFIED);
+        requireSameAuthority(engineInstanceId, authority);
         Decision decision;
         try {
             decision = registry.recheck(authority.instanceId());
@@ -55,8 +55,20 @@ public final class CurrentAuthority {
                     ? Reason.REVOKED : Reason.UNAVAILABLE);
         }
         refuseIfInterrupted();
-        if (!authority.equals(restore(engineInstanceId))) throw new AuthorityLostException(Reason.NOT_VERIFIED);
+        requireSameAuthority(engineInstanceId, authority);
         refuseIfInterrupted();
+    }
+
+    private void requireSameAuthority(String engineInstanceId, InstanceAuthority authority) {
+        InstanceAuthority observed;
+        try {
+            observed = restore(engineInstanceId);
+        } catch (AuthorityLostException e) {
+            // The caller started governed; disappearance is not permission to run as an ungoverned instance.
+            if (e.reason() == Reason.NOT_VERIFIED) throw new AuthorityLostException(Reason.REVOKED, e);
+            throw e;
+        }
+        if (!authority.equals(observed)) throw new AuthorityLostException(Reason.REVOKED);
     }
 
     static void refuseIfInterrupted() {

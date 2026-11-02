@@ -1,5 +1,7 @@
 # Changelog
 
+- Refuse a changed or disappearing delegated authority even when ungoverned workflows are allowed.
+
 - Prevent a delayed refusal for an old grant from placing a different replacement grant on hold.
 
 - Refuse asynchronous task work or results when its instance authority changes during token exchange or task execution.

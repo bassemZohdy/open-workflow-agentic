@@ -189,14 +189,14 @@ class GovernedAsyncDispatchTest {
             registered = Optional.of(replacementAuthority());
             return token;
         };
-        assertLost(Reason.NOT_VERIFIED, () -> dispatch.run("engine-1", "tool-cases", Set.of("cases:read"),
+        assertLost(Reason.REVOKED, () -> dispatch.run("engine-1", "tool-cases", Set.of("cases:read"),
                 token -> ran.getAndSet(true)));
         assertFalse(ran.get());
     }
 
     @Test void reauthorizationDuringWorkWithholdsTheOldGrantsResult() {
         var released = new ArrayList<String>();
-        assertLost(Reason.NOT_VERIFIED, () -> released.add(dispatch.run("engine-1", "tool-cases", Set.of("cases:read"), token -> {
+        assertLost(Reason.REVOKED, () -> released.add(dispatch.run("engine-1", "tool-cases", Set.of("cases:read"), token -> {
             registered = Optional.of(replacementAuthority());
             return "output";
         })));
@@ -219,7 +219,7 @@ class GovernedAsyncDispatchTest {
 
     @Test void reauthorizationDuringAuthorityRecheckRefusesBeforeExchange() {
         onRecheck = () -> registered = Optional.of(replacementAuthority());
-        assertLost(Reason.NOT_VERIFIED, this::run);
+        assertLost(Reason.REVOKED, this::run);
         assertTrue(requests.isEmpty());
     }
 
