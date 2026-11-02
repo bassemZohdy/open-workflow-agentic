@@ -42,6 +42,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.JdbcEffectLedger;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectState;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectKey;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.DelegationGrantStore;
@@ -719,6 +720,100 @@ class GovernedModelRunningControlTest {
             return controlled.execute(running, entry, allocation, profile, occurrence(running, entry, call), call,
                     budget, "registered:test", target);
         }
+    }
+
+    private static final class ReadOnlyRig {
+        final ToolEffectRig source;
+        final ApprovedToolProfile profile;
+        final GovernedToolGateway gateway;
+        final AtomicInteger calls = new AtomicInteger();
+        final AtomicInteger admissions = new AtomicInteger();
+        final java.util.List<String> auditEvents = new java.util.ArrayList<>();
+        final AtomicReference<String> response = new AtomicReference<>("{\"value\":\"ok\"}");
+        volatile java.util.function.Consumer<String> duringAudit = action -> { };
+        volatile Runnable during = () -> { };
+
+        ReadOnlyRig(ResourceExecutionEntry entry, Duration timeout) {
+            source = new ToolEffectRig(entry);
+            var registration = GovernedToolGateway.Registration.controlledReadOnly(
+                    "{\"type\":\"object\",\"required\":[\"query\"]}",
+                    "{\"type\":\"object\",\"required\":[\"value\"],\"properties\":{\"value\":{\"type\":\"string\"}}}",
+                    timeout, "e".repeat(64), args -> { calls.incrementAndGet(); during.run(); return response.get(); });
+            var registry = Map.of("tool:research", registration);
+            profile = new ApprovedToolProfile("read-only", "1", GovernedToolGateway.configurationFingerprint(registry),
+                    AGENT, Set.of("tool:research"), 3, Duration.ofSeconds(2));
+            var budget = new GovernedToolGateway.ToolBudget() {
+                @Override public void admit(GovernedToolGateway.Approval approval) { admissions.incrementAndGet(); }
+                @Override public void requireCurrent(GovernedToolGateway.Approval approval) { assertEquals(source.approved, approval); }
+                @Override public void requireProfile(GovernedToolGateway.Approval approval, ApprovedToolProfile expected) {
+                    assertEquals(profile, expected);
+                }
+            };
+            var pep = new Pep(request -> new Decision("fixture", DecisionOutcome.ALLOW, "allow", POLICY, NOW),
+                    event -> { }, Duration.ofSeconds(5), CLOCK);
+            gateway = new GovernedToolGateway(registry, () -> Optional.of(source.approved), profile, pep,
+                    event -> { auditEvents.add(event.action()); duringAudit.accept(event.action()); }, budget, CLOCK);
+        }
+        ToolCall call(String args) { return source.call(args); }
+        ResourceToolCall occurrence(Running running, ResourceExecutionEntry entry, ToolCall call) {
+            return ResourceToolCall.of(source.allocation, profile, entry, running.executor(), "graph/read-only/1", call);
+        }
+    }
+
+    @Test void controlledReadOnlyValidatesAndAuditsWithinTheLiveExecution() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ReadOnlyRig(entry, Duration.ofSeconds(1));
+            var bad = rig.call("{}");
+            assertInstanceOf(ToolResult.Rejected.class, rig.gateway.invokeReadOnly(running, entry, rig.source.allocation,
+                    rig.occurrence(running, entry, bad), bad));
+            assertEquals(0, rig.calls.get()); assertEquals(0, rig.admissions.get());
+            var call = rig.call("{\"query\":\"one\"}");
+            assertInstanceOf(ToolResult.Rejected.class, rig.gateway.invoke(call));
+            var result = assertInstanceOf(ToolResult.Completed.class, rig.gateway.invokeReadOnly(running, entry,
+                    rig.source.allocation, rig.occurrence(running, entry, call), call));
+            assertEquals("{\"value\":\"ok\"}", result.output());
+            assertEquals(1, rig.calls.get()); assertEquals(1, rig.admissions.get());
+            assertEquals(java.util.List.of("agent.tool.refused", "agent.tool.refused", "agent.tool.started",
+                    "agent.tool.completed"), rig.auditEvents);
+            return null;
+        });
+    }
+
+    @Test void controlledReadOnlyWithholdsInvalidAndLateOutputs() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ReadOnlyRig(entry, Duration.ofMillis(500)); var call = rig.call("{\"query\":\"one\"}");
+            var occurrence = rig.occurrence(running, entry, call);
+            rig.response.set("{\"value\":4}");
+            assertInstanceOf(ToolResult.Failed.class, rig.gateway.invokeReadOnly(running, entry, rig.source.allocation, occurrence, call));
+            rig.response.set("{\"value\":\"late\"}");
+            rig.during = () -> java.util.concurrent.locks.LockSupport.parkNanos(Duration.ofMillis(650).toNanos());
+            assertInstanceOf(ToolResult.Failed.class, rig.gateway.invokeReadOnly(running, entry, rig.source.allocation, occurrence, call));
+            assertEquals(2, rig.calls.get()); assertEquals(2, rig.admissions.get());
+            return null;
+        });
+    }
+
+    @Test void controlledReadOnlyWithholdsOutputWhenCompletionAuditExceedsTheCallTime() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ReadOnlyRig(entry, Duration.ofMillis(500)); var call = rig.call("{\"query\":\"one\"}");
+            rig.duringAudit = action -> { if (action.equals("agent.tool.completed"))
+                java.util.concurrent.locks.LockSupport.parkNanos(Duration.ofMillis(650).toNanos()); };
+            assertInstanceOf(ToolResult.Failed.class, rig.gateway.invokeReadOnly(running, entry, rig.source.allocation,
+                    rig.occurrence(running, entry, call), call));
+            assertEquals(1, rig.calls.get());
+            return null;
+        });
+    }
+
+    @Test void controlledReadOnlyCannotReturnAnAnswerAfterExecutionCloses() {
+        inClosingCallback((running, entry, checks) -> {
+            var rig = new ReadOnlyRig(entry, Duration.ofSeconds(1)); var call = rig.call("{\"query\":\"one\"}");
+            rig.during = running::close;
+            assertThrows(RefusedException.class, () -> rig.gateway.invokeReadOnly(running, entry, rig.source.allocation,
+                    rig.occurrence(running, entry, call), call));
+            assertEquals(1, rig.calls.get()); assertEquals(1, rig.admissions.get());
+            return null;
+        });
     }
 
     @Test void registeredEffectValidatesInputAndRetainsOneDispatch() throws Exception {
