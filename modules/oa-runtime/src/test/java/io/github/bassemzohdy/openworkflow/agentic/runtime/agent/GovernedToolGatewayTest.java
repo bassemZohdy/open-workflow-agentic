@@ -381,4 +381,12 @@ class GovernedToolGatewayTest {
                 GovernedToolGateway.configurationFingerprint(Map.of("search", second)));
     }
 
+    @Test void controlledReadOnlyModeIsBoundIntoTheApprovedRegistryFingerprint() {
+        GovernedToolGateway.Tool tool = args -> "{}";
+        var ordinary = new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofSeconds(1), IMPLEMENTATION, tool);
+        var controlled = GovernedToolGateway.Registration.controlledReadOnly(INPUT, OUTPUT, Duration.ofSeconds(1), IMPLEMENTATION, tool);
+        assertNotEquals(GovernedToolGateway.configurationFingerprint(Map.of("search", ordinary)),
+                GovernedToolGateway.configurationFingerprint(Map.of("search", controlled)));
+    }
+
 }

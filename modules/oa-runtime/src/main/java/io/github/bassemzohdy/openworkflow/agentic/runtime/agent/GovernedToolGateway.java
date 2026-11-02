@@ -72,7 +72,7 @@ public final class GovernedToolGateway implements ToolGateway {
         }
     }
 
-    /** Runs on a bounded worker; credentials and context must be explicitly bound, not read from caller thread locals. */
+    /** Credentials and context must be explicitly bound. Legacy calls use a worker; controlled calls are synchronous. */
     @FunctionalInterface public interface Tool { String invoke(String argumentsJson) throws Exception; }
 
     /** Trusted local binding only: no I/O or side effects; the target enforces finite transport deadlines. */
@@ -100,6 +100,7 @@ public final class GovernedToolGateway implements ToolGateway {
         private final String implementationFingerprint;
         private String effectTarget;
         private EffectTargetFactory effectFactory;
+        private boolean controlledReadOnly;
 
         public Registration(String inputSchema, String outputSchema, boolean mutating, Duration timeout,
                             String implementationFingerprint, Tool tool) {
@@ -111,6 +112,14 @@ public final class GovernedToolGateway implements ToolGateway {
             this.timeout = Objects.requireNonNull(timeout);
             if (timeout.compareTo(Duration.ofMillis(1)) < 0 || timeout.compareTo(Duration.ofMinutes(1)) > 0)
                 throw new IllegalArgumentException("tool timeout must be between 1 ms and 1 minute");
+        }
+
+        /** Trusted read-only transport with a finite, independently enforced network deadline. */
+        public static Registration controlledReadOnly(String inputSchema, String outputSchema, Duration timeout,
+                                                       String implementationFingerprint, Tool tool) {
+            var registration = new Registration(inputSchema, outputSchema, false, timeout, implementationFingerprint, tool);
+            registration.controlledReadOnly = true;
+            return registration;
         }
 
         /** Binds an effect target chosen by trusted composition, never by a tool request. */
@@ -153,18 +162,18 @@ public final class GovernedToolGateway implements ToolGateway {
     }
 
     /** Fingerprints exact schemas, timeouts, declared side effects, target IDs and composition-supplied digests.
-     * Version 2 changes every fingerprint; existing profiles must be reapproved, not silently migrated.
+     * Version 3 changes every fingerprint; existing profiles must be reapproved, not silently migrated.
      */
     public static String configurationFingerprint(Map<String, Registration> registry) {
         var entries = Map.copyOf(registry);
         if (entries.size() > AgentTaskContract.MAX_ALLOW_LIST_SIZE) throw new IllegalArgumentException("too many registered tools");
-        var encoder = new CanonicalEncoder("oa.tool.registry.v2").number(entries.size());
+        var encoder = new CanonicalEncoder("oa.tool.registry.v3").number(entries.size());
         entries.keySet().stream().sorted().forEach(name -> {
             Checks.requireMatching("tool name", name, AgentTaskContract.TOKEN);
             var entry = entries.get(name);
             encoder.text(name).text(entry.inputSource).text(entry.outputSource).text(entry.implementationFingerprint)
                     .number(entry.mutating ? 1 : 0).number(entry.timeout.getSeconds()).number(entry.timeout.getNano())
-                    .text(entry.effectTarget == null ? "" : entry.effectTarget);
+                    .text(entry.effectTarget == null ? "" : entry.effectTarget).number(entry.controlledReadOnly ? 1 : 0);
         });
         return CanonicalEncoder.sha256Hex(encoder.toBytes());
     }
@@ -181,7 +190,8 @@ public final class GovernedToolGateway implements ToolGateway {
         if (!profile.tools().contains(call.toolName())) return reject(call, approved, attempt, "tool is not permitted by the profile");
         Registration entry = registry.get(call.toolName());
         if (entry == null) return reject(call, approved, attempt, "tool is not registered");
-        if (entry.mutating) return reject(call, approved, attempt, "effect tool requires controlled execution");
+        if (entry.mutating || entry.controlledReadOnly)
+            return reject(call, approved, attempt, "tool requires controlled execution");
         if (entry.timeout.compareTo(profile.maxCallTime()) > 0) return reject(call, approved, attempt, "tool timeout exceeds profile");
         JsonNode arguments = parse(call.argumentsJson());
         if (arguments == null || !arguments.isObject() || !valid(entry.input, arguments))
@@ -246,6 +256,87 @@ public final class GovernedToolGateway implements ToolGateway {
                 || !budgetCurrent(approved) || !same(approved))
             return failed(call, approved, attempt, entry);
         return new ToolResult.Completed(answer);
+    }
+
+    /**
+     * Synchronous controlled read-only path. The registered callback must enforce its own finite transport
+     * deadline and may not perform external effects. The gateway withholds a late answer but cannot interrupt a
+     * transport which violates that contract. The caller must keep the enclosing execution alive until return and
+     * persist its own occurrence/request binding; read-only results are not durably recorded by this method.
+     */
+    public ToolResult invokeReadOnly(Running control, ResourceExecutionEntry execution, AllocatedResourceTask allocation,
+                                     ResourceToolCall occurrence, ToolCall call) {
+        Objects.requireNonNull(control); Objects.requireNonNull(execution); Objects.requireNonNull(allocation);
+        Objects.requireNonNull(occurrence); Objects.requireNonNull(call);
+        long started = System.nanoTime();
+        String attempt = UlidGenerator.shared().next().value();
+        control.requireCurrent(execution, occurrence.executor());
+        Approval approved = current();
+        control.requireCurrent(execution, occurrence.executor());
+        if (approved == null || !approved.task().id().equals(call.taskId()) || approved.budgetRemainingMicros() == 0)
+            return reject(call, approved, attempt, "no matching tool approval");
+        try { profile.requireWithin(approved.task(), approved.agent()); }
+        catch (IllegalArgumentException mismatch) { return reject(call, approved, attempt, "tool profile differs from task"); }
+        if (!approved.task().permitsTool(call.toolName()) || !profile.tools().contains(call.toolName()))
+            return reject(call, approved, attempt, "tool is not permitted");
+        Registration registration = registry.get(call.toolName());
+        if (registration == null || !registration.controlledReadOnly || registration.mutating
+                || registration.timeout.compareTo(profile.maxCallTime()) > 0)
+            return reject(call, approved, attempt, "controlled read-only tool is not registered");
+        JsonNode arguments = parse(call.argumentsJson());
+        if (arguments == null || !arguments.isObject() || !valid(registration.input, arguments))
+            return reject(call, approved, attempt, "tool arguments are invalid");
+        var expected = ResourceToolCall.of(allocation, profile, execution, occurrence.executor(), occurrence.nodeOccurrence(), call);
+        if (!expected.equals(occurrence) || !approved.task().equals(allocation.allocation().contract()))
+            return reject(call, approved, attempt, "tool occurrence does not match the request");
+        requireControlledCurrent(control, execution, occurrence, approved);
+        final Decision decision;
+        try { decision = pep.toolCall(approved.agent(), approved.task(), call.toolName(), approved.budgetRemainingMicros()); }
+        catch (RuntimeException unavailable) { return reject(call, approved, attempt, "tool policy is unavailable"); }
+        requireControlledCurrent(control, execution, occurrence, approved);
+        if (!decision.allows()) {
+            record(call, approved, attempt, "agent.tool.refused");
+            return new ToolResult.Rejected(decision);
+        }
+        if (!record(call, approved, attempt, "agent.tool.started"))
+            return reject(call, approved, attempt, "tool start audit is unavailable");
+        requireControlledCurrent(control, execution, occurrence, approved);
+        if (expired(started, registration.timeout)) return reject(call, approved, attempt, "tool deadline elapsed");
+        try { budget.admit(approved); }
+        catch (RuntimeException unavailable) { return reject(call, approved, attempt, "tool budget exhausted or unavailable"); }
+        requireControlledCurrent(control, execution, occurrence, approved);
+        if (expired(started, registration.timeout)) return reject(call, approved, attempt, "tool deadline elapsed");
+        final String answer;
+        try { answer = registration.tool.invoke(call.argumentsJson()); }
+        catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new ModelCallRefused("controlled tool was interrupted");
+        } catch (Exception failure) {
+            requireControlledCurrent(control, execution, occurrence, approved);
+            return failed(call, approved, attempt, registration);
+        }
+        requireControlledCurrent(control, execution, occurrence, approved);
+        if (expired(started, registration.timeout)) return failed(call, approved, attempt, registration);
+        JsonNode output = parse(answer);
+        if (output == null || !valid(registration.output, output)) return failed(call, approved, attempt, registration);
+        requireControlledCurrent(control, execution, occurrence, approved);
+        if (!record(call, approved, attempt, "agent.tool.completed")) return failed(call, approved, attempt, registration);
+        requireControlledCurrent(control, execution, occurrence, approved);
+        if (expired(started, registration.timeout)) return failed(call, approved, attempt, registration);
+        return new ToolResult.Completed(answer);
+    }
+
+    private static boolean expired(long started, Duration timeout) {
+        long elapsed = System.nanoTime() - started;
+        return elapsed < 0 || elapsed >= timeout.toNanos();
+    }
+
+    private void requireControlledCurrent(Running control, ResourceExecutionEntry execution,
+                                          ResourceToolCall occurrence, Approval approved) {
+        control.requireCurrent(execution, occurrence.executor());
+        if (!same(approved) || !budgetCurrent(approved) || !same(approved))
+            throw new ModelCallRefused("tool approval or profile changed");
+        control.requireCurrent(execution, occurrence.executor());
     }
 
     /**
