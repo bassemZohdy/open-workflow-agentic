@@ -5,9 +5,10 @@ roles with no elevated attributes, inherited permissions or role memberships. Th
 allocator is trusted to insert a budget only in the same transaction as a genuinely
 new approved resource-task allocation. The executor reads the existing budget and
 updates only its step or tool-call count. Neither role may own the tables or assume the other role.
-Tool-budget registration is not yet wired atomically into task allocation: the caller of its explicit preparation
-method must establish that the task is genuinely new and its tool-call ceiling approved. Never backfill based on a
-missing row.
+The opt-in proposed V78 allocation adapter can insert the tool budget in the same transaction as a fresh task and node
+budget. Its caller must supply the approved tool-call ceiling; this is not an approval source or production activation.
+The separate preparation method must only be used when the caller has independently established that the task is new.
+Never backfill based on a missing row.
 
 Replace `__BUDGET_ALLOCATOR_ROLE__` and `__BUDGET_EXECUTOR_ROLE__` in
 [agent-node-budget-grants.sql](sql/agent-node-budget-grants.sql) with those role

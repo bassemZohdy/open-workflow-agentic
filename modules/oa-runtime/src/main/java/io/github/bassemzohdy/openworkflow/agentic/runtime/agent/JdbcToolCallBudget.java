@@ -1,9 +1,13 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.agent;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Transactions;
 import jakarta.transaction.TransactionManager;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.Objects;
 import javax.sql.DataSource;
 
@@ -35,8 +39,50 @@ public final class JdbcToolCallBudget {
      */
     public GovernedToolGateway.ToolBudget registerForFreshTask(String thread, Subject actor, AgentTaskContract task,
                                                                int maxCalls) {
-        if (maxCalls < 1 || maxCalls > 100_000) throw new IllegalArgumentException("invalid tool-call ceiling");
+        validateCeiling(maxCalls);
         return open(thread, actor, task, maxCalls);
+    }
+
+    /** Insert only in the owned transaction that just created this allocation and its node budget. */
+    public static void insertForFreshAllocation(Connection connection, AllocatedResourceTask allocated, int maxCalls)
+            throws SQLException {
+        Objects.requireNonNull(connection); Objects.requireNonNull(allocated); validateCeiling(maxCalls);
+        if (connection.getAutoCommit()) throw new IllegalArgumentException("fresh allocation requires an owned transaction");
+        var allocation = allocated.allocation();
+        String binding = JdbcNodeBudget.binding(allocation.scope().threadId().value(), allocation.modelProfile().agent(),
+                allocation.contract());
+        try (var q = connection.prepareStatement("""
+                insert into task.agent_tool_budget(task_id,max_calls)
+                select task_id,? from task.agent_node_budget
+                where task_id=? and binding=? and started_at=? and deadline=?
+                """)) {
+            q.setInt(1, maxCalls); q.setString(2, allocation.contract().id().value()); q.setString(3, binding);
+            q.setTimestamp(4, Timestamp.from(allocated.createdAt())); q.setTimestamp(5, Timestamp.from(allocated.deadline()));
+            if (q.executeUpdate() != 1) throw new IllegalStateException("fresh allocation tool budget binding mismatch");
+        }
+    }
+
+    /** Exact historical data check only; it neither renews an expired deadline nor authorizes execution. */
+    public static void requireForAllocation(Connection connection, AllocatedResourceTask allocated, int maxCalls)
+            throws SQLException {
+        Objects.requireNonNull(connection); Objects.requireNonNull(allocated); validateCeiling(maxCalls);
+        var allocation = allocated.allocation();
+        String binding = JdbcNodeBudget.binding(allocation.scope().threadId().value(), allocation.modelProfile().agent(),
+                allocation.contract());
+        try (var q = connection.prepareStatement("""
+                select 1 from task.agent_tool_budget t join task.agent_node_budget n using (task_id)
+                where t.task_id=? and t.max_calls=? and n.binding=? and n.started_at=? and n.deadline=?
+                """)) {
+            q.setString(1, allocation.contract().id().value()); q.setInt(2, maxCalls); q.setString(3, binding);
+            q.setTimestamp(4, Timestamp.from(allocated.createdAt())); q.setTimestamp(5, Timestamp.from(allocated.deadline()));
+            try (var rows = q.executeQuery()) {
+                if (!rows.next()) throw new IllegalStateException("allocation tool budget is missing or mismatched");
+            }
+        }
+    }
+
+    private static void validateCeiling(int maxCalls) {
+        if (maxCalls < 1 || maxCalls > 100_000) throw new IllegalArgumentException("invalid tool-call ceiling");
     }
 
     /** Missing or differently bound rows refuse; they are never created by execution. */

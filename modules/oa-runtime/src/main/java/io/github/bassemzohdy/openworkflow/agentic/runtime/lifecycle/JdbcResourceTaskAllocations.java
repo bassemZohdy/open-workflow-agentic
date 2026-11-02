@@ -5,6 +5,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceTaskAllocations;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcNodeBudget;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcToolCallBudget;
 import jakarta.transaction.TransactionManager;
 import java.sql.*;
 import java.util.Objects;
@@ -30,6 +31,20 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
     }
 
     @Override public AllocatedResourceTask allocate(ResourceTaskAllocation candidate) {
+        return allocate(candidate, null);
+    }
+
+    /**
+     * Explicit trusted producer path: the supplied ceiling must come from approval, never a request. New allocation,
+     * node budget and tool budget commit together. An older allocation without this exact budget is not backfilled.
+     * Historical retries are data only and do not authorize execution or renew the original deadline.
+     */
+    public AllocatedResourceTask allocateWithToolBudget(ResourceTaskAllocation candidate, int maxToolCalls) {
+        if (maxToolCalls < 1 || maxToolCalls > 100_000) throw new IllegalArgumentException("invalid tool-call ceiling");
+        return allocate(candidate, maxToolCalls);
+    }
+
+    private AllocatedResourceTask allocate(ResourceTaskAllocation candidate, Integer maxToolCalls) {
         Objects.requireNonNull(candidate, "candidate");
         // Existing stored-task wire form is whole seconds. Refuse lossy precision BEFORE I/O.
         String contract = ResourceTaskAllocationCodec.contract(candidate.contract());
@@ -37,13 +52,13 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
         new DefinitionRef(candidate.scope().namespace() + "/" + candidate.scope().definition(), candidate.scope().version());
         return isolated(connection -> {
             var existing = read(connection, candidate.scope());
-            if (existing.isPresent()) return same(existing.get(), candidate);
+            if (existing.isPresent()) return matchingBudget(connection, same(existing.get(), candidate), maxToolCalls);
             try (var lock = connection.prepareStatement("select id from task.instance where id=? for update")) {
                 lock.setString(1, candidate.scope().instanceId().value());
                 try (var row = lock.executeQuery()) { if (!row.next()) throw conflict(); }
             }
             existing = read(connection, candidate.scope());
-            if (existing.isPresent()) return same(existing.get(), candidate);
+            if (existing.isPresent()) return matchingBudget(connection, same(existing.get(), candidate), maxToolCalls);
             int inserted;
             try (var insert = connection.prepareStatement("""
                     insert into task.resource_task_allocation(allocation_key,call_key,call_fingerprint,parent_task_id,
@@ -59,9 +74,20 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
                 inserted = insert.executeUpdate();
             }
             var allocated = same(read(connection, candidate.scope()).orElseThrow(JdbcResourceTaskAllocations::conflict), candidate);
-            if (inserted == 1) JdbcNodeBudget.insertForFreshAllocation(connection, allocated);
+            if (inserted == 1) {
+                JdbcNodeBudget.insertForFreshAllocation(connection, allocated);
+                if (maxToolCalls != null) JdbcToolCallBudget.insertForFreshAllocation(connection, allocated, maxToolCalls);
+            } else {
+                matchingBudget(connection, allocated, maxToolCalls);
+            }
             return allocated;
         });
+    }
+
+    private static AllocatedResourceTask matchingBudget(Connection connection, AllocatedResourceTask allocated,
+                                                         Integer maxToolCalls) throws SQLException {
+        if (maxToolCalls != null) JdbcToolCallBudget.requireForAllocation(connection, allocated, maxToolCalls);
+        return allocated;
     }
 
     @Override public Optional<AllocatedResourceTask> find(ResourceCallScope scope) {
