@@ -138,6 +138,30 @@ class HumanDecisionJournalTest {
         assertEquals(1, count("decision", f)); assertEquals(1, count("pending", f)); assertEquals(1, auditCount(f));
     }
 
+    @Test void abruptProcessExitAfterCommitLeavesOneRecoverableDecisionAndAudit() throws Exception {
+        var f = fixture("bob", "NONE");
+        String classpath = System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
+        String javaBin = java.nio.file.Path.of(System.getProperty("java.home"), "bin", "java").toString();
+        var arguments = java.nio.file.Files.createTempFile("human-worker-", ".args");
+        try {
+            java.nio.file.Files.writeString(arguments, "-cp\n\"" + classpath.replace("\\", "\\\\").replace("\"", "\\\"") + "\"\n",
+                    StandardCharsets.UTF_8);
+            Process child = new ProcessBuilder(javaBin, "@" + arguments, HumanDecisionCrashWorker.class.getName(), database,
+                    f.task().value(), f.instance().value(), f.decision().id().value()).redirectErrorStream(true).start();
+            try {
+                assertTrue(child.waitFor(40, TimeUnit.SECONDS), "the decision worker did not stop");
+                String output = new String(child.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                assertEquals(77, child.exitValue(), output);
+            } finally {
+                if (child.isAlive()) { child.destroyForcibly(); child.waitFor(10, TimeUnit.SECONDS); }
+            }
+        } finally {
+            java.nio.file.Files.deleteIfExists(arguments);
+        }
+        assertEquals(HumanDecisionJournal.Result.REPLAYED, record(f, f.decision(), "wait"));
+        assertEquals(1, count("decision", f)); assertEquals(1, count("pending", f)); assertEquals(1, auditCount(f));
+    }
+
     @Test void failedAuditAppendRollsBackDecisionAndTaskTransition() throws Exception {
         var f = fixture("bob", "NONE");
         try (var c = owned.getConnection(); var s = c.createStatement()) {
