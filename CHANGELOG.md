@@ -1,5 +1,7 @@
 # Changelog
 
+- Enable explicit audited effect composition through the governed tool gateway.
+
 - Add explicit resource-scoped central-audit gating to controlled tool effects.
 
 - Verify and deliver retained audit history for governed resource effects.

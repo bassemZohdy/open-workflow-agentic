@@ -1203,6 +1203,54 @@ class GovernedModelRunningControlTest {
         });
     }
 
+    private GovernedToolGateway auditedGateway(ToolEffectRig rig,io.github.bassemzohdy.openworkflow.agentic.contracts.port.IdempotentAuditSink sink) {
+        var manager=(jakarta.transaction.TransactionManager)java.lang.reflect.Proxy.newProxyInstance(
+                jakarta.transaction.TransactionManager.class.getClassLoader(),new Class<?>[]{jakarta.transaction.TransactionManager.class},
+                (proxy,method,args)->{if(method.getName().equals("suspend"))return null;throw new UnsupportedOperationException(method.getName());});
+        var producer=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditProducer();
+        var ledger=new JdbcEffectLedger(db.owner,manager,producer);
+        var delivery=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditDelivery(db.owner,manager,producer,sink);
+        var history=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditHistory(db.owner,manager,producer,delivery);
+        var pep=new Pep(request->new Decision("fixture",rig.outcome.get(),"fixture",POLICY,NOW),event->{},Duration.ofSeconds(5),CLOCK);
+        var registration=GovernedToolGateway.Registration.effectful("{\"type\":\"object\"}","{\"type\":\"object\"}",
+                Duration.ofSeconds(2),"d".repeat(64),"registered:test",args->{rig.bindings.incrementAndGet();return rig.target;});
+        return new GovernedToolGateway(Map.of("tool:research",registration),()->Optional.of(rig.approved),rig.profile,pep,
+                event->rig.auditEvents.add(event.action()),rig.budget,CLOCK,new DurableEffects(ledger,Clock.systemUTC()),
+                new ToolCallTelemetry(io.opentelemetry.api.OpenTelemetry.noop()),history);
+    }
+    @Test void auditedGatewayValidatesRequestAndDeliversOneEffect() throws Exception {
+        inCallback((running,entry,checks)->{
+            var rig=new ToolEffectRig(entry);var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(db.owner);
+            var events=new ArrayList<String>();
+            var gateway=auditedGateway(rig,(source,draft)->{events.add(source.transition().name());return central.appendOnce(source,draft);});
+            var bad=rig.call("[]");
+            assertThrows(ModelCallRefused.class,()->gateway.invokeEffect(running,entry,rig.allocation,rig.occurrence(running,entry,bad),bad));
+            assertEquals(0,rig.bindings.get());assertEquals(0,rig.dispatches.get());assertTrue(events.isEmpty());
+            var call=rig.call("{}");var occurrence=rig.occurrence(running,entry,call);
+            var first=gateway.invokeEffect(running,entry,rig.allocation,occurrence,call);
+            assertEquals(EffectState.CONFIRMED,first.state());assertEquals(1,rig.dispatches.get());
+            assertEquals(first,gateway.invokeEffect(running,entry,rig.allocation,occurrence,call));
+            assertEquals(1,rig.dispatches.get());assertTrue(events.containsAll(List.of("INTENT","DISPATCH","OUTCOME")));
+            assertTrue(rig.auditEvents.contains("agent.tool.effect.retained"));
+            return null;
+        });
+    }
+    @Test void auditedGatewayRefusesWhenCentralAuditFailsAndRechecksControl() throws Exception {
+        inCallback((running,entry,checks)->{
+            var rig=new ToolEffectRig(entry);var call=rig.call("{}");var occurrence=rig.occurrence(running,entry,call);
+            var gateway=auditedGateway(rig,(source,draft)->{throw new IllegalStateException("central unavailable");});
+            assertThrows(IllegalStateException.class,()->gateway.invokeEffect(running,entry,rig.allocation,occurrence,call));
+            assertEquals(0,rig.dispatches.get());assertTrue(rig.auditEvents.contains("agent.tool.failed"));return null;
+        });
+        inClosingCallback((running,entry,checks)->{
+            var rig=new ToolEffectRig(entry);var call=rig.call("{}");var occurrence=rig.occurrence(running,entry,call);
+            var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(db.owner);
+            var gateway=auditedGateway(rig,(source,draft)->{var receipt=central.appendOnce(source,draft);running.close();return receipt;});
+            assertThrows(RefusedException.class,()->gateway.invokeEffect(running,entry,rig.allocation,occurrence,call));
+            assertEquals(0,rig.dispatches.get());return null;
+        });
+    }
+
     @Test void aClosedOrMismatchedControlCannotDispatchAToolEffect() {
         inClosingCallback((running, entry, checks) -> {
             var rig = new ToolEffectRig(entry); var call = rig.call("{}");

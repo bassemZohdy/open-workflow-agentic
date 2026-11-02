@@ -29,6 +29,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolGateway;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditHistory;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditDraft;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import java.time.Clock;
@@ -160,6 +161,20 @@ public final class GovernedToolGateway implements ToolGateway {
     public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
                                ApprovedToolProfile profile, Pep pep, AuditSink audit, ToolBudget budget, Clock clock,
                                DurableEffects ledger, ToolCallTelemetry telemetry) {
+        this(registry,approvals,profile,pep,audit,budget,clock,ledger,telemetry,null,false);
+    }
+
+    /** Explicit trusted composition with resource-scoped audit gating; no default production registration. */
+    public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
+                               ApprovedToolProfile profile, Pep pep, AuditSink audit, ToolBudget budget, Clock clock,
+                               DurableEffects ledger, ToolCallTelemetry telemetry,EffectAuditHistory history) {
+        this(registry,approvals,profile,pep,audit,budget,clock,Objects.requireNonNull(ledger),telemetry,
+                Objects.requireNonNull(history),true);
+    }
+
+    private GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
+                                ApprovedToolProfile profile, Pep pep, AuditSink audit, ToolBudget budget, Clock clock,
+                                DurableEffects ledger,ToolCallTelemetry telemetry,EffectAuditHistory history,boolean audited) {
         this.registry = Map.copyOf(registry); this.approvals = Objects.requireNonNull(approvals);
         this.profile = Objects.requireNonNull(profile);
         if (!configurationFingerprint(this.registry).equals(profile.configurationFingerprint()))
@@ -167,7 +182,9 @@ public final class GovernedToolGateway implements ToolGateway {
         this.pep = Objects.requireNonNull(pep); this.audit = Objects.requireNonNull(audit);
         this.budget = Objects.requireNonNull(budget); this.clock = Objects.requireNonNull(clock);
         this.telemetry = Objects.requireNonNull(telemetry);
-        this.controlledEffects = ledger == null ? null : new ControlledToolEffects(ledger, this.pep, this.approvals);
+        this.controlledEffects = ledger == null ? null : audited
+                ? new ControlledToolEffects(ledger,this.pep,this.approvals,history)
+                : new ControlledToolEffects(ledger,this.pep,this.approvals);
     }
 
     /** Fingerprints exact schemas, timeouts, declared side effects, target IDs and composition-supplied digests.
