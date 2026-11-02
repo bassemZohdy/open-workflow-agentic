@@ -7,6 +7,9 @@ import io.serverlessworkflow.impl.WorkflowInstance;
 import io.serverlessworkflow.impl.WorkflowStatus;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,6 +24,9 @@ import org.jboss.logging.Logger;
 public class FlowWorkflowEngine implements WorkflowEngine {
 
     private static final Logger LOG = Logger.getLogger(FlowWorkflowEngine.class);
+    private static final int MAX_PENDING_STARTS = 1024;
+    private static final ReferenceQueue<WorkflowInstance> START_QUEUE = new ReferenceQueue<>();
+    private static final java.util.Set<StartIdentity> START_CLAIMS = new HashSet<>();
 
     @Inject
     WorkflowApplication application;
@@ -49,7 +55,7 @@ public class FlowWorkflowEngine implements WorkflowEngine {
             @Override
             public void start() {
                 // start() returns a future that completes when the instance completes or waits. We do not wait for it.
-                instance.start();
+                if (!startPending(instance)) throw new IllegalStateException("prepared engine instance is no longer pending");
             }
 
             @Override
@@ -93,12 +99,7 @@ public class FlowWorkflowEngine implements WorkflowEngine {
     @Override
     public boolean startRestored(DefinitionRef definition, String engineInstanceId) {
         Optional<WorkflowInstance> instance = definition(definition).flatMap(pinned -> pinned.activeInstance(engineInstanceId));
-        if (instance.isEmpty() || instance.get().status() != WorkflowStatus.PENDING) {
-            return false;
-        }
-        // Restored instances are registered as active but not started (WP-003, Q02). start() resumes them.
-        instance.get().start();
-        return true;
+        return instance.isPresent() && startPending(instance.get());
     }
 
     @Override
@@ -106,6 +107,44 @@ public class FlowWorkflowEngine implements WorkflowEngine {
         return definition(definition).flatMap(pinned -> pinned.activeInstance(engineInstanceId))
                 .map(WorkflowInstance::cancel)
                 .orElse(false);
+    }
+
+    /** Prevent concurrent starts of one SDK instance without blocking cancellation on a slow start. */
+    static boolean startPending(WorkflowInstance instance) {
+        java.util.Objects.requireNonNull(instance);
+        var identity = new StartIdentity(instance, null);
+        synchronized (START_CLAIMS) {
+            StartIdentity collected;
+            while ((collected = (StartIdentity) START_QUEUE.poll()) != null) START_CLAIMS.remove(collected);
+            if (START_CLAIMS.contains(identity) || START_CLAIMS.size() >= MAX_PENDING_STARTS) return false;
+            START_CLAIMS.add(new StartIdentity(instance, START_QUEUE));
+        }
+        boolean invoked = false;
+        try {
+            if (instance.status() != WorkflowStatus.PENDING) return false;
+            invoked = true;
+            instance.start();
+            return true;
+        } finally {
+            boolean release = !invoked;
+            // A thrown or asynchronous start may have entered work without changing status. Do not retry it blindly.
+            if (invoked) try { release = instance.status() != WorkflowStatus.PENDING; }
+            catch (RuntimeException unavailable) { /* Retain the weak claim while status is unknown. */ }
+            if (release) synchronized (START_CLAIMS) { START_CLAIMS.remove(identity); }
+        }
+    }
+
+    private static final class StartIdentity extends WeakReference<WorkflowInstance> {
+        private final int hash;
+        StartIdentity(WorkflowInstance instance, ReferenceQueue<WorkflowInstance> queue) {
+            super(instance, queue); hash = System.identityHashCode(instance);
+        }
+        @Override public int hashCode() { return hash; }
+        @Override public boolean equals(Object other) {
+            if (this == other) return true;
+            if (!(other instanceof StartIdentity identity)) return false;
+            WorkflowInstance value = get(); return value != null && value == identity.get();
+        }
     }
 
     private static EngineStatus status(WorkflowInstance instance) {

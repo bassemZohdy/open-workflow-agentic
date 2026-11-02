@@ -1,5 +1,7 @@
 # Changelog
 
+- Prevent concurrent adapter starts of the same pending Flow instance and retain uncertain start claims without blocking unrelated starts.
+
 - Characterize the pinned SDK's shared-event delivery failure when an earlier subscriber throws; durable per-recipient recovery remains open.
 
 - Release HTTP lookup capacity after fully consuming a bounded response, while keeping unfinished lookups quarantined.
