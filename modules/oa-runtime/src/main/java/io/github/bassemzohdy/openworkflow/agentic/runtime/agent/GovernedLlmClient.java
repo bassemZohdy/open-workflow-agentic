@@ -59,6 +59,33 @@ public class GovernedLlmClient {
     }
 
     /**
+     * Gateway path bound to the approval the gateway matched to its request. A changing context cannot let a call
+     * checked for one task or model borrow another approval. Context lookup and policy/audit can block, so the same
+     * approval is required again immediately before the provider call. This is not a durable reservation or a
+     * replacement for the execution-entry authority fence.
+     */
+    String complete(ApprovedModelContext.Approved expected, String system, String user) {
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(system, "system");
+        Objects.requireNonNull(user, "user");
+        requireSameApproval(expected);
+        if (expected.budgetRemainingMicros() == 0L) {
+            throw new ModelCallRefused("no model budget remaining for this model call");
+        }
+        var decision = pep.modelCall(expected.agent(), expected.task(), expected.modelId(), expected.budgetRemainingMicros());
+        return Pep.guard(decision, () -> {
+            requireSameApproval(expected);
+            return provider.complete(system, user);
+        });
+    }
+
+    private void requireSameApproval(ApprovedModelContext.Approved expected) {
+        if (!context.current().filter(expected::equals).isPresent()) {
+            throw new ModelCallRefused("the approved model context changed during this call");
+        }
+    }
+
+    /**
      * Controlled variant: the same boundary as {@link #complete(String, String)}, additionally bound to the SAME
      * private {@link JdbcResourceExecutionGate.Running} handle minted for a fresh, acknowledged gate callback. The
      * handle is rechecked against {@code expected} (its exact entry, live fence and invalidation) at four points:

@@ -61,6 +61,26 @@ class GovernedModelGatewayTest {
         assertTrue(engine.asked.isEmpty());
     }
 
+    @Test void changedApprovalBeforePolicyCannotBeBorrowed() {
+        var first = APPROVED.current().orElseThrow();
+        var other = new ApprovedModelContext.Approved(AGENT, TASK, "other-model", first.budgetRemainingMicros());
+        var reads = new java.util.concurrent.atomic.AtomicInteger();
+        ApprovedModelContext changing = () -> Optional.of(reads.getAndIncrement() == 0 ? first : other);
+        rejected(gateway(changing).complete(CALL));
+        assertTrue(engine.asked.isEmpty());
+        assertEquals(0, provider.calls.get());
+    }
+
+    @Test void approvalLostDuringPolicyAuditCannotReachTheProvider() {
+        var first = APPROVED.current().orElseThrow();
+        var reads = new java.util.concurrent.atomic.AtomicInteger();
+        ApprovedModelContext changing = () -> reads.getAndIncrement() < 2 ? Optional.of(first) : Optional.empty();
+        rejected(gateway(changing).complete(CALL));
+        assertEquals(1, engine.asked.size());
+        assertFalse(audit.events.isEmpty());
+        assertEquals(0, provider.calls.get());
+    }
+
     @Test void aPolicyDenyIsRejectedCarryingTheRefusingDecision() {
         var denying = new Engine(DecisionOutcome.DENY);
         var gateway = new GovernedModelGateway(new GovernedLlmClient(provider, pep(denying, audit), APPROVED), APPROVED,
