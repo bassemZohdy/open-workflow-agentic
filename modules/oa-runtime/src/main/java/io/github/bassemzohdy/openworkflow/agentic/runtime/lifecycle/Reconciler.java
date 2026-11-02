@@ -21,6 +21,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -429,8 +430,19 @@ public class Reconciler {
 
     private void lifetimesExceeded(ReconcileReport report, Instant now) {
         Optional<Instant> cutoff = settings.maxLifetime.map(now::minus);
-        for (RegistryScan.Ref ref : scan.livePastLifetime(now, cutoff, settings.batchSize, settings.startingLifetimeEnabled)) {
-            if (!tenantScope.test(ref.tenant())) continue;
+        // Select before mutating: repairs remove rows from this query and would shift subsequent offsets.
+        var selected = new ArrayList<RegistryScan.Ref>();
+        int offset = 0;
+        while (selected.size() < settings.batchSize) {
+            var page = scan.livePastLifetime(now, cutoff, settings.batchSize, settings.startingLifetimeEnabled, offset);
+            for (var ref : page) {
+                if (tenantScope.test(ref.tenant())) selected.add(ref);
+                if (selected.size() == settings.batchSize) break;
+            }
+            if (page.size() < settings.batchSize) break;
+            offset += page.size();
+        }
+        for (RegistryScan.Ref ref : selected) {
             report.bump(withInstance(ref.id(), () -> repairLifetime(ref, now)) ? "lifetime.examined" : "busy");
         }
     }

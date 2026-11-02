@@ -308,6 +308,41 @@ class InstanceLifetimePinTest {
         assertEquals(Optional.of(start.plusSeconds(10).plusNanos(1_000)), scan.pinnedLifetime(first.record().id().value()));
     }
 
+    @Test void lifetimeBatchFindsScopedRowsBehindEarlierOtherTenants() {
+        var other = request();
+        var older = InstanceRecord.starting(UlidGenerator.shared().next(), other, start.minus(Duration.ofHours(2)));
+        store.insertIfAbsent(older, "test.start");
+        store.replace(older.successor(older.createdAt(), InstanceStatus.RUNNING, "old-engine-" + other.tenant(), 0, null, null),
+                older.version(), "test.running", owner);
+        var request = request(); var engine = new Engine();
+        var target = service(engine, Optional.empty()).start(request).record();
+        var now = start.plus(Duration.ofMinutes(11));
+        var config = new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120), Duration.ofSeconds(60),
+                3, Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofHours(24), 1, Optional.empty(),
+                Optional.of(Duration.ofMinutes(10)), true);
+        var repair = new Reconciler(store, engine, new EngineStatusSync(store, scan, config, Clock.fixed(now, ZoneOffset.UTC)),
+                scan, new RepairStore(db), config, db, Clock.fixed(now, ZoneOffset.UTC), request.tenant()::equals);
+        repair.reconcileOnce();
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(request.tenant(), target.id()).orElseThrow().status());
+        assertEquals(InstanceStatus.RUNNING, store.find(other.tenant(), older.id()).orElseThrow().status());
+    }
+
+    @Test void pinnedLifetimeBatchAlsoFindsScopedRowsBehindOtherTenants() {
+        var other = request(); var engine = new Engine();
+        var olderService = new InstanceService(store, engine, LifecycleFaults.none(),
+                Clock.fixed(start.minus(Duration.ofHours(2)), ZoneOffset.UTC), UlidGenerator.shared(),
+                settings(Optional.of(Duration.ofMinutes(10))), db);
+        olderService.start(other);
+        var request = request(); var target = service(engine, Optional.of(Duration.ofMinutes(10))).start(request).record();
+        var now = start.plus(Duration.ofMinutes(11));
+        var config = new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120), Duration.ofSeconds(60),
+                3, Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofHours(24), 1, Optional.empty(), Optional.empty(), true);
+        var repair = new Reconciler(store, engine, new EngineStatusSync(store, scan, config, Clock.fixed(now, ZoneOffset.UTC)),
+                scan, new RepairStore(db), config, db, Clock.fixed(now, ZoneOffset.UTC), request.tenant()::equals);
+        repair.reconcileOnce();
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(request.tenant(), target.id()).orElseThrow().status());
+    }
+
     @Test void failedAuthorityHookRollsBackTheInstanceAndItsLifetimePin() {
         var engine = new Engine(); var request = request();
         assertThrows(StoreUnavailableException.class, () -> service(engine, Optional.of(Duration.ofMinutes(10))).start(request,
