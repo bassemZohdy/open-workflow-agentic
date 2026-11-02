@@ -17,6 +17,7 @@ import javax.sql.DataSource;
  */
 public final class WorkflowOwnerCoordinator implements AutoCloseable {
     public enum State { STARTING, ACTIVE, LOST, CLOSED }
+    private static final int MAX_RENEWAL_WORKERS = 4;
     private final Object monitor = new Object();
     private final JdbcWorkflowOwnerLease leases;
     private final TransactionManager transactions;
@@ -33,7 +34,7 @@ public final class WorkflowOwnerCoordinator implements AutoCloseable {
         this.bindings = Objects.requireNonNull(bindings);
         if (capacity < 1 || capacity > 1024) throw new IllegalArgumentException("owner capacity must be 1..1024");
         this.capacity = capacity;
-        scheduler = new ScheduledThreadPoolExecutor(1, task -> {
+        scheduler = new ScheduledThreadPoolExecutor(Math.min(capacity, MAX_RENEWAL_WORKERS), task -> {
             var thread = new Thread(task, "workflow-owner-renewal"); thread.setDaemon(true); return thread;
         });
         scheduler.setRemoveOnCancelPolicy(true);

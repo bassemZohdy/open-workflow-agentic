@@ -1131,7 +1131,8 @@
           "db-scheduler is embedded and reconciliation stores absolute workflow wait deadlines.",
           "Optional persisted maximum instance lifetime landed (PR 138): agentic.reconciler.max-lifetime (unset by default) makes the reconciler cancel RUNNING/WAITING instances whose stored created_at is older than the limit, through the same cancel path as a passed wait deadline (request recorded first, refused cancel re-sent, engine-lost instance FAILED, repair kind lifetime); six database-backed reconciler tests pass in CI. Escalation timers, duplicate-timer-delivery proof, two-replica Kubernetes-lease failover and T12 remain open, so WP-109 stays partial.",
           "Duplicate delivery of a due timer is proven harmless (PR 139, database-backed, CI): a due wait deadline or maximum lifetime delivered twice writes one history row and leaves the row version unchanged; a late duplicate after the engine confirmed the cancel changes nothing on the terminal row; two reconcilers delivering the same due deadline at once admit exactly one transition. When starting-state lifetime enforcement is enabled, the initial start service checks its pinned lifetime after authority admission and before engine execution; a deadline reached during either authority checking or engine preparation leaves the row pending rather than starting work. This is a service-clock check, not a fence for effects already in flight; reconciler rollout and multi-replica proof remain open.",
-          "Cause-free FAULTED polling no longer turns a CANCEL_REQUESTED row into irreversible FAILED while a cancellation report may be pending. Actual observed faults still fail the row, and polled faults on non-cancelling rows still apply. Without an event the cancellation may remain unresolved; durable report recovery remains open."
+          "Cause-free FAULTED polling no longer turns a CANCEL_REQUESTED row into irreversible FAILED while a cancellation report may be pending. Actual observed faults still fail the row, and polled faults on non-cancelling rows still apply. Without an event the cancellation may remain unresolved; durable report recovery remains open.",
+          "The explicitly composed workflow-owner coordinator uses up to four renewal workers rather than one, so a blocked renewal need not delay an unrelated owner. This bounded experimental coordinator is not production-wired; exhausting all workers and unbounded connection or network waits can still delay leases."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -1169,7 +1170,8 @@
           "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/lifecycle/WorkflowOwnerCoordinator.java",
           "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/lifecycle/RestoredWorkflowOwnerStarter.java",
           "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/WorkflowOwnerCoordinatorTest.java",
-          "docs/handoffs/gpt/WP-109-cancel-fault-poll.md"
+          "docs/handoffs/gpt/WP-109-cancel-fault-poll.md",
+          "docs/handoffs/gpt/WP-109-owner-renewal-workers.md"
         ]
       }
     },

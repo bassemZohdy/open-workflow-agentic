@@ -273,6 +273,56 @@ class WorkflowOwnerCoordinatorTest {
         });
     }
 
+    @Test void blockedRenewalDoesNotPreventAnotherOwnersRenewal() throws Exception {
+        String appId = "owner-independent-" + UUID.randomUUID();
+        var definitionId = new WorkflowDefinitionId("agentic-test", "owner-coordinator", "1.0.0");
+        try (var app = WorkflowApplication.builder().withId(appId).disableLifeCycleCEPublishing()
+                     .disableStatusChangePublishing().build();
+             var coordinator = new WorkflowOwnerCoordinator(data, transactions, bindings, 2)) {
+            var first = ownerFixture(app, definitionId);
+            var second = ownerFixture(app, definitionId);
+            var firstSession = coordinator.acquire(first.binding(), first.context(), Duration.ofMillis(1800)).orElseThrow();
+            var secondSession = coordinator.acquire(second.binding(), second.context(), Duration.ofMillis(4500)).orElseThrow();
+            try (var lock = data.getConnection()) {
+                lock.setAutoCommit(false);
+                try (var q = lock.prepareStatement("select id from task.instance where id=? for update")) {
+                    q.setString(1, first.binding().instanceId().value()); q.executeQuery().close();
+                }
+                await(() -> countWaitingRegistryChecks() > 0, Duration.ofSeconds(3));
+                await(() -> count("select count(*) from task.workflow_owner_lease where instance_id=? and renewed_at>acquired_at",
+                        second.binding().instanceId().value()) == 1, Duration.ofMillis(1600));
+                assertEquals(WorkflowOwnerCoordinator.State.ACTIVE, firstSession.state(), "first renewal is still blocked");
+                assertEquals(WorkflowOwnerCoordinator.State.ACTIVE, secondSession.state());
+                assertDoesNotThrow(() -> fence.requireCurrent(second.context()));
+                lock.rollback();
+            }
+        }
+    }
+
+    private record OwnerFixture(JdbcWorkflowOwnerLease.Binding binding, WorkflowContextData context) { }
+
+    private OwnerFixture ownerFixture(WorkflowApplication app, WorkflowDefinitionId definitionId) {
+        String tenant = "tenant-" + UUID.randomUUID(), engine = "engine-" + UUID.randomUUID();
+        var actor = new Subject(SubjectKind.USER, "owner-renewal-test");
+        var definition = new DefinitionRef(definitionId.namespace() + "/" + definitionId.name(), definitionId.version());
+        var request = new StartRequest(tenant, actor, definition, Map.of(), "owner-renewal-" + UUID.randomUUID());
+        var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        var row = store.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(), request, now), "test.insert").record();
+        row = store.replace(row.successor(now, InstanceStatus.RUNNING, engine, 0, null, null), row.version(), "test.running", actor);
+        var binding = new JdbcWorkflowOwnerLease.Binding(tenant, row.id(), app.id(), engine, definition);
+        var sdkInstance = (WorkflowInstanceData) Proxy.newProxyInstance(WorkflowInstanceData.class.getClassLoader(),
+                new Class<?>[]{WorkflowInstanceData.class}, (p, m, a) -> m.getName().equals("id") ? engine : null);
+        var sdkDefinition = (WorkflowDefinitionData) Proxy.newProxyInstance(WorkflowDefinitionData.class.getClassLoader(),
+                new Class<?>[]{WorkflowDefinitionData.class}, (p, m, a) -> switch(m.getName()) {
+                    case "id" -> definitionId; case "application" -> app; default -> null;
+                });
+        var context = (WorkflowContextData) Proxy.newProxyInstance(WorkflowContextData.class.getClassLoader(),
+                new Class<?>[]{WorkflowContextData.class}, (p, m, a) -> switch(m.getName()) {
+                    case "instanceData" -> sdkInstance; case "definition" -> sdkDefinition; default -> null;
+                });
+        return new OwnerFixture(binding, context);
+    }
+
     private long countWaitingRegistryChecks() throws SQLException {
         try (var c = data.getConnection(); var q = c.prepareStatement("select count(*) from pg_stat_activity "
                 + "where datname=current_database() and wait_event_type='Lock' "
