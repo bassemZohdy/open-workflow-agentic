@@ -4,12 +4,15 @@
 OpenAPI parser, approved service catalog, production gateway, or substitute for the policy and identity boundaries.
 A public instance requires an HTTPS endpoint with no userinfo, query, fragment, or dot segments, uses a direct client
 with redirects disabled, validates bounded JSON with duplicate-key and trailing-data rejection, fixes the request bytes
-and correlation, and sends the ledger's idempotency key. A package-local IPv4 loopback seam exists solely for tests. The credential supplier returns the existing issued-token type. The
-candidate compares its audience, issuer, grant, exact scopes and expiry with server-pinned expectations, then passes
-the exact issued token to a caller-supplied current-authority fence and rechecks expiry and the remaining operation
-budget before dispatch. These
-metadata checks do not prove token signature verification or that the supplied fence is authoritative: trusted
-composition must use the verified exchanger and real identity, policy, task and owner checks.
+and correlation, and sends the ledger's idempotency key. A package-local IPv4 loopback seam exists solely for tests. `GovernedHttpCredentials` can explicitly compose the transport with the
+existing `GovernedAsyncDispatch`, so exchange and HTTP work occur in the same scoped callback; the token is not returned
+from that identity boundary. The transport only accepts one synchronous callback on its owning thread and checks that
+the provider returns its actual result. It compares token audience, issuer, grant, exact scopes and expiry with
+server-pinned expectations, then passes the same token to a caller-supplied current-authority fence and rechecks expiry
+and the remaining operation budget before dispatch. These metadata checks and supplied fence do not prove signature
+verification or current authorization: production composition must supply the verified exchanger and real identity,
+policy, task and owner checks. If authority is lost after a target confirmation, this composition withholds the result;
+the ledger conservatively leaves the effect unresolved rather than pretending the target was undone.
 
 A trusted service contract must explicitly choose terminal confirmation status codes from 200, 201 and 204, and must
 prove those statuses mean the effect is complete. A 202, redirect, unselected status, timeout, I/O failure or missing
@@ -29,10 +32,12 @@ this can exhaust availability. Other classloaders, previous processes and remote
 
 Local loopback tests cover request/key/correlation/credential binding, terminal status selection, refusal of redirects,
 timeout uncertainty, invalid or expired tokens, authority refusal after acquisition, shared slot exhaustion and
-blocked credential acquisition. A PostgreSQL ledger test checks that a lost
-acknowledgement remains INTENDED and is not resent by the ledger. The Linux/PostgreSQL run passed the ledger case and
-19 existing effect cases; seven transport cases passed on Windows and Linux, with the expiry-during-fence assertion
-also rerun on Windows. The first Windows run exposed the process
+blocked credential acquisition. Scoped-dispatch tests exercise revocation before and after the target call and reject
+escaped or repeated callbacks, using a fixture exchanger and policy. A PostgreSQL case combines the actual grant store,
+identity dispatcher and ledger with a fixture exchanger and local service: revocation during the call withholds the
+result and leaves the effect INTENDED for manual resolution. Another ledger case checks that a lost acknowledgement
+remains INTENDED and is not resent by the ledger. The latest Linux/PostgreSQL run passed 44 focused cases, including both ledger cases; the scoped identity and transport
+cases also passed on Windows. These are controlled integrations, not real provider interoperability. The first Windows run exposed the process
 classpath length limit; the saturation probe now uses a Java argument file. The loopback seam and credentials are
 fixtures, not provider interoperability or network isolation evidence.
 

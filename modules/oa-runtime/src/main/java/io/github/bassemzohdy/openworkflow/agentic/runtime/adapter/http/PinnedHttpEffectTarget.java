@@ -49,8 +49,11 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
             .followRedirects(HttpClient.Redirect.NEVER).proxy(DIRECT).build();
 
-    /** Must use the verified exchanger and bound its own physical work; returned data alone is not proof of verification. */
-    @FunctionalInterface public interface CredentialProvider { IssuedToken tokenFor(String audience) throws Exception; }
+    /** Executes once, synchronously, inside the verified exchange scope; provider must bound its own physical work. */
+    @FunctionalInterface public interface CredentialProvider {
+        Reply withToken(String audience, TokenAction action) throws Exception;
+    }
+    @FunctionalInterface public interface TokenAction { Reply run(IssuedToken token) throws Exception; }
     /** Trusted composition rechecks this exact token, current identity, task, policy and owner after acquisition. */
     @FunctionalInterface public interface PreSendFence { void requireCurrent(IssuedToken token) throws Exception; }
     /** Server-pinned expectations, never taken from the tool request. */
@@ -107,52 +110,71 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     /** Unknown target deduplication means no automatic replay is permitted. */
     @Override public Duration replayWindow() { return Duration.ZERO; }
 
+    private static final class CallState {
+        final Thread owner=Thread.currentThread();
+        final java.util.concurrent.atomic.AtomicInteger phase=new java.util.concurrent.atomic.AtomicInteger();
+        boolean dispatched,finished;
+        Reply observed;
+    }
+
     @Override public Reply execute(String idempotencyKey) throws Exception {
         if(idempotencyKey==null || !idempotencyKey.matches("[!-~]{1,200}"))
             throw new IllegalArgumentException("idempotency key must be bounded visible ASCII");
         if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
         if(!SLOTS.tryAcquire())return new Reply(Outcome.UNKNOWN,"transport capacity unavailable");
-        long started=System.nanoTime();boolean dispatched=false,finished=false;
+        long started=System.nanoTime();var state=new CallState();
         try {
-            IssuedToken issued=Objects.requireNonNull(credentials.tokenFor(audience),"issued token");
-            requireToken(issued);
-            fence.requireCurrent(issued); // May block; expiry and the operation deadline are checked again afterward.
-            requireToken(issued);
-            if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
-            long elapsed=System.nanoTime()-started;
-            if(elapsed<0 || elapsed>=timeout.toNanos())return new Reply(Outcome.UNKNOWN,"transport deadline elapsed");
-            String token=issued.accessToken().reveal();
-            if(token.length()>8192 || !token.matches("[A-Za-z0-9._~+/-]+=*"))
-                throw new IllegalStateException("target-scoped credential unavailable");
-            var builder=HttpRequest.newBuilder(endpoint)
-                    .header("Authorization","Bearer "+token).header("Idempotency-Key",idempotencyKey)
-                    .header("X-Correlation-ID",correlation).header("Content-Type","application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body,StandardCharsets.UTF_8));
-            if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
-            // Request construction may consume time; the network phase receives only the remaining budget.
-            elapsed=System.nanoTime()-started;
-            if(elapsed<0 || elapsed>=timeout.toNanos() || !issued.usableAt(Instant.now()))
-                return new Reply(Outcome.UNKNOWN,"transport deadline elapsed");
-            HttpRequest request=builder.timeout(Duration.ofNanos(timeout.toNanos()-elapsed)).build();
-            requireToken(issued);
-            long beforeSend=System.nanoTime()-started;
-            if(beforeSend<0 || beforeSend>=timeout.toNanos())
-                return new Reply(Outcome.UNKNOWN,"transport deadline elapsed");
-            if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
-            dispatched=true;
-            var response=CLIENT.send(request,headersOnly());
-            if(confirmed.contains(response.statusCode())) {
-                finished=true;
-                return new Reply(Outcome.CONFIRMED,"target confirmed");
-            }
-            return new Reply(Outcome.UNKNOWN,"target outcome unresolved");
+            Reply result=credentials.withToken(audience,issued->{
+                if(Thread.currentThread()!=state.owner || !state.phase.compareAndSet(0,1))
+                    throw new IllegalStateException("credential callback must run once on its owning thread");
+                try {
+                    state.observed=send(Objects.requireNonNull(issued,"issued token"),idempotencyKey,started,state);
+                    return state.observed;
+                } finally {state.phase.set(2);}
+            });
+            if(state.phase.get()!=2 || result==null || result!=state.observed)
+                throw new IllegalStateException("credential provider did not return the scoped operation result");
+            return result;
         } catch(InterruptedException interrupted) {
             Thread.currentThread().interrupt();throw interrupted;
         } catch(IOException failure) {
             return new Reply(Outcome.UNKNOWN,"target outcome unresolved");
         } finally {
-            if(!dispatched || finished)SLOTS.release();
+            state.phase.set(3);
+            if(!state.dispatched || state.finished)SLOTS.release();
         }
+    }
+
+    private Reply send(IssuedToken issued,String idempotencyKey,long started,CallState state) throws Exception {
+        requireToken(issued);
+        fence.requireCurrent(issued); // May block; expiry and the operation deadline are checked again afterward.
+        requireToken(issued);
+        if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
+        long elapsed=System.nanoTime()-started;
+        if(elapsed<0 || elapsed>=timeout.toNanos())return new Reply(Outcome.UNKNOWN,"transport deadline elapsed");
+        String token=issued.accessToken().reveal();
+        if(token.length()>8192 || !token.matches("[A-Za-z0-9._~+/-]+=*"))
+            throw new IllegalStateException("target-scoped credential unavailable");
+        var builder=HttpRequest.newBuilder(endpoint)
+                .header("Authorization","Bearer "+token).header("Idempotency-Key",idempotencyKey)
+                .header("X-Correlation-ID",correlation).header("Content-Type","application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body,StandardCharsets.UTF_8));
+        if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
+        elapsed=System.nanoTime()-started;
+        if(elapsed<0 || elapsed>=timeout.toNanos() || !issued.usableAt(Instant.now()))
+            return new Reply(Outcome.UNKNOWN,"transport deadline elapsed");
+        HttpRequest request=builder.timeout(Duration.ofNanos(timeout.toNanos()-elapsed)).build();
+        requireToken(issued);
+        long beforeSend=System.nanoTime()-started;
+        if(beforeSend<0 || beforeSend>=timeout.toNanos())return new Reply(Outcome.UNKNOWN,"transport deadline elapsed");
+        if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
+        state.dispatched=true;
+        var response=CLIENT.send(request,headersOnly());
+        if(confirmed.contains(response.statusCode())) {
+            state.finished=true;
+            return new Reply(Outcome.CONFIRMED,"target confirmed");
+        }
+        return new Reply(Outcome.UNKNOWN,"target outcome unresolved");
     }
 
     private void requireToken(IssuedToken issued) {

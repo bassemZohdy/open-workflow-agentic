@@ -27,7 +27,7 @@ class PinnedHttpEffectTargetTest {
     }
     private static PinnedHttpEffectTarget operation(URI uri,Duration timeout) {
         return new PinnedHttpEffectTarget("tool:orders",uri,"audience:orders","trace-1","{\"amount\":10}",
-                timeout,Set.of(200),EXPECTED,audience->{assertEquals("audience:orders",audience);return token(audience);},issued->{},true);
+                timeout,Set.of(200),EXPECTED,(audience,action)->{assertEquals("audience:orders",audience);return action.run(token(audience));},issued->{},true);
     }
     private static URI uri(HttpServer server,String path) {return URI.create("http://127.0.0.1:"+server.getAddress().getPort()+path);}
     @Test void sendsBoundRequestAndRecognizesOnlyConfiguredTerminalConfirmation() throws Exception {
@@ -43,7 +43,7 @@ class PinnedHttpEffectTargetTest {
         try {
             var supplied=token("audience:orders");var checked=new AtomicReference<IssuedToken>();
             var target=new PinnedHttpEffectTarget("tool:orders",uri(server,"/orders"),"audience:orders","trace-1",
-                    "{\"amount\":10}",TIMEOUT,Set.of(200),EXPECTED,a->supplied,checked::set,true);
+                    "{\"amount\":10}",TIMEOUT,Set.of(200),EXPECTED,(a,action)->action.run(supplied),checked::set,true);
             assertEquals(Duration.ZERO,target.replayWindow());assertEquals(Outcome.CONFIRMED,target.execute("stable-key").outcome());
             assertSame(supplied,checked.get(),"the fence receives the exact credential being sent");
             assertEquals(1,seen.get());assertEquals("stable-key",key.get());assertEquals("Bearer token.value",auth.get());
@@ -113,14 +113,14 @@ class PinnedHttpEffectTargetTest {
             try(var workers=Executors.newVirtualThreadPerTaskExecutor()) {
                 for(int i=0;i<PinnedHttpEffectTarget.CAPACITY;i++) workers.submit(()->{
                     var target=new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",TIMEOUT,
-                            Set.of(200),EXPECTED,a->{seen.incrementAndGet();entered.countDown();release.await();return token(a);},
+                            Set.of(200),EXPECTED,(a,action)->{seen.incrementAndGet();entered.countDown();release.await();return action.run(token(a));},
                             issued->{throw new IllegalStateException("stop before send");},true);
                     try{target.execute("key");}catch(Exception expected){}
                 });
                 try {
                     if(!entered.await(10,TimeUnit.SECONDS))throw new AssertionError("providers did not enter");
                     var extra=new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",TIMEOUT,
-                            Set.of(200),EXPECTED,a->{seen.incrementAndGet();return token(a);},issued->{},true);
+                            Set.of(200),EXPECTED,(a,action)->{seen.incrementAndGet();return action.run(token(a));},issued->{},true);
                     if(extra.execute("extra").outcome()!=Outcome.UNKNOWN || seen.get()!=PinnedHttpEffectTarget.CAPACITY)
                         throw new AssertionError("capacity did not bound credential acquisition");
                 } finally {release.countDown();}
@@ -134,46 +134,46 @@ class PinnedHttpEffectTargetTest {
         try {
             URI endpoint=uri(server,"/orders");
             var expired=new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",TIMEOUT,
-                    Set.of(200),EXPECTED,a->new IssuedToken(Credential.of("token"),a,Set.of("orders:write"),
-                    Instant.now().minusSeconds(1),"issuer","jti",List.of("actor"),GRANT),issued->{},true);
+                    Set.of(200),EXPECTED,(a,action)->action.run(new IssuedToken(Credential.of("token"),a,Set.of("orders:write"),
+                    Instant.now().minusSeconds(1),"issuer","jti",List.of("actor"),GRANT)),issued->{},true);
             assertThrows(IllegalStateException.class,()->expired.execute("key"));
             var wrong=new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",TIMEOUT,
-                    Set.of(200),EXPECTED,a->token("wrong-audience"),issued->{},true);
+                    Set.of(200),EXPECTED,(a,action)->action.run(token("wrong-audience")),issued->{},true);
             assertThrows(IllegalStateException.class,()->wrong.execute("key"));
             for(var invalid:List.of(
                     new IssuedToken(Credential.of("token"),"audience:orders",Set.of("orders:write"),Instant.now().plusSeconds(60),"other","jti",List.of("actor"),GRANT),
                     new IssuedToken(Credential.of("token"),"audience:orders",Set.of("orders:write"),Instant.now().plusSeconds(60),"issuer","jti",List.of("actor"),UlidGenerator.shared().next()),
                     new IssuedToken(Credential.of("token"),"audience:orders",Set.of("orders:write","extra"),Instant.now().plusSeconds(60),"issuer","jti",List.of("actor"),GRANT))) {
                 var mismatch=new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",TIMEOUT,
-                        Set.of(200),EXPECTED,a->invalid,issued->{},true);
+                        Set.of(200),EXPECTED,(a,action)->action.run(invalid),issued->{},true);
                 assertThrows(IllegalStateException.class,()->mismatch.execute("key"));
             }
             var fenceEntered=new AtomicBoolean();
             var expiresDuringFence=new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",TIMEOUT,
-                    Set.of(200),EXPECTED,a->new IssuedToken(Credential.of("token"),a,Set.of("orders:write"),
-                    Instant.now().plusSeconds(2),"issuer","jti",List.of("actor"),GRANT),issued->{fenceEntered.set(true);Thread.sleep(2100);},true);
+                    Set.of(200),EXPECTED,(a,action)->action.run(new IssuedToken(Credential.of("token"),a,Set.of("orders:write"),
+                    Instant.now().plusSeconds(2),"issuer","jti",List.of("actor"),GRANT)),issued->{fenceEntered.set(true);Thread.sleep(2100);},true);
             assertThrows(IllegalStateException.class,()->expiresDuringFence.execute("key"));
             assertTrue(fenceEntered.get(),"token must be current when the blocking fence begins");
             var denied=new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",TIMEOUT,
-                    Set.of(200),EXPECTED,PinnedHttpEffectTargetTest::token,issued->{throw new IllegalStateException("denied");},true);
+                    Set.of(200),EXPECTED,(a,action)->action.run(token(a)),issued->{throw new IllegalStateException("denied");},true);
             assertThrows(IllegalStateException.class,()->denied.execute("key"));
             var slow=new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",Duration.ofMillis(100),
-                    Set.of(200),EXPECTED,a->{Thread.sleep(200);return token(a);},issued->{},true);
+                    Set.of(200),EXPECTED,(a,action)->{Thread.sleep(200);return action.run(token(a));},issued->{},true);
             assertEquals(Outcome.UNKNOWN,slow.execute("key").outcome());assertEquals(0,calls.get());
         } finally {server.stop(0);}
     }
 
     @Test void rejectsUntrustedConfigurationAndInvalidCredentialsBeforeSending() {
         URI secure=URI.create("https://example.test/orders");
-        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",URI.create("http://example.test/x"),"aud","c","{}",TIMEOUT,Set.of(200),EXPECTED,a->token(a),issued->{}));
-        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",URI.create("https://example.test/x?redirect=other"),"aud","c","{}",TIMEOUT,Set.of(200),EXPECTED,a->token(a),issued->{}));
-        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",secure,"aud","c","{}",TIMEOUT,Set.of(202),EXPECTED,a->token(a),issued->{}));
-        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",secure,"aud","c","{",TIMEOUT,Set.of(200),EXPECTED,a->token(a),issued->{}));
-        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",secure,"aud","c","{\"x\":1,\"x\":2}",TIMEOUT,Set.of(200),EXPECTED,a->token(a),issued->{}));
-        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",secure,"aud","c","{} {}",TIMEOUT,Set.of(200),EXPECTED,a->token(a),issued->{}));
+        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",URI.create("http://example.test/x"),"aud","c","{}",TIMEOUT,Set.of(200),EXPECTED,(a,action)->action.run(token(a)),issued->{}));
+        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",URI.create("https://example.test/x?redirect=other"),"aud","c","{}",TIMEOUT,Set.of(200),EXPECTED,(a,action)->action.run(token(a)),issued->{}));
+        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",secure,"aud","c","{}",TIMEOUT,Set.of(202),EXPECTED,(a,action)->action.run(token(a)),issued->{}));
+        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",secure,"aud","c","{",TIMEOUT,Set.of(200),EXPECTED,(a,action)->action.run(token(a)),issued->{}));
+        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",secure,"aud","c","{\"x\":1,\"x\":2}",TIMEOUT,Set.of(200),EXPECTED,(a,action)->action.run(token(a)),issued->{}));
+        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",secure,"aud","c","{} {}",TIMEOUT,Set.of(200),EXPECTED,(a,action)->action.run(token(a)),issued->{}));
         var target=new PinnedHttpEffectTarget("tool:orders",secure,"aud","c","{}",TIMEOUT,Set.of(200),EXPECTED,
-                a->new IssuedToken(Credential.of("bad\r\nheader"),a,Set.of("orders:write"),Instant.now().plusSeconds(60),
-                        "issuer","jti",List.of("actor"),GRANT),issued->{});
+                (a,action)->action.run(new IssuedToken(Credential.of("bad\r\nheader"),a,Set.of("orders:write"),Instant.now().plusSeconds(60),
+                        "issuer","jti",List.of("actor"),GRANT)),issued->{});
         assertThrows(IllegalStateException.class,()->target.execute("key"));
         assertThrows(IllegalArgumentException.class,()->target.execute("bad\r\nkey"));
     }
