@@ -10,6 +10,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.execution.GovernedExecutionRoot;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.OwnerFencedJpaWriter;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.CancellablePersistenceReader;
@@ -119,8 +120,10 @@ class WorkflowOwnerExecutionBoundaryTest {
             try { ResourceTaskAllocationMigrationTest.apply(c); c.commit(); }
             catch (Exception failure) { c.rollback(); throw failure; }
         }
+        ModelCallReservationStoreTest.apply79(data);
         exerciseOwnedResourceEntry(8);
         exerciseOwnedResourceEntry(9);
+        exerciseOwnedResourceEntry(10);
     }
 
     // 0: current; 1/2: takeover; 3: grant revoked; 4: policy revoked; 5/6/7: deny, PDP or PEP audit failure.
@@ -156,7 +159,8 @@ class WorkflowOwnerExecutionBoundaryTest {
             var row = store.find(tenant, binding.instanceId()).orElseThrow();
             var scope = new ResourceCallScope(tenant, row.id(), row.owner(), appId, instance.id(),
                     "agentic-test", "owner-boundary", "1.0.0", "do/0/wait", 1, "root", "agent-run", Pep.AGENT_RESEARCH_RUN,
-                    "a".repeat(64), ResourceCallScope.requestFingerprint("{}"));
+                    "a".repeat(64), ResourceCallScope.requestFingerprint(scenario == 10
+                            ? ResearchRequest.canonical("approved research") : "{}"));
             var ids = UlidGenerator.shared(); var clock = Clock.systemUTC();
             var now = clock.instant().truncatedTo(ChronoUnit.MICROS);
             var workload = new Subject(SubjectKind.WORKFLOW, "resource-owner-fixture");
@@ -203,7 +207,7 @@ class WorkflowOwnerExecutionBoundaryTest {
                         Set.of(), Set.of(), RiskTier.HIGH, new ExecutionLimits(3, Duration.ofSeconds(90), 5000),
                         row.owner(), child.id());
                 var profile = new ApprovedModelProfile("root-fixture", "1", "c".repeat(64), agent,
-                        "model", 1, 1000, Duration.ofSeconds(2), 256);
+                        "model", 3, 1000, Duration.ofSeconds(20), 256);
                 var allocation = new JdbcResourceTaskAllocations(data, transactions)
                         .allocate(new ResourceTaskAllocation(scope, null, contract, profile));
                 var central = new AuditAppendOnce(data);
@@ -215,6 +219,32 @@ class WorkflowOwnerExecutionBoundaryTest {
                      var root = GovernedExecutionRoot.audited(data, transactions, 1,
                              JdbcResourceExecutionGate.IoBounds.defaults(), central::appendOnce)) {
                     assertThrows(Exception.class, () -> new ObjectMapper().writeValueAsString(root));
+                    if (scenario == 10) {
+                        var providerCalls = new AtomicInteger();
+                        ReservedLlmClient provider = new ReservedLlmClient() {
+                            public String configuredModelId() { return "model"; }
+                            public String reservedConfigurationFingerprint() { return "c".repeat(64); }
+                            public long maximumCostMicros(String prompt, int tokens) { return 999; }
+                            public String complete(String system, String user) { throw new AssertionError("unreserved provider"); }
+                            public String completeReserved(String prompt, int tokens, Instant due) {
+                                providerCalls.incrementAndGet();
+                                return "{\"text\":\"answer\",\"actions\":[],\"escalation\":null}";
+                            }
+                        };
+                        ApprovedModelContext modelContext = () -> Optional.of(new ApprovedModelContext.Approved(agent, contract, "model", 5000));
+                        var model = new GovernedLlmClient(provider, pep, modelContext, new JdbcResourceModelCalls(data, transactions));
+                        var research = ResearchAgentTestFactory.create(data, model, modelContext);
+                        var renewer = Executors.newSingleThreadScheduledExecutor();
+                        try {
+                            renewer.scheduleAtFixedRate(() -> leases.renew(claim.get(), Duration.ofSeconds(30)), 5, 5, TimeUnit.SECONDS);
+                            var result = root.executeResearch(canonical, entry, UUID.randomUUID(), identity, policy, task, owner,
+                                    ignored -> {}, research, allocation, "approved research").get(90, TimeUnit.SECONDS);
+                            assertEquals(JdbcResourceExecutionGate.Kind.CALLED, result.kind());
+                            assertEquals("answer", result.value().text(ResearchState.REVIEW).orElseThrow());
+                            assertEquals(3, providerCalls.get());
+                        } finally { renewer.shutdownNow(); }
+                        return;
+                    }
                     if (scenario == 9) {
                         var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
                         try {

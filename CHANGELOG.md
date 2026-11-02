@@ -1,5 +1,7 @@
 # Changelog
 
+- Connect the audited execution root to reserved research-graph nodes and tracked graph termination.
+
 - Retain governed execution contexts and capacity through managed asynchronous termination.
 
 - Compose the audited execution root with live task, identity, policy and workflow-owner checks.

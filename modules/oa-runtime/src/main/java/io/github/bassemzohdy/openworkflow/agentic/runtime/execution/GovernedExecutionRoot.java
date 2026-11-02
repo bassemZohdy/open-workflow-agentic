@@ -3,10 +3,13 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.execution;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.IdempotentAuditSink;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceExecutionFence;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityResourceFence;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveResearchPolicyFence;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchAgent;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchState;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.CompositeExecutionFence;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.ResourceTaskExecutionFence;
@@ -83,6 +86,16 @@ public final class GovernedExecutionRoot implements AutoCloseable {
             }
             throw failure;
         }
+    }
+
+    /** Runs the fixed research graph under the audited managed entry and its exclusive live contexts. */
+    public Future<JdbcResourceExecutionGate.Result<ResearchState>> executeResearch(ResourceCallBinding binding,
+            ResourceExecutionEntry entry, UUID executor, LiveIdentityResourceFence identity,
+            LiveResearchPolicyFence policy, ResourceTaskExecutionFence task, WorkflowOwnerResourceFence owner,
+            ResourceExecutionFence preEntryAudit, ResearchAgent agent, AllocatedResourceTask allocation, String topic) {
+        Objects.requireNonNull(agent); Objects.requireNonNull(allocation); Objects.requireNonNull(topic);
+        return executeAsync(binding, entry, executor, identity, policy, task, owner, preEntryAudit,
+                running -> agent.runGoverned(running, allocation, topic));
     }
 
     private static CompositeExecutionFence composite(LiveIdentityResourceFence identity, LiveResearchPolicyFence policy,

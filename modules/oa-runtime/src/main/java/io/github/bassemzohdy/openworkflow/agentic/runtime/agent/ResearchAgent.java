@@ -11,8 +11,16 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import java.time.Clock;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.BiFunction;
 import javax.sql.DataSource;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResearchRequest;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceModelCall;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ModelCall;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate.Running;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.bsc.langgraph4j.CompileConfig;
@@ -112,18 +120,20 @@ public class ResearchAgent {
     private PostgresSaver saver;
 
     /** Compiles the plan/draft/review graph; {@code wrap} decorates each node (identity for an unwrapped run). */
+    @FunctionalInterface private interface ModelExecution { String complete(String node, String system, String user); }
+
     private CompiledGraph<ResearchState> compile(BiFunction<String, NodeAction<ResearchState>, NodeAction<ResearchState>> wrap,
-            ApprovedModelContext.Approved approved) throws Exception {
+            ModelExecution model) throws Exception {
         var g = new StateGraph<>(serializer)
                 .addNode("plan", node_async(wrap.apply("plan", s -> Map.of(ResearchState.PLAN,
-                        outputValidator.validateText(model(approved, "Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, give 3 short numbered research steps.",
+                        outputValidator.validateText(model(model, "plan", "Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, give 3 short numbered research steps.",
                                 s.text(ResearchState.TOPIC).orElse("")))))))
                 .addNode("draft", node_async(wrap.apply("draft", s -> Map.of(ResearchState.DRAFT,
-                        outputValidator.validateText(model(approved, "Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, write a concise research brief following the plan.",
+                        outputValidator.validateText(model(model, "draft", "Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, write a concise research brief following the plan.",
                                 "Topic: " + s.text(ResearchState.TOPIC).orElse("")
                                         + "\nPlan:\n" + s.text(ResearchState.PLAN).orElse("")))))))
                 .addNode("review", node_async(wrap.apply("review", s -> Map.of(ResearchState.REVIEW,
-                        outputValidator.validateText(model(approved, "Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, reply with APPROVE or REVISE and one reason.",
+                        outputValidator.validateText(model(model, "review", "Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, reply with APPROVE or REVISE and one reason.",
                                 s.text(ResearchState.DRAFT).orElse("")))))))
                 .addEdge(START, "plan")
                 .addEdge("plan", "draft")
@@ -133,9 +143,9 @@ public class ResearchAgent {
         return g.compile(CompileConfig.builder().checkpointSaver(saver).build());
     }
 
-    private String model(ApprovedModelContext.Approved approved, String system, String user) {
-        if (approved == null) throw new ModelCallRefused("no approved context for this graph run");
-        return llm.complete(approved, system, user);
+    private String model(ModelExecution model, String node, String system, String user) {
+        if (model == null) throw new ModelCallRefused("no approved context for this graph run");
+        return model.complete(node, system, user);
     }
 
     /** Runs the graph for a thread (one thread per business case) and returns the final state. */
@@ -164,9 +174,81 @@ public class ResearchAgent {
         var interceptor = NodeInterceptor.forLimits(approved.agent(), threadId, approved.task().limits(), audit, clock, budget);
         var trace = io.opentelemetry.context.Context.current();
         try {
-            return compile((name, action) -> GraphTraceContext.wrap(trace, interceptor.wrap(name, action, nodeTelemetry)), approved);
+            return compile((name, action) -> GraphTraceContext.wrap(trace, interceptor.wrap(name, action, nodeTelemetry)),
+                    (node, system, user) -> llm.complete(approved, system, user));
         } catch (Exception e) {
             throw new IllegalStateException("Agent graph could not be built for this run", e);
         }
+    }
+
+    /**
+     * Explicit fresh-entry graph path. Each fixed graph node has a stable occurrence and uses the reserved model
+     * boundary; it does not install a caller, provider, approval or route. Existing checkpoints are refused rather
+     * than interpreted as permission to resume. The per-run tracker retains the caller until every admitted node
+     * action physically returns, even if the graph reports failure or the caller is interrupted.
+     */
+    public ResearchState runGoverned(Running control, AllocatedResourceTask allocation, String topic) {
+        Objects.requireNonNull(control); Objects.requireNonNull(allocation); Objects.requireNonNull(topic);
+        var entry = control.entry(); var executor = control.executor();
+        control.requireCurrent(entry, executor);
+        var allocated = allocation.allocation();
+        if (topic.isBlank() || topic.length() > ResearchRequest.MAX_TOPIC_LENGTH
+                || !entry.scope().equals(allocated.scope()) || !Pep.AGENT_RESEARCH_RUN.equals(entry.scope().operation())
+                || !entry.scope().requestFingerprint().equals(ResourceCallScope.requestFingerprint(ResearchRequest.canonical(topic))))
+            throw new ModelCallRefused("research request differs from the retained allocation");
+        if (audit == null || approvedContext == null || nodeBudget == null)
+            throw new ModelCallRefused("agent run governance is unavailable");
+        var approved = approvedContext.current().orElseThrow(() -> new ModelCallRefused("no approved context for this graph run"));
+        control.requireCurrent(entry, executor);
+        var profile = allocated.modelProfile();
+        if (!approved.agent().equals(profile.agent()) || !approved.task().equals(allocated.contract())
+                || !approved.modelId().equals(profile.modelId()) || approved.budgetRemainingMicros() == 0)
+            throw new ModelCallRefused("model approval differs from the retained allocation");
+        verifyStore();
+        control.requireCurrent(entry, executor);
+        var activity = new NodeActivityTracker();
+        var config = RunnableConfig.builder().threadId(entry.threadId().value())
+                .emitterExecutor(activity.emitterExecutor()).build();
+        if (graph.lastStateOf(config).isPresent())
+            throw new ModelCallRefused("existing checkpoint requires reconciliation");
+        control.requireCurrent(entry, executor);
+        var budget = nodeBudget.openExisting(entry.threadId().value(), approved.agent(), approved.task());
+        var interceptor = NodeInterceptor.forLimits(approved.agent(), entry.threadId().value(), approved.task().limits(), audit, clock, budget);
+        var trace = io.opentelemetry.context.Context.current();
+        ResearchState result;
+        try {
+            var guarded = compile((name, action) -> activity.track(GraphTraceContext.wrap(trace,
+                    interceptor.wrap(name, state -> {
+                        control.requireCurrent(entry, executor);
+                        var nodeOutput = action.apply(state);
+                        control.requireCurrent(entry, executor);
+                        return nodeOutput;
+                    }, nodeTelemetry))), (node, system, user) -> {
+                var call = new ModelCall(allocated.contract().id(), profile.modelId(),
+                        "Instruction:\n" + system + "\n\nInput:\n" + user, profile.maxOutputTokens());
+                var occurrence = ResourceModelCall.of(allocation, entry, executor, "research/" + node, call);
+                return llm.completeReserved(control, allocation, occurrence, call);
+            });
+            control.requireCurrent(entry, executor);
+            var output = guarded.stream(Map.of(ResearchState.TOPIC, topic,
+                    ResearchStateVersion.KEY, ResearchStateVersion.CURRENT), config);
+            boolean consumed = false;
+            try (var stream = output.stream()) {
+                result = stream.reduce((left, right) -> right).map(node -> node.state())
+                        .orElseThrow(() -> new IllegalStateException("Agent graph produced no state"));
+                consumed = true;
+            } finally { if (!consumed) output.cancel(false); }
+        } catch (RuntimeException failure) {
+            throw failure;
+        } catch (Exception failure) {
+            throw new IllegalStateException("Governed agent graph could not be built or run", failure);
+        } finally {
+            activity.closeAndAwait();
+        }
+        control.requireCurrent(entry, executor);
+        if (!approvedContext.current().filter(approved::equals).isPresent())
+            throw new ModelCallRefused("model approval changed before graph output release");
+        control.requireCurrent(entry, executor);
+        return result;
     }
 }
