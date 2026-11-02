@@ -32,11 +32,13 @@ unchanged. Private queue contents are never exported here.
 
 The one-second cache bounds completed read-attempt frequency, including failures.
 Concurrent gauges do not start duplicate reads; they may see the prior immutable
-observation while one read is in flight. This does not bound JDBC query duration,
-make a whole scrape an atomic database snapshot, or certify current business
-delivery. A blocked first query can still block its owning scrape; the external
-exporter/up and stale signals address different observation failures. Query/
-connection timeout and production load budgets still need deployment evidence.
+observation while one read is in flight. The scrape query requests JDBC cancellation after two seconds; a PostgreSQL lock
+test exercises that timeout and subsequent recovery. Connection acquisition,
+network failure detection and driver cancellation response are governed separately
+and can still delay a scrape. The observations do not make a whole scrape an
+atomic database snapshot or certify current business delivery. Exporter/up and
+stale signals address different failures; deployment connection timeouts and
+load budgets still need evidence.
 
 ## Collection and dashboard proposal
 
