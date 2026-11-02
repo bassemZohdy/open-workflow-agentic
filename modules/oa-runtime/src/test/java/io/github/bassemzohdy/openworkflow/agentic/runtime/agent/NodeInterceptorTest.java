@@ -201,6 +201,23 @@ class NodeInterceptorTest {
     }
 
     @Test
+    void deadlineReachedDuringStartedAuditRefusesTheNodeAndCountsTheAttempt() {
+        var clock = new MovingClock();
+        var audit = new Audit();
+        AuditSink delayed = event -> {
+            audit.record(event);
+            if (event.action().equals("agent.node.started")) clock.now = clock.now.plusSeconds(5);
+        };
+        var node = new Counting();
+        var interceptor = new NodeInterceptor(GovernedLlmClientTest.AGENT, "run-1", 2, Duration.ofSeconds(5), delayed, clock);
+        assertThrows(NodeRefused.class, () -> interceptor.wrap("plan", node).apply(STATE));
+        assertEquals(0, node.runs.get());
+        assertEquals(1, interceptor.stepsCounted());
+        assertEquals(List.of("agent.node.started", "agent.node.refused"), audit.actions());
+        assertEquals("1", audit.events.get(1).attributes().get("agent.step"));
+    }
+
+    @Test
     void justBeforeTheDeadlineStillRuns() throws Exception {
         var clock = new MovingClock();
         var node = new Counting();
