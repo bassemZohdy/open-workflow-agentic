@@ -31,12 +31,15 @@ public final class CallerAuthority {
     private final VerifiedToken token;
     private final Clock clock;
     private final DelegatedRecheck delegated;
+    private final boolean trustedDevelopment;
 
-    private CallerAuthority(CallerContext caller, VerifiedToken token, Clock clock, DelegatedRecheck delegated) {
+    private CallerAuthority(CallerContext caller, VerifiedToken token, Clock clock, DelegatedRecheck delegated,
+                            boolean trustedDevelopment) {
         this.caller = Objects.requireNonNull(caller, "caller");
         this.token = token;
         this.clock = Objects.requireNonNull(clock, "clock");
         this.delegated = delegated;
+        this.trustedDevelopment = trustedDevelopment;
     }
 
     /** A user's or operator's own verified token. */
@@ -46,7 +49,7 @@ public final class CallerAuthority {
             throw new IllegalArgumentException("not a user's own token");
         }
         return new CallerAuthority(new CallerContext(token.tenant(), token.subject(), token.scopes(),
-                CallerContext.Provenance.VERIFIED_TOKEN), token, clock, null);
+                CallerContext.Provenance.VERIFIED_TOKEN), token, clock, null, false);
     }
 
     /** A delegated token admitted through the governed path; {@code recheck} judges its grant chain. */
@@ -57,13 +60,21 @@ public final class CallerAuthority {
             throw new IllegalArgumentException("not a delegated token");
         }
         return new CallerAuthority(new CallerContext(token.tenant(), token.subject(), token.scopes(),
-                CallerContext.Provenance.VERIFIED_TOKEN), token, clock, recheck);
+                CallerContext.Provenance.VERIFIED_TOKEN), token, clock, recheck, false);
     }
 
     /** A caller that is not backed by a verified token (development headers, hand-built): never current. */
     public static CallerAuthority unverified(CallerContext caller, Clock clock) {
-        return new CallerAuthority(caller, null, clock, null);
+        return new CallerAuthority(caller, null, clock, null, false);
     }
+
+    /** Only the resolver can mark headers that passed its explicit dev/test profile gate. */
+    static CallerAuthority trustedDevelopment(CallerContext caller, Clock clock) {
+        if (caller.provenance() != CallerContext.Provenance.DEV_HEADERS) throw new IllegalArgumentException("not development headers");
+        return new CallerAuthority(caller, null, clock, null, true);
+    }
+
+    public boolean trustedDevelopment() { return trustedDevelopment; }
 
     /** The caller this authority is for. */
     public CallerContext caller() {

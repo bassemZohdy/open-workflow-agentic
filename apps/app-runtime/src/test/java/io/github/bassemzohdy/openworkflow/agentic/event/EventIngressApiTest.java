@@ -15,6 +15,7 @@ import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import java.time.*;
 import java.util.*;
+import java.util.concurrent.*;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
@@ -105,6 +106,51 @@ class EventIngressApiTest {
         given().auth().oauth2(jwt).contentType(StructuredEvent.CONTENT_TYPE).body(body)
                 .post(path(wrongDefinition, "wait-1")).then().statusCode(404);
         assertEquals(0, count("inbox.message", instance)); assertEquals(0, count("inbox.message", wrongDefinition));
+    }
+
+    @Test
+    void tokenExpiringWhileReceiptWaitsForTheInstanceLockRollsBackAndCanBeRetried() throws Exception {
+        String instance = instance("agentic/orders"), id = UUID.randomUUID().toString();
+        String body = event(id, "urn:test:orders", "{}");
+        String valid = token("alice", TENANT, "oa.events.receive");
+        // Warm the identity, policy and audit path before measuring the short-lived token.
+        given().auth().oauth2(valid).contentType(StructuredEvent.CONTENT_TYPE)
+                .body(event(UUID.randomUUID().toString(), "urn:test:orders", "{}"))
+                .post(path(instance, "wait-1")).then().statusCode(202);
+        var claims = FakeIdpResource.idp().baseClaims("alice", null, Duration.ofSeconds(20));
+        claims.put("aud", FakeIdpResource.AUDIENCE); claims.put("tenant", TENANT); claims.put("scope", "oa.events.receive");
+        String expiring = FakeIdpResource.idp().signClaims(claims);
+        Instant expiry = Instant.ofEpochSecond(((Number) claims.get("exp")).longValue());
+        var executor = Executors.newSingleThreadExecutor();
+        try (var lock = dataSource.getConnection()) {
+            lock.setAutoCommit(false);
+            int blocker;
+            try (var q = lock.createStatement(); var rows = q.executeQuery("select pg_backend_pid()")) { rows.next(); blocker = rows.getInt(1); }
+            try (var q = lock.prepareStatement("select id from task.instance where id=? for update")) {
+                q.setString(1, instance); try (var rows = q.executeQuery()) { assertTrue(rows.next()); }
+            }
+            var response = executor.submit(() -> given().auth().oauth2(expiring).contentType(StructuredEvent.CONTENT_TYPE)
+                    .body(body).post(path(instance, "wait-1")));
+            boolean blocked = false;
+            try (var c = dataSource.getConnection(); var q = c.prepareStatement(
+                    "select exists(select 1 from pg_stat_activity where ? = any(pg_blocking_pids(pid)))")) {
+                q.setInt(1, blocker);
+                while (Instant.now().isBefore(expiry.minusSeconds(1))) {
+                    try (var rows = q.executeQuery()) { rows.next(); if (rows.getBoolean(1)) { blocked = true; break; } }
+                    Thread.sleep(25);
+                }
+            }
+            assertTrue(blocked, "receipt must have reached the locked instance while its token is current");
+            while (Instant.now().isBefore(expiry.plusMillis(100))) Thread.sleep(25);
+            lock.commit();
+            assertEquals(401, response.get(15, TimeUnit.SECONDS).statusCode());
+        } finally { executor.shutdownNow(); }
+        assertEquals(1, count("inbox.message", instance), "the expired receipt was rolled back");
+        given().auth().oauth2(valid).contentType(StructuredEvent.CONTENT_TYPE).body(body)
+                .post(path(instance, "wait-1")).then().statusCode(202);
+        given().auth().oauth2(valid).contentType(StructuredEvent.CONTENT_TYPE).body(body)
+                .post(path(instance, "wait-1")).then().statusCode(200);
+        assertEquals(2, count("inbox.message", instance));
     }
 
     @Test

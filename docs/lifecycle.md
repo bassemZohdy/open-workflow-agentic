@@ -628,7 +628,13 @@ occurrence. Without producer bindings ingress is denied. The source
 external producer bindings using it are rejected at startup, and receipt through
 this endpoint is denied. The human-decision producer and dispatcher are not yet
 activated. Development headers are accepted only through the existing explicit
-development/test caller seam.
+development/test caller seam. A verified bearer is rechecked after policy and audit,
+after the receipt's database locks are acquired and immediately before transaction
+completion, and again before returning its result. Expiry at the transaction check
+rolls back a new receipt. If authority expires during commit or result audit, the
+receipt may already be durable; the response is withheld and a current caller can
+retry the same event id. The last application-level check cannot prove authority
+remained current throughout a blocked database commit.
 
 The complete envelope is persisted before any listener wake. A new receipt is
 202, an identical source/id retry is 200, and changed content or routing is 409.

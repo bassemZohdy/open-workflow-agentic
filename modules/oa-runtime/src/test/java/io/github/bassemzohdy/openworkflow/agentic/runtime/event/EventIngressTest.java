@@ -8,10 +8,13 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.PolicyDecisionPoint;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerContext;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.problem.ProblemException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.VerifiedToken;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
+import jakarta.ws.rs.WebApplicationException;
 import java.lang.reflect.Proxy;
 import java.time.*;
 import java.util.*;
@@ -40,6 +43,9 @@ class EventIngressTest {
         @Override public Received receive(InboxMessage message, Instant until) {
             calls++; boolean created = !committed; committed = true; return new Received(message, until, created);
         }
+        @Override public Received receive(InboxMessage message, Instant until, Runnable beforeCommit) {
+            beforeCommit.run(); return receive(message, until);
+        }
     }
     static EventIngressSettings settings() {
         return new EventIngressSettings() {
@@ -54,11 +60,66 @@ class EventIngressTest {
             }); }
         };
     }
-    static CallerContext caller() { return new CallerContext("tenant", ALICE, Set.of("oa.events.receive"), CallerContext.Provenance.VERIFIED_TOKEN); }
+    static CallerAuthority caller() {
+        var now = Instant.now();
+        return CallerAuthority.ofUserToken(new VerifiedToken("issuer", ALICE, Set.of("api"), Set.of("oa.events.receive"),
+                "tenant", now, now.plusSeconds(120), "id", List.of()), Clock.systemUTC());
+    }
     static StructuredEvent event() { return StructuredEventTest.parse("{" + StructuredEventTest.PREFIX + ",\"data\":{\"ok\":true}}"); }
+    static final class MovingClock extends Clock {
+        Instant instant = Instant.parse("2030-01-01T00:00:00Z");
+        public ZoneId getZone() { return ZoneOffset.UTC; }
+        public Clock withZone(ZoneId zone) { return this; }
+        public Instant instant() { return instant; }
+        void advance() { instant = instant.plusSeconds(10); }
+    }
+    static CallerAuthority expiring(MovingClock clock) {
+        return CallerAuthority.ofUserToken(new VerifiedToken("issuer", ALICE, Set.of("api"), Set.of("oa.events.receive"),
+                "tenant", clock.instant(), clock.instant().plusSeconds(5), "id", List.of()), clock);
+    }
     EventIngress ingress(Inbox inbox, DecisionOutcome outcome, AuditSink sink) {
         PolicyDecisionPoint pdp = request -> { decisions.add(request); return new Decision("test", outcome, "test", PolicyRef.FAIL_CLOSED, Instant.now()); };
         return new EventIngress(inbox, store, new Pep(pdp, audit::add), sink, settings(), Clock.systemUTC());
+    }
+
+    @Test void expiresDuringAttemptAuditOrReceiptLockBeforeCommitting() {
+        for (boolean duringReceipt : List.of(false, true)) {
+            var clock = new MovingClock(); var authority = expiring(clock);
+            Inbox inbox = new Inbox() {
+                @Override public Received receive(InboxMessage message, Instant until, Runnable beforeCommit) {
+                    if (duringReceipt) clock.advance();
+                    return super.receive(message, until, beforeCommit);
+                }
+            };
+            PolicyDecisionPoint pdp = request -> new Decision("test", DecisionOutcome.ALLOW, "test", PolicyRef.FAIL_CLOSED, clock.instant());
+            var ingress = new EventIngress(inbox, store, new Pep(pdp, e -> {}, Duration.ofSeconds(3), clock), e -> {
+                if (!duringReceipt && e.action().equals("event.receive.attempt")) clock.advance();
+            }, settings(), clock);
+            assertEquals(401, assertThrows(WebApplicationException.class,
+                    () -> ingress.receive(authority, row.id(), "wait-1", event())).getResponse().getStatus());
+            assertFalse(inbox.committed);
+        }
+    }
+
+    @Test void expiryAfterCommitWithholdsResultButRetryFindsReceipt() {
+        var clock = new MovingClock(); var authority = expiring(clock); var inbox = new Inbox();
+        PolicyDecisionPoint pdp = request -> new Decision("test", DecisionOutcome.ALLOW, "test", PolicyRef.FAIL_CLOSED, clock.instant());
+        var ingress = new EventIngress(inbox, store, new Pep(pdp, e -> {}, Duration.ofSeconds(3), clock), e -> {
+            if (e.action().equals("event.received")) clock.advance();
+        }, settings(), clock);
+        assertEquals(401, assertThrows(WebApplicationException.class,
+                () -> ingress.receive(authority, row.id(), "wait-1", event())).getResponse().getStatus());
+        assertTrue(inbox.committed);
+        assertFalse(ingress.receive(expiring(clock), row.id(), "wait-1", event()).created());
+    }
+
+    @Test void forgedOrDevelopmentContextCannotSubstituteForVerifiedAuthority() {
+        var ingress = ingress(new Inbox(), DecisionOutcome.ALLOW, audit::add);
+        for (var provenance : List.of(CallerContext.Provenance.VERIFIED_TOKEN, CallerContext.Provenance.DEV_HEADERS)) {
+            var forged = CallerAuthority.unverified(new CallerContext("tenant", ALICE, Set.of("oa.events.receive"), provenance), Clock.systemUTC());
+            assertThrows(WebApplicationException.class, () -> ingress.receive(forged, row.id(), "wait-1", event()));
+        }
+        assertEquals(0, targetReads.get());
     }
 
     @Test
@@ -119,7 +180,7 @@ class EventIngressTest {
     @Test
     void unverifiedWrongRouteDeniedAndUnavailablePolicyNeverWriteReceipt() {
         Inbox inbox = new Inbox(); var ingress = ingress(inbox, DecisionOutcome.ALLOW, audit::add);
-        assertEquals(403, assertThrows(ProblemException.class, () -> ingress.receive(new CallerContext("tenant", ALICE), row.id(), "wait-1", event())).getResponse().getStatus());
+        assertEquals(403, assertThrows(ProblemException.class, () -> ingress.receive(CallerAuthority.unverified(new CallerContext("tenant", ALICE), Clock.systemUTC()), row.id(), "wait-1", event())).getResponse().getStatus());
         assertEquals(403, assertThrows(ProblemException.class, () -> ingress.receive(caller(), row.id(), "another-wait", event())).getResponse().getStatus());
         for (var outcome : List.of(DecisionOutcome.DENY, DecisionOutcome.ERROR)) {
             var denied = ingress(inbox, outcome, audit::add);

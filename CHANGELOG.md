@@ -1,5 +1,7 @@
 # Changelog
 
+- Recheck event-producer authority after policy/audit, inside the receipt transaction and before returning its result; expiry before the final transaction check rolls the receipt back.
+
 - Share the process-local coordination budget between workflow starts and lifecycle repairs, so competing advisory locks do not consume every small-pool connection.
 
 - Cap start admission below the configured Agroal pool maximum, keeping a slot available for registry work when only starts use the pool; reject a one-connection pool.

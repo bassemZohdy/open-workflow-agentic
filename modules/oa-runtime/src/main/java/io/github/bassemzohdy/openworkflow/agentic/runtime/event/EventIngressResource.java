@@ -26,7 +26,7 @@ public class EventIngressResource {
     @POST @Consumes(StructuredEvent.CONTENT_TYPE)
     public Response receive(@Context HttpHeaders headers, @PathParam("instance") String id,
                             @PathParam("correlation") String correlation, InputStream body) {
-        var caller = callers.resolve(headers);
+        var caller = callers.resolveAuthority(headers);
         Ulid instance;
         try { instance = Ulid.parse(id); }
         catch (IllegalArgumentException | NullPointerException invalid) { throw new ProblemException(404, "no such instance"); }
