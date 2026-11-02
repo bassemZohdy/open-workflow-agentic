@@ -772,7 +772,7 @@
           "Human-action facts and policy rules exist; an immutable decision identity distinguishes exact retries from changed actor, task, version, outcome or content. A non-wired preflight checks verified non-delegated caller authority and task facts before and after policy evaluation.",
           "An isolated, unactivated PostgreSQL proposal tests transactional task decision, a non-sensitive audit event and blocked wakeup, including exact retries, a simulated lost commit reply, abrupt writer-process exit after commit, concurrent conflicts, rollback and audit failure. Proposed database rules enforce task versioning, immutable retained decisions and consistent decision/audit/wakeup facts at commit.",
           "An unwired coordinator tests pinned-policy matching, rechecking caller expiry after audit, concurrent decisions and uncertain commit outcomes. An isolated companion checks the real registry and inbox wait, including cancellation and expiry during deferred commit checks; it is not an SDK dispatch lease or checkpoint proof.",
-          "A reference-only wakeup envelope binds a decision identity to the exact wait digest and keeps private decision content out of event data. No producer or consumer is wired; actual SDK predicate evaluation, production schema, lease fencing, authorized replay, wakeup delivery and whole-chain verification remain open."
+          "A reference-only canonical CloudEvent binds a decision identity to the exact wait digest, decodes through the inbox event path and keeps private decision content out of event data. No producer or consumer is wired; actual SDK predicate evaluation, production schema, lease fencing, authorized replay, wakeup delivery and whole-chain verification remain open."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -785,6 +785,7 @@
           "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/human/HumanDecisionJournalTest.java",
           "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/human/RegisteredHumanWaitFenceTest.java",
           "modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/event/HumanDecisionWakeTest.java",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/HumanDecisionWakeCloudEventTest.java",
           "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java"
         ]
       }

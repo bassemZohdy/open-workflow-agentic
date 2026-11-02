@@ -24,9 +24,11 @@ public final class HumanDecisionWake {
         if (!decision.tenant().equals(wait.tenant()) || !route(decision.taskId()).equals(wait.route())
                 || !TYPE.equals(wait.eventType())) throw new IllegalArgumentException("human decision and wait do not match");
         // ULIDs and the lowercase hex digest have fixed, JSON-safe alphabets; no decision text is interpolated.
-        String body = "{\"decisionId\":\"" + decision.id().value() + "\",\"taskId\":\"" + decision.taskId().value()
-                + "\",\"waitDigest\":\"" + wait.digest() + "\"}";
-        return new InboxMessage(wait.tenant(), SOURCE, decision.id().value(), TYPE, wait.instanceId(), wait.route(), body);
+        String envelope = "{\"data\":{\"decisionId\":\"" + decision.id().value() + "\",\"taskId\":\""
+                + decision.taskId().value() + "\",\"waitDigest\":\"" + wait.digest()
+                + "\"},\"datacontenttype\":\"application/json\",\"id\":\"" + decision.id().value()
+                + "\",\"source\":\"" + SOURCE + "\",\"specversion\":\"1.0\",\"type\":\"" + TYPE + "\"}";
+        return new InboxMessage(wait.tenant(), SOURCE, decision.id().value(), TYPE, wait.instanceId(), wait.route(), envelope);
     }
 
     /** Exact identity/content check in addition to the SDK predicate; equality alone is never delivery permission. */
