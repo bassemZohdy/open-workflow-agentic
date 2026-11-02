@@ -38,3 +38,12 @@ use a short independent request timeout and a non-sensitive unavailable marker.
 Do not claim issue75 fixed. Independently investigate real listener failure/restore
 thread and terminal-report-loss hypotheses only with deterministic proof, never by
 assuming absent means completed or changing the probe to hide shared-listener races.
+
+## Pinned SDK broadcast failure characterization
+
+`SdkEventRegistrationSemanticsTest` deterministically exercises the actual pinned in-memory event broker with two
+same-type subscribers. If the earlier subscriber's predicate or callback throws, publish completes exceptionally and
+the later subscriber is not called. Removing the failing registration permits the later subscriber to receive the same
+event. This confirms a delivery hazard; it does not prove that a stale registration existed during issue 75 or explain
+the historical failure. The in-memory publisher is not a durable per-recipient delivery queue, and catching or hiding
+the exception alone would not recover the missed delivery. Production recovery, isolation and T13 remain open.

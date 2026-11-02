@@ -1,5 +1,7 @@
 # Changelog
 
+- Characterize the pinned SDK's shared-event delivery failure when an earlier subscriber throws; durable per-recipient recovery remains open.
+
 - Release HTTP lookup capacity after fully consuming a bounded response, while keeping unfinished lookups quarantined.
 
 - Select optional effect lookup operations from the same pinned OpenAPI document, checking the GET, idempotency header, security and documented confirmation statuses.

@@ -46,5 +46,39 @@ class SdkEventRegistrationSemanticsTest {
             assertEquals(2,received.size(),"the earlier second callback came from the captured snapshot, not a retained subscription");
         }
     }
+
+    @Test void failingEarlierSubscriberPreventsLaterDeliveryUntilItIsRemoved() throws Exception {
+        try(var events=new InMemoryEvents()) {
+            var first=events.register(new TypeEventRegistrationBuilder("order.ready",(ce,w,t)->{
+                throw new IllegalStateException("fixture predicate failure");
+            }),ce->fail("failing predicate must not deliver"));
+            var received=new java.util.concurrent.atomic.AtomicInteger();
+            events.register(new TypeEventRegistrationBuilder("order.ready",(ce,w,t)->true),ce->received.incrementAndGet());
+            var event=CloudEventBuilder.v1().withId("one").withSource(URI.create("urn:test:orders")).withType("order.ready").build();
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->events.publish(event).get(5,TimeUnit.SECONDS));
+            assertInstanceOf(IllegalStateException.class,failure.getCause());
+            assertEquals(0,received.get(),"the later registration is not offered the event after the earlier failure");
+            events.unregister(first);
+            events.publish(event).get(5,TimeUnit.SECONDS);
+            assertEquals(1,received.get(),"the same later registration receives the event once the failing one is removed");
+        }
+    }
+
+    @Test void failingEarlierCallbackAlsoPreventsLaterDelivery() throws Exception {
+        try(var events=new InMemoryEvents()) {
+            var first=events.register(new TypeEventRegistrationBuilder("order.ready",(ce,w,t)->true),ce->{
+                throw new IllegalStateException("fixture callback failure");
+            });
+            var received=new java.util.concurrent.atomic.AtomicInteger();
+            events.register(new TypeEventRegistrationBuilder("order.ready",(ce,w,t)->true),ce->received.incrementAndGet());
+            var event=CloudEventBuilder.v1().withId("one").withSource(URI.create("urn:test:orders")).withType("order.ready").build();
+            var failure=assertThrows(java.util.concurrent.ExecutionException.class,()->events.publish(event).get(5,TimeUnit.SECONDS));
+            assertInstanceOf(IllegalStateException.class,failure.getCause());
+            assertEquals(0,received.get());
+            events.unregister(first);
+            events.publish(event).get(5,TimeUnit.SECONDS);
+            assertEquals(1,received.get());
+        }
+    }
 }
 
