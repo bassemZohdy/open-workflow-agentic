@@ -20,7 +20,8 @@ import java.util.function.Supplier;
  *   <li><b>Circuit breaker.</b> After {@code failureThreshold} consecutive failures the circuit opens and every call is
  *       rejected with {@link Rejection#CIRCUIT_OPEN} without touching the dependency, for {@code openFor}. Then exactly
  *       one probe is let through (half-open): its success closes the circuit, its failure reopens it for another
- *       {@code openFor}. A rejected call is neither a success nor a failure.</li>
+ *       {@code openFor}. Results of calls admitted before opening do not affect a later circuit generation. A rejected
+ *       call is neither a success nor a failure.</li>
  *   <li><b>Retry budget.</b> {@link #callWithRetry} retries only while the budget of {@code retryBudget} retries per
  *       {@code retryWindow} lasts, so a failing dependency cannot be multiplied by retries. Rejections are never
  *       retried. Each retry passes the bulkhead and breaker again.</li>
@@ -94,6 +95,7 @@ public final class DependencyGuard {
     // guarded by lock
     private State state = State.CLOSED;
     private int consecutiveFailures;
+    private long generation;
     private Instant openedAt;
     private boolean probeInFlight;
     private Instant windowStart;
@@ -141,20 +143,20 @@ public final class DependencyGuard {
             throw new RejectedException(settings.name(), Rejection.OVERLOADED);
         }
         try {
-            boolean probe = admit();
+            Admission admission = admit();
             try {
                 T result = operation.get();
-                recordSuccess(probe);
+                recordSuccess(admission);
                 return result;
             } catch (Throwable failure) {
                 boolean counts;
                 try {
                     counts = countsAsFailure.test(failure);
                 } catch (Throwable classifierFailure) {
-                    recordNeutral(probe);
+                    recordNeutral(admission);
                     throw classifierFailure;
                 }
-                if (counts) recordFailure(probe); else recordNeutral(probe);
+                if (counts) recordFailure(admission); else recordNeutral(admission);
                 throw failure;
             }
         } finally {
@@ -203,27 +205,29 @@ public final class DependencyGuard {
         return state;
     }
 
-    /** @return true when this call is the half-open probe */
-    private boolean admit() {
+    private record Admission(boolean probe, long generation) { }
+
+    private Admission admit() {
         synchronized (lock) {
             Instant now = clock.instant();
             State current = effectiveState(now);
-            if (current == State.CLOSED) return false;
+            if (current == State.CLOSED) return new Admission(false, generation);
             if (current == State.HALF_OPEN && !probeInFlight) {
                 state = State.HALF_OPEN;
                 probeInFlight = true;
-                return true;
+                return new Admission(true, generation);
             }
             rejectedCircuit.incrementAndGet();
             throw new RejectedException(settings.name(), Rejection.CIRCUIT_OPEN);
         }
     }
 
-    private void recordSuccess(boolean probe) {
+    private void recordSuccess(Admission admission) {
         successes.incrementAndGet();
         synchronized (lock) {
+            if (admission.generation() != generation) return;
             consecutiveFailures = 0;
-            if (probe) {
+            if (admission.probe()) {
                 probeInFlight = false;
                 state = State.CLOSED;
                 openedAt = null;
@@ -231,16 +235,17 @@ public final class DependencyGuard {
         }
     }
 
-    private void recordNeutral(boolean probe) {
+    private void recordNeutral(Admission admission) {
         synchronized (lock) {
-            if (probe) probeInFlight = false; // stays half-open: the next call is the probe
+            if (admission.probe() && admission.generation() == generation) probeInFlight = false;
         }
     }
 
-    private void recordFailure(boolean probe) {
+    private void recordFailure(Admission admission) {
         failures.incrementAndGet();
         synchronized (lock) {
-            if (probe) {
+            if (admission.generation() != generation) return;
+            if (admission.probe()) {
                 probeInFlight = false;
                 open();
             } else if (state == State.CLOSED && ++consecutiveFailures >= settings.failureThreshold()) {
@@ -250,6 +255,7 @@ public final class DependencyGuard {
     }
 
     private void open() {
+        generation++;
         state = State.OPEN;
         openedAt = clock.instant();
         consecutiveFailures = 0;

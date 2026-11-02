@@ -178,6 +178,50 @@ class DependencyGuardTest {
         assertEquals("ok", guard.call(() -> "ok"), "the circuit recovered through the first probe");
     }
 
+    @Test void oldFailureDoesNotOpenARecoveredCircuit() throws Exception {
+        var guard = guard(2, 1, 0);
+        var started = new CountDownLatch(1);
+        var finish = new CountDownLatch(1);
+        Future<?> old = pool.submit(() -> assertThrows(IllegalStateException.class, () -> guard.call(() -> {
+            started.countDown();
+            try { assertTrue(finish.await(5, TimeUnit.SECONDS)); }
+            catch (InterruptedException e) { throw new AssertionError(e); }
+            return boom("old failure");
+        })));
+        try {
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            fail(guard, 1);
+            clock.advance(Duration.ofSeconds(30));
+            assertEquals("probe", guard.call(() -> "probe"));
+            finish.countDown();
+            old.get(5, TimeUnit.SECONDS);
+            assertEquals(State.CLOSED, guard.state());
+        } finally { finish.countDown(); }
+    }
+
+    @Test void oldSuccessDoesNotResetFailuresAfterRecovery() throws Exception {
+        var guard = guard(2, 2, 0);
+        var started = new CountDownLatch(1);
+        var finish = new CountDownLatch(1);
+        Future<String> old = pool.submit(() -> guard.call(() -> {
+            started.countDown();
+            try { assertTrue(finish.await(5, TimeUnit.SECONDS)); }
+            catch (InterruptedException e) { throw new AssertionError(e); }
+            return "old success";
+        }));
+        try {
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            fail(guard, 2);
+            clock.advance(Duration.ofSeconds(30));
+            assertEquals("probe", guard.call(() -> "probe"));
+            fail(guard, 1);
+            finish.countDown();
+            assertEquals("old success", old.get(5, TimeUnit.SECONDS));
+            fail(guard, 1);
+            assertEquals(State.OPEN, guard.state());
+        } finally { finish.countDown(); }
+    }
+
     // ---- retry budget ------------------------------------------------------------------------------------
 
     @Test void aRetriableFailureIsRetriedUpToTheAttemptsWithABackoffBetween() {
