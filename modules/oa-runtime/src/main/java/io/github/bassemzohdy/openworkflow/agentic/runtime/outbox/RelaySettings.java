@@ -11,11 +11,19 @@ import java.util.Objects;
  * @param backoffBase delay after the first failure; doubles with each further failure
  * @param backoffMax  upper bound of the delay
  * @param interval    pause between relay runs in the scheduled mode
+ * @param lockTimeoutMillis maximum PostgreSQL lock wait per statement
+ * @param statementTimeoutMillis maximum PostgreSQL execution time per statement
+ * @param idleTransactionTimeoutMillis maximum idle time while a relay transaction holds its claim
  */
 public record RelaySettings(int batchSize, int maxAttempts, Duration backoffBase, Duration backoffMax,
-                            Duration interval) {
+                            Duration interval, int lockTimeoutMillis, int statementTimeoutMillis,
+                            int idleTransactionTimeoutMillis) {
 
     public static final int MAX_BATCH_SIZE = 1_000;
+
+    public RelaySettings(int batchSize, int maxAttempts, Duration backoffBase, Duration backoffMax, Duration interval) {
+        this(batchSize, maxAttempts, backoffBase, backoffMax, interval, 5_000, 30_000, 30_000);
+    }
 
     public RelaySettings {
         if (batchSize < 1 || batchSize > MAX_BATCH_SIZE) {
@@ -32,6 +40,9 @@ public record RelaySettings(int batchSize, int maxAttempts, Duration backoffBase
         }
         if (interval.isZero() || interval.isNegative()) {
             throw new IllegalArgumentException("interval must be positive");
+        }
+        if (lockTimeoutMillis < 1 || statementTimeoutMillis < lockTimeoutMillis || idleTransactionTimeoutMillis < 1) {
+            throw new IllegalArgumentException("relay database timeouts must be positive and statement timeout at least lock timeout");
         }
     }
 

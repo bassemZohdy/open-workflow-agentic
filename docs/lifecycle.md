@@ -445,7 +445,7 @@ sequenceDiagram
     R->>DB: published_at = now(), commit (same transaction)
 ```
 
-The relay runs in each process on a single-thread executor (`OutboxRelayService`, every `agentic.outbox.relay.interval`, default 500 ms). db-scheduler is not used: the relay polls a table, it does not fire at a time, and several processes may poll at once because the claim skips locked rows. Configuration keys: `agentic.outbox.relay.enabled`, `.batch-size` (20), `.max-attempts` (5), `.backoff-base` (1 s), `.backoff-max` (1 min), `.interval`.
+The relay runs in each process on a single-thread executor (`OutboxRelayService`, every `agentic.outbox.relay.interval`, default 500 ms). db-scheduler is not used: the relay polls a table, it does not fire at a time, and several processes may poll at once because the claim skips locked rows. Configuration keys: `agentic.outbox.relay.enabled`, `.batch-size` (20), `.max-attempts` (5), `.backoff-base` (1 s), `.backoff-max` (1 min), `.interval`, `.lock-timeout-ms` (5000), `.statement-timeout-ms` (30000), and `.idle-transaction-timeout-ms` (30000). The database caps each relay transaction at these limits, or an already stricter database setting. If a consumer stalls while its transaction is idle, PostgreSQL can disconnect it, roll back its writes, and release claimed rows for another relay. Statement limits apply per statement, not to total batch duration; consumer code and network/connection acquisition can still block. Consumers must only write through the relay connection and remain idempotent.
 
 ### 10.3 Ordering and delivery guarantees
 
