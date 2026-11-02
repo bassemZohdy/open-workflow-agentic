@@ -1,5 +1,7 @@
 # Changelog
 
+- Test the human-decision proposal against real workflow registry and inbox wait registration, including cancellation and expiry during commit. It does not implement dispatch ownership, checkpoint proof or wakeup delivery.
+
 - Test an unactivated human-decision coordinator with pinned policy, post-audit caller freshness and uncertain commits using a test-only wait fence. Real lease fencing, replay authorization and workflow wakeup remain open.
 
 - Harden the isolated human-decision schema proposal with task-version, immutable-history and deferred decision/audit/wakeup consistency checks; real workflow authority and delivery remain open.

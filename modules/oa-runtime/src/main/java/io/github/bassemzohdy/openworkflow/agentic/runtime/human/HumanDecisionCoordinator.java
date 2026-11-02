@@ -59,9 +59,10 @@ final class HumanDecisionCoordinator {
         try (var connection = dataSource.getConnection()) {
             connection.setAutoCommit(false);
             try {
+                // Registry and registered wait are locked before the human task, matching the inbox lock order.
+                fence.requireCurrent(connection, decision.tenant(), before.instance(), before.waitKey());
                 Snapshot locked = snapshot(connection, decision, true);
                 if (!before.equals(locked)) throw new Refused();
-                fence.requireCurrent(connection, decision.tenant(), locked.instance(), locked.waitKey());
                 if (journal.record(connection, decision, locked.instance(), locked.waitKey()) != HumanDecisionJournal.Result.RECORDED) {
                     throw new Refused();
                 }

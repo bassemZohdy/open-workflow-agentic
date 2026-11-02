@@ -290,16 +290,17 @@ class HumanDecisionJournalTest {
     @Test void coordinatorRefusesTaskChangesDuringPolicyEvaluation() throws Exception {
         var f = fixture("bob", "NONE");
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        var fenceChecks = new java.util.concurrent.atomic.AtomicInteger();
         var coordinator = new HumanDecisionCoordinator(owned, admission(clock, ignored -> {
             try (var c = owned.getConnection(); var q = c.prepareStatement("update human_proposal.task "
                     + "set assignee_id='bob',version=version+1 where tenant=? and task_id=?")) {
                 q.setString(1, "tenant"); q.setString(2, f.task().value()); q.executeUpdate();
             } catch (SQLException e) { throw new IllegalStateException(e); }
             return allowed();
-        }), (c, tenant, instance, wait) -> fail("stale facts must never reach the fence"), clock);
+        }), (c, tenant, instance, wait) -> fenceChecks.incrementAndGet(), clock);
         assertThrows(HumanDecisionCoordinator.Refused.class,
                 () -> coordinator.recordNew(caller(clock, NOW.plusSeconds(60)), f.decision()));
-        assertEquals(0, count("decision", f)); assertEquals(0, auditCount(f));
+        assertEquals(1, fenceChecks.get()); assertEquals(0, count("decision", f)); assertEquals(0, auditCount(f));
     }
 
     @Test void expiryAfterAuditAndFenceFailureRollBackEverything() throws Exception {
