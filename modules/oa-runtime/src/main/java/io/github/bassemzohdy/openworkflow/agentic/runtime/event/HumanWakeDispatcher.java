@@ -30,6 +30,16 @@ public final class HumanWakeDispatcher {
     /** Dispatches only the specified captured registration; no SDK broadcast is used. */
     public Result dispatch(HumanDecision decision,InboxWait wait,InboxTaskClaim claim,InboxListenGroup group,
                            String snapshot,TypeEventRegistration registration) {
+        return dispatch(decision,wait,claim,group,snapshot,registration,null);
+    }
+    /** Uses a revocable local SDK capture; identity and live claim still require durable checks. */
+    public Result dispatch(HumanDecision decision,InboxWait wait,InboxTaskClaim claim,InboxListenGroup group,
+                           String snapshot,HumanWakeRegistrations.Handle handle) {
+        Objects.requireNonNull(handle);
+        return dispatch(decision,wait,claim,group,snapshot,handle.registration(),handle);
+    }
+    private Result dispatch(HumanDecision decision,InboxWait wait,InboxTaskClaim claim,InboxListenGroup group,
+                           String snapshot,TypeEventRegistration registration,HumanWakeRegistrations.Handle handle) {
         Objects.requireNonNull(decision);Objects.requireNonNull(wait);Objects.requireNonNull(claim);
         Objects.requireNonNull(group);Objects.requireNonNull(snapshot);Objects.requireNonNull(registration);
         if(!claim.task().equals(wait.task())||!group.task().equals(wait.task()))
@@ -38,12 +48,15 @@ public final class HumanWakeDispatcher {
         var token=new Object();
         if(active.putIfAbsent(wait.task(),token)!=null){capacity.release();return Result.BUSY;}
         try {
+            requireCurrent(handle);
             var message=HumanDecisionWake.message(decision,wait);
             if(HumanWakeSelection.select(decision,wait,group,snapshot,message).isEmpty())
                 throw new IllegalArgumentException("human wake does not match the retained filter");
             var event=StoredCloudEventDecoder.decode(message);
             requireRegistration(registration,wait,event);
+            requireCurrent(handle);
             stage.stage(decision,wait,claim,group,snapshot);
+            requireCurrent(handle);
             var reserved=owned.reserve(claim,wait);
             if(reserved.isEmpty())return Result.NOT_RESERVED;
             if(!message.equals(reserved.get().receipt()))throw new IllegalStateException("reserved human wake changed");
@@ -51,9 +64,15 @@ public final class HumanWakeDispatcher {
             // Both audit and predicate code can block. A stale lease cannot authorize a new callback.
             requireRegistration(registration,wait,event);
             leases.requireLive(claim);
-            registration.consumer().accept(event);
+            requireCurrent(handle);
+            if(handle!=null&&!handle.begin())throw new IllegalStateException("human SDK registration cannot start another callback");
+            try {registration.consumer().accept(event);}
+            finally {if(handle!=null)handle.end();}
             return Result.DISPATCHED;
         } finally {active.remove(wait.task(),token);capacity.release();}
+    }
+    private static void requireCurrent(HumanWakeRegistrations.Handle handle) {
+        if(handle!=null&&!handle.isCurrent())throw new IllegalStateException("human SDK registration is no longer current");
     }
 
     private static void requireRegistration(TypeEventRegistration registration,InboxWait wait,CloudEvent event) {

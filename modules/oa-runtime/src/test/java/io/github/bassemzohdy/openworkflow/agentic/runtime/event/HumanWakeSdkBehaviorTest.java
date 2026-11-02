@@ -126,4 +126,51 @@ class HumanWakeSdkBehaviorTest {
             assertFalse(broker.deliverTargeted(DECISION, wait, message), "a captured callback is used at most once in this process");
         }
     }
+    @Test void capturedSdkRegistrationsAreTargetedRevocableAndNotInTheDelegateBroadcast() throws Exception {
+        var delegate=new InMemoryEvents();var captures=new HumanWakeRegistrations(delegate,2);
+        try(var app=WorkflowApplication.builder().withEventConsumer(captures).disableLifeCycleCEPublishing()
+                .disableStatusChangePublishing().build()) {
+            var definition=app.workflowDefinition(WorkflowReader.readWorkflowFromString(DOCUMENT,WorkflowFormat.YAML));
+            var first=definition.instance(Map.of());var second=definition.instance(Map.of());
+            var firstDone=first.start();var secondDone=second.start();
+            var firstWait=new InboxWait("tenant",Ulid.parse("01ARZ3NDEKTSV4RRFFQ69G5FAX"),app.id(),first.id(),
+                    "agentic-test","human-wake","1.0.0","do/0/awaitDecision",1,HumanDecisionWake.route(TASK),HumanDecisionWake.TYPE,"0".repeat(64),Duration.ofSeconds(30));
+            var secondWait=new InboxWait("tenant",firstWait.instanceId(),app.id(),second.id(),firstWait.namespace(),firstWait.definition(),firstWait.version(),
+                    firstWait.taskPosition(),1,firstWait.route(),firstWait.eventType(),firstWait.filterDigest(),firstWait.maxWait());
+            var firstHandle=new java.util.concurrent.atomic.AtomicReference<HumanWakeRegistrations.Handle>();
+            var secondHandle=new java.util.concurrent.atomic.AtomicReference<HumanWakeRegistrations.Handle>();
+            assertTimeoutPreemptively(Duration.ofSeconds(5),()->{
+                while(firstHandle.get()==null||secondHandle.get()==null){
+                    captures.find(firstWait).ifPresent(firstHandle::set);captures.find(secondWait).ifPresent(secondHandle::set);
+                    if(firstHandle.get()==null||secondHandle.get()==null)Thread.sleep(5);
+                }
+            });
+            var event=StoredCloudEventDecoder.decode(HumanDecisionWake.message(DECISION,firstWait));
+            delegate.publish(event).get(5,TimeUnit.SECONDS);
+            assertFalse(firstDone.isDone());assertFalse(secondDone.isDone(),"human type was not registered with the broadcast delegate");
+            try(var bounded=new HumanWakeRegistrations(new InMemoryEvents(),1)) {
+                var firstRegistration=firstHandle.get().registration();var secondRegistration=secondHandle.get().registration();
+                var builder=new TypeEventRegistrationBuilder(firstRegistration.type(),firstRegistration.predicate(),firstRegistration.correlationPredicates());
+                bounded.register(builder,firstRegistration.consumer(),firstRegistration.workflow(),firstRegistration.task());
+                assertThrows(IllegalStateException.class,()->bounded.register(builder,secondRegistration.consumer(),secondRegistration.workflow(),secondRegistration.task()));
+                assertTrue(bounded.find(firstWait).orElseThrow().isCurrent());assertTrue(bounded.find(secondWait).isEmpty());
+            }
+            firstHandle.get().registration().consumer().accept(event);firstDone.get(5,TimeUnit.SECONDS);
+            assertFalse(firstHandle.get().isCurrent());assertTrue(captures.find(firstWait).isEmpty());
+            assertTrue(secondHandle.get().isCurrent());
+            var old=secondHandle.get().registration();assertTrue(secondHandle.get().begin());
+            assertFalse(secondHandle.get().begin(),"one captured registration cannot start two callbacks");
+            captures.unregister(old);assertFalse(secondHandle.get().isCurrent());
+            var builder=new TypeEventRegistrationBuilder(old.type(),old.predicate(),old.correlationPredicates());
+            assertThrows(IllegalStateException.class,()->captures.register(builder,old.consumer(),old.workflow(),old.task()),
+                    "an unregistered in-flight callback prevents a replacement until it returns");
+            secondHandle.get().end();
+            var replacement=captures.register(builder,
+                    old.consumer(),old.workflow(),old.task());
+            var fresh=captures.find(secondWait).orElseThrow();captures.unregister(old);
+            assertTrue(fresh.isCurrent(),"late unregistration cannot remove its replacement");
+            replacement.consumer().accept(StoredCloudEventDecoder.decode(HumanDecisionWake.message(DECISION,secondWait)));
+            secondDone.get(5,TimeUnit.SECONDS);assertFalse(fresh.isCurrent());captures.unregister(replacement);
+        }
+    }
 }

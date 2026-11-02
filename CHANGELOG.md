@@ -1,5 +1,7 @@
 # Changelog
 
+- Capture and revoke targeted human-wake SDK listeners for explicitly composed recovery.
+
 - Verify human-wake recovery after the reservation owner exits before the callback.
 
 - Add an explicitly composed, task-fenced targeted human-wake dispatcher.

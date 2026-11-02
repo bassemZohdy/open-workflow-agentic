@@ -346,7 +346,7 @@ class HumanWakeCheckpointTest {
         assertEquals(Optional.of(message),inbox.boundSignal(wait));assertEquals(1,deliveryAttempts(wait));
         var next=new CompletableFuture<Void>();var release=new CompletableFuture<Void>();var cleaned=new CompletableFuture<Void>();
         var nextStarts=new java.util.concurrent.atomic.AtomicInteger();
-        var broker=new Broker();var clock=Clock.systemUTC();
+        var broker=new HumanWakeRegistrations(new InMemoryEvents(),8);var clock=Clock.systemUTC();
         var recovery=new JdbcInboxCheckpointRecovery(dataSource,CheckpointRecoveryAudit::append,clock);
         try(var gate=new PersistenceCommitGate(Duration.ofSeconds(15),clock);
             var finalizer=new InboxCheckpointFinalizer(owned,leases);
@@ -368,7 +368,10 @@ class HumanWakeCheckpointTest {
                     Duration.ofMillis(1),Duration.ofMillis(1),Duration.ofHours(24),100,Optional.empty());
             new Reconciler(registry,new FlowWorkflowEngine(app),sync,scan,repairs,settings,dataSource,clock,
                     row.tenant()::equals,ResumeGate.ALLOW,new InboxRestoreCheckpointGate(recovery,app,gate)).recover(row.tenant(),row.id().value());
-            var registration=broker.registration.get(10,TimeUnit.SECONDS);
+            var registration=new java.util.concurrent.atomic.AtomicReference<HumanWakeRegistrations.Handle>();
+            assertTimeoutPreemptively(Duration.ofSeconds(10),()->{
+                while(registration.get()==null){broker.find(wait).ifPresent(registration::set);if(registration.get()==null)Thread.sleep(10);}
+            });
             var claim=new java.util.concurrent.atomic.AtomicReference<InboxTaskClaim>();
             assertTimeoutPreemptively(Duration.ofSeconds(45),()->{
                 while(claim.get()==null) {
@@ -381,8 +384,10 @@ class HumanWakeCheckpointTest {
                 var group=new InboxListenGroup(wait.task(),InboxListenGroup.Strategy.ONE,List.of(HASH),InboxListenGroup.Stop.NONE,
                         List.of(),null,InboxListenGroup.snapshotFingerprint(SNAPSHOT));
                 var dispatcher=new HumanWakeDispatcher(new HumanWakeStage(dataSource,inbox,owned,clock),owned,leases,8);
-                assertEquals(HumanWakeDispatcher.Result.DISPATCHED,dispatcher.dispatch(decision,wait,claim.get(),group,SNAPSHOT,registration));
+                assertEquals(HumanWakeDispatcher.Result.DISPATCHED,dispatcher.dispatch(decision,wait,claim.get(),group,SNAPSHOT,registration.get()));
                 next.get(15,TimeUnit.SECONDS);assertTrue(proof.consumed(wait,message));assertEquals(2,deliveryAttempts(wait));
+                assertFalse(registration.get().isCurrent());
+                assertThrows(IllegalStateException.class,()->dispatcher.dispatch(decision,wait,claim.get(),group,SNAPSHOT,registration.get()));
                 release.complete(null);cleaned.get(10,TimeUnit.SECONDS);assertTrue(gate.status().healthy());assertEquals(1,nextStarts.get());
                 assertEquals("ACKNOWLEDGED",deliveryState(wait));assertEquals(1,acknowledgementAudits(row));
                 try(var c=dataSource.getConnection();var q=c.prepareStatement("select count(*) from inbox.message where tenant=? and source=? and event_id=?")) {
