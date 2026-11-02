@@ -328,6 +328,12 @@ restart; it remained there throughout the observed 60-second check. The intentio
 the [reproduction branch](https://github.com/bassemZohdy/open-workflow-agentic/blob/codex/WP-109-process-deadline-recovery/docs/handoffs/WP-109-pending-cancellation-reproduction.md).
 Do not start expired work merely to make SDK cancellation succeed: that could execute a task after its deadline.
 
+SDK characterization narrows the options: a synchronous workflow-start callback can cancel before a task on a new
+in-memory instance, but the JPA-restored instance does not emit that callback. A task-start callback cancelled one
+restored JPA listen instance and removed its database row in an isolated same-process test; however, a task whose
+condition is false does not emit task-start at all. A failed listener future is swallowed by the SDK. These callbacks
+are therefore not a general cancellation fence, and none of the experimental callbacks is wired into recovery.
+
 ### 9.6 Entry points for 105d
 
 Java methods on `Reconciler`, to be exposed by the operations API with its own authorization:
