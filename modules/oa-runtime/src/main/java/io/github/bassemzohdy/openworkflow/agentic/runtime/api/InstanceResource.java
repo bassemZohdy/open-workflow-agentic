@@ -20,6 +20,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceServ
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.InstanceStore;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Reconciler;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StartRequest;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StartCapacityException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StartResult;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import jakarta.enterprise.inject.Instance;
@@ -149,6 +150,9 @@ public class InstanceResource {
             throw new WebApplicationException(e.getMessage(), 422);
         } catch (IdempotencyKeyReusedException e) {
             throw new WebApplicationException(e.getMessage(), Response.Status.CONFLICT);
+        } catch (StartCapacityException busy) {
+            throw new ProblemException(Response.Status.SERVICE_UNAVAILABLE,
+                    "workflow start capacity is full; retry with the same idempotency key");
         }
         InstanceRecord row = result.record();
         if (!result.created()) {

@@ -1,5 +1,7 @@
 # Changelog
 
+- Bound concurrent workflow starts per process; when full, reject new keys before insertion with a retryable response while preserving idempotent repeats.
+
 - Rotate stale-start and cancellation scans independently, so held locks or unconfirmed cancellations do not block later recovery work.
 
 - Rotate overdue wait scans across passes so a held lock on an older wait does not block later waits.

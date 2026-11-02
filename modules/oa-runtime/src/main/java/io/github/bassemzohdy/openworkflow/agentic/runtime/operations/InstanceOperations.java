@@ -25,6 +25,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.LiveRetryExi
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Reconciler;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StaleVersionException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StartResult;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StartCapacityException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.SafeRecovery;
@@ -166,6 +167,10 @@ public class InstanceOperations {
         } catch (Refusal refused) {
             writeResult(refused.result, operation, operator, caller.tenant(), instanceId, decision);
             throw new ProblemException(refused.status(), refused.getMessage());
+        } catch (StartCapacityException busy) {
+            writeResult("start-capacity", operation, operator, caller.tenant(), instanceId, decision);
+            throw new ProblemException(Response.Status.SERVICE_UNAVAILABLE,
+                    "workflow start capacity is full; retry with the same idempotency key");
         } catch (StoreUnavailableException unavailable) {
             LOG.errorf(unavailable, "operation %s on %s failed in the registry", operation.wire(), instanceId);
             writeResult("store-unavailable", operation, operator, caller.tenant(), instanceId, decision);

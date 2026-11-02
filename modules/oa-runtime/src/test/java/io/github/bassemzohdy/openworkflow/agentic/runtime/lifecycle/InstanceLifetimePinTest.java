@@ -80,6 +80,70 @@ class InstanceLifetimePinTest {
                 Clock.fixed(now, ZoneOffset.UTC), request.tenant()::equals);
     }
 
+    @Test void admissionBoundsStartsAndStillRecognizesDuplicates() throws Exception {
+        assertThrows(IllegalArgumentException.class, () -> new StartAdmission(0));
+        var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        var starts = new AtomicInteger(); var request = request(); var other = request();
+        WorkflowEngine engine = new WorkflowEngine() {
+            public boolean hasDefinition(DefinitionRef ignored) { return true; }
+            public EngineLaunch prepare(DefinitionRef ignored, Map<String, Object> input) {
+                return new EngineLaunch() {
+                    public String engineInstanceId() { return "admission-" + UUID.randomUUID(); }
+                    public void start() {
+                        starts.incrementAndGet(); entered.countDown();
+                        try { if (!release.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("timed out"); }
+                        catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                    }
+                };
+            }
+        };
+        var service = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start, ZoneOffset.UTC),
+                UlidGenerator.shared(), settings(Optional.empty()), db, new StartAdmission(1));
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var first = executor.submit(() -> service.start(request));
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            var duplicate = service.start(request);
+            assertFalse(duplicate.created());
+            assertEquals(InstanceStatus.STARTING, duplicate.record().status());
+            var impostor = new StartRequest(request.tenant(), new Subject(SubjectKind.USER, "mallory"), definition, Map.of(), "key");
+            assertThrows(IdempotencyKeyReusedException.class, () -> service.start(impostor));
+            assertThrows(StartCapacityException.class, () -> service.start(other));
+            assertTrue(store.findByKey(other.tenant(), other.idempotencyKey()).isEmpty());
+            release.countDown();
+            assertTrue(first.get(10, TimeUnit.SECONDS).created());
+            assertTrue(service.start(other).created());
+            var failed = request();
+            assertThrows(StoreUnavailableException.class, () -> service.start(failed,
+                    (connection, instance) -> { throw new SQLException("injected failure"); }));
+            assertTrue(service.start(failed).created());
+            assertEquals(3, starts.get());
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
+
+    @Test void simultaneousSameKeyWaitsForTheCreatingTransactionEvenWhenCapacityIsFull() throws Exception {
+        var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        var engine = new Engine(); var request = request();
+        var service = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start, ZoneOffset.UTC),
+                UlidGenerator.shared(), settings(Optional.empty()), db, new StartAdmission(1));
+        var executor = Executors.newFixedThreadPool(2);
+        try {
+            var first = executor.submit(() -> service.start(request, (connection, instance) -> {
+                entered.countDown();
+                try { if (!release.await(15, TimeUnit.SECONDS)) throw new SQLException("timed out"); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new SQLException(e); }
+            }));
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            var duplicate = executor.submit(() -> service.start(request));
+            assertThrows(TimeoutException.class, () -> duplicate.get(150, TimeUnit.MILLISECONDS));
+            release.countDown();
+            var original = first.get(10, TimeUnit.SECONDS); var repeated = duplicate.get(10, TimeUnit.SECONDS);
+            assertTrue(original.created()); assertFalse(repeated.created());
+            assertEquals(original.record().id(), repeated.record().id());
+            assertEquals(1, engine.starts.get());
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
+
     @Test void lockedStaleStartDoesNotStarveLaterStarts() throws Exception {
         var engine = new Engine(); var firstRequest = request();
         var secondRequest = new StartRequest(firstRequest.tenant(), owner, definition, Map.of(), "second");
