@@ -46,6 +46,7 @@ class LifecycleRecoveryIT {
 
     private static final Path JAR = Path.of("target/quarkus-app/quarkus-run.jar");
     private static final Path LOGS = Path.of("target/process-logs");
+    private static final String RUN = UUID.randomUUID().toString();
     /** The server to administer; each class run creates its own database on it. */
     private static final String SERVER_URL = System.getenv().getOrDefault("DB_URL",
             "jdbc:postgresql://localhost:5432/agentic");
@@ -103,7 +104,7 @@ class LifecycleRecoveryIT {
         Files.createDirectories(LOGS);
         ManagedProcess.Builder builder = ManagedProcess.jar(JAR)
                 .httpPort(port)
-                .logFile(LOGS.resolve(label + ".log"))
+                .logFile(LOGS.resolve(RUN + "-" + label + ".log"))
                 .property("quarkus.datasource.jdbc.url", dbUrl)
                 .property("agentic.dev.trust-caller-headers", "true")
                 // The packaged jar runs in the production profile, which refuses the header seam (WP-102).
