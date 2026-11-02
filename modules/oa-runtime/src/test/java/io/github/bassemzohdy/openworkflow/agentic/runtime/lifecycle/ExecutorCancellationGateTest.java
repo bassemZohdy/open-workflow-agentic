@@ -8,6 +8,8 @@ import io.serverlessworkflow.api.types.Task;
 import io.serverlessworkflow.api.types.TaskBase;
 import io.serverlessworkflow.impl.*;
 import io.serverlessworkflow.impl.executors.*;
+import io.serverlessworkflow.impl.expressions.ExpressionDescriptor;
+import io.serverlessworkflow.impl.expressions.jq.JQExpressionFactory;
 import io.serverlessworkflow.impl.lifecycle.*;
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -57,6 +59,24 @@ class ExecutorCancellationGateTest {
                     return CompletableFuture.failedFuture(new CancellationException("cancel before task execution"));
                 };
             }
+        }
+    }
+
+    /** Test-only: production has other expression factories and a Quarkus-specific jq scope. */
+    private static final class ExperimentalExpressions extends JQExpressionFactory {
+        final Set<String> cancelled;
+        final AtomicInteger entries = new AtomicInteger();
+        ExperimentalExpressions(Set<String> cancelled) { this.cancelled = cancelled; }
+        @Override public WorkflowFilter buildFilter(ExpressionDescriptor expression, WorkflowModelFactory models) {
+            var next = super.buildFilter(expression, models);
+            return (workflow, task, input) -> {
+                if (task == null && cancelled.contains(workflow.instanceData().id())) {
+                    entries.incrementAndGet();
+                    if (!workflow.instance().cancel()) throw new IllegalStateException("cancellation was refused");
+                    throw new CancellationException("cancel before input filter");
+                }
+                return next.apply(workflow, task, input);
+            };
         }
     }
 
@@ -137,6 +157,38 @@ class ExecutorCancellationGateTest {
             assertThrows(Exception.class, () -> instance.start().get(5, TimeUnit.SECONDS));
             assertEquals(0, factory.entries.get(), "the workflow input filter was evaluated before the guard");
             assertNotEquals(WorkflowStatus.CANCELLED, instance.status());
+        }
+    }
+
+    @Test void anArmedInputFilterCanBeStoppedBeforeItIsEvaluated() throws Exception {
+        var factory = new ExperimentalFactory();
+        var expressions = new ExperimentalExpressions(factory.cancelled);
+        String filtered = DOCUMENT.replace("do:\n", "input:\n  from: '${ error(\"filter executed\") }'\ndo:\n");
+        try (var app = WorkflowApplication.builder().withTaskExecutorFactory(factory).withExpressionFactory(expressions)
+                .disableLifeCycleCEPublishing().build()) {
+            var definition = app.workflowDefinition(WorkflowReader.readWorkflowFromString(filtered, WorkflowFormat.YAML));
+            var instance = definition.instance(Map.of());
+            factory.cancelled.add(instance.id());
+            assertThrows(Exception.class, () -> instance.start().get(5, TimeUnit.SECONDS));
+            assertEquals(1, expressions.entries.get());
+            assertEquals(0, factory.entries.get(), "the executor must not be reached");
+            assertEquals(WorkflowStatus.CANCELLED, instance.status());
+            assertTrue(definition.activeInstance(instance.id()).isEmpty());
+        }
+    }
+
+    @Test void anUnarmedInputFilterStillTransformsTheWorkflowInput() throws Exception {
+        var factory = new ExperimentalFactory();
+        var expressions = new ExperimentalExpressions(factory.cancelled);
+        String filtered = DOCUMENT.replace("do:\n", "input:\n  from: ${ .payload }\ndo:\n")
+                .replace("set: { result: executed }", "set: { result: '${ .original }' }");
+        try (var app = WorkflowApplication.builder().withTaskExecutorFactory(factory).withExpressionFactory(expressions)
+                .disableLifeCycleCEPublishing().build()) {
+            var definition = app.workflowDefinition(WorkflowReader.readWorkflowFromString(filtered, WorkflowFormat.YAML));
+            var instance = definition.instance(Map.of("payload", Map.of("original", "kept")));
+            var result = instance.start().get(5, TimeUnit.SECONDS).asMap().orElseThrow();
+            assertEquals("kept", result.get("result"));
+            assertEquals(0, expressions.entries.get());
         }
     }
 }
