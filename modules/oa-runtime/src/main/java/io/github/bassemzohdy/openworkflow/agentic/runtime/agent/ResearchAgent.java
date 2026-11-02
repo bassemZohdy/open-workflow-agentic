@@ -43,8 +43,7 @@ public class ResearchAgent {
     /**
      * Where the approved task, and so the run's limits and acting agent, come from. With this and {@link #audit} both
      * present, every run gets a {@link NodeInterceptor} backed by its task's durable node budget.
-     * Left unset, the graph runs unwrapped exactly as before. With the default context (none) a run is refused at its
-     * first model call regardless.
+     * An absent approval, audit sink or durable budget refuses the run before any graph node can start.
      */
     @Inject
     ApprovedModelContext approvedContext;
@@ -103,24 +102,25 @@ public class ResearchAgent {
 
         this.serializer = serializer;
         this.saver = saver;
-        this.graph = compile((name, action) -> action);
+        this.graph = compile((name, action) -> action, null);
     }
 
     private ObjectStreamStateSerializer<ResearchState> serializer;
     private PostgresSaver saver;
 
     /** Compiles the plan/draft/review graph; {@code wrap} decorates each node (identity for an unwrapped run). */
-    private CompiledGraph<ResearchState> compile(BiFunction<String, NodeAction<ResearchState>, NodeAction<ResearchState>> wrap) throws Exception {
+    private CompiledGraph<ResearchState> compile(BiFunction<String, NodeAction<ResearchState>, NodeAction<ResearchState>> wrap,
+            ApprovedModelContext.Approved approved) throws Exception {
         var g = new StateGraph<>(serializer)
                 .addNode("plan", node_async(wrap.apply("plan", s -> Map.of(ResearchState.PLAN,
-                        outputValidator.validateText(llm.complete("Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, give 3 short numbered research steps.",
+                        outputValidator.validateText(model(approved, "Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, give 3 short numbered research steps.",
                                 s.text(ResearchState.TOPIC).orElse("")))))))
                 .addNode("draft", node_async(wrap.apply("draft", s -> Map.of(ResearchState.DRAFT,
-                        outputValidator.validateText(llm.complete("Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, write a concise research brief following the plan.",
+                        outputValidator.validateText(model(approved, "Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, write a concise research brief following the plan.",
                                 "Topic: " + s.text(ResearchState.TOPIC).orElse("")
                                         + "\nPlan:\n" + s.text(ResearchState.PLAN).orElse("")))))))
                 .addNode("review", node_async(wrap.apply("review", s -> Map.of(ResearchState.REVIEW,
-                        outputValidator.validateText(llm.complete("Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, reply with APPROVE or REVISE and one reason.",
+                        outputValidator.validateText(model(approved, "Return JSON with exactly text (string), actions (empty array), and escalation (null). In text, reply with APPROVE or REVISE and one reason.",
                                 s.text(ResearchState.DRAFT).orElse("")))))))
                 .addEdge(START, "plan")
                 .addEdge("plan", "draft")
@@ -128,6 +128,11 @@ public class ResearchAgent {
                 .addEdge("review", END);
 
         return g.compile(CompileConfig.builder().checkpointSaver(saver).build());
+    }
+
+    private String model(ApprovedModelContext.Approved approved, String system, String user) {
+        if (approved == null) throw new ModelCallRefused("no approved context for this graph run");
+        return llm.complete(approved, system, user);
     }
 
     /** Runs the graph for a thread (one thread per business case) and returns the final state. */
@@ -144,21 +149,18 @@ public class ResearchAgent {
     }
 
     /**
-     * The graph for one run. With an approved context and an audit sink, a fresh {@link NodeInterceptor} wraps each
-     * node, backed by the durable counter and deadline bound to the approved task and thread. Without an approved
-     * context the shared unwrapped graph is used and the first
-     * governed model call refuses, as before.
+     * Every run requires an approved task, audit sink and previously registered durable budget. The same approval
+     * used to open the budget is pinned to every model call in the graph.
      */
     private CompiledGraph<ResearchState> runGraph(String threadId) {
-        if (audit == null || approvedContext == null) return graph;
-        var approved = approvedContext.current().orElse(null);
-        if (approved == null) return graph;
-        if (nodeBudget == null) throw new IllegalStateException("durable agent node budget is unavailable");
+        if (audit == null || approvedContext == null || nodeBudget == null)
+            throw new ModelCallRefused("agent run governance is unavailable");
+        var approved = approvedContext.current().orElseThrow(() -> new ModelCallRefused("no approved context for this graph run"));
         // An absent checkpoint cannot prove this task never ran before an upgrade or crash.
         var budget = nodeBudget.openExisting(threadId, approved.agent(), approved.task());
         var interceptor = NodeInterceptor.forLimits(approved.agent(), threadId, approved.task().limits(), audit, clock, budget);
         try {
-            return compile(interceptor::wrap);
+            return compile(interceptor::wrap, approved);
         } catch (Exception e) {
             throw new IllegalStateException("Agent graph could not be built for this run", e);
         }

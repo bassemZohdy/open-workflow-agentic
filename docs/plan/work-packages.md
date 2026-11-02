@@ -760,6 +760,7 @@ Implementation status: **partial**.
 - Implemented: The model gateway rechecks its pinned approved context after cost calculation before returning output. A changed, missing or unavailable context produces a failed call after the provider ran; it does not invent a refund or claim a pre-call refusal.
 - Implemented: The governed model boundary refuses an unknown or mismatched provider model before sending a prompt. The OpenAI-compatible provider reports the model pinned into its built transport; exact identity matching is required, so aliases need a future trusted mapping. This check does not establish configuration approval, usage limits or live identity.
 - Implemented: The model gateway passes the requested per-call output-token ceiling to a provider that explicitly supports bounded calls; otherwise it refuses before provider I/O. The OpenAI-compatible adapter includes the ceiling in its request. This does not prove a remote server honours it, bind the call to a trusted profile, constrain the legacy graph path, or account for usage and cost.
+- Implemented: The research graph refuses entry when its approved context, node audit or pre-registered durable budget is unavailable; it no longer falls back to an unwrapped graph. Its model nodes pin the same approval used to open the budget, preventing a different task from borrowing that allowance. A production approval source, trusted task start and model-cost reservation remain open.
 
 Remaining gates:
 

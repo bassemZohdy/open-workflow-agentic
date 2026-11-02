@@ -369,6 +369,21 @@ class GovernedLlmClientTest {
         return agent;
     }
 
+    private static ApprovedModelContext freshGraphApproval() {
+        var task = new AgentTaskContract(io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator.shared().next(),
+                TASK.goal(), TASK.permittedTools(), TASK.permittedDataScopes(), TASK.riskTier(), TASK.limits(),
+                TASK.requestingSubject(), TASK.delegationGrantId());
+        return () -> Optional.of(new ApprovedModelContext.Approved(AGENT, task, "gpt-test", 500_000L));
+    }
+
+    private static void prepareGraph(ResearchAgent agent, DataSource ds, ApprovedModelContext context, String thread) {
+        agent.approvedContext = context;
+        agent.audit = new Audit();
+        agent.nodeBudget = new JdbcNodeBudget(ds);
+        var approved = context.current().orElseThrow();
+        agent.nodeBudget.registerNew(thread, approved.agent(), approved.task());
+    }
+
     @Test
     void aGraphCannotCompleteWhenApprovalDisappearsDuringTheModelCall() throws Exception {
         DataSource ds = AgentTestDatabase.dataSource();
@@ -393,8 +408,10 @@ class GovernedLlmClientTest {
     void aDeniedGraphRunMakesNoProviderCallAndLeavesNoCompletedRun() throws Exception {
         DataSource ds = AgentTestDatabase.dataSource();
         var provider = new CountingProvider();
-        var agent = agent(ds, new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.DENY), new Audit()), APPROVED));
+        var context = freshGraphApproval();
+        var agent = agent(ds, new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.DENY), new Audit()), context));
         String thread = "governed-deny-" + UUID.randomUUID();
+        prepareGraph(agent, ds, context, thread);
 
         assertThrows(Exception.class, () -> agent.run(thread, "topic"));
 
@@ -409,8 +426,10 @@ class GovernedLlmClientTest {
         DataSource ds = AgentTestDatabase.dataSource();
         var provider = new CountingProvider();
         var audit = new Audit();
-        var agent = agent(ds, new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.ALLOW), audit), APPROVED));
+        var context = freshGraphApproval();
+        var agent = agent(ds, new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.ALLOW), audit), context));
         String thread = "governed-allow-" + UUID.randomUUID();
+        prepareGraph(agent, ds, context, thread);
 
         var state = agent.run(thread, "topic");
 

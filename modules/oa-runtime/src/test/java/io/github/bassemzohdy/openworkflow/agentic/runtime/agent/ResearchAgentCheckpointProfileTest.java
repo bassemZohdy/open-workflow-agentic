@@ -31,12 +31,11 @@ class ResearchAgentCheckpointProfileTest {
 
     private static ResearchAgent agent(DataSource dataSource, AtomicInteger providerCalls, String configuredSchema)
             throws Exception {
-        ResearchAgent agent = new ResearchAgent();
-        agent.checkpointSchema = configuredSchema; // manual fixture: what the configuration injects in production
-        agent.llm = GovernedFixtures.allowing((s, u) -> {
+        ResearchAgent agent = GovernedFixtures.budgetedAgent(dataSource, (s, u) -> {
             providerCalls.incrementAndGet();
             return OK;
         });
+        agent.checkpointSchema = configuredSchema; // manual fixture: what the configuration injects in production
         agent.dataSource = dataSource;
         agent.outputValidator = new AgentOutputValidator(new ObjectMapper(), target -> false);
         agent.build();

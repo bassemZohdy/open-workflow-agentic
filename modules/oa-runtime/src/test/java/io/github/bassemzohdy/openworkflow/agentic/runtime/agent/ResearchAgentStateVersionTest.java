@@ -37,7 +37,19 @@ class ResearchAgentStateVersionTest {
 
     @Test void aNewRunRecordsTheCurrentStateVersion() throws Exception {
         DataSource ds = AgentTestDatabase.dataSource();
-        var state = agent(ds, new CountingProvider()).run("state-version-new-" + UUID.randomUUID(), "topic");
+        var candidate = agent(ds, new CountingProvider());
+        var task = new io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract(
+                io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator.shared().next(), TASK.goal(),
+                TASK.permittedTools(), TASK.permittedDataScopes(), TASK.riskTier(), TASK.limits(),
+                TASK.requestingSubject(), TASK.delegationGrantId());
+        ApprovedModelContext context = () -> java.util.Optional.of(new ApprovedModelContext.Approved(AGENT, task, "gpt-test", 500_000L));
+        candidate.approvedContext = context;
+        candidate.llm = new GovernedLlmClient(new CountingProvider(), pep(new Engine(DecisionOutcome.ALLOW), new Audit()), context);
+        candidate.audit = new Audit();
+        candidate.nodeBudget = new JdbcNodeBudget(ds);
+        String thread = "state-version-new-" + UUID.randomUUID();
+        candidate.nodeBudget.registerNew(thread, AGENT, task);
+        var state = candidate.run(thread, "topic");
         assertEquals(ResearchStateVersion.CURRENT, ((Number) state.value(ResearchStateVersion.KEY).orElseThrow()).intValue());
     }
 
