@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an internal transaction seam for task-owned inbox matching, retaining the live-owner checks before and after matching. Callback reservation and checkpoint proof remain separate.
+
 - Add an internal transaction seam for inbox receipts and test atomic wait binding, rollback and duplicate receipt behavior. Producer authorization and delivery remain open.
 
 - Characterize a test-only targeted SDK callback that avoids cross-instance broadcast and rejects concurrent duplicate attempts in one process. Durable dispatch, leases and checkpoints remain open.

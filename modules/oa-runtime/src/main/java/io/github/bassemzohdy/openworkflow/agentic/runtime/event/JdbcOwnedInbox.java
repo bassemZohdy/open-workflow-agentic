@@ -41,12 +41,18 @@ public class JdbcOwnedInbox {
     /** The SDK evaluated this exact candidate's predicate outside the transaction; no different receipt is substituted. */
     public Optional<InboxMessage> match(InboxTaskClaim claim,InboxWait wait,InboxMessage candidate) {
         requireTask(claim,wait);
-        return Transactions.inTransaction(dataSource,c-> {
-            leases.requireCurrent(c,claim,true);
-            var matched=inbox.matchCandidate(c,wait,candidate);
-            leases.requireCurrent(c,claim,true); // Also fences expiry while waiting for delivery/message locks.
-            return matched;
-        });
+        return Transactions.inTransaction(dataSource,c->matchInTransaction(c,claim,wait,candidate));
+    }
+
+    /** Internal seam; caller owns commit/rollback. This is not a callback reservation or a checkpoint receipt. */
+    Optional<InboxMessage> matchInTransaction(Connection connection,InboxTaskClaim claim,InboxWait wait,
+                                               InboxMessage candidate) throws SQLException {
+        Objects.requireNonNull(connection,"connection"); requireTask(claim,wait);
+        if(connection.getAutoCommit())throw new IllegalArgumentException("an existing transaction is required");
+        leases.requireCurrent(connection,claim,true);
+        var matched=inbox.matchCandidate(connection,wait,candidate);
+        leases.requireCurrent(connection,claim,true); // Also fences expiry while waiting for delivery/message locks.
+        return matched;
     }
 
     /**

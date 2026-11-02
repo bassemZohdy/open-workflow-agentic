@@ -98,7 +98,9 @@ class JdbcEventInboxTransactionTest {
     }
 
     @Test void receiptAndExactWaitBindingCommitOrRollBackTogether() throws Exception {
-        for (boolean commit : new boolean[] {false, true}) {
+        for (int mode = 0; mode < 3; mode++) {
+            boolean commit = mode == 1;
+            boolean staleClaim = mode == 2;
             var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
             var owner = new Subject(SubjectKind.USER, "alice");
             var request = new StartRequest("tenant", owner, new DefinitionRef("agentic/receipt-test", "1"),
@@ -116,15 +118,24 @@ class JdbcEventInboxTransactionTest {
             var message = new InboxMessage("tenant", "urn:test:transaction", UUID.randomUUID().toString(), "test.event",
                     initial.id(), "route", "{\"ok\":true}");
             var until = Instant.now().plus(Duration.ofDays(1));
-            try (var c = owned.getConnection()) {
-                c.setAutoCommit(false);
-                assertTrue(inbox.receiveInTransaction(c, message, until).created());
-                assertEquals(Optional.of(message), inbox.matchCandidate(c, wait, message));
-                assertTrue(inbox.boundSignal(wait).isEmpty(), "an independent reader cannot see either uncommitted row");
-                if (commit) c.commit(); else c.rollback();
+            var leases = new JdbcInboxTaskLease(owned, event -> { }, Clock.systemUTC());
+            var claim = leases.acquire(wait.task(), "test-owner", Duration.ofSeconds(30)).orElseThrow().claim();
+            var matcher = new JdbcOwnedInbox(owned, leases, inbox, new JdbcInboxCheckpointProof(owned), event -> { }, Clock.systemUTC());
+            try {
+                if (staleClaim) assertTrue(leases.release(claim));
+                try (var c = owned.getConnection()) {
+                    c.setAutoCommit(false);
+                    assertTrue(inbox.receiveInTransaction(c, message, until).created());
+                    if (staleClaim) assertThrows(IllegalStateException.class, () -> matcher.matchInTransaction(c, claim, wait, message));
+                    else assertEquals(Optional.of(message), matcher.matchInTransaction(c, claim, wait, message));
+                    assertTrue(inbox.boundSignal(wait).isEmpty(), "an independent reader cannot see either uncommitted row");
+                    if (commit) c.commit(); else c.rollback();
+                }
+                assertEquals(commit ? Optional.of(message) : Optional.empty(), inbox.boundSignal(wait));
+                assertEquals(!commit, inbox.receive(message, until).created());
+            } finally {
+                leases.release(claim);
             }
-            assertEquals(commit ? Optional.of(message) : Optional.empty(), inbox.boundSignal(wait));
-            assertEquals(!commit, inbox.receive(message, until).created());
         }
     }
 

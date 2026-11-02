@@ -447,7 +447,7 @@ Deliverables:
 - Duplicate, early, late and out-of-order event handling; cancellation race rules
 
 Implementation status: **partial**.
-- Implemented: An internal transaction seam lets an inbox receipt and its exact wait binding share a caller-owned PostgreSQL transaction; rollback, duplicate and concurrent-receipt tests pass. It is not a producer, dispatch permission or T13 completion.
+- Implemented: Internal transaction seams let an inbox receipt and its exact task-owned wait binding share a caller-owned PostgreSQL transaction; rollback, duplicate, concurrent-receipt and released-owner tests pass. This is not a producer, callback reservation, checkpoint proof or T13 completion.
 - Implemented: JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.
 - Implemented: Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied.
 - Implemented: Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.
