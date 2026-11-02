@@ -4,13 +4,13 @@ create table human_proposal.task (
   tenant text not null, task_id char(26) not null, instance_id char(26) not null,
   wait_key text not null, version bigint not null check (version >= 0), status text not null,
   initiator_kind text not null, initiator_id text not null, assignee_id text not null,
-  separation text not null, risk_tier text not null, policy_pin text not null, due_at timestamptz,
+  separation text not null, risk_tier text not null, policy_id text not null, policy_version text not null, due_at timestamptz,
   primary key (tenant, task_id),
   check (status in ('IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'EXPIRED')),
   check (separation in ('NONE', 'INITIATOR_MUST_NOT_ACT')),
   check (initiator_kind in ('USER', 'AGENT', 'WORKFLOW', 'SERVICE')),
   check (risk_tier in ('LOW', 'MEDIUM', 'HIGH')),
-  check (length(policy_pin) between 1 and 256)
+  check (length(policy_id) between 1 and 128), check (length(policy_version) between 1 and 64)
 );
 create table human_proposal.decision (
   tenant text not null, decision_id char(26) not null, task_id char(26) not null,
@@ -37,9 +37,9 @@ begin
     raise exception 'human task history is retained' using errcode='insufficient_privilege';
   end if;
   if row(new.tenant,new.task_id,new.instance_id,new.wait_key,new.initiator_kind,new.initiator_id,
-         new.risk_tier,new.policy_pin,new.separation)
+         new.risk_tier,new.policy_id,new.policy_version,new.separation)
        is distinct from row(old.tenant,old.task_id,old.instance_id,old.wait_key,old.initiator_kind,old.initiator_id,
-                            old.risk_tier,old.policy_pin,old.separation)
+                            old.risk_tier,old.policy_id,old.policy_version,old.separation)
      or new.version <> old.version + 1 or old.status <> 'IN_PROGRESS' then
     raise exception 'invalid human task mutation' using errcode='check_violation';
   end if;
