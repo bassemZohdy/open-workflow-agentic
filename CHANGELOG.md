@@ -1,5 +1,7 @@
 # Changelog
 
+- Exercise the audited governed effect path against a pinned OpenAPI HTTP target.
+
 - Enable explicit audited effect composition through the governed tool gateway.
 
 - Add explicit resource-scoped central-audit gating to controlled tool effects.

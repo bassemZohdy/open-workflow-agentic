@@ -934,13 +934,16 @@ class GovernedModelRunningControlTest {
 
     @Test void pinnedOpenApiToolSendsOneValidatedRequestThroughLedger() throws Exception {
         var calls = new AtomicInteger(); var lookupCalls = new AtomicInteger(); var payload = new AtomicReference<String>();
+        var audited=java.util.concurrent.ConcurrentHashMap.<String>newKeySet();
+        var firstRequestAudited=new java.util.concurrent.atomic.AtomicBoolean();
         var idempotency = new AtomicReference<String>(); var authorization = new AtomicReference<String>();
         var requestPath = new AtomicReference<String>();
         var requestQuery = new AtomicReference<String>();
         var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/orders", exchange -> {
             try {
-                calls.incrementAndGet(); payload.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+                if(calls.incrementAndGet()==1)firstRequestAudited.set(audited.containsAll(Set.of("INTENT","DISPATCH")));
+                payload.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
                 requestPath.set(exchange.getRequestURI().getRawPath());
                 requestQuery.set(exchange.getRequestURI().getRawQuery());
                 idempotency.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
@@ -995,8 +998,18 @@ class GovernedModelRunningControlTest {
                 };
                 var pep = new Pep(request -> new Decision("fixture", DecisionOutcome.ALLOW, "allow", POLICY, NOW),
                         event -> { }, Duration.ofSeconds(5), CLOCK);
+                var manager=(jakarta.transaction.TransactionManager)java.lang.reflect.Proxy.newProxyInstance(
+                        jakarta.transaction.TransactionManager.class.getClassLoader(),new Class<?>[]{jakarta.transaction.TransactionManager.class},
+                        (proxy,method,args)->{if(method.getName().equals("suspend"))return null;throw new UnsupportedOperationException(method.getName());});
+                var producer=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditProducer();
+                var scopedLedger=new JdbcEffectLedger(db.owner,manager,producer);
+                var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(db.owner);
+                var delivery=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditDelivery(db.owner,manager,producer,
+                        (source,draft)->{var receipt=central.appendOnce(source,draft);audited.add(source.transition().name());return receipt;});
+                var history=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditHistory(db.owner,manager,producer,delivery);
                 var gateway = new GovernedToolGateway(registry, () -> Optional.of(rig.approved), profile, pep,
-                        event -> { }, budget, CLOCK, new DurableEffects(rig.ledger, Clock.systemUTC()));
+                        event -> { }, budget, CLOCK, new DurableEffects(scopedLedger, Clock.systemUTC()),
+                        new ToolCallTelemetry(io.opentelemetry.api.OpenTelemetry.noop()),history);
                 for (String unsafe : List.of("../admin", "a/b", "%2f", ".", "x".repeat(129))) {
                     var invalid = rig.call("{\"path\":{\"orderId\":\"" + unsafe + "\"},\"query\":{\"region\":\"west\"},\"body\":{\"amount\":10}}");
                     var invalidOccurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/invalid", invalid);
@@ -1023,7 +1036,8 @@ class GovernedModelRunningControlTest {
                 var changed = rig.call("{\"path\":{\"orderId\":\"order_123\"},\"query\":{\"region\":\"east\",\"channel\":\"online\"},\"body\":{\"amount\":10.123456789012345678901}}");
                 var changedOccurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/http", changed);
                 assertThrows(IllegalStateException.class, () -> gateway.invokeEffect(running, entry, rig.allocation, changedOccurrence, changed));
-                assertEquals(1, calls.get()); assertEquals("{\"amount\":10.123456789012345678901}", payload.get());
+                assertEquals(1, calls.get()); assertTrue(firstRequestAudited.get(),"intent and dispatch must be audited before HTTP");
+                assertTrue(audited.contains("OUTCOME"));assertEquals("{\"amount\":10.123456789012345678901}", payload.get());
                 assertEquals("/orders/order_123", requestPath.get());
                 assertEquals("channel=online&region=west", requestQuery.get());
                 assertEquals(occurrence.effectCommand("registered:test").key().idempotencyKey(), idempotency.get());
