@@ -1,5 +1,7 @@
 # Changelog
 
+- Combine exact human wake occurrence checks with the supported literal listen filters, refusing stop events and unsupported filters. Full SDK predicates, producer and dispatch remain open.
+
 - Encode the proposed human wake reference as a canonical structured CloudEvent and verify it with the real inbox decoder. Delivery and SDK predicate integration remain open.
 
 - Define a reference-only human-decision wake envelope tied to the exact wait; no event producer, SDK matcher or workflow delivery is activated.
