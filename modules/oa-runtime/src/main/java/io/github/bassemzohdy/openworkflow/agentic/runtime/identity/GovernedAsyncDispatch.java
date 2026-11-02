@@ -86,13 +86,16 @@ public final class GovernedAsyncDispatch {
         Objects.requireNonNull(work, "work");
         InstanceAuthority authority = current.require(engineInstanceId);
         IssuedToken token = exchange(authority, audience, scopes);
+        // Exchange and authority storage can block; do not enter work with an obsolete binding or expired token.
+        current.requireCurrent(engineInstanceId, authority);
+        if (!token.usableAt(clock.instant())) throw new AuthorityLostException(Reason.EXPIRED);
         T result;
         try (AuthorityScope ignored = AuthorityScope.enter(authority)) {
             result = work.apply(token);
         }
         // Blocking work may have outlived the grant or the token: nothing is released unless both are still current.
         CurrentAuthority.refuseIfInterrupted();
-        current.requireCurrent(authority);
+        current.requireCurrent(engineInstanceId, authority);
         if (!token.usableAt(clock.instant())) throw new AuthorityLostException(Reason.EXPIRED);
         return result;
     }

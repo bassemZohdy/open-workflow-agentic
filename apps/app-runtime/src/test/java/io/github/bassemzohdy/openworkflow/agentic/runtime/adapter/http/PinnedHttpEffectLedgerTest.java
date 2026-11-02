@@ -10,6 +10,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.DelegationGrants;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InstanceAuthorities;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InstanceAuthority;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InstanceAuthorityStore;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.GovernedAsyncDispatch;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
@@ -42,6 +43,47 @@ class PinnedHttpEffectLedgerTest {
     @Inject JdbcInstanceStore instances;
     @Inject InstanceAuthorities authorities;
     @Inject DelegationGrants grants;
+    @Inject InstanceAuthorityStore authorityStore;
+
+    @Test void rebindDuringExchangeDoesNotRunOldGrantWork() {
+        rebindDuringDispatch(true);
+    }
+
+    @Test void rebindDuringWorkDoesNotReleaseOldGrantResult() {
+        rebindDuringDispatch(false);
+    }
+
+    private void rebindDuringDispatch(boolean duringExchange) {
+        String tenant="http-rebind-"+UUID.randomUUID();
+        var user=new Subject(SubjectKind.USER,"alice");var agent=new Subject(SubjectKind.AGENT,"worker");
+        var oldGrant=grants.grant(tenant,user,user,agent,Set.of("orders:write"),Instant.now().plusSeconds(600),null);
+        var newGrant=grants.grant(tenant,user,user,agent,Set.of("orders:write"),Instant.now().plusSeconds(600),null);
+        var request=new StartRequest(tenant,user,new DefinitionRef("demo/start","1"),Map.of(),"start-key");
+        var now=Instant.now().truncatedTo(ChronoUnit.MICROS);
+        var candidate=InstanceRecord.starting(UlidGenerator.shared().next(),request,now);
+        var row=instances.insertIfAbsent(candidate,"test.insert",authorities.bindAtStart(tenant,user,oldGrant.id(),"corr-test")).record();
+        String engineId="http-rebind-"+UUID.randomUUID();
+        instances.replace(row.successor(now,InstanceStatus.STARTING,engineId,0,null,null),row.version(),"test.prepared",user);
+        Runnable rebind=()->{
+            assertTrue(authorityStore.markReauthorizationRequired(row.id(),"test.rebind",Instant.now()));
+            assertTrue(authorityStore.rebind(row.id(),oldGrant.id(),newGrant.id(),Instant.now()));
+        };
+        var creds=new GovernedAsyncDispatch.Credentials() {
+            public Optional<Credential> subject(InstanceAuthority a){return Optional.of(Credential.of("subject"));}
+            public Credential actor(){return Credential.of("actor");}
+        };
+        var dispatch=new GovernedAsyncDispatch(GovernedAsyncDispatch.over(authorities,grants),creds,exchange->{
+            if(duringExchange)rebind.run();
+            return new IssuedToken(Credential.of("issued"),exchange.audience(),exchange.scopes(),Instant.now().plusSeconds(60),
+                    "issuer","jti",List.of("worker"),oldGrant.id());
+        },Clock.systemUTC());
+        var ran=new AtomicInteger();
+        assertThrows(AuthorityLostException.class,()->dispatch.run(engineId,"orders",Set.of("orders:write"),token->{
+            ran.incrementAndGet();if(!duringExchange)rebind.run();return "output";
+        }));
+        assertEquals(duringExchange?0:1,ran.get());
+        assertEquals(newGrant.id(),authorities.find(row.id()).orElseThrow().grantId());
+    }
 
     @Test void revocationDuringCallRetainsConfirmedFactWithoutReleasingIt() throws Exception {
         revokeDuringCall(200, EffectState.CONFIRMED);

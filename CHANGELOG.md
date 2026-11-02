@@ -1,5 +1,7 @@
 # Changelog
 
+- Refuse asynchronous task work or results when its instance authority changes during token exchange or task execution.
+
 - Prevent concurrent adapter starts of the same pending Flow instance and retain uncertain start claims without blocking unrelated starts.
 
 - Characterize the pinned SDK's shared-event delivery failure when an earlier subscriber throws; durable per-recipient recovery remains open.

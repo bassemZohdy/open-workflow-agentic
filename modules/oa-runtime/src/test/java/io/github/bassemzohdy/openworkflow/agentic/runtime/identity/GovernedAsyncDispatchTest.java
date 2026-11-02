@@ -39,6 +39,7 @@ class GovernedAsyncDispatchTest {
     private Decision decision;
     private RuntimeException registryFailure;
     private RuntimeException auditFailure;
+    private Runnable onRecheck = () -> {};
     private Optional<Credential> subject;
     private final List<String> marked = new ArrayList<>();
     private final List<ExchangeRequest> requests = new ArrayList<>();
@@ -65,7 +66,7 @@ class GovernedAsyncDispatchTest {
                 if (registryFailure != null) throw registryFailure;
                 return registered;
             }
-            @Override public Decision recheck(Ulid id) { return decision; }
+            @Override public Decision recheck(Ulid id) { onRecheck.run(); return decision; }
             @Override public void requireReauthorization(InstanceAuthority a, String reason) {
                 if (auditFailure != null) throw auditFailure;
                 marked.add(reason);
@@ -178,6 +179,53 @@ class GovernedAsyncDispatchTest {
             return "output";
         })));
         assertTrue(released.isEmpty(), "the output of work that outlived its grant is never released");
+    }
+
+    @Test void reauthorizationDuringExchangeDoesNotRunWorkUnderTheOldGrant() {
+        var ran = new AtomicReference<>(false);
+        var original = exchanger;
+        exchanger = request -> {
+            IssuedToken token = original.exchange(request);
+            registered = Optional.of(replacementAuthority());
+            return token;
+        };
+        assertLost(Reason.NOT_VERIFIED, () -> dispatch.run("engine-1", "tool-cases", Set.of("cases:read"),
+                token -> ran.getAndSet(true)));
+        assertFalse(ran.get());
+    }
+
+    @Test void reauthorizationDuringWorkWithholdsTheOldGrantsResult() {
+        var released = new ArrayList<String>();
+        assertLost(Reason.NOT_VERIFIED, () -> released.add(dispatch.run("engine-1", "tool-cases", Set.of("cases:read"), token -> {
+            registered = Optional.of(replacementAuthority());
+            return "output";
+        })));
+        assertTrue(released.isEmpty());
+    }
+
+    @Test void interruptionDuringExchangeDoesNotEnterWork() {
+        var ran = new AtomicReference<>(false);
+        var original = exchanger;
+        exchanger = request -> {
+            IssuedToken token = original.exchange(request);
+            Thread.currentThread().interrupt();
+            return token;
+        };
+        assertLost(Reason.UNAVAILABLE, () -> dispatch.run("engine-1", "tool-cases", Set.of("cases:read"),
+                token -> ran.getAndSet(true)));
+        assertFalse(ran.get());
+        assertTrue(Thread.currentThread().isInterrupted());
+    }
+
+    @Test void reauthorizationDuringAuthorityRecheckRefusesBeforeExchange() {
+        onRecheck = () -> registered = Optional.of(replacementAuthority());
+        assertLost(Reason.NOT_VERIFIED, this::run);
+        assertTrue(requests.isEmpty());
+    }
+
+    private InstanceAuthority replacementAuthority() {
+        return new InstanceAuthority(instanceId, "t1", USER, UlidGenerator.shared().next(), "corr-1",
+                InstanceAuthority.State.AUTHORIZED, null, NOW.plusSeconds(1), NOW);
     }
 
     @Test void theTokenExpiringDuringBlockingWorkWithholdsTheResult() {

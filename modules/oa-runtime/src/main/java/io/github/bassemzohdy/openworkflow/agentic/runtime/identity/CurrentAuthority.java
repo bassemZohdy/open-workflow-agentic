@@ -25,7 +25,7 @@ public final class CurrentAuthority {
         if (engineInstanceId == null || engineInstanceId.isBlank()) throw new AuthorityLostException(Reason.NOT_VERIFIED);
         refuseIfInterrupted();
         InstanceAuthority authority = restore(engineInstanceId);
-        requireCurrent(authority);
+        requireCurrent(engineInstanceId, authority);
         return authority;
     }
 
@@ -41,16 +41,22 @@ public final class CurrentAuthority {
         return authority;
     }
 
-    void requireCurrent(InstanceAuthority authority) {
+    void requireCurrent(String engineInstanceId, InstanceAuthority authority) {
+        refuseIfInterrupted();
+        if (!authority.equals(restore(engineInstanceId))) throw new AuthorityLostException(Reason.NOT_VERIFIED);
         Decision decision;
         try {
             decision = registry.recheck(authority.instanceId());
         } catch (RuntimeException e) {
             throw new AuthorityLostException(Reason.UNAVAILABLE, e);
         }
-        if (decision.outcome() == Outcome.PROCEED) return;
-        throw new AuthorityLostException(decision.outcome() == Outcome.REAUTHORIZATION_REQUIRED
-                ? Reason.REVOKED : Reason.UNAVAILABLE);
+        if (decision.outcome() != Outcome.PROCEED) {
+            throw new AuthorityLostException(decision.outcome() == Outcome.REAUTHORIZATION_REQUIRED
+                    ? Reason.REVOKED : Reason.UNAVAILABLE);
+        }
+        refuseIfInterrupted();
+        if (!authority.equals(restore(engineInstanceId))) throw new AuthorityLostException(Reason.NOT_VERIFIED);
+        refuseIfInterrupted();
     }
 
     static void refuseIfInterrupted() {
