@@ -25,6 +25,11 @@ class GovernedModelGatewayTest {
         LlmClient bound = new LlmClient() {
             @Override public String configuredModelId() { return "gpt-test"; }
             @Override public String complete(String system, String user) { return llm.complete(system, user); }
+            @Override public boolean supportsOutputTokenLimit() { return true; }
+            @Override public String complete(String system, String user, int maxOutputTokens) {
+                assertEquals(CALL.maxOutputTokens(), maxOutputTokens);
+                return llm.complete(system, user);
+            }
         };
         return new GovernedModelGateway(new GovernedLlmClient(bound, pep(engine, audit), context), context, cost, CLOCK);
     }
@@ -42,6 +47,18 @@ class GovernedModelGatewayTest {
         assertEquals(1, provider.calls.get());
         assertEquals(1, engine.asked.size());
         assertFalse(audit.events.isEmpty(), "the decision was audited");
+    }
+
+    @Test void unsupportedOutputLimitRejectsWithoutCallingTheProvider() {
+        var unbounded = new LlmClient() {
+            @Override public String configuredModelId() { return "gpt-test"; }
+            @Override public String complete(String system, String user) { return provider.complete(system, user); }
+        };
+        var governed = new GovernedLlmClient(unbounded, pep(engine, audit), APPROVED);
+        var result = new GovernedModelGateway(governed, APPROVED, COST, CLOCK).complete(CALL);
+        assertInstanceOf(ModelResult.Rejected.class, result);
+        assertEquals(0, provider.calls.get());
+        assertTrue(engine.asked.isEmpty());
     }
 
     @Test void noApprovedContextRejectsWithoutReachingPolicyOrProvider() {

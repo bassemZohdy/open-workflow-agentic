@@ -72,6 +72,10 @@ class GovernedLlmClientTest {
         }
 
         @Override public String configuredModelId() { return "gpt-test"; }
+        @Override public boolean supportsOutputTokenLimit() { return true; }
+        @Override public String complete(String system, String user, int maxOutputTokens) {
+            return complete(system, user);
+        }
 
         @Override
         public String complete(String system, String user) {

@@ -29,9 +29,9 @@ import java.util.function.ToLongBiFunction;
  *       priced explicitly, since an implicit zero would understate spend.</li>
  * </ul>
  *
- * <p>Limits, stated so they are not assumed: the narrow provider port takes no output-token bound, so
- * {@link ModelCall#maxOutputTokens()} is not enforced here; the prompt is sent as the user text with an empty system
- * text; the approved context is read on the calling thread, so the call must be synchronous on it.
+ * <p>The requested output-token ceiling is sent through a provider that declares bounded-call support; an unsupported
+ * provider is refused before it is called. Enforcement by the remote provider and durable usage accounting remain
+ * external requirements. The prompt is sent as user text with an empty system text, and calls are synchronous.
  */
 public final class GovernedModelGateway implements ModelGateway {
 
@@ -63,7 +63,7 @@ public final class GovernedModelGateway implements ModelGateway {
         if (!approved.modelId().equals(call.modelId())) return reject("the call names a model other than the approved one");
         String text;
         try {
-            text = governed.complete(approved, "", call.prompt());
+            text = governed.complete(approved, "", call.prompt(), call.maxOutputTokens());
         } catch (GovernedLlmClient.ApprovalLostAfterCall e) {
             return new ModelResult.Failed("model output withheld after approval changed");
         } catch (ModelCallRefused e) {

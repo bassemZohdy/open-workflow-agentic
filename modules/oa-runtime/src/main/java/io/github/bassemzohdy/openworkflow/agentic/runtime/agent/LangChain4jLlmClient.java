@@ -3,6 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.agent;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -51,5 +52,17 @@ public class LangChain4jLlmClient implements LlmClient {
     @Override
     public String complete(String system, String user) {
         return model.chat(SystemMessage.from(system), UserMessage.from(user)).aiMessage().text();
+    }
+
+    @Override
+    public boolean supportsOutputTokenLimit() { return true; }
+
+    @Override
+    public String complete(String system, String user, int maxOutputTokens) {
+        if (maxOutputTokens < 1 || maxOutputTokens > io.github.bassemzohdy.openworkflow.agentic.contracts.port.ModelCall.MAX_OUTPUT_TOKENS)
+            throw new IllegalArgumentException("invalid output-token limit");
+        var request = ChatRequest.builder().messages(SystemMessage.from(system), UserMessage.from(user))
+                .maxOutputTokens(maxOutputTokens).build();
+        return model.chat(request).aiMessage().text();
     }
 }
