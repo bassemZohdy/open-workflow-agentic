@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 
 /**
  * A request to start one instance (ADR 0019, Start). The idempotency key is unique per tenant: a repeated request
- * with the same key returns the existing instance and starts nothing.
+ * with the same key and full owner returns the existing instance and starts nothing. A different owner conflicts.
  *
  * @param tenant         the tenant the instance belongs to
  * @param owner          the subject that asked for the start

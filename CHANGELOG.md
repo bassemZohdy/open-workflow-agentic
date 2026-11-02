@@ -1,5 +1,7 @@
 # Changelog
 
+- Reject a lifecycle start or retry when a tenant-wide idempotency key belongs to another full owner, including while the checkpoint store is degraded. Event-specific and delegated-grant replay binding remain open.
+
 - Return a failed model call when the provider supplies no answer instead of letting a null response escape the gateway contract.
 
 - Report provider-thrown refusal-shaped errors as failed calls, since the provider was already reached; never expose provider error details.

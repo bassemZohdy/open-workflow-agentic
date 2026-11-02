@@ -12,6 +12,7 @@ import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.LifecycleSupp
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -114,6 +115,19 @@ class InstanceApiTest {
         assertEquals(1, engine.starts(), "a repeat must not start the engine again");
         assertEquals(1L, count(dataSource, "select count(*) from task.instance where tenant = ? and idempotency_key = ?",
                 tenant, key));
+    }
+
+    @Test
+    void anotherOwnerCannotRecoverTheExistingInstanceWithTheSameKey() {
+        String tenant = newTenant(); String key = newKey();
+        String first = startedId(tenant, key);
+        var response = given().header("X-Tenant", tenant).header("X-Subject", "bob")
+                .header("X-Scopes", "oa.operate").contentType("application/json")
+                .body(standardBody(key)).when().post("/instances").then().statusCode(409).extract().response();
+        assertFalse(response.asString().contains(first), "conflict must not reveal the existing instance");
+        assertEquals(1, engine.starts());
+        assertEquals(1L, count(dataSource, "select count(*) from task.instance where tenant = ? and idempotency_key = ?", tenant, key));
+        post(tenant, standardBody(key)).statusCode(200).body("id", equalTo(first));
     }
 
     @Test

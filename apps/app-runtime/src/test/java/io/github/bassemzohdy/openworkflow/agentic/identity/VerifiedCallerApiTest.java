@@ -134,6 +134,20 @@ class VerifiedCallerApiTest {
     // ---- the verified caller drives the instance and operations APIs ----------------------------------------------------
 
     @Test
+    void anotherVerifiedUserCannotReuseTheStartersKeyToReadTheInstance() throws Exception {
+        String tenant = newTenant(); var body = startBody();
+        String alice = token("alice", tenant, "oa.operate");
+        String bob = token("bob", tenant, "oa.operate");
+        String id = given().header("Authorization", "Bearer " + alice).contentType("application/json").body(body)
+                .when().post("/instances").then().statusCode(202).extract().path("id");
+        var conflict = given().header("Authorization", "Bearer " + bob).contentType("application/json").body(body)
+                .when().post("/instances").then().statusCode(409).extract().response();
+        org.junit.jupiter.api.Assertions.assertFalse(conflict.asString().contains(id));
+        given().header("Authorization", "Bearer " + alice).contentType("application/json").body(body)
+                .when().post("/instances").then().statusCode(200).body("id", equalTo(id));
+    }
+
+    @Test
     void theTokenScopesDecideWhatTheOperationsApiAllows() throws Exception {
         String tenant = newTenant();
         String owner = token("alice", tenant, "oa.operate oa.inspect");

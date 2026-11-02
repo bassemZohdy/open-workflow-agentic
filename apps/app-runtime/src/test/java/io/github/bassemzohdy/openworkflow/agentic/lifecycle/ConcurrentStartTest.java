@@ -85,6 +85,29 @@ class ConcurrentStartTest {
         }
     }
 
+    @Test
+    void competingOwnersWithTheSameKeyCannotSeeEachOthersInstance() throws Exception {
+        String tenant = newTenant(); String key = newKey();
+        var pool = Executors.newFixedThreadPool(2); var barrier = new CyclicBarrier(2);
+        try {
+            List<Future<Outcome>> futures = new ArrayList<>();
+            for (String subject : List.of("alice", "bob")) {
+                futures.add(pool.submit(() -> {
+                    barrier.await(20, TimeUnit.SECONDS);
+                    var response = io.restassured.RestAssured.given().header("X-Tenant", tenant)
+                            .header("X-Subject", subject).header("X-Scopes", "oa.operate")
+                            .contentType("application/json").body(standardBody(key)).when().post("/instances").then().extract().response();
+                    return new Outcome(response.statusCode(), response.path("id"));
+                }));
+            }
+            var left = futures.get(0).get(60, TimeUnit.SECONDS); var right = futures.get(1).get(60, TimeUnit.SECONDS);
+            assertEquals(Set.of(202, 409), Set.of(left.status(), right.status()));
+            assertTrue((left.status() == 409 ? left.id() : right.id()) == null, "the conflict has no instance id");
+            assertEquals(1, engine.starts());
+            assertEquals(1L, count(dataSource, "select count(*) from task.instance where tenant = ? and idempotency_key = ?", tenant, key));
+        } finally { pool.shutdownNow(); }
+    }
+
     private record Outcome(int status, String id) {
     }
 }

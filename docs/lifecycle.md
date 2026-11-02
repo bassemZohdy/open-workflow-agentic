@@ -135,7 +135,7 @@ Points that matter:
 
 | Request | Response |
 |---|---|
-| `POST /instances` with `{definitionId, definitionVersion, input, idempotencyKey}` and headers `X-Tenant`, `X-Subject`, `X-Scopes` (scope `oa.operate`) | 202 and `Location` for a new instance; 200 with the same body for a repeated key; 409 for a key used with a different request; 422 unknown definition; 400 malformed; 401 no caller; 403 without `oa.operate`; 503 policy decision unavailable |
+| `POST /instances` with `{definitionId, definitionVersion, input, idempotencyKey}` and headers `X-Tenant`, `X-Subject`, `X-Scopes` (scope `oa.operate`) | 202 and `Location` for a new instance; 200 with the same body for a repeated key by the same owner; 409 for a key used by a different owner or with a different request; 422 unknown definition; 400 malformed; 401 no caller; 403 without `oa.operate`; 503 policy decision unavailable |
 | `GET /instances/{id}` (scope `oa.inspect`) | 200 with `{id, definitionId, definitionVersion, status, engineInstanceId, startAttempts, version, createdAt, updatedAt}`; 404 unknown, malformed or another tenant's id; 401 no caller; 403 without `oa.inspect`; 503 policy decision unavailable |
 
 **Policy on the instance API (WP-103).** The three routes (`POST /instances`, `GET /instances/{id}`, `POST /instances/{id}/reauthorize`) ask the policy enforcement point for their own action before anything else: `instance:start` and `instance:reauthorize` need the documented scope `oa.operate`, `instance:get` needs `oa.inspect` (no new permission model; the resources are distinct from `operation:*`). The order is: caller (401, 503), policy decision (403 DENY, 503 when the engine, a timeout, the 64-evaluation bulkhead or the decision audit fails), then body and path (400, 404), then the effect. An unscoped or wrongly scoped caller therefore learns nothing from the body or the id (a malformed id is 403, not 404, without the scope). None of the three routes is a safe-recovery operation, so there is no emergency fallback: with the policy unavailable nothing starts, is read, is re-authorized or is resumed. A read stays tenant-wide for every caller who holds `oa.inspect` (no owner-only rule is added here). Re-authorization still needs the exact starter, tenant and grant checks of the identity layer on top of `oa.operate`.
@@ -638,7 +638,7 @@ its lifecycle stage pending without holding a waiting thread or connection. It
 never converts a failure or late commit into progress. The process latches
 unhealthy, readiness reports DOWN, and new starts/retries are refused before
 registry/engine changes. Existing identical idempotency keys still return the
-original result. Cancellation writes may still be attempted independently.
+original result to the same owner; another owner receives a conflict. Cancellation writes may still be attempted independently.
 
 `agentic.persistence.commit-timeout` defaults to PT30S (positive, at most PT5M).
 There is no automatic reset or retry using the mutable in-memory workflow

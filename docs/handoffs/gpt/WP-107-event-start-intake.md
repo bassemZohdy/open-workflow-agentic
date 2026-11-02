@@ -4,7 +4,7 @@ Requester and proposed lifecycle/storage producer: GPT. Identity, policy and
 audit producer: Claude. Status: **proposal only; not approved, implemented or
 activated**. WP-107, WP-105, T13 and T16 remain partial/open.
 
-## Observed boundary on main `c07e02c`
+## Observed boundary and current integration
 
 `runtime/event/EventIngress` authorizes a deployment-bound producer and commits
 an `InboxMessage` for an already existing registry instance. `inbox.message`
@@ -16,8 +16,9 @@ instance ID or correlation extension is not trusted start authority.
 instance and invokes the hook in the same insert transaction, before launch.
 The hook runs only on a newly created row, not on a duplicate. The registry key
 is unique per tenant; `StartRequest.fingerprint()` covers definition, version
-and canonical input, but not owner or a delegated grant. These are existing
-facts, not proof that a replay with a changed principal or grant is safe. An
+and canonical input, but not owner or a delegated grant. The lifecycle service now
+separately compares the full owner on the integration branch before returning an idempotent retry. This does
+not bind the original delegated grant or the event-specific retained contract. An
 engine start and a later audit result can fail after the insert commits.
 
 ## Proposed contract for owner review
