@@ -62,7 +62,7 @@ class PendingCancellationReceiptTest {
                 });
     }
     interface Scenario { void run(WorkflowInstance instance, InstanceRecord row, String appId,
-                                   PersistenceCommitGate gate) throws Exception; }
+                                   PersistenceCommitGate gate, WorkflowEngine engine) throws Exception; }
     void withRestored(Scenario scenario) throws Exception {
         withRestored(java.util.function.UnaryOperator.identity(), scenario);
     }
@@ -97,7 +97,7 @@ class PendingCancellationReceiptTest {
                 var guardedWriter = new CheckpointingWriter(borrowed(receiptWriter), cancelGate, (op,id)->{});
                 var reader = new CancellablePersistenceReader(operations, wrap.apply(guardedWriter));
                 var instance = reader.find(definition, original.id()).orElseThrow();
-                scenario.run(instance, row, appId, cancelGate);
+                scenario.run(instance, row, appId, cancelGate, new FlowWorkflowEngine(restored));
             }
         }
     }
@@ -113,7 +113,7 @@ class PendingCancellationReceiptTest {
                         }
                         return result;
                     } catch (InvocationTargetException e) { throw e.getCause(); }
-                }), (instance, row, appId, gate) -> {
+                }), (instance, row, appId, gate, engine) -> {
             assertThrows(ExecutionException.class, () -> instance.cancelFuture().get(10, TimeUnit.SECONDS));
             assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
             assertEquals(0, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
@@ -130,7 +130,7 @@ class PendingCancellationReceiptTest {
                     if (method.getName().equals("aborted") && first.getAndSet(false))
                         return CompletableFuture.failedFuture(new IllegalStateException("temporary failure"));
                     try { return method.invoke(real, args); } catch (InvocationTargetException e) { throw e.getCause(); }
-                }), (instance, row, appId, gate) -> {
+                }), (instance, row, appId, gate, engine) -> {
             assertThrows(ExecutionException.class, () -> instance.cancelFuture().get(10, TimeUnit.SECONDS));
             assertEquals(0, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
             assertEquals(1, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
@@ -140,13 +140,34 @@ class PendingCancellationReceiptTest {
             assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
         });
     }
+    @Test void engineCanReissueCancellationOfAnActiveGuardedInstance() throws Exception {
+        var first = new java.util.concurrent.atomic.AtomicBoolean(true);
+        withRestored(real -> (PersistenceInstanceWriter) Proxy.newProxyInstance(PersistenceInstanceWriter.class.getClassLoader(),
+                new Class<?>[]{PersistenceInstanceWriter.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("aborted") && first.getAndSet(false))
+                        return CompletableFuture.failedFuture(new IllegalStateException("temporary failure"));
+                    try { return method.invoke(real, args); } catch (InvocationTargetException e) { throw e.getCause(); }
+                }), (instance, row, appId, gate, engine) -> {
+            assertEquals(EngineStatus.PENDING, engine.activeInstance(row.definition(), instance.id()).orElseThrow().status());
+            assertFalse(engine.cancel(row.definition(), instance.id()));
+            assertEquals(EngineStatus.PENDING, engine.activeInstance(row.definition(), instance.id()).orElseThrow().status());
+            assertThrows(CancellationException.class, () -> instance.start().join());
+            assertTrue(engine.cancel(row.definition(), instance.id()));
+            assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
+                while (engine.activeInstance(row.definition(), instance.id()).isPresent()) Thread.sleep(10);
+            });
+            assertEquals(WorkflowStatus.CANCELLED, instance.status());
+            assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+            assertEquals(0, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+        });
+    }
     long count(String sql, String value) throws Exception {
         try (var c = data.getConnection(); var q = c.prepareStatement(sql)) {
             q.setString(1, value); try (var r = q.executeQuery()) { r.next(); return r.getLong(1); }
         }
     }
     @Test void actualJpaDeleteAndExactReceiptCommitTogether() throws Exception {
-        withRestored((instance, row, appId, gate) -> {
+        withRestored((instance, row, appId, gate, engine) -> {
             assertTrue(instance.cancelFuture().get(10, TimeUnit.SECONDS));
             assertEquals(0, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
             assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
@@ -170,7 +191,7 @@ class PendingCancellationReceiptTest {
         });
     }
     @Test void receiptCannotCommitWithoutRemovingTheMatchingCheckpoint() throws Exception {
-        withRestored((instance, row, appId, gate) -> {
+        withRestored((instance, row, appId, gate, engine) -> {
             try (var c = data.getConnection()) {
                 c.setAutoCommit(false);
                 try (var q = c.prepareStatement("""
@@ -188,7 +209,7 @@ class PendingCancellationReceiptTest {
         });
     }
     @Test void failedJpaDeletionRollsBackTheReceiptAndDoesNotConfirmCancellation() throws Exception {
-        withRestored((instance, row, appId, gate) -> {
+        withRestored((instance, row, appId, gate, engine) -> {
             assertTrue(appId.matches("receipt-[0-9a-f-]{36}"));
             try (var c = data.getConnection(); var s = c.createStatement()) {
                 s.execute("create function task.test_reject_receipt_delete() returns trigger language plpgsql as $$ "
@@ -242,7 +263,7 @@ class PendingCancellationReceiptTest {
     }
 
     @Test void committedReceiptFencesStaleSdkWorkflowAndTaskWrites() throws Exception {
-        withRestored((instance, row, appId, gate) -> {
+        withRestored((instance, row, appId, gate, engine) -> {
             var old = snapshot(appId, instance.id());
             assertTrue(instance.cancelFuture().get(10, TimeUnit.SECONDS));
             try (var c = data.getConnection()) {
@@ -262,7 +283,7 @@ class PendingCancellationReceiptTest {
     }
 
     @Test void staleSdkInsertWaitingBehindCancellationSeesTheCommittedReceipt() throws Exception {
-        withRestored((instance, row, appId, gate) -> {
+        withRestored((instance, row, appId, gate, engine) -> {
             var old = snapshot(appId, instance.id());
             var pool = Executors.newSingleThreadExecutor();
             var started = new CountDownLatch(1);
@@ -302,7 +323,7 @@ class PendingCancellationReceiptTest {
     }
 
     @Test void mismatchCannotCreateAReceipt() throws Exception {
-        withRestored((instance, row, appId, gate) -> {
+        withRestored((instance, row, appId, gate, engine) -> {
             try (var c = data.getConnection(); var q = c.prepareStatement("""
                     insert into task.pending_cancellation_receipt
                     (instance_id,application_id,engine_instance_id,definition_id,definition_version)
