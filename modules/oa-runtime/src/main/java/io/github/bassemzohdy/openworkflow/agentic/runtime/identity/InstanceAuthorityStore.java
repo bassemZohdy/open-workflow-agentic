@@ -62,6 +62,21 @@ public class InstanceAuthorityStore {
         });
     }
 
+    /** True only for a retained original start binding, not the mutable current reauthorization grant. */
+    public boolean matchesInitialGrant(Ulid instanceId, String tenant, Subject subject, Ulid requestedGrant) {
+        Objects.requireNonNull(instanceId, "instanceId"); Objects.requireNonNull(tenant, "tenant");
+        Objects.requireNonNull(subject, "subject");
+        return Transactions.inTransaction(dataSource, connection -> {
+            try (var ps = connection.prepareStatement("select initial_grant_known and initial_grant_id is not distinct from ? "
+                    + "from identity.instance_authority where instance_id=? and tenant=? and subject_kind=? and subject_id=?")) {
+                ps.setString(1, requestedGrant == null ? null : requestedGrant.value());
+                ps.setString(2, instanceId.value()); ps.setString(3, tenant);
+                ps.setString(4, subject.kind().name()); ps.setString(5, subject.id());
+                try (var rs = ps.executeQuery()) { return rs.next() && rs.getBoolean(1); }
+            }
+        });
+    }
+
     /**
      * The authority of the instance that the engine knows under {@code engineInstanceId}. This is how the identity is
      * re-established when a task calls back with the engine's id (the {@code X-Flow-Instance-Id} header).

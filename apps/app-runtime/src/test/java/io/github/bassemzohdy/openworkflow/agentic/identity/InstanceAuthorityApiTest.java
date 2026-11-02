@@ -132,6 +132,74 @@ class InstanceAuthorityApiTest {
     }
 
     @Test
+    void duplicateStartRequiresTheOriginalGrantEvenAfterReauthorization() throws Exception {
+        String tenant = newTenant(); String alice = token("alice", tenant, "oa.operate");
+        var first = grantOf(tenant, "alice", Duration.ofHours(1));
+        var second = grantOf(tenant, "alice", Duration.ofHours(2));
+        var original = body(first.id().value());
+        String id = given().header("Authorization", "Bearer " + alice).contentType("application/json").body(original)
+                .when().post("/instances").then().statusCode(202).extract().path("id");
+        given().header("Authorization", "Bearer " + alice).contentType("application/json").body(original)
+                .when().post("/instances").then().statusCode(200).body("id", equalTo(id));
+        var changed = new LinkedHashMap<>(original); changed.put("delegationGrantId", second.id().value());
+        var conflict = given().header("Authorization", "Bearer " + alice).contentType("application/json").body(changed)
+                .when().post("/instances").then().statusCode(409).extract().response();
+        org.junit.jupiter.api.Assertions.assertFalse(conflict.asString().contains(id));
+        var omitted = new LinkedHashMap<>(original); omitted.remove("delegationGrantId");
+        given().header("Authorization", "Bearer " + alice).contentType("application/json").body(omitted)
+                .when().post("/instances").then().statusCode(409);
+        assertTrue(authorityStore.markReauthorizationRequired(Ulid.parse(id), "grant.refused", Instant.now()));
+        reauthorize(alice, id, second.id().value()).statusCode(200);
+        assertEquals(second.id().value(), scalar("select grant_id from identity.instance_authority where instance_id = ?", id));
+        assertEquals(first.id().value(), scalar("select initial_grant_id from identity.instance_authority where instance_id = ?", id));
+        given().header("Authorization", "Bearer " + alice).contentType("application/json").body(original)
+                .when().post("/instances").then().statusCode(200).body("id", equalTo(id));
+        given().header("Authorization", "Bearer " + alice).contentType("application/json").body(changed)
+                .when().post("/instances").then().statusCode(409);
+    }
+
+    @Test
+    void concurrentDifferentGrantStartsCannotShareOneIdempotencyKey() throws Exception {
+        String tenant = newTenant(); String alice = token("alice", tenant, "oa.operate");
+        var first = body(grantOf(tenant, "alice", Duration.ofHours(1)).id().value());
+        var second = new LinkedHashMap<>(first);
+        second.put("delegationGrantId", grantOf(tenant, "alice", Duration.ofHours(1)).id().value());
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var barrier = new java.util.concurrent.CyclicBarrier(2);
+        try {
+            java.util.concurrent.Callable<io.restassured.response.Response> left = () -> {
+                barrier.await(20, java.util.concurrent.TimeUnit.SECONDS);
+                return given().header("Authorization", "Bearer " + alice).contentType("application/json").body(first)
+                        .when().post("/instances");
+            };
+            java.util.concurrent.Callable<io.restassured.response.Response> right = () -> {
+                barrier.await(20, java.util.concurrent.TimeUnit.SECONDS);
+                return given().header("Authorization", "Bearer " + alice).contentType("application/json").body(second)
+                        .when().post("/instances");
+            };
+            var f1 = pool.submit(left); var f2 = pool.submit(right);
+            var r1 = f1.get(60, java.util.concurrent.TimeUnit.SECONDS); var r2 = f2.get(60, java.util.concurrent.TimeUnit.SECONDS);
+            assertEquals(Set.of(202, 409), Set.of(r1.statusCode(), r2.statusCode()));
+            String id = (r1.statusCode() == 202 ? r1 : r2).path("id");
+            org.junit.jupiter.api.Assertions.assertFalse((r1.statusCode() == 409 ? r1 : r2).asString().contains(id));
+            assertEquals("1", scalar("select count(*)::text from task.instance where tenant = ?", tenant));
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test
+    void anInitiallyUndelegatedStartCannotBeRetriedWithAGrant() throws Exception {
+        String tenant = newTenant(); String alice = token("alice", tenant, "oa.operate");
+        var original = body(null);
+        String id = given().header("Authorization", "Bearer " + alice).contentType("application/json").body(original)
+                .when().post("/instances").then().statusCode(202).extract().path("id");
+        var changed = new LinkedHashMap<>(original); changed.put("delegationGrantId", grantOf(tenant, "alice", Duration.ofHours(1)).id().value());
+        given().header("Authorization", "Bearer " + alice).contentType("application/json").body(changed)
+                .when().post("/instances").then().statusCode(409);
+        given().header("Authorization", "Bearer " + alice).contentType("application/json").body(original)
+                .when().post("/instances").then().statusCode(200).body("id", equalTo(id));
+    }
+
+    @Test
     void aGrantThatIsNotUsableIsRefusedAndNoInstanceIsCreated() throws Exception {
         String tenant = newTenant();
         DelegationGrant others = grantOf(tenant, "bob", Duration.ofHours(1));

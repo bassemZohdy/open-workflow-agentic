@@ -151,6 +151,15 @@ public class InstanceResource {
             throw new WebApplicationException(e.getMessage(), Response.Status.CONFLICT);
         }
         InstanceRecord row = result.record();
+        if (!result.created()) {
+            try {
+                if (!authorities.matchesInitialGrant(caller.tenant(), caller.subject(), row.id(), parseGrant(body.delegationGrantId()))) {
+                    throw new WebApplicationException("the idempotency key was already used for a different request", Response.Status.CONFLICT);
+                }
+            } catch (GrantException e) {
+                throw problem(e);
+            }
+        }
         URI location = uri.getBaseUriBuilder().path(InstanceResource.class).path(row.id().value()).build();
         Response.Status status = result.created() ? Response.Status.ACCEPTED : Response.Status.OK;
         Response response = Response.status(status).location(location).entity(view(row)).build();

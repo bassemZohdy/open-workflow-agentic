@@ -311,6 +311,7 @@ Implementation owner: **Claude**; reviewer: **GPT**; backlog: Claude-01. Shared 
 
 Implemented scope:
 
+- Additive V77.1 captures the original start grant atomically and immutably for new authority rows, including inserts from older replicas. The instance API checks that original binding on duplicate starts, even after reauthorization. Pre-migration rows have unknown original grants and receive a conflict on retry rather than a guessed match; old application replicas do not enforce the new retry check. This does not complete supported delegation, live asynchronous authority or event-triggered start binding.
 - JWT verification, scoped grants, replay protection, RFC 8693 client, mounted-secret rotation and wait reauthorization are implemented.
 - T07 is automated using in-process stand-ins; issuer interoperability is not proven.
 - 102a audit endpoints bind verified caller subject/kind/scopes before querying; GPT reviewed PR #39 at 28f6e9bcced23fd865a1bd559508175eab8b6858 with green audit CI.
@@ -417,7 +418,7 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-05. Shared pat
 
 Implemented scope:
 
-- Lifecycle start and retry now require the original full owner as well as the request fingerprint when reusing a tenant-wide idempotency key, including while checkpoint storage is unavailable. A different owner receives a conflict without an instance ID; event-specific binding and delegated-grant replay identity remain open.
+- Lifecycle start and retry now require the original full owner as well as the request fingerprint when reusing a tenant-wide idempotency key, including while checkpoint storage is unavailable. A different owner receives a conflict without an instance ID; event-specific binding and recovery of legacy unknown-grant retries remain open.
 - WP-105a/b/c/d implement the registry, task state machines, outbox/projection, reconciler and operator APIs.
 - Linked retry of FAILED instances and direct cancellation before engine preparation are implemented.
 - Merged diagnostic90 exposes disabled-by-default actual engine snapshots and asynchronous dev-publish failure evidence. Actual postmerge99631cc passes1432 with verified archived reports; absent engine remains unknown and issue75 is not fixed by passing runs or diagnostics.

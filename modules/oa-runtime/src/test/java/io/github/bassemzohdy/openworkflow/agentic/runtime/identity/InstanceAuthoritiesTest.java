@@ -316,6 +316,9 @@ class InstanceAuthoritiesTest {
         InstanceAuthorities down = new InstanceAuthorities(broken, grants, IdentityTestSupport.audit(sink, clock), clock);
 
         assertEquals(Outcome.UNAVAILABLE, down.recheck(UlidGenerator.shared().next()).outcome());
+        var error = assertThrows(GrantException.class,
+                () -> down.matchesInitialGrant(tenant, alice, UlidGenerator.shared().next(), null));
+        assertEquals(GrantException.Code.UNAVAILABLE, error.code());
     }
 
     // ---- re-authorization ----------------------------------------------------------------------------------------------
