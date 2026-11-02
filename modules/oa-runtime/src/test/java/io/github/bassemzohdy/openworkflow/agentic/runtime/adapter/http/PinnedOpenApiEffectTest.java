@@ -184,4 +184,30 @@ class PinnedOpenApiEffectTest {
                 (audience,action)->{throw new AssertionError();},token->{},other));
         assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget.Lookup(URI.create("https://orders.example/%2e%2e/lookup"),Set.of(200)));
     }
+
+    @Test void selectsLookupOnlyFromTheSamePinnedDocumentAndContract() {
+        String entry="\"/lookup\":{\"get\":{\"operationId\":\"findOrder\",\"parameters\":[{\"name\":\"Idempotency-Key\",\"in\":\"header\",\"required\":true,\"schema\":{\"type\":\"string\"}}],\"responses\":{\"200\":{\"description\":\"complete\"}}}},";
+        String doc=secured(DOC.replace("\"paths\":{", "\"paths\":{"+entry));
+        var op=rawOperation(doc,"createOrder",ORIGIN);
+        var selected=op.registrationWithLookupOperation(doc,"findOrder",Set.of(200),"tool:orders","orders","corr",Duration.ofSeconds(2),
+                Set.of(200),Set.of(),EXPECTED,(audience,action)->{throw new AssertionError();},token->{});
+        assertNotEquals(fingerprint(registration(op,Set.of(200))),fingerprint(selected));
+        assertThrows(IllegalArgumentException.class,()->op.registrationWithLookupOperation(doc+" ","findOrder",Set.of(200),"tool:orders","orders","corr",Duration.ofSeconds(2),
+                Set.of(200),Set.of(),EXPECTED,(audience,action)->{throw new AssertionError();},token->{}));
+        assertThrows(IllegalArgumentException.class,()->op.registrationWithLookupOperation(doc,"findOrder",Set.of(204),"tool:orders","orders","corr",Duration.ofSeconds(2),
+                Set.of(200),Set.of(),EXPECTED,(audience,action)->{throw new AssertionError();},token->{}));
+        String bad=doc.replace("\"name\":\"Idempotency-Key\"","\"name\":\"Other\"");
+        var badOp=rawOperation(bad,"createOrder",ORIGIN);
+        assertThrows(IllegalArgumentException.class,()->badOp.registrationWithLookupOperation(bad,"findOrder",Set.of(200),"tool:orders","orders","corr",Duration.ofSeconds(2),
+                Set.of(200),Set.of(),EXPECTED,(audience,action)->{throw new AssertionError();},token->{}));
+        String anonymous=doc.replace("\"operationId\":\"findOrder\"","\"operationId\":\"findOrder\",\"security\":[]");
+        var anonymousOp=rawOperation(anonymous,"createOrder",ORIGIN);
+        assertThrows(IllegalArgumentException.class,()->anonymousOp.registrationWithLookupOperation(anonymous,"findOrder",Set.of(200),"tool:orders","orders","corr",Duration.ofSeconds(2),
+                Set.of(200),Set.of(),EXPECTED,(audience,action)->{throw new AssertionError();},token->{}));
+        String wrongScope=doc.replace("\"securitySchemes\":{\"Bearer\":", "\"securitySchemes\":{\"OAuth\":{\"type\":\"oauth2\",\"flows\":{\"clientCredentials\":{\"scopes\":{\"orders:read\":\"read\"}}}},\"Bearer\":")
+                .replace("\"operationId\":\"findOrder\"", "\"operationId\":\"findOrder\",\"security\":[{\"OAuth\":[\"orders:read\"]}]");
+        var wrongScopeOp=rawOperation(wrongScope,"createOrder",ORIGIN);
+        assertThrows(IllegalArgumentException.class,()->wrongScopeOp.registrationWithLookupOperation(wrongScope,"findOrder",Set.of(200),"tool:orders","orders","corr",Duration.ofSeconds(2),
+                Set.of(200),Set.of(),EXPECTED,(audience,action)->{throw new AssertionError();},token->{}));
+    }
 }

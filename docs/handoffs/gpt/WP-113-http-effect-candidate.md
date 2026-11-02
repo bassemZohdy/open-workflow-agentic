@@ -76,6 +76,11 @@ the same scoped credential and fresh authority checks. Only explicitly selected 
 contract is supplied separately and is not inferred or approved from the OpenAPI document. A service must guarantee
 that selected statuses prove completion for that exact key; the same audience and scopes must authorize lookup. An
 uncertain lookup also reserves transport capacity. This is a candidate, not proof of a real provider's behavior.
+Alternatively, trusted composition can select a unique fixed-path GET operation from the same pinned OpenAPI document.
+The selector requires one declared required `Idempotency-Key` string header, supported security compatible with the
+pinned credential, and explicitly documented confirmation statuses. It refuses other parameters and operation-level
+server overrides. This checks the documented interface but does not prove that the provider's response means the
+original effect completed; that semantic guarantee still requires a service contract.
 
 Sixteen slots are shared by candidate instances in one classloader and are acquired before credential acquisition.
 A completed refusal before target dispatch releases its slot; the supplier must independently bound any physical

@@ -1,5 +1,7 @@
 # Changelog
 
+- Select optional effect lookup operations from the same pinned OpenAPI document, checking the GET, idempotency header, security and documented confirmation statuses.
+
 - Add an opt-in, same-origin authoritative lookup for HTTP effect recovery, preserving unknown outcomes and refusing output after authority loss.
 
 - Allow explicitly documented service-contract rejection statuses to be retained as failed effects without retry; unselected statuses remain unknown.

@@ -157,6 +157,60 @@ public final class PinnedOpenApiEffect {
                 });
     }
 
+    /** Select a same-origin GET lookup from the identical pinned document; service semantics still need approval. */
+    public GovernedToolGateway.Registration registrationWithLookupOperation(String document, String lookupId,
+            Set<Integer> lookupConfirmed, String target, String audience, String correlation, Duration timeout,
+            Set<Integer> confirmed, Set<Integer> rejected, PinnedHttpEffectTarget.CredentialExpectation expectation,
+            PinnedHttpEffectTarget.CredentialProvider credentials, PinnedHttpEffectTarget.PreSendFence fence) {
+        byte[] bytes = CanonicalEncoder.strictUtf8(Objects.requireNonNull(document));
+        if (bytes.length > 262_144 || !documentDigest.equals(CanonicalEncoder.sha256Hex(bytes)))
+            throw new IllegalArgumentException("lookup document differs from the approved document");
+        if (lookupId == null || !lookupId.matches("[A-Za-z0-9._-]{1,128}")) throw new IllegalArgumentException("invalid lookup operation ID");
+        final JsonNode root;
+        try { root=JSON.readTree(document); }
+        catch (java.io.IOException invalid) { throw new IllegalArgumentException("invalid OpenAPI JSON",invalid); }
+        JsonNode chosen=null, pathItem=null; String path=null; int matches=0;
+        var paths=root.path("paths").fields();
+        while(paths.hasNext()) {
+            var item=paths.next();
+            for(String method:METHODS) {
+                JsonNode operation=item.getValue().get(method);
+                if(operation!=null && operation.isObject() && lookupId.equals(operation.path("operationId").asText())) {
+                    if(!"get".equals(method))throw new IllegalArgumentException("lookup operation must use GET");
+                    matches++; chosen=operation; pathItem=item.getValue(); path=item.getKey();
+                }
+            }
+        }
+        if(matches!=1 || path==null || !pathParameters(path).isEmpty() || pathItem.has("$ref")
+                || pathItem.has("parameters") || pathItem.has("servers") || chosen.has("servers") || chosen.has("requestBody"))
+            throw new IllegalArgumentException("lookup must be a unique fixed-path GET without overrides");
+        JsonNode params=chosen.path("parameters");
+        if(!params.isArray() || params.size()!=1 || !params.get(0).isObject())
+            throw new IllegalArgumentException("lookup requires one idempotency-key header");
+        JsonNode parameter=params.get(0); var fields=new java.util.HashSet<String>(); parameter.fieldNames().forEachRemaining(fields::add);
+        if(!Set.of("name","in","required","schema","description","style","explode","deprecated").containsAll(fields)
+                || !"Idempotency-Key".equalsIgnoreCase(parameter.path("name").asText())
+                || !"header".equals(parameter.path("in").asText()) || !parameter.path("required").isBoolean()
+                || !parameter.path("required").asBoolean() || !parameter.path("schema").isObject()
+                || parameter.path("schema").size()!=1 || !"string".equals(parameter.path("schema").path("type").asText())
+                || (parameter.has("style") && !"simple".equals(parameter.path("style").asText()))
+                || (parameter.has("explode") && (!parameter.path("explode").isBoolean() || parameter.path("explode").asBoolean())))
+            throw new IllegalArgumentException("unsupported lookup header contract");
+        Set<String> requiredScopes=securityScopes(root,chosen);
+        if(requiredScopes!=null && !requiredScopes.equals(expectation.scopes()))
+            throw new IllegalArgumentException("lookup scopes differ from pinned credentials");
+        Set<Integer> statuses=Set.copyOf(lookupConfirmed); JsonNode responses=chosen.path("responses");
+        if(!responses.isObject())throw new IllegalArgumentException("lookup responses required");
+        for(int status:statuses) {
+            JsonNode response=responses.get(Integer.toString(status));
+            if(response==null || !resolveObject(response,root.path("components").path("responses"),"responses")
+                    .path("description").isTextual())throw new IllegalArgumentException("lookup response is not documented");
+        }
+        String origin=endpoint.getScheme()+"://"+endpoint.getRawAuthority();
+        var lookup=new PinnedHttpEffectTarget.Lookup(URI.create(origin+path),statuses);
+        return registration(target,audience,correlation,timeout,confirmed,rejected,expectation,credentials,fence,lookup);
+    }
+
     private record BoundRequest(URI endpoint, String body) { }
 
     private BoundRequest bind(String arguments) {

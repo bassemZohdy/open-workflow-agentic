@@ -919,7 +919,9 @@ class GovernedModelRunningControlTest {
                          "required":["amount"],"properties":{"amount":{"type":"number","minimum":1}}}},
                          "requestBodies":{"OrderBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}}},
                          "responses":{"Done":{"description":"done"}}},
-                         "paths":{"/orders/{orderId}":{"post":{"operationId":"createOrder",
+                         "paths":{"/lookup":{"get":{"operationId":"findOrder","parameters":[{"name":"Idempotency-Key","in":"header",
+                         "required":true,"schema":{"type":"string"}}],"responses":{"200":{"description":"complete"}}}},
+                         "/orders/{orderId}":{"post":{"operationId":"createOrder",
                          "parameters":[{"name":"orderId","in":"path","required":true,"schema":{"type":"string"}},
                          {"name":"region","in":"query","required":true,"schema":{"type":"string"}},
                          {"name":"channel","in":"query","schema":{"type":"string"}}],
@@ -933,12 +935,10 @@ class GovernedModelRunningControlTest {
                 var grant = UlidGenerator.shared().next();
                 var expectation = new io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.http.PinnedHttpEffectTarget.CredentialExpectation(
                         "issuer", grant, Set.of("orders:write"));
-                var registration = op.registration("registered:test", "orders", "corr", Duration.ofSeconds(2), Set.of(200), Set.of(422),
+                var registration = op.registrationWithLookupOperation(document, "findOrder", Set.of(200), "registered:test", "orders", "corr", Duration.ofSeconds(2), Set.of(200), Set.of(422),
                         expectation, (audience, action) -> action.run(new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken(
                                 io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Credential.of("fixture-token"), audience,
-                                Set.of("orders:write"), Instant.now().plusSeconds(60), "issuer", "jti", List.of("worker"), grant)), token -> { },
-                        new io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.http.PinnedHttpEffectTarget.Lookup(
-                                java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/lookup"), Set.of(200)));
+                                Set.of("orders:write"), Instant.now().plusSeconds(60), "issuer", "jti", List.of("worker"), grant)), token -> { });
                 var registry = Map.of("tool:research", registration);
                 var profile = new ApprovedToolProfile("fixture", "1", GovernedToolGateway.configurationFingerprint(registry),
                         AGENT, Set.of("tool:research"), 3, Duration.ofSeconds(2));
