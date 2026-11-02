@@ -322,6 +322,12 @@ Before starting a restored instance, the reconciler also checks its own stored w
 lifetime after authority and checkpoint preparation. An expired instance is cancelled or failed even if the bounded
 deadline scan has not reached it. This check is not an atomic fence around the engine start or a multi-replica lease.
 
+**Open recovery defect:** the pinned Flow SDK refuses cancellation of a restored `PENDING` instance. A process-level
+test found that a deadline expiring while the application is down can leave the registry `CANCEL_REQUESTED` after
+restart; it remained there throughout the observed 60-second check. The intentionally failing reproduction is on
+the [reproduction branch](https://github.com/bassemZohdy/open-workflow-agentic/blob/codex/WP-109-process-deadline-recovery/docs/handoffs/WP-109-pending-cancellation-reproduction.md).
+Do not start expired work merely to make SDK cancellation succeed: that could execute a task after its deadline.
+
 ### 9.6 Entry points for 105d
 
 Java methods on `Reconciler`, to be exposed by the operations API with its own authorization:

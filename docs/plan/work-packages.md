@@ -624,6 +624,7 @@ Implementation status: **partial**.
 Remaining gates:
 
 - Complete deployed role grants and verify mixed-version rollout; implement escalation timers and prove deadline recovery across restart and replicas.
+- Fix restored PENDING instances refusing cancellation when a deadline passes during downtime; the real-process regression on codex/WP-109-process-deadline-recovery currently fails.
 - Establish scan fairness across restart and replicas, and verify shared-pool and cluster capacity under load.
 - Run two execution replicas with durable Kubernetes lease mode; test node loss and post-warmup recovery.
 - Automate T12.
