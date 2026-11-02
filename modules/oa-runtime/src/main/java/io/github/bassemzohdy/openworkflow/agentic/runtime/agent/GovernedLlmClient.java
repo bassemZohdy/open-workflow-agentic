@@ -60,6 +60,10 @@ public class GovernedLlmClient {
      * replacement for the execution-entry authority fence.
      */
     String complete(ApprovedModelContext.Approved expected, String system, String user) {
+        return complete(expected, system, user, null);
+    }
+
+    String complete(ApprovedModelContext.Approved expected, String system, String user, Integer maxOutputTokens) {
         Objects.requireNonNull(expected, "expected");
         Objects.requireNonNull(system, "system");
         Objects.requireNonNull(user, "user");
@@ -67,13 +71,17 @@ public class GovernedLlmClient {
         if (expected.budgetRemainingMicros() == 0L) {
             throw new ModelCallRefused("no model budget remaining for this model call");
         }
+        if (maxOutputTokens != null && !provider.supportsOutputTokenLimit()) {
+            throw new ModelCallRefused("provider cannot enforce an output-token limit");
+        }
         var decision = pep.modelCall(expected.agent(), expected.task(), expected.modelId(), expected.budgetRemainingMicros());
         return Pep.guard(decision, () -> {
             requireProviderModel(expected.modelId());
             requireSameApproval(expected);
             final String output;
             try {
-                output = provider.complete(system, user);
+                output = maxOutputTokens == null ? provider.complete(system, user)
+                        : provider.complete(system, user, maxOutputTokens);
             } catch (RuntimeException providerFailure) {
                 // Provider exceptions must never masquerade as a refusal before the provider was reached.
                 throw new ProviderCallFailed();

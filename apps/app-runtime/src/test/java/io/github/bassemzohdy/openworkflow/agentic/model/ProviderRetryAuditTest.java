@@ -38,6 +38,7 @@ class ProviderRetryAuditTest {
     // shared as plain string system properties (a non-string value in the system properties breaks other libraries).
     static final String PORT = "oa.test.retry-audit.port";
     static final String COUNT = "oa.test.retry-audit.count";
+    static final String BODY = "oa.test.retry-audit.body";
 
     static synchronized int port() {
         synchronized (System.class) {
@@ -48,7 +49,8 @@ class ProviderRetryAuditTest {
                         synchronized (System.class) {
                             System.setProperty(COUNT, Integer.toString(count() + 1));
                         }
-                        exchange.getRequestBody().readAllBytes();
+                        System.setProperty(BODY, new String(exchange.getRequestBody().readAllBytes(),
+                                java.nio.charset.StandardCharsets.UTF_8));
                         byte[] body = "{\"error\":{\"message\":\"boom\"}}".getBytes();
                         exchange.getResponseHeaders().add("Content-Type", "application/json");
                         exchange.sendResponseHeaders(500, body.length);
@@ -105,5 +107,19 @@ class ProviderRetryAuditTest {
         }
         assertThrows(RuntimeException.class, () -> provider.complete("system", "hello"));
         assertEquals(1, count(), "physical requests made by one chat() against a failing provider");
+    }
+
+    @Test
+    void boundedCallSendsItsOutputLimitInTheActualHttpRequest() throws Exception {
+        synchronized (System.class) {
+            System.setProperty(COUNT, "0");
+            System.clearProperty(BODY);
+        }
+        assertThrows(RuntimeException.class, () -> provider.complete("system", "hello", 37));
+        assertEquals(1, count());
+        var body = new com.fasterxml.jackson.databind.ObjectMapper().readTree(System.getProperty(BODY));
+        var limit = body.has("max_completion_tokens") ? body.get("max_completion_tokens") : body.get("max_tokens");
+        org.junit.jupiter.api.Assertions.assertNotNull(limit, "provider request must carry an output-token ceiling");
+        assertEquals(37, limit.intValue());
     }
 }
