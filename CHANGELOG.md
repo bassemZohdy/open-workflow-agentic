@@ -1,5 +1,7 @@
 # Changelog
 
+- Provide and test read-only resource provenance grants for manual effect recovery.
+
 - Revalidate resource-scoped effect provenance during manual resolution and replay.
 
 - Provide and test least-privilege scope-key grants for the legacy effect guard.

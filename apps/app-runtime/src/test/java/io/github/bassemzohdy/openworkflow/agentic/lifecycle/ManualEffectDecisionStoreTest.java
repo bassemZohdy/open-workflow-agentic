@@ -431,6 +431,47 @@ class ManualEffectDecisionStoreTest {
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
     }
 
+    @Test void resourceManualResolutionNeedsReadOnlyProvenanceGrants() throws Exception {
+        var f=fixture(support.db,"a".repeat(64));var scope=f.binding().scope();
+        var command=EffectCommand.of(scope.threadId(),"tool:charge",scope.key(),"approved-fixture","{}");
+        ledger.prepareResourceScoped(scope,command,Duration.ZERO,Instant.now());ledger.markAttempted(command.key());
+        ledger.requireManualResolution(command.key(),"effect.outcome.unknown");
+        var ready=new Ready(scope.owner(),f.row(),command);var caller=authority(ready,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var role="manual_probe_"+UUID.randomUUID().toString().replace("-","");var request=UlidGenerator.shared().next();
+        try(var c=support.db.owner.getConnection();var q=c.createStatement()) {
+            q.execute("create role "+role+" nologin noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls");
+            q.execute("grant usage on schema effect,task,audit to "+role);
+            // Separately supplied fixture prerequisites; not a proposed production permission set.
+            q.execute("grant all on all tables in schema effect to "+role);
+            q.execute("grant all on all sequences in schema effect to "+role);
+            q.execute("grant select,update on task.instance to "+role);
+            q.execute("grant select on audit.source_binding,audit.event to "+role);
+        }
+        try {
+            var roleData=asRole(role);var roleLedger=new JdbcEffectLedger(roleData,manager,producer);
+            var resolver=new ManualEffectResolver(roleData,manager,allowingPep(),new AuditAppendOnce(support.db.owner),roleLedger);
+            var denied=assertThrows(StoreUnavailableException.class,()->resolver.resolve(caller,command.key(),request,EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+            assertEquals("42501",assertInstanceOf(SQLException.class,denied.getCause()).getSQLState());
+            assertEquals(EffectState.INTENDED,ledger.find(command.key()).orElseThrow().state());
+            assertEquals(0,count("select count(*) from effect.manual_decision_applied"));
+            var root=java.nio.file.Path.of("").toAbsolutePath();
+            while(root!=null&&!java.nio.file.Files.isRegularFile(root.resolve("deploy/sql/manual-effect-provenance-grants.sql")))root=root.getParent();
+            assertNotNull(root,"manual provenance grant template not found");
+            var sql=java.nio.file.Files.readString(root.resolve("deploy/sql/manual-effect-provenance-grants.sql"))
+                    .replace("__MANUAL_PROVENANCE_READER__",role);
+            try(var c=support.db.owner.getConnection();var q=c.createStatement()){q.execute(sql);}
+            try(var c=roleData.getConnection();var q=c.createStatement()) {
+                assertEquals("42501",assertThrows(SQLException.class,()->q.executeUpdate("update task.resource_call set fingerprint=fingerprint")).getSQLState());
+                assertEquals("42501",assertThrows(SQLException.class,()->q.executeUpdate("delete from task.resource_occurrence")).getSQLState());
+            }
+            assertEquals(EffectState.CONFIRMED,resolver.resolve(caller,command.key(),request,EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
+            assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+            assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        } finally {
+            try(var c=support.db.owner.getConnection();var q=c.createStatement()){q.execute("drop owned by "+role);q.execute("drop role "+role);}
+        }
+    }
+
     @Test void resourceScopedUnknownEffectCanBeResolvedAndRejectsCorruptReplay() throws Exception {
         var f=fixture(support.db,"a".repeat(64));var scope=f.binding().scope();
         var command=EffectCommand.of(scope.threadId(),"tool:charge",scope.key(),"approved-fixture","{}");
