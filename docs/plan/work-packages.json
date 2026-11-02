@@ -1342,11 +1342,20 @@
       "reuse": [],
       "notes": "",
       "progress": {
-        "status": "not-started",
-        "implemented": [],
+        "status": "partial",
+        "implemented": [
+          "The research graph applies approved per-run iteration and wall-clock limits through its existing node interceptor. The interceptor now rechecks the deadline after the mandatory started audit, refusing execution if audit latency consumed the remaining time; the admitted attempt remains counted. Limits remain process-local and restart resets them."
+        ],
         "completed_deliverables": [],
-        "remaining_tasks": [],
-        "evidence": []
+        "remaining_tasks": [
+          "Implement durable shared token, cost, time, iteration and tool-call accounting across retries and restarts; enforce it at all relevant gateways and graph boundaries.",
+          "Add durable exhaustion escalation and prove T06, including concurrent and restart cases."
+        ],
+        "evidence": [
+          "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptor.java",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptorTest.java",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/ResearchAgentNodeLimitsTest.java"
+        ]
       }
     },
     {

@@ -1,5 +1,7 @@
 # Changelog
 
+- Recheck the research graph node deadline after its started audit, preventing a delayed audit from allowing a late node to begin. Cross-restart budgets and exhaustion escalation remain open.
+
 - Harden the isolated human-task proposal against changing assignment or deadline while closing a task; separately versioned in-progress changes remain supported.
 
 - Prove an abruptly stopped writer leaves its staged human wake recoverable by a new owner without a duplicate receipt. Workflow-checkpoint process crash remains open.

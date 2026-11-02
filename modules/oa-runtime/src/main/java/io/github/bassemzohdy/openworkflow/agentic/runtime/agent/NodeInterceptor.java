@@ -25,7 +25,7 @@ import org.bsc.langgraph4j.state.AgentState;
  *   <li>the wall-clock deadline, when there is one, must not have passed; otherwise the node is refused;</li>
  *   <li>the step is counted against {@code maxSteps}; when the limit is already reached the node is refused;</li>
  *   <li>{@code agent.node.started} is recorded; if that record cannot be written the node is refused;</li>
- *   <li>the node runs;</li>
+ *   <li>the deadline is rechecked after the started audit; the node runs only while it is still current;</li>
  *   <li>{@code agent.node.completed} is recorded and the result is returned only after that write succeeds. If the
  *       write fails the result is dropped and the step fails, so graph state never advances on an unrecorded step.
  *       A node that throws is recorded as {@code agent.node.failed} (best effort) and its exception is rethrown.</li>
@@ -35,7 +35,8 @@ import org.bsc.langgraph4j.state.AgentState;
  *
  * <p>The deadline is {@code startedAt + maxWallClock}, fixed when the interceptor is made. It is checked when a node is
  * admitted, so a node already running is not interrupted (nothing here can stop it); the next node is refused. A
- * refused node does not use a step.
+ * node refused before admission does not use a step. If the started audit takes the request past its deadline, the
+ * attempt remains counted and the action is refused before it runs.
  *
  * <p>Every attempt counts, including retries and failures, so a loop cannot run past the limit by failing. One
  * interceptor is made for one run; its counter is not shared. Policy checks for what a node does (tool, model) stay
@@ -92,6 +93,7 @@ public final class NodeInterceptor {
         return state -> {
             int step = admit(node);
             record("agent.node.started", node, step, null, true);
+            requireCurrentDeadline(node, step);
             Map<String, Object> result;
             try {
                 result = action.apply(state);
@@ -105,11 +107,7 @@ public final class NodeInterceptor {
     }
 
     private int admit(String node) {
-        if (deadline != null && !clock.instant().isBefore(deadline)) {
-            int current = steps.get();
-            record("agent.node.refused", node, current, "wall-clock limit " + maxWallClock + " reached", false);
-            throw new NodeRefused("wall-clock limit " + maxWallClock + " reached before node " + node);
-        }
+        requireCurrentDeadline(node, steps.get());
         while (true) {
             int current = steps.get();
             if (current >= maxSteps) {
@@ -119,6 +117,13 @@ public final class NodeInterceptor {
             if (steps.compareAndSet(current, current + 1)) {
                 return current + 1;
             }
+        }
+    }
+
+    private void requireCurrentDeadline(String node, int step) {
+        if (deadline != null && !clock.instant().isBefore(deadline)) {
+            record("agent.node.refused", node, step, "wall-clock limit " + maxWallClock + " reached", false);
+            throw new NodeRefused("wall-clock limit " + maxWallClock + " reached before node " + node);
         }
     }
 
