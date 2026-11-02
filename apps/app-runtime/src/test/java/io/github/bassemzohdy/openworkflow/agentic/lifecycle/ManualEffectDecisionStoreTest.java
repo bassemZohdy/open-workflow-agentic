@@ -445,15 +445,18 @@ class ManualEffectDecisionStoreTest {
                     return new Reply(Outcome.UNKNOWN,null);
                 }
             };
-            var worker=pool.submit(()->new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects(ledger)
-                    .execute(f.command(),target));
+            var worker=pool.submit(()->ledger.exclusively(f.command().key(),()->{
+                try{return target.lookup(f.command().key().idempotencyKey());}
+                catch(Exception failure){throw new IllegalStateException(failure);}
+            }));
             assertTrue(held.await(5,TimeUnit.SECONDS));
             var failure=assertThrows(io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException.class,
                     ()->resolver.resolve(authority,f.command().key(),request,EffectState.FAILED,"TARGET_REJECTED"));
             assertEquals("55P03",assertInstanceOf(SQLException.class,failure.getCause()).getSQLState());
             assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());
             assertEquals(0,count("select count(*) from effect.manual_decision_applied"));
-            release.countDown();assertEquals(EffectState.INTENDED,worker.get(5,TimeUnit.SECONDS).state());
+            release.countDown();assertEquals(io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget.Outcome.UNKNOWN,
+                    worker.get(5,TimeUnit.SECONDS).outcome());
             assertEquals(EffectState.FAILED,resolver.resolve(authority,f.command().key(),request,EffectState.FAILED,"TARGET_REJECTED").state());
             assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
             assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));

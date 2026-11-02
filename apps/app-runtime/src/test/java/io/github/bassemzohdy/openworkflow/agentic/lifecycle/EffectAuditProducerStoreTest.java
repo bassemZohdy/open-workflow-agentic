@@ -101,6 +101,17 @@ class EffectAuditProducerStoreTest {
         var prepared=ledger.prepareResourceScoped(call,command,Duration.ZERO,now());
         assertEquals(prepared,ledger.prepareResourceScoped(call,command,Duration.ZERO,now()));
         ledger.markAttempted(command.key());ledger.requireManualResolution(command.key(),"effect.outcome.unknown");
+        var calls=new java.util.concurrent.atomic.AtomicInteger();
+        var legacyTarget=new io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget() {
+            public String target(){return command.target();}
+            public Reply execute(String key){calls.incrementAndGet();return new Reply(Outcome.CONFIRMED,null);}
+            public Reply lookup(String key){calls.incrementAndGet();return new Reply(Outcome.UNKNOWN,null);}
+        };
+        var legacy=new DurableEffects(new JdbcEffectLedger(owned),Clock.systemUTC());
+        assertThrows(IllegalStateException.class,()->legacy.execute(command,legacyTarget));
+        var undo=EffectCommand.of(call.threadId(),"tool:refund",call.key(),command.target(),"refund");
+        assertThrows(IllegalStateException.class,()->legacy.compensate(command.key(),undo,legacyTarget));
+        assertEquals(0,calls.get(),"legacy execution must not look up, dispatch or compensate a scoped effect");
         var facts=Transactions.inTransaction(owned,c->producer.forKey(c,command.key(),0,128));
         assertEquals(List.of(AuditSource.Transition.INTENT,AuditSource.Transition.DISPATCH,AuditSource.Transition.UNKNOWN),
                 facts.stream().map(v->v.source().transition()).toList());
@@ -130,6 +141,15 @@ class EffectAuditProducerStoreTest {
         try(var c=owned.getConnection();var q=c.prepareStatement("select count(*) from audit.event where event_type like 'effect.%'")) {
             try(var r=q.executeQuery()){assertTrue(r.next());assertEquals(3,r.getInt(1));}
         }
+        // An unscoped original must not reuse a separately scoped compensation key either.
+        ledger.recordOutcome(command.key(),EffectState.CONFIRMED,"confirmed");
+        var scopedUndo=EffectCommand.of(call.threadId(),"tool:scoped-refund",call.key(),command.target(),"refund");
+        ledger.prepareCompensation(command.key(),scopedUndo,Duration.ZERO,now());
+        var unscopedOriginal=EffectCommand.of(call.threadId(),"tool:legacy-original",call.key(),command.target(),"legacy");
+        var legacyLedger=new JdbcEffectLedger(owned);legacyLedger.prepare(unscopedOriginal,Duration.ZERO,now());
+        legacyLedger.markAttempted(unscopedOriginal.key());legacyLedger.recordOutcome(unscopedOriginal.key(),EffectState.CONFIRMED,"confirmed");
+        var refused=assertThrows(IllegalStateException.class,()->legacy.compensate(unscopedOriginal.key(),scopedUndo,legacyTarget));
+        assertTrue(refused.getMessage().contains("scoped effect requires audited execution"));assertEquals(0,calls.get());
         // A direct writer cannot attach another workflow's retained resource call to a fresh legacy intent.
         var foreign=fixture();ledger.prepare(foreign.command(),Duration.ZERO,now());
         try(var c=owned.getConnection();var q=c.prepareStatement("""
@@ -145,6 +165,51 @@ class EffectAuditProducerStoreTest {
             q.setString(9,call.key());q.setString(10,key.threadId().value());q.setString(11,key.nodeId());q.setString(12,key.idempotencyKey());
             var denied=assertThrows(SQLException.class,q::executeUpdate);
             assertTrue(denied.getMessage().contains("effect resource call attribution differs"));
+        }
+    }
+
+    @Test void legacyExecutorRefusesMissingScopeTableAfterMigration() throws Exception {
+        var f=fixture();prepare(f);var calls=new java.util.concurrent.atomic.AtomicInteger();
+        var target=new io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget() {
+            public String target(){return f.command().target();}
+            public Reply execute(String key){calls.incrementAndGet();return new Reply(Outcome.CONFIRMED,null);}
+        };
+        try(var c=owned.getConnection();var q=c.createStatement()){q.execute("alter table effect.audit_scope rename to audit_scope_hidden_test");}
+        try {
+            var refused=assertThrows(IllegalStateException.class,()->new DurableEffects(new JdbcEffectLedger(owned)).execute(f.command(),target));
+            assertTrue(refused.getMessage().contains("missing after migration"));assertEquals(0,calls.get());
+        } finally {
+            try(var c=owned.getConnection();var q=c.createStatement()){q.execute("alter table effect.audit_scope_hidden_test rename to audit_scope");}
+        }
+    }
+
+    @Test void legacyExecutorFailsClosedWhenScopeReadIsNotGranted() throws Exception {
+        var f=fixture();prepare(f);var role="eap_no_scope_"+UUID.randomUUID().toString().replace("-","");
+        assertTrue(role.matches("eap_no_scope_[0-9a-f]{32}"));
+        try(var c=owned.getConnection();var q=c.createStatement()) {
+            q.execute("create role "+role+" nologin");q.execute("grant usage on schema effect to "+role);
+        }
+        try {
+            var limited=(DataSource)Proxy.newProxyInstance(DataSource.class.getClassLoader(),new Class<?>[]{DataSource.class},(p,m,a)->{
+                if(m.getName().equals("getConnection")) {
+                    var c=owned.getConnection();try(var q=c.createStatement()){q.execute("set role "+role);}return c;
+                }
+                throw new UnsupportedOperationException(m.getName());
+            });
+            var calls=new java.util.concurrent.atomic.AtomicInteger();
+            var target=new io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget() {
+                public String target(){return f.command().target();}
+                public Reply execute(String key){calls.incrementAndGet();return new Reply(Outcome.CONFIRMED,null);}
+            };
+            var error=assertThrows(StoreUnavailableException.class,()->new DurableEffects(new JdbcEffectLedger(limited)).execute(f.command(),target));
+            assertEquals("42501",assertInstanceOf(SQLException.class,error.getCause()).getSQLState());assertEquals(0,calls.get());
+            try(var c=owned.getConnection();var q=c.createStatement()) {
+                q.execute("grant select(thread_name,node_id,idempotency_key) on effect.audit_scope to "+role);
+            }
+            var scoped=assertThrows(IllegalStateException.class,()->new DurableEffects(new JdbcEffectLedger(limited)).execute(f.command(),target));
+            assertTrue(scoped.getMessage().contains("scoped effect requires audited execution"));assertEquals(0,calls.get());
+        } finally {
+            try(var c=owned.getConnection();var q=c.createStatement()){q.execute("drop owned by "+role);q.execute("drop role "+role);}
         }
     }
 

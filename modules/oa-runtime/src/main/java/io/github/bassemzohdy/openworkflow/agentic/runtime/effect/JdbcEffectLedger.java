@@ -418,6 +418,31 @@ public class JdbcEffectLedger implements EffectLedger {
             }
     }
 
+    /** Refuse silently treating a retained scoped effect as an unaudited legacy effect. */
+    void requireUnscoped(EffectKey key) {
+        Objects.requireNonNull(key);
+        transaction(c -> {
+            // V77 is absent on older migration baselines; it is the first version that can contain scopes.
+            try(var q=c.prepareStatement("select pg_catalog.to_regclass('effect.audit_scope')" );var r=q.executeQuery()) {
+                if(!r.next())throw new IllegalStateException("effect scope catalog is unavailable");
+                if(r.getString(1)==null) {
+                    try(var history=c.prepareStatement("select exists(select 1 from public.flyway_schema_history where version='77' and success)");
+                        var versions=history.executeQuery()) {
+                        if(!versions.next() || versions.getBoolean(1))
+                            throw new IllegalStateException("effect scope table is missing after migration");
+                    }
+                    return null;
+                }
+            }
+            try(var q=c.prepareStatement("select 1 from effect.audit_scope"+WHERE)) {
+                bind(q,key);try(var r=q.executeQuery()) {
+                    if(r.next())throw new IllegalStateException("scoped effect requires audited execution");
+                }
+            }
+            return null;
+        });
+    }
+
     /** Session lock, not a network-spanning transaction. Competing workers fail without waiting. */
     public <T> T exclusively(EffectKey key, Supplier<T> work) {
         return isolated(()->claim(key,work));

@@ -126,6 +126,20 @@ class EffectAuditFactsMigrationTest {
             }finally{c.rollback();}}
         }
     }
+    @Test void legacyExecutionRemainsAvailableBeforeScopeMigration() throws Exception {
+        try(var db=new Database()) {
+            db.migrate("76");var f=fixture(db,"a".repeat(64));
+            var command=scope(f).command("pre-v77","occurrence","approved-target","{}");
+            var calls=new java.util.concurrent.atomic.AtomicInteger();
+            var target=new io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget() {
+                public String target(){return command.target();}
+                public Reply execute(String key){calls.incrementAndGet();return new Reply(Outcome.CONFIRMED,null);}
+            };
+            var effect=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects(new JdbcEffectLedger(db.owner));
+            assertEquals(EffectState.CONFIRMED,effect.execute(command,target).state());assertEquals(1,calls.get());
+        }
+    }
+
     @Test void nonemptySeventySixUpgradeDoesNotInventScopesSourcesOrReceipts() throws Exception {
         try(var db=new Database()) {
             db.migrate("76");var f=fixture(db,"a".repeat(64));var cmd=scope(f).command("legacy","occurrence","approved-target","{}");

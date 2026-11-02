@@ -39,6 +39,7 @@ class DurableEffectsCancellationTest {
             if(cancelClaim)Thread.currentThread().interrupt();
             try{return work.get();}finally{if(cancelUnlock)Thread.currentThread().interrupt();}
         }
+        @Override void requireUnscoped(EffectKey key) { }
         public Prepared prepare(EffectCommand command,Duration window,Instant now){
             prepares++;
             if(effect==null)effect=new Effect(command.key().threadId(),command.key().nodeId(),command.key().idempotencyKey(),

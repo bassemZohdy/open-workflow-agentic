@@ -67,7 +67,10 @@ public class DurableEffects {
         requireTarget(command, target);
         requireNotInterrupted();
         if (!slots.tryAcquire()) throw new JdbcEffectLedger.EffectBusyException();
-        try { return ledger.exclusively(command.key(), () -> {requireNotInterrupted();return executeLocked(command, target,scope,history);}); }
+        try { return ledger.exclusively(command.key(), () -> {
+            requireNotInterrupted();if(scope==null)ledger.requireUnscoped(command.key());
+            requireNotInterrupted();return executeLocked(command, target,scope,history);
+        }); }
         finally { slots.release(); }
     }
 
@@ -163,12 +166,16 @@ public class DurableEffects {
         try {
             return ledger.exclusively(original, () -> {
                 requireNotInterrupted();
+                if(scope==null)ledger.requireUnscoped(original);
+                requireNotInterrupted();
                 Runnable auditOriginal=scope==null?() -> { }:() -> {history.observedResourceHistory(scope,original,128);};
                 auditOriginal.run();requireNotInterrupted();
                 Effect before = ledger.find(original).orElseThrow();
                 requireNotInterrupted();
                 if (before.state() == EffectState.INTENDED) throw new IllegalStateException("resolve original first");
                 Effect undo = ledger.exclusively(compensation.key(), () -> {
+                    requireNotInterrupted();
+                    if(scope==null)ledger.requireUnscoped(compensation.key());
                     requireNotInterrupted();
                     Duration window=Objects.requireNonNull(target.replayWindow(),"replayWindow");
                     requireNotInterrupted();
