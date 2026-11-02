@@ -179,6 +179,9 @@ public class DurableEffects {
                 if (currentWindow.isZero() || currentWindow.isNegative() || !now.isBefore(replay.replayUntil())
                         || !now.isBefore(replay.createdAt().plus(currentWindow)))
                     return new Reply(EffectTarget.Outcome.UNKNOWN, null);
+                if (!ledger.databaseReplayWindowOpen(replay, currentWindow))
+                    return new Reply(EffectTarget.Outcome.UNKNOWN, null);
+                requireNotInterrupted();
             }
             try { return Objects.requireNonNull(target.execute(key.idempotencyKey()), "target reply"); }
             catch (InterruptedException e) {

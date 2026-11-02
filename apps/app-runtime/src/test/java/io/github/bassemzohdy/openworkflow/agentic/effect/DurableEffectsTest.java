@@ -88,6 +88,24 @@ class DurableEffectsTest {
     }
 
     @Test
+    void recoveryDoesNotExtendOriginalRetentionWhenApplicationClocksDisagree() throws Exception {
+        EffectCommand command = JdbcEffectLedgerTest.command("replay-clock-skew");
+        Target target = new Target();
+        Instant creatorClock = Instant.now().plus(Duration.ofHours(1));
+        ledger.prepare(command, Duration.ofMillis(150), creatorClock);
+        ledger.markAttempted(command.key());
+        target.window = Duration.ofHours(2); // A later, wider guarantee cannot extend the original one.
+        Thread.sleep(400);
+        Clock slow = Clock.offset(Clock.systemUTC(), Duration.ofHours(-1));
+
+        Effect result = new DurableEffects(ledger, slow).execute(command, target);
+
+        assertEquals(EffectState.INTENDED, result.state());
+        assertEquals(0, target.calls.get(), "expired retention must not permit a second effect");
+        assertEquals(1, ledger.manualQueue(command.key().threadId(), 10).size());
+    }
+
+    @Test
     void replayIsWithheldWhenRetentionExpiresDuringDispatchTelemetry() {
         for (int scenario = 0; scenario < 3; scenario++) {
             boolean persistedLimit = scenario == 0;

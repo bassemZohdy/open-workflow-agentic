@@ -106,6 +106,33 @@ public class JdbcEffectLedger implements EffectLedger {
         return transaction(c->{projection.lockRoot(c,scope);return insert(c,intent,command.requestFingerprint(),until,"EFFECT",new EffectAuditProducer.Origin(scope,null));});
     }
 
+    /** Conservative replay check based on the database creation timestamp and its current clock.
+     * The original window is reconstructed from the two timestamps written together at intent creation, so an
+     * application clock skew or a later increase in the target's advertised window cannot extend that contract.
+     */
+    boolean databaseReplayWindowOpen(Prepared prepared, Duration currentWindow) {
+        if (prepared.replayUntil() == null || currentWindow.isNegative() || currentWindow.isZero()) return false;
+        Duration originalWindow = Duration.between(prepared.effect().recordedAt(), prepared.replayUntil());
+        // PostgreSQL timestamps have microsecond precision; round down rather than extend a replay guarantee.
+        originalWindow = originalWindow.minusNanos(1_000);
+        if (originalWindow.isNegative() || originalWindow.isZero() || originalWindow.compareTo(Duration.ofDays(30)) > 0)
+            return false;
+        Instant originalDeadline = prepared.createdAt().plus(originalWindow);
+        Instant currentDeadline = prepared.createdAt().plus(currentWindow);
+        long started = System.nanoTime();
+        Instant sampled = transaction(c -> {
+            try (PreparedStatement s = c.prepareStatement("select clock_timestamp()"); ResultSet r = s.executeQuery()) {
+                if (!r.next()) throw new SQLException("database clock unavailable");
+                return r.getTimestamp(1).toInstant();
+            }
+        });
+        // Include the whole query and cleanup duration, even though the sample occurred partway through it.
+        long elapsed = System.nanoTime() - started;
+        if (elapsed < 0 || sampled.isBefore(prepared.createdAt())) return false;
+        Instant conservativeNow = sampled.plusNanos(elapsed);
+        return conservativeNow.isBefore(originalDeadline) && conservativeNow.isBefore(currentDeadline);
+    }
+
     /** A compensation intent and its original link commit together, before any refund can be sent. */
     public Prepared prepareCompensation(EffectKey original, EffectCommand command, Duration window, Instant now) {
         if (!original.threadId().equals(command.key().threadId()) || original.equals(command.key())) {
