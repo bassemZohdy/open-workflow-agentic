@@ -23,6 +23,12 @@ import java.util.function.Function;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Future;
 import java.util.concurrent.Flow;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.sql.DataSource;
 
 /**
@@ -32,7 +38,8 @@ import javax.sql.DataSource;
  * never one from HTTP/workflow fields. No identity/PDP/task/target/lease implementation or default allowance exists
  * here. Production adoption must supply all of those, mandatory audit and governed node/output propagation.
  *
- * <p>Attempts are bounded with no queue or internally spawned workers. Close invalidates promptly, but a running
+ * <p>Attempts are bounded with no queue. The optional async entry uses bounded, gate-owned workers; its callback is
+ * still synchronous and must not detach work. Close invalidates promptly, but a running
  * attempt retains its slot and fence until the actual synchronous worker exits, even if JDBC ignores interruption.
  * A returned future, completion stage or JDK publisher is refused and quarantines that gate slot permanently: its
  * completion or cancellation does not prove that detached physical work stopped. This cannot detect hidden work
@@ -103,6 +110,8 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
     private final TransactionManager transactions;
     private final int limit;
     private final IoBounds io;
+    private final Semaphore workerSlots;
+    private final ThreadFactory workerFactory;
     private final Set<Attempt> active = new HashSet<>();
     private boolean closed;
 
@@ -117,8 +126,12 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         this.io = Objects.requireNonNull(io);
         if (maxInFlight < 1 || maxInFlight > 1024) throw new IllegalArgumentException("entry bound must be 1..1024");
         limit = maxInFlight;
+        workerSlots = new Semaphore(maxInFlight);
+        workerFactory = Thread.ofVirtual().name("resource-entry-", 0).inheritInheritableThreadLocals(false).factory();
     }
     public synchronized int activeCount() { return active.size(); }
+    /** Slots reserved by gate-owned workers, including workers that have not yet started or have not exited. */
+    public int reservedWorkerCount() { return limit - workerSlots.availablePermits(); }
     /** Legacy synchronous component callback. Production node composition must use openGoverned/executeGoverned. */
     public Attempt open(ResourceCallBinding binding, ResourceExecutionEntry entry, UUID executor,
                         ResourceExecutionFence trustedFence) {
@@ -129,6 +142,60 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         Objects.requireNonNull(trustedFence);
         if (!Objects.requireNonNull(binding).equals(trustedFence.binding)) throw new RefusedException("fence credential differs");
         return openInternal(binding, entry, executor, trustedFence, true);
+    }
+
+    /**
+     * Explicit candidate async transport around a synchronous governed callback. No queue or caller-supplied executor
+     * is used. Cancellation closes the attempt without interrupting the worker and cannot stop an in-flight effect;
+     * capacity is retained until the
+     * gate-owned worker actually exits. It is not installed in the application and has no process-wide bound.
+     */
+    public <T> Future<Result<T>> executeGovernedAsync(ResourceCallBinding binding, ResourceExecutionEntry entry,
+            UUID executor, CredentialFence trustedFence, Function<Running, T> callback) {
+        Objects.requireNonNull(callback, "callback");
+        var attempt = openGoverned(binding, entry, executor, trustedFence);
+        var result = new AsyncResult<T>(attempt);
+        if (!workerSlots.tryAcquire()) {
+            attempt.close();
+            result.outcome.completeExceptionally(new RefusedException("worker capacity unavailable"));
+            return result;
+        }
+        try {
+            workerFactory.newThread(() -> {
+                try {
+                    result.outcome.complete(attempt.executeGoverned(callback));
+                } catch (Throwable failure) {
+                    result.outcome.completeExceptionally(failure);
+                    if (failure instanceof Error fatal) throw fatal;
+                } finally {
+                    workerSlots.release();
+                }
+            }).start();
+        } catch (RuntimeException | Error failure) {
+            workerSlots.release();
+            attempt.close();
+            throw failure;
+        }
+        return result;
+    }
+
+    /** The caller can cancel or wait, but cannot fabricate completion or access the private attempt. */
+    @JsonSerialize(using = TransientControlSerializer.class)
+    private final class AsyncResult<T> implements Future<Result<T>> {
+        private final Attempt attempt;
+        private final CompletableFuture<Result<T>> outcome = new CompletableFuture<>();
+        private AsyncResult(Attempt attempt) { this.attempt = attempt; }
+        @Override public boolean cancel(boolean mayInterruptIfRunning) {
+            if (outcome.isDone()) return false;
+            attempt.close();
+            return outcome.cancel(false);
+        }
+        @Override public boolean isCancelled() { return outcome.isCancelled(); }
+        @Override public boolean isDone() { return outcome.isDone(); }
+        @Override public Result<T> get() throws InterruptedException, ExecutionException { return outcome.get(); }
+        @Override public Result<T> get(long timeout, TimeUnit unit)
+                throws InterruptedException, ExecutionException, TimeoutException { return outcome.get(timeout, unit); }
+        @Override public String toString() { return "AsyncResourceResult[redacted]"; }
     }
     private synchronized Attempt openInternal(ResourceCallBinding binding, ResourceExecutionEntry entry, UUID executor,
                                              ResourceExecutionFence trustedFence, boolean governed) {

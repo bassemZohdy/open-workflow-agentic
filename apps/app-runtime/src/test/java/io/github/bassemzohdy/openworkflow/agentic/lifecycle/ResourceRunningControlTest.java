@@ -25,6 +25,138 @@ import org.junit.jupiter.api.Test;
 
 /** Real PG/control/identity mechanics. Fixture verifier and identity-only fence are NOT production composition. */
 class ResourceRunningControlTest {
+    @Test void managedAsyncReturnsOnlyAfterSynchronousWorkerEnds() throws Exception {
+        try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
+            db.migrate(null);var f=fixture(db,"a".repeat(64));var caller=Thread.currentThread();
+            var local=new InheritableThreadLocal<String>();local.set("must-not-propagate");
+            var ordinary=new ThreadLocal<String>();var firstWorker=new AtomicReference<Thread>();
+            try {
+                var paired=CredentialFence.pair(f.binding(),entry->{});
+                var result=gate.executeGovernedAsync(f.binding(),f.entry(1),UUID.randomUUID(),paired,r->{
+                    assertNotSame(caller,Thread.currentThread());
+                    assertNull(local.get(),"worker must not inherit ambient thread context");
+                    firstWorker.set(Thread.currentThread());ordinary.set("private-worker-value");
+                    r.requireCurrent(f.entry(1));return "fixture";
+                });
+                assertThrows(JsonProcessingException.class,()->new ObjectMapper().writeValueAsString(result));
+                var completed=result.get(10,TimeUnit.SECONDS);
+                assertEquals(Kind.CALLED,completed.kind());assertEquals("fixture",completed.value());
+                assertEquals(0,gate.activeCount());
+                assertFalse(result.cancel(true),"completed work cannot be cancelled");
+                awaitWorkerCount(gate,0);
+                var next=fixture(db,"a".repeat(64));var nextPair=CredentialFence.pair(next.binding(),entry->{});
+                var second=gate.executeGovernedAsync(next.binding(),next.entry(1),UUID.randomUUID(),nextPair,r->{
+                    assertNotSame(firstWorker.get(),Thread.currentThread());
+                    assertNull(ordinary.get(),"ordinary thread locals must not leak across attempts");
+                    return "second";
+                });
+                assertEquals("second",second.get(10,TimeUnit.SECONDS).value());
+            } finally {local.remove();}
+        }
+    }
+
+    @Test void cancellingAsyncWaiterKeepsCapacityUntilWorkerActuallyExits() throws Exception {
+        try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
+            db.migrate(null);var f=fixture(db,"a".repeat(64));var entered=new CountDownLatch(1);
+            var release=new CountDownLatch(1);var control=new AtomicReference<Running>();
+            try {
+                var paired=CredentialFence.pair(f.binding(),entry->{});
+                var result=gate.executeGovernedAsync(f.binding(),f.entry(1),UUID.randomUUID(),paired,r->{
+                    control.set(r);entered.countDown();
+                    try {
+                        if(!release.await(10,TimeUnit.SECONDS))throw new IllegalStateException("test timed out");
+                        assertThrows(RefusedException.class,r::requireCurrent);
+                        return "private output";
+                    } catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+                });
+                assertTrue(entered.await(10,TimeUnit.SECONDS));
+                assertTrue(result.cancel(true));assertTrue(result.isCancelled());
+                assertThrows(CancellationException.class,result::get);
+                assertThrows(RefusedException.class,control.get()::requireCurrent);
+                assertEquals(1,gate.activeCount(),"cancel is not physical termination");
+                assertEquals(1,gate.reservedWorkerCount());
+                assertThrows(RefusedException.class,()->gate.executeGovernedAsync(
+                        f.binding(),f.entry(1),UUID.randomUUID(),paired,r->"must not run"));
+                release.countDown();awaitActiveCount(gate,0);awaitWorkerCount(gate,0);
+                var retained=gate.openGoverned(f.binding(),f.entry(1),UUID.randomUUID(),paired)
+                        .executeGoverned(r->{fail("the committed entry must not run twice");return "duplicate";});
+                assertEquals(Kind.RETAINED,retained.kind());assertNull(retained.value());
+            } finally {release.countDown();}
+        }
+    }
+
+    @Test void closingAsyncGateDoesNotReleaseRunningWorkerEarly() throws Exception {
+        try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
+            db.migrate(null);var f=fixture(db,"a".repeat(64));var entered=new CountDownLatch(1);
+            var release=new CountDownLatch(1);
+            try {
+                var paired=CredentialFence.pair(f.binding(),entry->{});
+                var result=gate.executeGovernedAsync(f.binding(),f.entry(1),UUID.randomUUID(),paired,r->{
+                    entered.countDown();
+                    try {if(!release.await(10,TimeUnit.SECONDS))throw new IllegalStateException("test timed out");}
+                    catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+                    return "private output";
+                });
+                assertTrue(entered.await(10,TimeUnit.SECONDS));gate.close();
+                assertEquals(1,gate.activeCount());assertEquals(1,gate.reservedWorkerCount());assertFalse(result.isDone());
+                release.countDown();
+                var refused=assertThrows(ExecutionException.class,()->result.get(10,TimeUnit.SECONDS));
+                assertInstanceOf(RefusedException.class,refused.getCause());
+                assertEquals(0,gate.activeCount());assertTrue(gate.find(f.binding().scope()).isPresent());
+                assertThrows(RefusedException.class,()->gate.executeGovernedAsync(
+                        f.binding(),f.entry(1),UUID.randomUUID(),paired,r->"must not run"));
+            } finally {release.countDown();}
+        }
+    }
+
+    @Test void cancellationDuringAdmissionKeepsCapacityAndDoesNotCreateEntry() throws Exception {
+        try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
+            db.migrate(null);var f=fixture(db,"a".repeat(64));var entered=new CountDownLatch(1);
+            var release=new CountDownLatch(1);var callbacks=new AtomicInteger();
+            try {
+                var paired=CredentialFence.pair(f.binding(),entry->{
+                    entered.countDown();
+                    try {if(!release.await(10,TimeUnit.SECONDS))throw new IllegalStateException("test timed out");}
+                    catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+                });
+                var result=gate.executeGovernedAsync(f.binding(),f.entry(1),UUID.randomUUID(),paired,
+                        r->{callbacks.incrementAndGet();return "private";});
+                assertTrue(entered.await(10,TimeUnit.SECONDS));assertTrue(result.cancel(false));
+                assertEquals(1,gate.activeCount(),"blocked admission still occupies its worker");
+                assertEquals(1,gate.reservedWorkerCount());
+                release.countDown();awaitActiveCount(gate,0);awaitWorkerCount(gate,0);
+                assertEquals(0,callbacks.get());assertTrue(gate.find(f.binding().scope()).isEmpty());
+            } finally {release.countDown();}
+        }
+    }
+
+    @Test void managedWorkerReturningAnotherStageStillQuarantinesEntry() throws Exception {
+        try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
+            db.migrate(null);var f=fixture(db,"a".repeat(64));var detached=new CompletableFuture<String>();
+            var paired=CredentialFence.pair(f.binding(),entry->{});
+            var result=gate.executeGovernedAsync(f.binding(),f.entry(1),UUID.randomUUID(),paired,r->detached);
+            var refusal=assertThrows(ExecutionException.class,()->result.get(10,TimeUnit.SECONDS));
+            assertInstanceOf(RefusedException.class,refusal.getCause());
+            awaitWorkerCount(gate,0);
+            assertEquals(1,gate.activeCount(),"detached work must retain the entry slot");
+            detached.complete("finished");
+            assertEquals(1,gate.activeCount(),"stage completion does not prove physical termination");
+            assertTrue(gate.find(f.binding().scope()).isPresent());
+        }
+    }
+
+    private static void awaitActiveCount(JdbcResourceExecutionGate gate,int expected) throws Exception {
+        long until=System.nanoTime()+Duration.ofSeconds(10).toNanos();
+        while(gate.activeCount()!=expected && System.nanoTime()<until)Thread.sleep(20);
+        assertEquals(expected,gate.activeCount(),"worker did not actually terminate");
+    }
+
+    private static void awaitWorkerCount(JdbcResourceExecutionGate gate,int expected) throws Exception {
+        long until=System.nanoTime()+Duration.ofSeconds(10).toNanos();
+        while(gate.reservedWorkerCount()!=expected && System.nanoTime()<until)Thread.sleep(20);
+        assertEquals(expected,gate.reservedWorkerCount(),"worker slot did not retire");
+    }
+
     @Test void observableAsynchronousResultsRefuseAndQuarantineCapacity() throws Exception {
         try(var db=new Database()) {
             db.migrate(null);

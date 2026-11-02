@@ -399,7 +399,12 @@ The explicit entry gate now refuses a returned JDK future, completion stage or p
 quarantines its slot, even if that object completes or is cancelled. Tests verify that the committed entry survives
 and the escaped control no longer works. This per-gate bound cannot detect hidden asynchronous work behind other
 values, stop a physical effect already started, or bound multiple independently constructed gates. Production
-composition still requires a trusted synchronous worker or a protocol that proves actual termination.
+composition still requires a trusted synchronous worker or a protocol that proves actual termination. An explicit
+managed async path now runs the synchronous callback on a fresh gate-owned virtual worker, with no queue or inherited
+thread locals and a bounded worker-slot semaphore. Cancelling the waiter or closing the gate invalidates the attempt
+without releasing that worker slot until the worker exits. Tests cover cancellation during admission and callback,
+shutdown, retained entries, nested-stage quarantine and context isolation. This path is not installed in production;
+it cannot detect hidden detached work, stop an in-flight effect, or impose a process-wide bound across gates.
 
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`
