@@ -73,6 +73,7 @@ public final class GovernedModelGateway implements ModelGateway {
         } catch (RuntimeException e) {
             return new ModelResult.Failed("the model call failed");
         }
+        if (text == null) return new ModelResult.Failed("the model call produced no answer");
         long micros;
         try {
             micros = cost.applyAsLong(call, text);

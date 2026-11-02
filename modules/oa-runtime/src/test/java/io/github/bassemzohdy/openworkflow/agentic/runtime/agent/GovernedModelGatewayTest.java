@@ -145,6 +145,18 @@ class GovernedModelGatewayTest {
         assertFalse(failed.reason().contains("secret"));
     }
 
+    @Test void providerReturningNoAnswerIsACompletedAttemptFailure() {
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        LlmClient empty = (system, user) -> { calls.incrementAndGet(); return null; };
+        var costCalls = new java.util.concurrent.atomic.AtomicInteger();
+        var failed = assertInstanceOf(ModelResult.Failed.class, gateway(APPROVED, (call, text) -> {
+            costCalls.incrementAndGet(); return 0L;
+        }, empty).complete(CALL));
+        assertEquals(1, calls.get());
+        assertEquals(0, costCalls.get());
+        assertTrue(failed.reason().contains("no answer"));
+    }
+
     @Test void providerExceptionsCannotMasqueradeAsPreCallRefusals() {
         var denial = new io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision("provider", DecisionOutcome.DENY,
                 "private provider detail", io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef.FAIL_CLOSED, CLOCK.instant());
