@@ -122,6 +122,12 @@ class InboxCheckpointRecoveryTest {
             s.setString(1,row.id().value());try(var r=s.executeQuery()){r.next();return r.getInt(1);}
         }
     }
+    private String deliveryState(InboxWait wait) throws Exception {
+        try(var c=dataSource.getConnection();var q=c.prepareStatement("select state from inbox.delivery where tenant=? and instance_id=? and wait_key=?")) {
+            q.setString(1,wait.tenant());q.setString(2,wait.instanceId().value());q.setString(3,wait.key());
+            try(var r=q.executeQuery()){assertTrue(r.next());return r.getString(1);}
+        }
+    }
     @Test void failureAfterAuditInsertRollsBackAuditAndAcknowledgementTogether() throws Exception {
         try(var f=new Fixture(2)) {
             var interrupted=new JdbcInboxCheckpointRecovery(dataSource,(c,e)->{
@@ -167,6 +173,78 @@ class InboxCheckpointRecoveryTest {
                 assertTrue(owned.reserve(f.claims.get(i),f.waits.get(i)).isEmpty());
             }
             assertEquals(2,recoveryAudits(f.row),"rechecking a committed acknowledgement must not append another audit");
+        }
+    }
+    @Test void concurrentOwnedAcknowledgementsShareOneRetainedAudit() throws Exception {
+        try(var f=new Fixture(2);var pool=Executors.newFixedThreadPool(2)) {
+            var both=new CountDownLatch(2);
+            var service=new JdbcOwnedInbox(dataSource,leases,inbox,proof,audit,Clock.systemUTC(),event->{
+                both.countDown();
+                try {if(!both.await(10,TimeUnit.SECONDS))throw new IllegalStateException("both acknowledgements did not reach audit");}
+                catch(InterruptedException failure){Thread.currentThread().interrupt();throw new IllegalStateException(failure);}
+                CheckpointRecoveryAudit.record(dataSource,event);
+            });
+            var one=pool.submit(()->service.acknowledge(f.waits.getFirst()));
+            var two=pool.submit(()->service.acknowledge(f.waits.getFirst()));
+            assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,one.get(20,TimeUnit.SECONDS));
+            assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,two.get(20,TimeUnit.SECONDS));
+            assertEquals(1,recoveryAudits(f.row));assertEquals(1,acknowledged(f.row));
+        }
+    }
+    @Test void lostReplyAfterOwnedAuditReusesTheSameEventDuringRecovery() throws Exception {
+        try(var f=new Fixture(2)) {
+            var interrupted=new JdbcOwnedInbox(dataSource,leases,inbox,proof,audit,Clock.systemUTC(),event->{
+                CheckpointRecoveryAudit.record(dataSource,event);throw new IllegalStateException("lost acknowledgement reply");
+            });
+            assertThrows(IllegalStateException.class,()->interrupted.acknowledge(f.waits.getFirst()));
+            assertEquals(1,recoveryAudits(f.row));assertEquals(0,acknowledged(f.row));
+            assertTrue(recovery.repairBatch(f.row,f.appId,64));
+            assertEquals(2,recoveryAudits(f.row));assertEquals(2,acknowledged(f.row));
+        }
+    }
+    @Test void ownedAuditAndRecoveryRaceShareOneEvent() throws Exception {
+        try(var f=new Fixture(2);var pool=Executors.newSingleThreadExecutor()) {
+            var recorded=new CountDownLatch(1);var resume=new CountDownLatch(1);
+            var service=new JdbcOwnedInbox(dataSource,leases,inbox,proof,audit,Clock.systemUTC(),event->{
+                CheckpointRecoveryAudit.record(dataSource,event);recorded.countDown();
+                try {if(!resume.await(10,TimeUnit.SECONDS))throw new IllegalStateException("audit release timed out");}
+                catch(InterruptedException failure){Thread.currentThread().interrupt();throw new IllegalStateException(failure);}
+            });
+            try {
+                var result=pool.submit(()->service.acknowledge(f.waits.getFirst()));
+                assertTrue(recorded.await(10,TimeUnit.SECONDS));assertTrue(recovery.repairBatch(f.row,f.appId,64));
+                resume.countDown();assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,result.get(10,TimeUnit.SECONDS));
+                assertEquals(2,recoveryAudits(f.row));assertEquals(2,acknowledged(f.row));
+            } finally {resume.countDown();}
+        }
+    }
+    @Test void conflictingEventForRetainedAuditIdentityCannotAcknowledgeTheCheckpoint() throws Exception {
+        try(var f=new Fixture(2)) {
+            var conflicted=new JdbcOwnedInbox(dataSource,leases,inbox,proof,audit,Clock.systemUTC(),event->{
+                var attributes=new HashMap<>(event.attributes());attributes.put("event.attempt","999");
+                audit.record(AuditDraft.of(event.id(),event.occurredAt(),event.actor(),event.action(),event.resourceType(),event.resourceId(),attributes));
+                CheckpointRecoveryAudit.record(dataSource,event);
+            });
+            assertThrows(IllegalStateException.class,()->conflicted.acknowledge(f.waits.getFirst()));
+            assertEquals("DISPATCHED",deliveryState(f.waits.getFirst()));
+            assertThrows(IllegalStateException.class,()->recovery.repairBatch(f.row,f.appId,64));
+            assertEquals("DISPATCHED",deliveryState(f.waits.getFirst()));
+        }
+    }
+    @Test void retainedCheckpointAuditSourceCannotBeMutatedOrForged() throws Exception {
+        try(var f=new Fixture(2)) {
+            assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,owned.acknowledge(f.waits.getFirst()));
+            try(var c=dataSource.getConnection();var q=c.prepareStatement("update inbox.checkpoint_audit_source set dispatch_attempt=dispatch_attempt+1 where tenant=? and instance_id=?")) {
+                q.setString(1,f.row.tenant());q.setString(2,f.row.id().value());assertThrows(java.sql.SQLException.class,q::executeUpdate);
+            }
+            try(var c=dataSource.getConnection();var q=c.prepareStatement("insert into inbox.checkpoint_audit_source "
+                    +"(tenant,instance_id,wait_key,identity_digest,receipt_fingerprint,dispatch_attempt,event_id,occurred_at) "
+                    +"select tenant,instance_id,wait_key,identity_digest,?,dispatch_attempt,?,clock_timestamp() "
+                    +"from inbox.checkpoint_receipt where tenant=? and instance_id=? and wait_key=?")) {
+                q.setString(1,"0".repeat(64));q.setString(2,UlidGenerator.shared().next().value());
+                q.setString(3,f.row.tenant());q.setString(4,f.row.id().value());q.setString(5,f.waits.getLast().key());
+                assertThrows(java.sql.SQLException.class,q::executeUpdate);
+            }
         }
     }
     @Test void mismatchedApplicationTenantAndFullOwnerFailBeforeAuditOrAcknowledgement() throws Exception {

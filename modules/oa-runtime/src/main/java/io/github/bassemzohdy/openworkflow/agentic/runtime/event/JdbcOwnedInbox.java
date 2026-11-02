@@ -25,8 +25,9 @@ public class JdbcOwnedInbox {
     private final JdbcInboxCheckpointProof proof;
     private final AuditSink audit;
     private final Clock clock;
+    private final java.util.function.Consumer<AuditEvent> checkpointAudit;
     private record Row(String state,int attempts,Instant deadline,String task,String owner,Long epoch) { }
-    private record Consumed(Reserved reservation,boolean acknowledged) { }
+    private record Consumed(AuditEvent draft,boolean acknowledged) { }
 
     @Inject public JdbcOwnedInbox(DataSource dataSource,JdbcInboxTaskLease leases,JdbcEventInbox inbox,
                                  JdbcInboxCheckpointProof proof,AuditTrail audit) {
@@ -34,9 +35,16 @@ public class JdbcOwnedInbox {
     }
     public JdbcOwnedInbox(DataSource dataSource,JdbcInboxTaskLease leases,JdbcEventInbox inbox,
                           JdbcInboxCheckpointProof proof,AuditSink audit,Clock clock) {
+        this(dataSource,leases,inbox,proof,audit,clock,event->CheckpointRecoveryAudit.record(dataSource,event));
+    }
+    /** Explicit audit seam for fault-injection tests; production uses the retained-source appender. */
+    public JdbcOwnedInbox(DataSource dataSource,JdbcInboxTaskLease leases,JdbcEventInbox inbox,
+                          JdbcInboxCheckpointProof proof,AuditSink audit,Clock clock,
+                          java.util.function.Consumer<AuditEvent> checkpointAudit) {
         this.dataSource=Objects.requireNonNull(dataSource); this.leases=Objects.requireNonNull(leases);
         this.inbox=Objects.requireNonNull(inbox); this.proof=Objects.requireNonNull(proof);
         this.audit=Objects.requireNonNull(audit); this.clock=Objects.requireNonNull(clock);
+        this.checkpointAudit=Objects.requireNonNull(checkpointAudit);
     }
 
     /** The SDK evaluated this exact candidate's predicate outside the transaction; no different receipt is substituted. */
@@ -108,14 +116,16 @@ public class JdbcOwnedInbox {
         Optional<Consumed> consumed=Transactions.inTransaction(dataSource,c-> {
             instance(c,wait); Row row=row(c,wait);
             if(row==null || !(row.state.equals("DISPATCHED") || row.state.equals("ACKNOWLEDGED"))) return Optional.empty();
-            return signal(c,wait).filter(m-> {
-                try { return proof.consumed(c,wait,m); }
-                catch(SQLException unavailable) { throw new io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException("owned proof read failed",unavailable); }
-            }).map(m->new Consumed(new Reserved(wait,m,row.attempts,row.deadline),row.state.equals("ACKNOWLEDGED")));
+            var receipt=signal(c,wait);
+            if(receipt.isEmpty()||!proof.consumed(c,wait,receipt.get())) return Optional.empty();
+            if(row.state.equals("ACKNOWLEDGED"))return Optional.of(new Consumed(null,true));
+            var draft=CheckpointAuditSource.draft(c,wait.tenant(),wait.instanceId(),wait.key(),wait.digest(),
+                    receipt.get().fingerprint(),row.attempts,clock);
+            return Optional.of(new Consumed(draft,false));
         });
         if(consumed.isEmpty()) return Acknowledgement.NO_PROOF;
         if(consumed.get().acknowledged()) return Acknowledgement.ACKNOWLEDGED;
-        record(consumed.get().reservation(),null,"event.checkpoint.observed");
+        checkpointAudit.accept(consumed.get().draft());
         return Transactions.inTransaction(dataSource,c-> {
             instance(c,wait); Row row=row(c,wait);
             if(row==null || !(row.state.equals("DISPATCHED") || row.state.equals("ACKNOWLEDGED"))) return Acknowledgement.NO_RESERVATION;

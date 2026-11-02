@@ -1,5 +1,7 @@
 # Changelog
 
+- Retain one audit identity across concurrent owned checkpoint acknowledgements, crashes and recovery.
+
 - Avoid repeating acknowledgement audits when an owned checkpoint receipt was already acknowledged.
 
 - Verify human-wake checkpoint recovery after an abrupt application-process exit.

@@ -8,6 +8,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.event.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.CheckpointRecoveryAudit;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.*;
 import io.quarkiverse.flow.persistence.jpa.*;
@@ -105,7 +106,7 @@ class AtomicInboxCheckpointTest {
         assertInstanceOf(InboxCheckpointJpaOperations.class,operations);
         boolean finalizing=Set.of(Mode.ACK_DELAY,Mode.ACK_FAILURE,Mode.ACK_OWNER_LOSS).contains(mode);
         var ackEntered=new CompletableFuture<Void>();var releaseAck=new CompletableFuture<Void>();
-        var ackService=new JdbcOwnedInbox(dataSource,taskLeases,inbox,proof,e->{
+        var ackService=new JdbcOwnedInbox(dataSource,taskLeases,inbox,proof,audit,Clock.systemUTC(),e->{
             if(e.action().equals("event.checkpoint.observed")) {
                 ackEntered.complete(null);
                 try { releaseAck.get(10,TimeUnit.SECONDS); }
@@ -113,8 +114,8 @@ class AtomicInboxCheckpointTest {
                 catch(ExecutionException | TimeoutException error) { throw new IllegalStateException("ACK audit not released",error); }
                 if(mode==Mode.ACK_FAILURE) throw new IllegalStateException("injected ACK audit failure");
             }
-            audit.record(e);
-        },Clock.systemUTC());
+            CheckpointRecoveryAudit.record(dataSource,e);
+        });
         try(var gate = new PersistenceCommitGate(Duration.ofSeconds(15),Clock.systemUTC()); var broker = new Broker();
             var finalizer=new InboxCheckpointFinalizer(ackService,taskLeases)) {
             var next = new CompletableFuture<Void>(); var releaseNext = new CompletableFuture<Void>();

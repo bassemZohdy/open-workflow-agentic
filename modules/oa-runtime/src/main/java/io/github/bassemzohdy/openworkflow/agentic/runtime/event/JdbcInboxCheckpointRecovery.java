@@ -17,7 +17,6 @@ import javax.sql.DataSource;
 /** Historical actual-checkpoint ACK repair. Neither a callback return nor this repair grants dispatch/resume authority. */
 @ApplicationScoped @Transactional(Transactional.TxType.NOT_SUPPORTED)
 public class JdbcInboxCheckpointRecovery {
-    private static final Subject RECOVERY=new Subject(SubjectKind.SERVICE,"system:event-recovery");
     private static final String FACTS="""
             select p.wait_key,p.identity_digest,p.receipt_fingerprint,p.dispatch_attempt,p.application_id,
               p.engine_instance_id,p.task_position,p.iteration,p.task_digest,p.claim_owner,p.claim_epoch,
@@ -136,11 +135,7 @@ public class JdbcInboxCheckpointRecovery {
     }
     private static void key(PreparedStatement s,InstanceRecord row) throws SQLException { s.setString(1,row.tenant());s.setString(2,row.id().value()); }
     private void record(Connection connection,Receipt receipt) throws SQLException {
-        var values=new LinkedHashMap<String,String>();
-        values.put(AuditKeys.TENANT,receipt.task().tenant());values.put(AuditKeys.INSTANCE,receipt.task().instanceId().value());
-        values.put("event.wait",receipt.key());values.put("event.receipt",receipt.fingerprint());
-        values.put("event.attempt",Integer.toString(receipt.attempt()));values.put("event.repair","before-restore");
-        audit.record(connection,AuditDraft.of(UlidGenerator.shared().next(),clock.instant(),RECOVERY,"event.checkpoint.observed",
-                "event-delivery",receipt.digest(),values));
+        audit.record(connection,CheckpointAuditSource.draft(connection,receipt.task().tenant(),receipt.task().instanceId(),
+                receipt.key(),receipt.digest(),receipt.fingerprint(),receipt.attempt(),clock));
     }
 }

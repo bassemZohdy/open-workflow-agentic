@@ -81,6 +81,7 @@ class HumanWakeCheckpointTest {
     @Test void stagedWakeWithLostOwnerCannotCommitRealSdkCheckpoint() throws Exception { execute(true, false, false); }
     @Test void stagedWakeRecoversFromPersistedWorkflowWithoutRedelivery() throws Exception { execute(false, true, false); }
     @Test void separateRecoveryProcessesRepairRealCheckpointWithoutRepeatingAcknowledgement() throws Exception { execute(false, true, true); }
+    @Test void ownedAuditSurvivesProcessDeathBeforeAcknowledgement() throws Exception { execute(false,true,false,null,true); }
     @Test void killedCheckpointWriterIsRestoredByAFreshApplicationProcess() throws Exception {
         var manifest=java.nio.file.Files.createTempFile("human-process-checkpoint-", ".properties");
         try {
@@ -92,6 +93,9 @@ class HumanWakeCheckpointTest {
         execute(loseOwner,restore,processRecovery,null);
     }
     void execute(boolean loseOwner, boolean restore, boolean processRecovery, java.nio.file.Path crashManifest) throws Exception {
+        execute(loseOwner,restore,processRecovery,crashManifest,false);
+    }
+    private void execute(boolean loseOwner, boolean restore, boolean processRecovery, java.nio.file.Path crashManifest,boolean ownedCrash) throws Exception {
         try (var gate = new PersistenceCommitGate(Duration.ofSeconds(15), Clock.systemUTC()); var broker = new Broker()) {
             var next = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();
             var guarded = new CheckpointingWriter(borrowed(), gate, (op,id) -> {});
@@ -167,6 +171,13 @@ class HumanWakeCheckpointTest {
                     }
                     if (restore) {
                         gate.close(); // Stop the old workflow component before reconstructing it from JPA.
+                        if(ownedCrash) {
+                            assertEquals(0,acknowledgementAudits(row));
+                            recoveryProcess(row,app.id(),"owned-before-ack",79,wait);
+                            assertEquals(1,acknowledgementAudits(row));assertEquals("DISPATCHED",deliveryState(wait));
+                            recoveryProcess(row,app.id(),"halt",77);
+                            assertEquals(1,acknowledgementAudits(row));assertEquals("ACKNOWLEDGED",deliveryState(wait));
+                        }
                         if (processRecovery) {
                             assertEquals(0, acknowledgementAudits(row));
                             recoveryProcess(row, app.id(), "before-ack", 78);
@@ -211,15 +222,19 @@ class HumanWakeCheckpointTest {
         }
     }
     private void recoveryProcess(InstanceRecord row,String appId,String mode,int expectedExit) throws Exception {
+        recoveryProcess(row,appId,mode,expectedExit,null);
+    }
+    private void recoveryProcess(InstanceRecord row,String appId,String mode,int expectedExit,InboxWait wait) throws Exception {
         String url;try(var c=dataSource.getConnection()){url=c.getMetaData().getURL();}
         String classpath=System.getProperty("surefire.test.class.path",System.getProperty("java.class.path"));
         var args=java.nio.file.Files.createTempFile("human-checkpoint-recovery-", ".args");
         var output=java.nio.file.Files.createTempFile("human-checkpoint-recovery-", ".log");
         try {
             java.nio.file.Files.writeString(args,"-cp\n\""+classpath.replace("\\","\\\\").replace("\"","\\\"")+"\"\n");
-            var builder=new ProcessBuilder(java.nio.file.Path.of(System.getProperty("java.home"),"bin","java").toString(),
-                    "@"+args,HumanCheckpointRecoveryWorker.class.getName(),row.id().value(),appId,mode)
-                    .redirectErrorStream(true).redirectOutput(output.toFile());
+            var command=new ArrayList<String>(List.of(java.nio.file.Path.of(System.getProperty("java.home"),"bin","java").toString(),
+                    "@"+args,HumanCheckpointRecoveryWorker.class.getName(),row.id().value(),appId,mode));
+            if(wait!=null)command.addAll(List.of(wait.taskPosition(),Integer.toString(wait.iteration()),wait.route(),wait.eventType(),wait.filterDigest()));
+            var builder=new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output.toFile());
             builder.environment().put("HUMAN_CHECKPOINT_TEST_URL",url);
             var child=builder.start();
             try {
