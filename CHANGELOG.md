@@ -1,5 +1,7 @@
 # Changelog
 
+- Test an unactivated human-decision coordinator with pinned policy, post-audit caller freshness and uncertain commits using a test-only wait fence. Real lease fencing, replay authorization and workflow wakeup remain open.
+
 - Harden the isolated human-decision schema proposal with task-version, immutable-history and deferred decision/audit/wakeup consistency checks; real workflow authority and delivery remain open.
 
 - Prove same-decision recovery after a simulated lost commit reply in the isolated human journal; changed retained audit metadata fails closed. Actual process restart and workflow delivery remain open.

@@ -423,7 +423,8 @@ Deliverables:
 
 Implementation status: **partial**.
 - Implemented: Human-action facts and policy rules exist; an immutable decision identity distinguishes exact retries from changed actor, task, version, outcome or content. A non-wired preflight checks verified non-delegated caller authority and task facts before and after policy evaluation.
-- Implemented: An isolated, unactivated PostgreSQL proposal tests transactional task decision, a non-sensitive audit event and blocked wakeup, including exact retries, a simulated lost commit reply, concurrent conflicts, rollback and audit failure. Proposed database rules enforce task versioning, immutable retained decisions and consistent decision/audit/wakeup facts at commit. Production schema, live lease/current-authority checks, wakeup delivery and whole-chain verification remain open.
+- Implemented: An isolated, unactivated PostgreSQL proposal tests transactional task decision, a non-sensitive audit event and blocked wakeup, including exact retries, a simulated lost commit reply, concurrent conflicts, rollback and audit failure. Proposed database rules enforce task versioning, immutable retained decisions and consistent decision/audit/wakeup facts at commit.
+- Implemented: An unwired coordinator tests pinned-policy matching, rechecking caller expiry after audit, concurrent decisions and uncertain commit outcomes using a test-only wait fence. Production schema, a real commit-time lease fence, authorized replay, wakeup delivery and whole-chain verification remain open.
 
 Remaining gates:
 
