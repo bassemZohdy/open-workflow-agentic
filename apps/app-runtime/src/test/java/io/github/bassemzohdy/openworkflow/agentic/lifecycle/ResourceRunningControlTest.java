@@ -86,6 +86,48 @@ class ResourceRunningControlTest {
         }
     }
 
+    @Test void cancelledWorkerRetainsGateAndContextsThroughTerminationCleanup() throws Exception {
+        try (var db = new Database(); var gate = new JdbcResourceExecutionGate(db.owner, 1)) {
+            db.migrate(null); var f = fixture(db, "a".repeat(64));
+            var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+            var cleaning = new CountDownLatch(1); var finishCleanup = new CountDownLatch(1);
+            var count = new AtomicInteger();
+            try {
+                var paired = CredentialFence.pair(f.binding(), ignored -> {});
+                var result = gate.executeGovernedAsync(f.binding(), f.entry(1), UUID.randomUUID(), paired, running -> {
+                    entered.countDown();
+                    try { if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("test timed out"); }
+                    catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                    return "private";
+                }, () -> {
+                    count.incrementAndGet(); cleaning.countDown();
+                    try { if (!finishCleanup.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("cleanup timed out"); }
+                    catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                });
+                assertTrue(entered.await(10, TimeUnit.SECONDS));
+                assertTrue(result.cancel(false)); assertEquals(0, count.get());
+                release.countDown(); assertTrue(cleaning.await(10, TimeUnit.SECONDS));
+                assertEquals(1, gate.activeCount()); assertEquals(1, gate.reservedWorkerCount());
+                assertThrows(RefusedException.class, () -> gate.openGoverned(f.binding(), f.entry(1), UUID.randomUUID(), paired));
+                finishCleanup.countDown(); awaitActiveCount(gate, 0); awaitWorkerCount(gate, 0);
+                assertEquals(1, count.get());
+            } finally { release.countDown(); finishCleanup.countDown(); }
+        }
+    }
+
+    @Test void terminationFailureWithholdsTheCompletedCallbackResult() throws Exception {
+        try (var db = new Database(); var gate = new JdbcResourceExecutionGate(db.owner, 1)) {
+            db.migrate(null); var f = fixture(db, "a".repeat(64));
+            var paired = CredentialFence.pair(f.binding(), ignored -> {});
+            var result = gate.executeGovernedAsync(f.binding(), f.entry(1), UUID.randomUUID(), paired,
+                    running -> "private", () -> { throw new IllegalStateException("cleanup failure"); });
+            var failure = assertThrows(ExecutionException.class, () -> result.get(10, TimeUnit.SECONDS));
+            assertEquals("cleanup failure", failure.getCause().getMessage());
+            assertTrue(gate.find(f.binding().scope()).isPresent());
+            assertEquals(0, gate.activeCount()); assertEquals(0, gate.reservedWorkerCount());
+        }
+    }
+
     @Test void closingAsyncGateDoesNotReleaseRunningWorkerEarly() throws Exception {
         try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
             db.migrate(null);var f=fixture(db,"a".repeat(64));var entered=new CountDownLatch(1);
@@ -113,7 +155,7 @@ class ResourceRunningControlTest {
     @Test void cancellationDuringAdmissionKeepsCapacityAndDoesNotCreateEntry() throws Exception {
         try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
             db.migrate(null);var f=fixture(db,"a".repeat(64));var entered=new CountDownLatch(1);
-            var release=new CountDownLatch(1);var callbacks=new AtomicInteger();
+            var release=new CountDownLatch(1);var callbacks=new AtomicInteger();var terminated=new AtomicInteger();
             try {
                 var paired=CredentialFence.pair(f.binding(),entry->{
                     entered.countDown();
@@ -121,12 +163,13 @@ class ResourceRunningControlTest {
                     catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
                 });
                 var result=gate.executeGovernedAsync(f.binding(),f.entry(1),UUID.randomUUID(),paired,
-                        r->{callbacks.incrementAndGet();return "private";});
+                        r->{callbacks.incrementAndGet();return "private";}, terminated::incrementAndGet);
                 assertTrue(entered.await(10,TimeUnit.SECONDS));assertTrue(result.cancel(false));
+                assertEquals(0,terminated.get());
                 assertEquals(1,gate.activeCount(),"blocked admission still occupies its worker");
                 assertEquals(1,gate.reservedWorkerCount());
                 release.countDown();awaitActiveCount(gate,0);awaitWorkerCount(gate,0);
-                assertEquals(0,callbacks.get());assertTrue(gate.find(f.binding().scope()).isEmpty());
+                assertEquals(0,callbacks.get());assertEquals(1,terminated.get());assertTrue(gate.find(f.binding().scope()).isEmpty());
             } finally {release.countDown();}
         }
     }

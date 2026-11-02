@@ -177,39 +177,65 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
      */
     public <T> Future<Result<T>> executeGovernedAsync(ResourceCallBinding binding, ResourceExecutionEntry entry,
             UUID executor, CredentialFence trustedFence, Function<Running, T> callback) {
+        return executeGovernedAsync(binding, entry, executor, trustedFence, callback, () -> { });
+    }
+
+    /** The trusted termination action runs after the synchronous worker returns, including on cancellation. */
+    public <T> Future<Result<T>> executeGovernedAsync(ResourceCallBinding binding, ResourceExecutionEntry entry,
+            UUID executor, CredentialFence trustedFence, Function<Running, T> callback, Runnable onTermination) {
         Objects.requireNonNull(callback, "callback");
+        Objects.requireNonNull(onTermination, "onTermination");
         var attempt = openGoverned(binding, entry, executor, trustedFence);
         var result = new AsyncResult<T>(attempt);
         if (!workerSlots.tryAcquire()) {
             attempt.close();
-            result.outcome.completeExceptionally(new RefusedException("worker capacity unavailable"));
+            result.outcome.completeExceptionally(terminate(onTermination, new RefusedException("worker capacity unavailable")));
             return result;
         }
         if (!PROCESS_WORKERS.tryAcquire()) {
             workerSlots.release();
             attempt.close();
-            result.outcome.completeExceptionally(new RefusedException("process worker capacity unavailable"));
+            result.outcome.completeExceptionally(terminate(onTermination, new RefusedException("process worker capacity unavailable")));
             return result;
         }
+        attempt.managed = true; // Keep the gate slot through termination cleanup, not just callback return.
         try {
             workerFactory.newThread(() -> {
+                Result<T> value = null;
+                Throwable failure = null;
                 try {
-                    result.outcome.complete(attempt.executeGoverned(callback));
-                } catch (Throwable failure) {
+                    value = attempt.executeGoverned(callback);
+                } catch (Throwable caught) {
+                    failure = caught;
+                } finally {
+                    failure = terminate(onTermination, failure);
+                    workerSlots.release();
+                    if (attempt.phase.get() != 3) {
+                        retire(attempt);
+                        PROCESS_WORKERS.release();
+                    }
+                }
+                if (failure == null) result.outcome.complete(value);
+                else {
                     result.outcome.completeExceptionally(failure);
                     if (failure instanceof Error fatal) throw fatal;
-                } finally {
-                    workerSlots.release();
-                    if (attempt.phase.get() != 3) PROCESS_WORKERS.release();
                 }
             }).start();
         } catch (RuntimeException | Error failure) {
+            attempt.close();
+            var terminal = terminate(onTermination, failure);
+            retire(attempt);
             workerSlots.release();
             PROCESS_WORKERS.release();
-            attempt.close();
-            throw failure;
+            if (terminal instanceof Error fatal) throw fatal;
+            throw (RuntimeException) terminal;
         }
         return result;
+    }
+
+    private static Throwable terminate(Runnable action, Throwable failure) {
+        try { action.run(); return failure; }
+        catch (Throwable cleanup) { return combine(failure, cleanup); }
     }
 
     /** The caller can cancel or wait, but cannot fabricate completion or access the private attempt. */
@@ -285,6 +311,7 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         private final Running running;
         private final AtomicReference<ResourceExecutionFence> fence;
         private final AtomicBoolean invalid = new AtomicBoolean();
+        private volatile boolean managed;
         // 0 unstarted, 1 executing, 2 terminated, 3 quarantined after an observable detached result.
         private final AtomicInteger phase = new AtomicInteger();
         private Attempt(ResourceCallBinding binding, ResourceExecutionEntry entry, UUID executor,
@@ -342,12 +369,12 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
                 invalid.set(true);
                 fence.set(null);
                 phase.set(quarantine ? 3 : 2);
-                if (!quarantine) retire(this);
+                if (!quarantine && !managed) retire(this);
             }
         }
         @Override public void close() {
             invalid.set(true);
-            if (phase.compareAndSet(0, 2)) { fence.set(null); retire(this); }
+            if (phase.compareAndSet(0, 2)) { fence.set(null); if (!managed) retire(this); }
         }
         @Override public String toString() { return "ResourceEntryAttempt[redacted]"; }
     }

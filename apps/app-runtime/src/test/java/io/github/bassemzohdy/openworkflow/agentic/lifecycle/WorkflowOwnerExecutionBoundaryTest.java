@@ -118,6 +118,7 @@ class WorkflowOwnerExecutionBoundaryTest {
             catch (Exception failure) { c.rollback(); throw failure; }
         }
         exerciseOwnedResourceEntry(8);
+        exerciseOwnedResourceEntry(9);
     }
 
     // 0: current; 1/2: takeover; 3: grant revoked; 4: policy revoked; 5/6/7: deny, PDP or PEP audit failure.
@@ -147,7 +148,7 @@ class WorkflowOwnerExecutionBoundaryTest {
                     .instance(Map.of());
             var binding = register(appId, tenant, instance);
             var leases = new JdbcWorkflowOwnerLease(data);
-            claim.set(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(scenario == 8 ? 30 : 25)).orElseThrow().claim());
+            claim.set(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(scenario >= 8 ? 30 : 25)).orElseThrow().claim());
             instance.start();
             assertTrue(waiting.await(10, TimeUnit.SECONDS));
             var row = store.find(tenant, binding.instanceId()).orElseThrow();
@@ -192,7 +193,7 @@ class WorkflowOwnerExecutionBoundaryTest {
                 policyAudits.incrementAndGet();
                 if (scenario == 7) throw new IllegalStateException("fixture audit outage");
             }, Duration.ofSeconds(3), clock);
-            if (scenario == 8) {
+            if (scenario >= 8) {
                 var agent = new Subject(SubjectKind.AGENT, "audited-root-fixture");
                 var child = grants.delegate(grant.id(), workload, agent, Set.of("oa.agent.run"),
                         now.plusSeconds(600), null);
@@ -212,6 +213,35 @@ class WorkflowOwnerExecutionBoundaryTest {
                      var root = GovernedExecutionRoot.audited(data, transactions, 1,
                              JdbcResourceExecutionGate.IoBounds.defaults(), central::appendOnce)) {
                     assertThrows(Exception.class, () -> new ObjectMapper().writeValueAsString(root));
+                    if (scenario == 9) {
+                        var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+                        try {
+                            var pending = root.executeAsync(canonical, entry, UUID.randomUUID(), identity, policy, task, owner,
+                                    ignored -> {}, running -> {
+                                        entered.countDown();
+                                        try { if (!release.await(20, TimeUnit.SECONDS)) throw new IllegalStateException("test timed out"); }
+                                        catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                                        return "withheld";
+                                    });
+                            assertTrue(entered.await(20, TimeUnit.SECONDS));
+                            assertTrue(pending.cancel(false));
+                            assertThrows(CancellationException.class, pending::get);
+                            assertTrue(task.boundTo(entry, canonical), "cancellation must not close running task context");
+                            assertDoesNotThrow(() -> identity.requireCurrent(entry));
+                            release.countDown();
+                            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+                            while (task.boundTo(entry, canonical) && System.nanoTime() < deadline) Thread.sleep(10);
+                            assertFalse(task.boundTo(entry, canonical), "worker termination must retire task context");
+                            boolean identityClosed = false;
+                            while (!identityClosed && System.nanoTime() < deadline) {
+                                try { identity.requireCurrent(entry); }
+                                catch (IllegalStateException closed) { identityClosed = true; }
+                                if (!identityClosed) Thread.sleep(10);
+                            }
+                            assertTrue(identityClosed, "worker termination must retire identity context");
+                        } finally { release.countDown(); }
+                        return;
+                    }
                     var result = root.execute(canonical, entry, UUID.randomUUID(), identity, policy, task, owner,
                             ignored -> {}, running -> {
                                 running.requireCurrent(entry);

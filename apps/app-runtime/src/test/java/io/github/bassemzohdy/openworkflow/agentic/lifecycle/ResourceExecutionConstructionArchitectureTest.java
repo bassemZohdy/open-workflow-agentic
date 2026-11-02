@@ -41,7 +41,7 @@ class ResourceExecutionConstructionArchitectureTest {
                                     ||(owner.equals(GATE)&&name.equals("executeGovernedAsync"))
                                     ||(owner.equals(GATE+"$CredentialFence")&&name.equals("pair"))
                                     ||(owner.equals(GATE+"$Attempt")&&name.equals("executeGoverned"))
-                                    ||(owner.equals(ROOT)&&Set.of("pair","audited","execute").contains(name));
+                                    ||(owner.equals(ROOT)&&Set.of("pair","audited","execute","executeAsync").contains(name));
                             if(legacy||(controlled&&!root))events.add(SimpleConditionEvent.violated(item,call.getDescription()));
                         }
                     }
@@ -55,7 +55,7 @@ class ResourceExecutionConstructionArchitectureTest {
     }
     @TestFactory Stream<DynamicTest> eachIndependentBypassFixtureIsRejected() {
         return Stream.of(ConstructorLeak.class,LegacyEntryLeak.class,LegacyCallbackLeak.class,FenceLeak.class,
-                        AsyncEntryLeak.class,RootPairLeak.class,RootFactoryLeak.class,GovernedExecutionRoot.class)
+                        AsyncEntryLeak.class,RootPairLeak.class,RootFactoryLeak.class,RootAsyncLeak.class,GovernedExecutionRoot.class)
                 .map(type->DynamicTest.dynamicTest(type.getSimpleName(),()->{
                     var imported=new ClassFileImporter().importClasses(type);
                     assertTrue(rule(Set.of(ROOT)).evaluate(imported).hasViolation(),"missing guard for "+type.getName());
@@ -99,6 +99,15 @@ class ResourceExecutionConstructionArchitectureTest {
                            io.github.bassemzohdy.openworkflow.agentic.contracts.port.IdempotentAuditSink sink) {
             return io.github.bassemzohdy.openworkflow.agentic.runtime.execution.GovernedExecutionRoot
                     .audited(source,transactions,1,JdbcResourceExecutionGate.IoBounds.defaults(),sink);
+        }
+    }
+    static class RootAsyncLeak {
+        static Object run(io.github.bassemzohdy.openworkflow.agentic.runtime.execution.GovernedExecutionRoot root,
+                ResourceCallBinding binding, ResourceExecutionEntry entry, LiveIdentityResourceFence identity,
+                LiveResearchPolicyFence policy, ResourceTaskExecutionFence task,
+                io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.WorkflowOwnerResourceFence owner,
+                io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceExecutionFence audit) {
+            return root.executeAsync(binding, entry, UUID.randomUUID(), identity, policy, task, owner, audit, running -> "fixture");
         }
     }
     // Same simple name is insufficient: only the exact reviewed production package can be allowed.

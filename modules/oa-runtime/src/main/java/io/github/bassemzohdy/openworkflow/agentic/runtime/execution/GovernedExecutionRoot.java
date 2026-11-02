@@ -15,6 +15,8 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.WorkflowOwne
 import jakarta.transaction.TransactionManager;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import javax.sql.DataSource;
 
@@ -48,14 +50,68 @@ public final class GovernedExecutionRoot implements AutoCloseable {
             UUID executor, LiveIdentityResourceFence identity, LiveResearchPolicyFence policy,
             ResourceTaskExecutionFence task, WorkflowOwnerResourceFence owner, ResourceExecutionFence preEntryAudit,
             Function<JdbcResourceExecutionGate.Running, T> callback) {
-        var composite = CompositeExecutionFence.builder()
+        var composite = composite(identity, policy, task, owner, preEntryAudit);
+        var credential = pair(binding, identity, policy, task, composite);
+        return gate.openGoverned(binding, entry, executor, credential).executeGoverned(callback);
+    }
+
+    /**
+     * Transfers exclusive ownership of the four single-call contexts to a gate-owned worker. Cancellation invalidates
+     * the attempt but does not close the contexts or release the worker slot until synchronous work really returns.
+     * Submission failure closes them immediately. The callback must not detach work or return an async value.
+     */
+    public <T> Future<JdbcResourceExecutionGate.Result<T>> executeAsync(ResourceCallBinding binding,
+            ResourceExecutionEntry entry, UUID executor, LiveIdentityResourceFence identity,
+            LiveResearchPolicyFence policy, ResourceTaskExecutionFence task, WorkflowOwnerResourceFence owner,
+            ResourceExecutionFence preEntryAudit, Function<JdbcResourceExecutionGate.Running, T> callback) {
+        var retired = new AtomicBoolean();
+        Runnable retire = () -> {
+            if (retired.compareAndSet(false, true)) closeContexts(owner, task, policy, identity);
+        };
+        try {
+            Objects.requireNonNull(identity); Objects.requireNonNull(policy); Objects.requireNonNull(task); Objects.requireNonNull(owner);
+            var composite = composite(identity, policy, task, owner, preEntryAudit);
+            var credential = pair(binding, identity, policy, task, composite);
+            return gate.executeGovernedAsync(binding, entry, executor, credential, callback, retire);
+        } catch (RuntimeException | Error failure) {
+            try { retire.run(); }
+            catch (RuntimeException | Error cleanup) {
+                if (cleanup instanceof Error fatal && !(failure instanceof Error)) {
+                    fatal.addSuppressed(failure); throw fatal;
+                }
+                if (cleanup != failure) failure.addSuppressed(cleanup);
+            }
+            throw failure;
+        }
+    }
+
+    private static CompositeExecutionFence composite(LiveIdentityResourceFence identity, LiveResearchPolicyFence policy,
+            ResourceTaskExecutionFence task, WorkflowOwnerResourceFence owner, ResourceExecutionFence preEntryAudit) {
+        return CompositeExecutionFence.builder()
                 .with(CompositeExecutionFence.Check.IDENTITY, identity)
                 .with(CompositeExecutionFence.Check.POLICY, policy)
                 .with(CompositeExecutionFence.Check.TASK_AND_TARGET, task)
                 .with(CompositeExecutionFence.Check.OWNER_AND_LEASE, owner)
                 .with(CompositeExecutionFence.Check.AUDIT, preEntryAudit).build();
-        var credential = pair(binding, identity, policy, task, composite);
-        return gate.openGoverned(binding, entry, executor, credential).executeGoverned(callback);
+    }
+
+    private static void closeContexts(WorkflowOwnerResourceFence owner, ResourceTaskExecutionFence task,
+                                      LiveResearchPolicyFence policy, LiveIdentityResourceFence identity) {
+        Throwable failure = null;
+        for (Runnable close : new Runnable[]{() -> { if (owner != null) owner.close(); },
+                () -> { if (task != null) task.close(); }, () -> { if (policy != null) policy.close(); },
+                () -> { if (identity != null) identity.close(); }}) {
+            try { close.run(); }
+            catch (RuntimeException | Error caught) {
+                if (failure == null) failure = caught;
+                else if (caught instanceof Error && !(failure instanceof Error)) {
+                    caught.addSuppressed(failure); failure = caught;
+                }
+                else if (caught != failure) failure.addSuppressed(caught);
+            }
+        }
+        if (failure instanceof Error fatal) throw fatal;
+        if (failure instanceof RuntimeException runtime) throw runtime;
     }
 
     @Override public void close() { gate.close(); }

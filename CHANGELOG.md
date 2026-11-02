@@ -1,5 +1,7 @@
 # Changelog
 
+- Retain governed execution contexts and capacity through managed asynchronous termination.
+
 - Compose the audited execution root with live task, identity, policy and workflow-owner checks.
 
 - Enforce fresh-entry transaction and attribution when retaining resource-entry audit sources.
