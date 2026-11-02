@@ -83,6 +83,25 @@ class EffectAuditFactsMigrationTest {
             }
         }
     }
+    @Test void resourceScopeUpgradePreservesExistingScopedAuditFacts() throws Exception {
+        try(var db=new Database()) {
+            db.migrate("77.8");var f=fixture(db,"a".repeat(64)); Fact original;
+            try(var c=db.owner.getConnection()) {
+                c.setAutoCommit(false);original=initial(c,scope(f),true);c.commit();
+            }
+            db.migrate(null);db.flyway(null).validate();
+            try(var c=db.owner.getConnection()) {
+                var retained=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditProducer()
+                        .find(c,original.id()).orElseThrow();
+                assertEquals(original.source(),retained.source());assertEquals(original.draft(),retained.draft());
+                assertNull(valueOrNull(c,"select resource_call_key from effect.audit_scope where initial_event_id=?",original.id()));
+            }
+        }
+    }
+    private static String valueOrNull(Connection c,String query,Object arg) throws SQLException {
+        try(var q=c.prepareStatement(query)) {q.setObject(1,arg);try(var r=q.executeQuery()){assertTrue(r.next());return r.getString(1);}}
+    }
+
     @Test void maliciousSessionFunctionShadowsCannotChangeThePinnedCanonicalEncoding() throws Exception {
         try(var db=new Database()) {
             db.migrate(null);var f=fixture(db,"a".repeat(64));

@@ -5,6 +5,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEnco
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.*;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import java.sql.*;
 import java.time.Instant;
@@ -22,8 +23,10 @@ public final class EffectAuditProducer {
     private static final Subject ACTOR=new Subject(SubjectKind.SERVICE,"system:effect-ledger");
     private static final String WHERE=" where thread_name=? and node_id=? and idempotency_key=?";
     record Fact(long id,Instant occurredAt,EffectKey key,EffectState from,EffectState to,String reason) { }
-    record Origin(EffectScope scope,Long parentInitialId) { }
-    record Bound(EffectScope scope,long initialId,Long parentInitialId) { }
+    record Origin(EffectScope scope,Long parentInitialId,String resourceCallKey) {
+        Origin(EffectScope scope,Long parentInitialId) { this(scope,parentInitialId,null); }
+    }
+    record Bound(EffectScope scope,long initialId,Long parentInitialId,String resourceCallKey) { }
     public record Retained(AuditSource source,AuditEvent draft) {
         public Retained {
             Objects.requireNonNull(source);Objects.requireNonNull(draft);
@@ -54,36 +57,41 @@ public final class EffectAuditProducer {
     }
 
     Optional<Bound> bound(Connection c,EffectKey key) throws SQLException {
-        try(var q=c.prepareStatement("select tenant,registry_instance_id,owner_kind,owner_id,scope_fingerprint,initial_event_id,parent_initial_event_id from effect.audit_scope"+WHERE)) {
+        try(var q=c.prepareStatement("select tenant,registry_instance_id,owner_kind,owner_id,scope_fingerprint,initial_event_id,parent_initial_event_id,resource_call_key from effect.audit_scope"+WHERE)) {
             bind(q,key);try(var r=q.executeQuery()) {
                 if(!r.next()) return Optional.empty();
                 var scope=new EffectScope(r.getString(1),Ulid.parse(r.getString(2)),new Subject(SubjectKind.valueOf(r.getString(3)),r.getString(4)));
-                scope.requireKey(key);long initial=r.getLong(6);
+                String resourceKey=r.getString(8); requireKey(scope,resourceKey,key);
+                if(resourceKey!=null) {
+                    var call=resourceCall(c,resourceKey);
+                    if(!scope.equals(new EffectScope(call.tenant(),call.instanceId(),call.owner())))throw inconsistent();
+                }
+                long initial=r.getLong(6);
                 if(initial<1 || !scopeFingerprint(scope).equals(r.getString(5))) throw inconsistent();
-                return Optional.of(new Bound(scope,initial,r.getObject(7,Long.class)));
+                return Optional.of(new Bound(scope,initial,r.getObject(7,Long.class),resourceKey));
             }
         }
     }
     Origin compensationOrigin(Connection c,EffectKey original) throws SQLException {
-        return bound(c,original).map(b->new Origin(b.scope(),b.initialId())).orElse(null);
+        return bound(c,original).map(b->new Origin(b.scope(),b.initialId(),b.resourceCallKey())).orElse(null);
     }
     void requireOrigin(Connection c,EffectKey key,Origin origin) throws SQLException {
         var stored=bound(c,key).orElseThrow(EffectAuditProducer::inconsistent);
-        if(!stored.scope().equals(origin.scope()) || !Objects.equals(stored.parentInitialId(),origin.parentInitialId())) throw inconsistent();
+        if(!stored.scope().equals(origin.scope()) || !Objects.equals(stored.parentInitialId(),origin.parentInitialId()) || !Objects.equals(stored.resourceCallKey(),origin.resourceCallKey())) throw inconsistent();
         // An exact prepare retry must verify its original retained source, including uncertain-commit recovery.
         find(c,stored.initialId()).orElseThrow(EffectAuditProducer::inconsistent);
     }
     /** Called ONLY after the ledger observed inserted==1 in this SAME transaction. Never a historical backfill API. */
     void bindFresh(Connection c,Fact initial,Origin origin) throws SQLException {
-        transaction(c);origin.scope().requireKey(initial.key());
+        transaction(c);requireKey(origin.scope(),origin.resourceCallKey(),initial.key());
         if(initial.from()!=null || initial.to()!=EffectState.INTENDED || !initial.reason().equals("effect.intended")) throw inconsistent();
         try(var q=c.prepareStatement("""
                 insert into effect.audit_scope(thread_name,node_id,idempotency_key,tenant,registry_instance_id,
-                  owner_kind,owner_id,scope_fingerprint,initial_event_id,parent_initial_event_id) values(?,?,?,?,?,?,?,?,?,?)
+                  owner_kind,owner_id,scope_fingerprint,initial_event_id,parent_initial_event_id,resource_call_key) values(?,?,?,?,?,?,?,?,?,?,?)
                 """)) {
             bind(q,initial.key());var s=origin.scope();q.setString(4,s.tenant());q.setString(5,s.instanceId().value());
             q.setString(6,s.owner().kind().name());q.setString(7,s.owner().id());q.setString(8,scopeFingerprint(s));
-            q.setLong(9,initial.id());q.setObject(10,origin.parentInitialId());q.executeUpdate();
+            q.setLong(9,initial.id());q.setObject(10,origin.parentInitialId());q.setString(11,origin.resourceCallKey());q.executeUpdate();
         }
     }
 
@@ -95,7 +103,7 @@ public final class EffectAuditProducer {
         try(var q=c.prepareStatement("select purpose,target,request_fingerprint from effect.ledger"+WHERE)) {
             bind(q,fact.key());try(var r=q.executeQuery()){if(!r.next())throw inconsistent();purpose=r.getString(1);target=r.getString(2);request=r.getString(3);}
         }
-        var value=build(scope.get().scope(),fact,purpose,target,request,UlidGenerator.shared().next());
+        var value=build(scope.get().scope(),scope.get().resourceCallKey(),fact,purpose,target,request,UlidGenerator.shared().next());
         try(var q=c.prepareStatement("""
                 insert into effect.audit_source(source_event_id,scope_initial_event_id,schema_version,scope_fingerprint,
                   key_fingerprint,transition,source_sequence,source_key,draft_id,occurred_at,actor_kind,actor_id,
@@ -130,7 +138,7 @@ public final class EffectAuditProducer {
                 if(scope.initialId()!=r.getLong("scope_initial_event_id")) throw inconsistent();
                 var fact=new Fact(journalId,r.getTimestamp("journal_time").toInstant(),key,state(r.getString("journal_from")),
                         EffectState.valueOf(r.getString("journal_to")),r.getString("journal_reason"));
-                var expected=build(scope.scope(),fact,r.getString("ledger_purpose"),r.getString("ledger_target"),r.getString("ledger_request"),Ulid.parse(r.getString("draft_id")));
+                var expected=build(scope.scope(),scope.resourceCallKey(),fact,r.getString("ledger_purpose"),r.getString("ledger_target"),r.getString("ledger_request"),Ulid.parse(r.getString("draft_id")));
                 var source=new AuditSource(r.getInt("schema_version"),r.getString("scope_fingerprint"),r.getString("key_fingerprint"),
                         AuditSource.Transition.valueOf(r.getString("transition")),r.getLong("source_sequence"),r.getString("content_fingerprint"));
                 var draft=new AuditEvent(Ulid.parse(r.getString("draft_id")),1,r.getTimestamp("occurred_at").toInstant(),
@@ -165,9 +173,12 @@ public final class EffectAuditProducer {
     }
 
     static Retained build(EffectScope scope,Fact fact,String purpose,String target,String request,Ulid draftId) {
+        return build(scope,null,fact,purpose,target,request,draftId);
+    }
+    private static Retained build(EffectScope scope,String resourceKey,Fact fact,String purpose,String target,String request,Ulid draftId) {
         if(fact.id()<1 || fact.occurredAt().getNano()%1000!=0 || !Set.of("EFFECT","COMPENSATION").contains(purpose)
                 || request==null || !request.matches("[0-9a-f]{64}")) throw inconsistent();
-        scope.requireKey(fact.key());var transition=transition(fact);String sf=scopeFingerprint(scope),kf=keyFingerprint(fact.key());
+        requireKey(scope,resourceKey,fact.key());var transition=transition(fact);String sf=scopeFingerprint(scope),kf=keyFingerprint(fact.key());
         var identity=new AuditSource(1,sf,kf,transition,fact.id(),"0".repeat(64));
         var attrs=new TreeMap<String,String>();attrs.put("oa.chain","effect-"+fingerprint("oa.effect.audit-chain.v1",scope.tenant()));
         attrs.put("oa.tenant",scope.tenant());attrs.put("oa.instance",scope.instanceId().value());
@@ -178,6 +189,34 @@ public final class EffectAuditProducer {
         var draft=new AuditEvent(draftId,1,fact.occurredAt(),ACTOR,"effect."+transition.name().toLowerCase(Locale.ROOT),
                 "effect","efp1-"+kf,attrs,AuditHash.GENESIS,AuditHash.GENESIS);
         return new Retained(new AuditSource(1,sf,kf,transition,fact.id(),AuditDraftFingerprint.of(draft)),draft);
+    }
+    Origin resourceOrigin(Connection c,ResourceCallScope expected) throws SQLException {
+        var scope=new EffectScope(expected.tenant(),expected.instanceId(),expected.owner());
+        lockRoot(c,scope);
+        if(!expected.equals(resourceCall(c,expected.key())))throw inconsistent();
+        return new Origin(scope,null,expected.key());
+    }
+    private static ResourceCallScope resourceCall(Connection c,String key) throws SQLException {
+        try(var q=c.prepareStatement("select r.*,o.occurrence_key from task.resource_call r "
+                + "join task.resource_occurrence o on o.call_key=r.call_key where r.call_key=?")) {
+            q.setString(1,key);try(var r=q.executeQuery()) {
+                if(!r.next())throw inconsistent();
+                var call=new ResourceCallScope(r.getString("tenant"),Ulid.parse(r.getString("instance_id")),
+                        new Subject(SubjectKind.valueOf(r.getString("owner_kind")),r.getString("owner_id")),
+                        r.getString("application_id"),r.getString("engine_instance_id"),r.getString("namespace"),
+                        r.getString("definition_name"),r.getString("definition_version"),r.getString("task_position"),
+                        r.getInt("iteration"),r.getString("logical_occurrence"),r.getString("audience"),r.getString("operation"),
+                        r.getString("target_fingerprint"),r.getString("request_fingerprint"));
+                if(!call.key().equals(key)||!call.fingerprint().equals(r.getString("fingerprint"))
+                        ||!call.occurrenceKey().equals(r.getString("occurrence_key"))||r.next())throw inconsistent();
+                return call;
+            }
+        }
+    }
+    private static void requireKey(EffectScope scope,String resourceKey,EffectKey key) {
+        if(resourceKey==null) {scope.requireKey(key);return;}
+        String subject="s1-"+fingerprint("oa.thread.subject",scope.owner().kind().name(),scope.owner().id());
+        if(!ThreadId.derive(scope.tenant(),subject,"governed:"+resourceKey).equals(key.threadId()))throw inconsistent();
     }
     private static AuditSource.Transition transition(Fact f) {
         if(f.reason().equals("effect.intended") && f.from()==null && f.to()==EffectState.INTENDED)return AuditSource.Transition.INTENT;

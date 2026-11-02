@@ -106,6 +106,19 @@ public class JdbcEffectLedger implements EffectLedger {
         return transaction(c->{projection.lockRoot(c,scope);return insert(c,intent,command.requestFingerprint(),until,"EFFECT",new EffectAuditProducer.Origin(scope,null));});
     }
 
+    /** Atomically bind an existing governed resource occurrence to a new effect and retained audit facts. */
+    public Prepared prepareResourceScoped(io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope scope,
+                                          EffectCommand command,Duration replayWindow,Instant now) {
+        Objects.requireNonNull(scope);Objects.requireNonNull(command);Objects.requireNonNull(replayWindow);Objects.requireNonNull(now);
+        if(!scope.threadId().equals(command.key().threadId()))throw new IllegalArgumentException("effect key belongs to another resource call");
+        if(projection==null)throw new IllegalStateException("scoped effect audit producer is not configured");
+        if(replayWindow.isNegative() || replayWindow.compareTo(Duration.ofDays(30))>0)
+            throw new IllegalArgumentException("replay window must be between zero and 30 days");
+        Instant until=replayWindow.isZero()?null:now.plus(replayWindow);
+        var key=command.key();var intent=new Effect(key.threadId(),key.nodeId(),key.idempotencyKey(),command.target(),EffectState.INTENDED,null,now);
+        return transaction(c->{var origin=projection.resourceOrigin(c,scope);return insert(c,intent,command.requestFingerprint(),until,"EFFECT",origin);});
+    }
+
     /** Conservative replay check based on the database creation timestamp and its current clock.
      * The original window is reconstructed from the two timestamps written together at intent creation, so an
      * application clock skew or a later increase in the target's advertised window cannot extend that contract.

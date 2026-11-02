@@ -79,3 +79,7 @@ The merged gate covers storage acknowledgement/concurrency/close with real Postg
 V77 audit DATA85 is merged with exact Claude review/independent88 and inspected full1365; postmerge1365 also passes.
 Atomic producer86 is merged as an explicit data component after independent61/full1386. Delivery87 is unmerged, and no production relay/central receipt target adapter is active. Data/ACK guards do not establish original
 historical authority, causal central append or current permission. V78..V80 and production mapping remain later gates.
+
+## Governed-resource effect provenance
+
+V77.9 adds a nullable resource-call anchor to new effect audit scopes without rewriting existing scope or effect keys. The opt-in `prepareResourceScoped` reconstructs the retained resource call and its occurrence, checks the full call fingerprint and current registry owner, and atomically records the original audit source with the governed thread. The database independently recomputes the resource call key and rejects a foreign workflow or changed thread. Existing legacy scope derivation is unchanged. This establishes retained attribution only: the caller must still prove the actual tool occurrence, identity, policy, central audit receipt and current task/lease immediately before target entry. The existing observed-history API accepts legacy scopes only; a resource-scoped history consumer remains to be implemented. There is no CDI or Flow adoption, automatic history delivery, or permission in this change; role deployment and T03 remain open.

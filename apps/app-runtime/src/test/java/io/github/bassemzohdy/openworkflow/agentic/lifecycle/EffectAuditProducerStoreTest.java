@@ -80,6 +80,58 @@ class EffectAuditProducerStoreTest {
             try(var r=q.executeQuery()){r.next();return r.getLong(1);}
         }
     }
+    @Test void governedResourceScopeRetainsOriginalThreadAndRefusesChangedCall() throws Exception {
+        var f=fixture();var row=registry.find(f.scope().tenant(),f.scope().instanceId()).orElseThrow();
+        var call=new ResourceCallScope(row.tenant(),row.id(),OWNER,"app",row.engineInstanceId(),"agentic",
+                "effect-source-test","1","do/0/tool",3,"branch/é/1","agent-run","run","a".repeat(64),"b".repeat(64));
+        try(var c=owned.getConnection();var q=c.prepareStatement("""
+            insert into task.resource_call(call_key,fingerprint,tenant,instance_id,owner_kind,owner_id,application_id,
+              engine_instance_id,namespace,definition_name,definition_version,task_position,iteration,logical_occurrence,
+              audience,operation,target_fingerprint,request_fingerprint) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """)) {
+            q.setString(1,call.key());q.setString(2,call.fingerprint());q.setString(3,call.tenant());q.setString(4,call.instanceId().value());
+            q.setString(5,call.owner().kind().name());q.setString(6,call.owner().id());q.setString(7,call.applicationId());
+            q.setString(8,call.engineInstanceId());q.setString(9,call.namespace());q.setString(10,call.definition());
+            q.setString(11,call.version());q.setString(12,call.taskPosition());q.setInt(13,call.iteration());
+            q.setString(14,call.logicalOccurrence());q.setString(15,call.audience());q.setString(16,call.operation());
+            q.setString(17,call.targetFingerprint());q.setString(18,call.requestFingerprint());q.executeUpdate();
+        }
+        var command=EffectCommand.of(call.threadId(),"tool:charge",call.key(),"approved-charge","private request");
+        assertNotEquals(f.scope().threadId(),command.key().threadId());
+        var prepared=ledger.prepareResourceScoped(call,command,Duration.ZERO,now());
+        assertEquals(prepared,ledger.prepareResourceScoped(call,command,Duration.ZERO,now()));
+        ledger.markAttempted(command.key());ledger.requireManualResolution(command.key(),"effect.outcome.unknown");
+        var facts=Transactions.inTransaction(owned,c->producer.forKey(c,command.key(),0,128));
+        assertEquals(List.of(AuditSource.Transition.INTENT,AuditSource.Transition.DISPATCH,AuditSource.Transition.UNKNOWN),
+                facts.stream().map(v->v.source().transition()).toList());
+        try(var c=owned.getConnection();var q=c.prepareStatement("select resource_call_key from effect.audit_scope where initial_event_id=?")) {
+            q.setLong(1,facts.getFirst().source().sequence());try(var r=q.executeQuery()){assertTrue(r.next());assertEquals(call.key(),r.getString(1));}
+        }
+        var changed=new ResourceCallScope(call.tenant(),call.instanceId(),call.owner(),call.applicationId(),call.engineInstanceId(),
+                call.namespace(),call.definition(),call.version(),call.taskPosition(),call.iteration(),call.logicalOccurrence(),
+                "other-audience",call.operation(),call.targetFingerprint(),call.requestFingerprint());
+        assertEquals(call.key(),changed.key());
+        assertThrows(IllegalStateException.class,()->ledger.prepareResourceScoped(changed,command,Duration.ZERO,now()));
+        var other=EffectCommand.of(f.scope().threadId(),"tool:charge",call.key(),"approved-charge","private request");
+        assertThrows(IllegalArgumentException.class,()->ledger.prepareResourceScoped(call,other,Duration.ZERO,now()));
+        // A direct writer cannot attach another workflow's retained resource call to a fresh legacy intent.
+        var foreign=fixture();ledger.prepare(foreign.command(),Duration.ZERO,now());
+        try(var c=owned.getConnection();var q=c.prepareStatement("""
+            insert into effect.audit_scope(thread_name,node_id,idempotency_key,tenant,registry_instance_id,
+              owner_kind,owner_id,scope_fingerprint,initial_event_id,resource_call_key)
+            select e.thread_name,e.node_id,e.idempotency_key,?,?,?,?,
+              effect.audit_fingerprint('oa.effect.audit-scope.v1',?,?,?,?),e.id,?
+            from effect.event e where e.thread_name=? and e.node_id=? and e.idempotency_key=?
+            """)) {
+            var scope=foreign.scope();var key=foreign.command().key();
+            q.setString(1,scope.tenant());q.setString(2,scope.instanceId().value());q.setString(3,scope.owner().kind().name());q.setString(4,scope.owner().id());
+            q.setString(5,scope.tenant());q.setString(6,scope.instanceId().value());q.setString(7,scope.owner().kind().name());q.setString(8,scope.owner().id());
+            q.setString(9,call.key());q.setString(10,key.threadId().value());q.setString(11,key.nodeId());q.setString(12,key.idempotencyKey());
+            var denied=assertThrows(SQLException.class,q::executeUpdate);
+            assertTrue(denied.getMessage().contains("effect resource call attribution differs"));
+        }
+    }
+
     @Test void firstIntentScopeAndOriginalDraftCommitTogetherAndExactRetryReopensSameSource() throws Exception {
         var f=fixture();var first=prepare(f);var saved=history(f);assertEquals(1,saved.size());
         assertEquals(AuditSource.Transition.INTENT,saved.getFirst().source().transition());
