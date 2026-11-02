@@ -28,6 +28,8 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.outbox.TaskViewFilter;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.api.PageRequest;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.github.bassemzohdy.openworkflow.agentic.lifecycle.PendingCancellationDatabase;
 import jakarta.inject.Inject;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -48,6 +50,7 @@ import org.junit.jupiter.api.Test;
  */
 @QuarkusTest
 @TestProfile(OutboxProfile.class)
+@QuarkusTestResource(value = PendingCancellationDatabase.class, restrictToAnnotatedClass = true)
 class OutboxRelayTest {
 
     @Inject

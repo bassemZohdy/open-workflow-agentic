@@ -50,11 +50,15 @@ public class OutboxRelayService {
             @ConfigProperty(name = "agentic.outbox.relay.max-attempts", defaultValue = "5") int maxAttempts,
             @ConfigProperty(name = "agentic.outbox.relay.backoff-base", defaultValue = "1s") Duration backoffBase,
             @ConfigProperty(name = "agentic.outbox.relay.backoff-max", defaultValue = "1m") Duration backoffMax,
-            @ConfigProperty(name = "agentic.outbox.relay.interval", defaultValue = "500ms") Duration interval) {
+            @ConfigProperty(name = "agentic.outbox.relay.interval", defaultValue = "500ms") Duration interval,
+            @ConfigProperty(name = "agentic.outbox.relay.lock-timeout-ms", defaultValue = "5000") int lockTimeoutMillis,
+            @ConfigProperty(name = "agentic.outbox.relay.statement-timeout-ms", defaultValue = "30000") int statementTimeoutMillis,
+            @ConfigProperty(name = "agentic.outbox.relay.idle-transaction-timeout-ms", defaultValue = "30000") int idleTransactionTimeoutMillis) {
         this.dataSource = dataSource;
         this.consumers = consumers;
         this.enabled = enabled;
-        this.settings = new RelaySettings(batchSize, maxAttempts, backoffBase, backoffMax, interval);
+        this.settings = new RelaySettings(batchSize, maxAttempts, backoffBase, backoffMax, interval,
+                lockTimeoutMillis, statementTimeoutMillis, idleTransactionTimeoutMillis);
     }
 
     void onStart(@Observes StartupEvent event) {
@@ -73,8 +77,8 @@ public class OutboxRelayService {
     }
 
     /**
-     * Stops scheduling and waits for a tick in progress to finish, so that no batch commits after the application has
-     * stopped. A batch is short, so the wait is bounded by a few seconds.
+     * Stops scheduling and waits up to ten seconds for a tick. A consumer that ignores interruption may continue
+     * afterward; PostgreSQL transaction timeouts limit database work, not arbitrary consumer code or commit latency.
      */
     void onStop(@Observes ShutdownEvent event) throws InterruptedException {
         if (executor != null) {

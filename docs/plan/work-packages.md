@@ -651,7 +651,7 @@ Deliverables:
 - Proof that committed work is neither lost nor duplicated under overload
 
 Implementation status: **partial**.
-- Implemented: Policy calls have timeout and concurrency bounds; unintended Flow HTTP-client retries are disabled. Outbox scrapes return the last completed observation without waiting for database work, using one background worker and a two-second JDBC statement timeout. PostgreSQL lock-and-recovery and blocked-worker tests pass; a stuck worker and deployment connection/network bounds remain operational concerns.
+- Implemented: Policy calls have timeout and concurrency bounds; unintended Flow HTTP-client retries are disabled. Outbox relay transactions now cap lock waits, statement duration and idle-transaction duration. An isolated PostgreSQL test verifies a stalled consumer loses its lock, its partial write rolls back and another relay commits the event; arbitrary consumer code and network or pool acquisition remain unbounded. Outbox scrapes return the last completed observation without waiting for database work, using one background worker and a two-second JDBC statement timeout. PostgreSQL lock-and-recovery and blocked-worker tests pass; a stuck worker and deployment connection/network bounds remain operational concerns.
 - Implemented: The runtime token exchanger bounds HTTP response-body time and physical concurrency, and its production producer configures a circuit breaker without automatic token-request retries. Focused local tests cover stalled bodies, retained worker capacity and producer wiring; the latest integration branch CI is pending.
 
 Remaining gates:

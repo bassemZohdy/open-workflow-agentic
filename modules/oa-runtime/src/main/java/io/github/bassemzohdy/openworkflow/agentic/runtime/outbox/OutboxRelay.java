@@ -73,7 +73,12 @@ public final class OutboxRelay {
      * @return the number of rows delivered and marked published; failed attempts are not counted
      */
     public int drainOnce() {
-        return Transactions.inTransaction(dataSource, this::processBatch).delivered();
+        return batch().delivered();
+    }
+
+    private Batch batch() {
+        return Transactions.inBoundedPostgresTransaction(dataSource, this::processBatch,
+                settings.lockTimeoutMillis(), settings.statementTimeoutMillis(), settings.idleTransactionTimeoutMillis());
     }
 
     /**
@@ -85,7 +90,7 @@ public final class OutboxRelay {
     public int drainAll(int maxBatches) {
         int total = 0;
         for (int i = 0; i < maxBatches; i++) {
-            Batch batch = Transactions.inTransaction(dataSource, this::processBatch);
+            Batch batch = batch();
             total += batch.delivered();
             if (batch.claimed() == 0) {
                 break;
