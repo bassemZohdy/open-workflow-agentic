@@ -18,6 +18,17 @@ import org.junit.jupiter.api.Test;
 class HumanWakeProcessPhase extends HumanWakeCheckpointTest {
     private Path manifest() {return Path.of(System.getenv("HUMAN_CHECKPOINT_MANIFEST"));}
     @Test void checkpointAndCrash() throws Exception {execute(false,false,false,manifest());fail("writer must halt");}
+    @Test void reserveAndCrash() throws Exception {crashAfterReservation(manifest());fail("reservation owner must halt");}
+    @Test void restoreAfterReservationCrash() throws Exception {
+        var p=new Properties();try(var in=Files.newInputStream(manifest())){p.load(in);}
+        var row=registry.find("tenant",Ulid.parse(p.getProperty("instance"))).orElseThrow();
+        var task=Ulid.parse(p.getProperty("task"));
+        var wait=new InboxWait(row.tenant(),row.id(),p.getProperty("application"),row.engineInstanceId(),
+                "agentic","human-checkpoint-test","1.0.0",p.getProperty("position"),Integer.parseInt(p.getProperty("iteration")),
+                HumanDecisionWake.route(task),HumanDecisionWake.TYPE,HASH,Duration.ofMinutes(2));
+        var decision=new HumanDecision(Ulid.parse(p.getProperty("decision")),row.tenant(),task,0,ALICE,HumanDecision.Outcome.APPROVE,"private");
+        restoreReservedWake(row,p.getProperty("application"),wait,decision);
+    }
     @Test void restoreAfterCrash() throws Exception {
         var p=new Properties();try(var in=Files.newInputStream(manifest())){p.load(in);}
         var row=registry.find("tenant",Ulid.parse(p.getProperty("instance"))).orElseThrow();

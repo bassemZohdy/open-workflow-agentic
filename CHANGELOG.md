@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify human-wake recovery after the reservation owner exits before the callback.
+
 - Add an explicitly composed, task-fenced targeted human-wake dispatcher.
 
 - Document and test restricted checkpoint-audit database grants.

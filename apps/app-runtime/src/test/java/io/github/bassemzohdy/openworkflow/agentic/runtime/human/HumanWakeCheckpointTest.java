@@ -96,6 +96,13 @@ class HumanWakeCheckpointTest {
             quarkusProcess("restoreAfterCrash",0,manifest);
         } finally {java.nio.file.Files.deleteIfExists(manifest);}
     }
+    @Test void killedReservationOwnerIsRecoveredByAFreshApplicationProcess() throws Exception {
+        var manifest=java.nio.file.Files.createTempFile("human-process-reservation-", ".properties");
+        try {
+            quarkusProcess("reserveAndCrash",78,manifest);
+            quarkusProcess("restoreAfterReservationCrash",0,manifest);
+        } finally {java.nio.file.Files.deleteIfExists(manifest);}
+    }
     private void execute(boolean loseOwner, boolean restore, boolean processRecovery) throws Exception {
         execute(loseOwner,restore,processRecovery,null);
     }
@@ -109,6 +116,12 @@ class HumanWakeCheckpointTest {
         execute(loseOwner,restore,processRecovery,crashManifest,ownedCrash,guardedDispatch,false);
     }
     private void execute(boolean loseOwner, boolean restore, boolean processRecovery, java.nio.file.Path crashManifest,boolean ownedCrash,boolean guardedDispatch,boolean revokeDuringAudit) throws Exception {
+        execute(loseOwner,restore,processRecovery,crashManifest,ownedCrash,guardedDispatch,revokeDuringAudit,false);
+    }
+    void crashAfterReservation(java.nio.file.Path manifest) throws Exception {
+        execute(false,false,false,manifest,false,false,false,true);
+    }
+    private void execute(boolean loseOwner, boolean restore, boolean processRecovery, java.nio.file.Path crashManifest,boolean ownedCrash,boolean guardedDispatch,boolean revokeDuringAudit,boolean crashBeforeCallback) throws Exception {
         try (var gate = new PersistenceCommitGate(Duration.ofSeconds(15), Clock.systemUTC()); var broker = new Broker()) {
             var next = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();
             var guarded = new CheckpointingWriter(borrowed(), gate, (op,id) -> {});
@@ -145,10 +158,20 @@ class HumanWakeCheckpointTest {
                         new PolicyRef("test-policy", "1"), clock.instant()), event -> {}, Duration.ofSeconds(3), clock), clock);
                 new HumanDecisionCoordinator(dataSource, admission, new RegisteredHumanWaitFence(wait), clock)
                         .recordNew(CallerAuthority.ofUserToken(token, clock), decision);
-                var claim = leases.acquire(wait.task(), "human-test-owner", Duration.ofSeconds(30)).orElseThrow().claim();
+                var claim = leases.acquire(wait.task(), "human-test-owner", Duration.ofSeconds(crashBeforeCallback?20:30)).orElseThrow().claim();
                 try {
                     var group = new InboxListenGroup(wait.task(), InboxListenGroup.Strategy.ONE, List.of(HASH), InboxListenGroup.Stop.NONE,
                             List.of(), null, InboxListenGroup.snapshotFingerprint(SNAPSHOT));
+                    if(crashBeforeCallback) {
+                        saveManifest(crashManifest,row,app.id(),wait,decision);
+                        var crashingOwned=new JdbcOwnedInbox(dataSource,leases,inbox,proof,event->{
+                            audit.record(event);
+                            if(event.action().equals("event.dispatch.attempt"))Runtime.getRuntime().halt(78);
+                        },clock);
+                        new HumanWakeDispatcher(new HumanWakeStage(dataSource,inbox,crashingOwned,clock),crashingOwned,leases,8)
+                                .dispatch(decision,wait,claim,group,SNAPSHOT,registration);
+                        fail("reservation owner must halt before callback");
+                    }
                     if(guardedDispatch) {
                         assertSame(registration,broker.registrations.poll(10,TimeUnit.SECONDS));
                         var other=app.workflowDefinition(WorkflowReader.readWorkflowFromClasspath("human/decision-checkpoint.yaml")).instance(Map.of());
@@ -216,11 +239,7 @@ class HumanWakeCheckpointTest {
                     assertTrue(QuarkusTransaction.requiringNew().call(() -> em.find(CompletedTaskEntity.class, key) != null));
                     assertTrue(proof.consumed(wait, message));
                     if(crashManifest!=null) {
-                        var saved=new Properties();
-                        saved.setProperty("instance",row.id().value());saved.setProperty("application",app.id());
-                        saved.setProperty("position",wait.taskPosition());saved.setProperty("iteration",Integer.toString(wait.iteration()));
-                        saved.setProperty("task",taskId.value());saved.setProperty("decision",decision.id().value());
-                        try(var out=java.nio.file.Files.newOutputStream(crashManifest)){saved.store(out,"isolated checkpoint process fixture");}
+                        saveManifest(crashManifest,row,app.id(),wait,decision);
                         Runtime.getRuntime().halt(77);
                     }
                     if (restore) {
@@ -263,6 +282,12 @@ class HumanWakeCheckpointTest {
                 } finally { release.complete(null); leases.release(claim); }
             }
         }
+    }
+    private static void saveManifest(java.nio.file.Path path,InstanceRecord row,String application,InboxWait wait,HumanDecision decision) throws Exception {
+        var saved=new Properties();saved.setProperty("instance",row.id().value());saved.setProperty("application",application);
+        saved.setProperty("position",wait.taskPosition());saved.setProperty("iteration",Integer.toString(wait.iteration()));
+        saved.setProperty("task",decision.taskId().value());saved.setProperty("decision",decision.id().value());
+        try(var out=java.nio.file.Files.newOutputStream(path)){saved.store(out,"isolated checkpoint process fixture");}
     }
     long acknowledgementAudits(InstanceRecord row) throws Exception {
         try (var c=dataSource.getConnection(); var q=c.prepareStatement("select count(*) from audit.event where event_type='event.checkpoint.observed' and attributes->>'oa.instance'=?")) {
@@ -314,6 +339,64 @@ class HumanWakeCheckpointTest {
                 assertEquals(expectedExit,child.exitValue(),java.nio.file.Files.readString(output));
             } finally {if(child.isAlive()){child.destroyForcibly();child.waitFor(10,TimeUnit.SECONDS);}}
         } finally {java.nio.file.Files.deleteIfExists(args);java.nio.file.Files.deleteIfExists(output);}
+    }
+    void restoreReservedWake(InstanceRecord row,String appId,InboxWait wait,HumanDecision decision) throws Exception {
+        var message=HumanDecisionWake.message(decision,wait);
+        assertFalse(proof.consumed(wait,message));assertEquals("DISPATCHED",deliveryState(wait));
+        assertEquals(Optional.of(message),inbox.boundSignal(wait));assertEquals(1,deliveryAttempts(wait));
+        var next=new CompletableFuture<Void>();var release=new CompletableFuture<Void>();var cleaned=new CompletableFuture<Void>();
+        var nextStarts=new java.util.concurrent.atomic.AtomicInteger();
+        var broker=new Broker();var clock=Clock.systemUTC();
+        var recovery=new JdbcInboxCheckpointRecovery(dataSource,CheckpointRecoveryAudit::append,clock);
+        try(var gate=new PersistenceCommitGate(Duration.ofSeconds(15),clock);
+            var finalizer=new InboxCheckpointFinalizer(owned,leases);
+            var app=WorkflowApplication.builder().withId(appId).withEventConsumer(broker)
+                    .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                    .withListener(new WorkflowPersistenceListener(new CheckpointingWriter(borrowed(),gate,(op,id)->{
+                        if(op==PersistenceCommitGate.Operation.COMPLETED)cleaned.complete(null);
+                    },finalizer)))
+                    .withListener(new WorkflowExecutionCompletableListener() {
+                        @Override public CompletableFuture<?> onTaskStarted(TaskStartedEvent event) {
+                            if(event.taskContext().taskName().equals("afterDecision")){nextStarts.incrementAndGet();next.complete(null);return release;}
+                            return CompletableFuture.completedFuture(null);
+                        }
+                    }).build()) {
+            var definition=app.workflowDefinition(WorkflowReader.readWorkflowFromClasspath("human/decision-checkpoint.yaml"));
+            var restored=reader.find(definition,row.engineInstanceId()).orElseThrow();
+            assertEquals(WorkflowStatus.PENDING,restored.status());
+            var settings=new LifecycleSettings(false,Duration.ofSeconds(30),Duration.ofSeconds(120),Duration.ofMillis(1),3,
+                    Duration.ofMillis(1),Duration.ofMillis(1),Duration.ofHours(24),100,Optional.empty());
+            new Reconciler(registry,new FlowWorkflowEngine(app),sync,scan,repairs,settings,dataSource,clock,
+                    row.tenant()::equals,ResumeGate.ALLOW,new InboxRestoreCheckpointGate(recovery,app,gate)).recover(row.tenant(),row.id().value());
+            var registration=broker.registration.get(10,TimeUnit.SECONDS);
+            var claim=new java.util.concurrent.atomic.AtomicReference<InboxTaskClaim>();
+            assertTimeoutPreemptively(Duration.ofSeconds(45),()->{
+                while(claim.get()==null) {
+                    leases.acquire(wait.task(),"human-recovered-owner",Duration.ofSeconds(30)).ifPresent(l->claim.set(l.claim()));
+                    if(claim.get()==null)Thread.sleep(100);
+                }
+            });
+            try {
+                assertThrows(IllegalStateException.class,()->leases.requireLive(new InboxTaskClaim(wait.task(),"human-test-owner",1)));
+                var group=new InboxListenGroup(wait.task(),InboxListenGroup.Strategy.ONE,List.of(HASH),InboxListenGroup.Stop.NONE,
+                        List.of(),null,InboxListenGroup.snapshotFingerprint(SNAPSHOT));
+                var dispatcher=new HumanWakeDispatcher(new HumanWakeStage(dataSource,inbox,owned,clock),owned,leases,8);
+                assertEquals(HumanWakeDispatcher.Result.DISPATCHED,dispatcher.dispatch(decision,wait,claim.get(),group,SNAPSHOT,registration));
+                next.get(15,TimeUnit.SECONDS);assertTrue(proof.consumed(wait,message));assertEquals(2,deliveryAttempts(wait));
+                release.complete(null);cleaned.get(10,TimeUnit.SECONDS);assertTrue(gate.status().healthy());assertEquals(1,nextStarts.get());
+                assertEquals("ACKNOWLEDGED",deliveryState(wait));assertEquals(1,acknowledgementAudits(row));
+                try(var c=dataSource.getConnection();var q=c.prepareStatement("select count(*) from inbox.message where tenant=? and source=? and event_id=?")) {
+                    q.setString(1,message.tenant());q.setString(2,message.source());q.setString(3,message.eventId());
+                    try(var r=q.executeQuery()){assertTrue(r.next());assertEquals(1,r.getInt(1));}
+                }
+            } finally {release.complete(null);leases.release(claim.get());}
+        } finally {release.complete(null);}
+    }
+    private int deliveryAttempts(InboxWait wait) throws Exception {
+        try(var c=dataSource.getConnection();var q=c.prepareStatement("select attempts from inbox.delivery where tenant=? and instance_id=? and wait_key=?")) {
+            q.setString(1,wait.tenant());q.setString(2,wait.instanceId().value());q.setString(3,wait.key());
+            try(var r=q.executeQuery()){assertTrue(r.next());return r.getInt(1);}
+        }
     }
     void restoreCheckpoint(InstanceRecord row, String appId, InboxWait wait, InboxMessage message) throws Exception {
         var resumed = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();
