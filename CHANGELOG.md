@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an opt-in, digest-pinned OpenAPI JSON POST selector for governed effect registrations, with a trusted origin and schema validation; production approval and identity integration remain open.
+
 - Preserve unknown effect outcomes for reconciliation and propagate lost-authority refusals without replaying a refused lookup.
 
 - Refuse governed model calls when the provider cannot prove it is configured for the approved model; model aliases require a trusted mapping.

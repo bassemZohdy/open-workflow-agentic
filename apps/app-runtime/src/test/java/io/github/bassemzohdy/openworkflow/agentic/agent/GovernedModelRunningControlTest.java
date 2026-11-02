@@ -834,6 +834,51 @@ class GovernedModelRunningControlTest {
         });
     }
 
+    @Test void pinnedOpenApiRegistrationValidatesBeforeCredentialAcquisition() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry);
+            String document = """
+                    {"openapi":"3.1.0","paths":{"/orders":{"post":{"operationId":"createOrder",
+                    "requestBody":{"required":true,"content":{"application/json":{"schema":
+                    {"type":"object","required":["amount"],"properties":{"amount":{"type":"integer"}}}}}},
+                    "responses":{"200":{"description":"done"}}}}}}
+                    """;
+            var digest = io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder.sha256Hex(
+                    io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder.strictUtf8(document));
+            var op = new io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.http.PinnedOpenApiEffect(
+                    document, digest, "createOrder", java.net.URI.create("https://orders.example"));
+            var expectation = new io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.http.PinnedHttpEffectTarget.CredentialExpectation(
+                    "issuer", UlidGenerator.shared().next(), Set.of("orders:write"));
+            var acquisitions = new AtomicInteger();
+            var registration = op.registration("registered:test", "orders", "corr", Duration.ofSeconds(2), Set.of(200),
+                    expectation, (audience, action) -> { acquisitions.incrementAndGet();
+                        throw new AuthorityLostException(AuthorityLostException.Reason.REVOKED); }, token -> { });
+            var registry = Map.of("tool:research", registration);
+            var profile = new ApprovedToolProfile("fixture", "1", GovernedToolGateway.configurationFingerprint(registry),
+                    AGENT, Set.of("tool:research"), 3, Duration.ofSeconds(2));
+            var budget = new GovernedToolGateway.ToolBudget() {
+                public void admit(GovernedToolGateway.Approval approval) { }
+                public void requireCurrent(GovernedToolGateway.Approval approval) { }
+                public void requireProfile(GovernedToolGateway.Approval approval, ApprovedToolProfile expected) { assertEquals(profile, expected); }
+            };
+            var pep = new Pep(request -> new Decision("fixture", DecisionOutcome.ALLOW, "allow", POLICY, NOW),
+                    event -> { }, Duration.ofSeconds(5), CLOCK);
+            var gateway = new GovernedToolGateway(registry, () -> Optional.of(rig.approved), profile, pep,
+                    event -> { }, budget, CLOCK, new DurableEffects(rig.ledger, Clock.systemUTC()));
+            var invalid = rig.call("{}");
+            var invalidOccurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/1", invalid);
+            assertThrows(ModelCallRefused.class, () -> gateway.invokeEffect(running, entry, rig.allocation, invalidOccurrence, invalid));
+            assertEquals(0, acquisitions.get());
+            assertTrue(rig.ledger.find(invalidOccurrence.effectCommand("registered:test").key()).isEmpty());
+            var valid = rig.call("{\"amount\":10}");
+            var occurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/2", valid);
+            assertThrows(AuthorityLostException.class, () -> gateway.invokeEffect(running, entry, rig.allocation, occurrence, valid));
+            assertEquals(1, acquisitions.get());
+            assertEquals(EffectState.INTENDED, rig.ledger.find(occurrence.effectCommand("registered:test").key()).orElseThrow().state());
+            return null;
+        });
+    }
+
     @Test void registeredEffectRetainsConfirmedFactWhenTargetWithholdsAfterAuthorityLoss() throws Exception {
         inCallback((running, entry, checks) -> {
             var rig = new ToolEffectRig(entry); var call = rig.call("{}");

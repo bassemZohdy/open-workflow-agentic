@@ -1,0 +1,110 @@
+package io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.http;
+
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.StreamReadConstraints;
+import com.fasterxml.jackson.core.StreamReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedToolGateway;
+import java.net.URI;
+import java.time.Duration;
+import java.util.Objects;
+import java.util.Set;
+
+/** Explicit, trusted composition of a digest-pinned OpenAPI 3.1 JSON POST with the governed effect gateway.
+ * This narrow subset is not a general OpenAPI validator, approval source, credential verifier or CDI wiring.
+ * The trusted base URI overrides document servers; parameters, references and path templates are unsupported.
+ */
+public final class PinnedOpenApiEffect {
+    private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
+            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+            .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64)
+                    .maxStringLength(262_144).maxNumberLength(128).build()).build())
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+    private static final Set<String> METHODS = Set.of("get", "put", "post", "delete", "options", "head", "patch", "trace");
+    private final String documentDigest, operationId, schema;
+    private final URI endpoint;
+    private final Set<Integer> documentedResponses;
+
+    public PinnedOpenApiEffect(String document, String expectedSha256, String operationId, URI trustedOrigin) {
+        byte[] bytes = CanonicalEncoder.strictUtf8(Objects.requireNonNull(document));
+        if (bytes.length > 262_144) throw new IllegalArgumentException("OpenAPI document exceeds 256 KiB");
+        this.documentDigest = CanonicalEncoder.sha256Hex(bytes);
+        if (expectedSha256 == null || !expectedSha256.matches("[0-9a-f]{64}") || !documentDigest.equals(expectedSha256))
+            throw new IllegalArgumentException("OpenAPI digest differs from the approved document");
+        if (operationId == null || !operationId.matches("[A-Za-z0-9._-]{1,128}"))
+            throw new IllegalArgumentException("invalid operation ID");
+        this.operationId = operationId;
+        Objects.requireNonNull(trustedOrigin);
+        if (!"https".equals(trustedOrigin.getScheme()) || trustedOrigin.getHost() == null
+                || trustedOrigin.getRawUserInfo() != null || trustedOrigin.getRawQuery() != null
+                || trustedOrigin.getRawFragment() != null || !(trustedOrigin.getRawPath().isEmpty() || "/".equals(trustedOrigin.getRawPath())))
+            throw new IllegalArgumentException("trusted origin must be an HTTPS origin without a path");
+        final JsonNode root;
+        try { root = JSON.readTree(document); }
+        catch (Exception invalid) { throw new IllegalArgumentException("invalid OpenAPI JSON", invalid); }
+        if (root == null || !root.isObject() || root.has("jsonSchemaDialect") || !root.path("openapi").asText().matches("3\\.1\\.[0-9]+")
+                || !root.path("paths").isObject()) throw new IllegalArgumentException("OpenAPI 3.1 paths required");
+        JsonNode selected = null, selectedPath = null; String path = null; int matches = 0;
+        var paths = root.path("paths").fields();
+        while (paths.hasNext()) {
+            var item = paths.next();
+            if (!item.getValue().isObject()) throw new IllegalArgumentException("invalid path item");
+            for (String method : METHODS) {
+                JsonNode operation = item.getValue().get(method);
+                if (operation != null && operation.isObject() && operationId.equals(operation.path("operationId").asText())) {
+                    matches++; selected = operation; selectedPath = item.getValue(); path = item.getKey();
+                    if (!method.equals("post")) throw new IllegalArgumentException("only POST operations are supported");
+                }
+            }
+        }
+        if (matches != 1 || path == null || !path.matches("/(?:[A-Za-z0-9_~-]+(?:\\.[A-Za-z0-9_~-]+)*/?)+")
+                || selectedPath.has("$ref") || selectedPath.has("parameters") || selected.has("parameters")
+                || selectedPath.has("servers") || selected.has("servers"))
+            throw new IllegalArgumentException("operation must be unique, fixed-path and parameter-free");
+        JsonNode request = selected.path("requestBody");
+        JsonNode input = request.path("content").path("application/json").path("schema");
+        if (!request.isObject() || request.has("$ref") || !request.path("required").isBoolean() || !request.path("required").asBoolean() || !input.isObject()
+                || !"object".equals(input.path("type").asText()))
+            throw new IllegalArgumentException("required inline JSON object schema is required");
+        requireSelfContained(input);
+        this.schema = input.toString();
+        JsonNode responses = selected.path("responses");
+        if (!responses.isObject()) throw new IllegalArgumentException("documented responses required");
+        var allowed = new java.util.HashSet<Integer>();
+        for (int code : new int[]{200, 201, 204}) {
+            JsonNode response = responses.get(Integer.toString(code));
+            if (response != null && response.isObject() && !response.has("$ref")) allowed.add(code);
+        }
+        this.documentedResponses = Set.copyOf(allowed);
+        this.endpoint = URI.create(trustedOrigin.toString().replaceAll("/$", "") + path);
+    }
+
+    /** Trusted composition only. Gateway validation occurs before target binding and no network I/O occurs here. */
+    public GovernedToolGateway.Registration registration(String target, String audience, String correlation,
+            Duration timeout, Set<Integer> confirmed, PinnedHttpEffectTarget.CredentialExpectation expectation,
+            PinnedHttpEffectTarget.CredentialProvider credentials, PinnedHttpEffectTarget.PreSendFence fence) {
+        Objects.requireNonNull(expectation); Set<Integer> statuses = Set.copyOf(confirmed);
+        if (!documentedResponses.containsAll(statuses)) throw new IllegalArgumentException("confirmation response is not documented inline");
+        var encoder = new CanonicalEncoder("oa.openapi.effect.v1").text(documentDigest).text(operationId)
+                .text(endpoint.toASCIIString()).text(target).text(audience).text(correlation)
+                .number(timeout.getSeconds()).number(timeout.getNano()).text(expectation.issuer())
+                .text(expectation.grantId().toString()).number(expectation.scopes().size());
+        expectation.scopes().stream().sorted().forEach(encoder::text);
+        encoder.number(statuses.size()); statuses.stream().sorted().forEach(s -> encoder.number(s));
+        String fingerprint = CanonicalEncoder.sha256Hex(encoder.toBytes());
+        // Construct once at registration to reject malformed pinned configuration before any tool call.
+        new PinnedHttpEffectTarget(target, endpoint, audience, correlation, "{}", timeout, statuses, expectation, credentials, fence);
+        return GovernedToolGateway.Registration.effectful(schema, "{}", timeout, fingerprint, target,
+                body -> new PinnedHttpEffectTarget(target, endpoint, audience, correlation, body, timeout,
+                        statuses, expectation, credentials, fence));
+    }
+
+    private static void requireSelfContained(JsonNode node) {
+        if (node.isObject()) for (String key : new String[]{"$ref", "$dynamicRef", "$recursiveRef", "$id", "$schema"})
+            if (node.has(key)) throw new IllegalArgumentException("schema references are unsupported");
+        node.elements().forEachRemaining(PinnedOpenApiEffect::requireSelfContained);
+    }
+}

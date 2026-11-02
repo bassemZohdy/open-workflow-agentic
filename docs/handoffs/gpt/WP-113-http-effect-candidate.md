@@ -21,6 +21,20 @@ If the scoped identity boundary reports lost authority without a definitive outc
 for reconciliation and propagates the refusal. A refused lookup cannot trigger a replay, even within a replay window.
 This does not imply that an already dispatched network operation was cancelled or that a queue write always succeeds.
 
+`PinnedOpenApiEffect` explicitly composes a digest-pinned OpenAPI 3.1 JSON document with the controlled tool
+registration and HTTP candidate. It selects one unique POST by operation ID, an inline required JSON object schema,
+and a fixed literal path. The caller supplies a trusted HTTPS origin: document-level servers are ignored, and path or
+operation server overrides, parameters, path templates, custom schema dialects and schema references are refused. Confirmed status codes must
+also be documented inline. The gateway fingerprint covers the exact document digest, selected operation, origin,
+target, timeout, correlation, confirmation codes and token expectations. The gateway validates arguments against the
+selected schema before binding; no credential or network call occurs at registration. This narrow selector is not a
+complete OpenAPI validator, approval workflow or interpretation of OpenAPI security schemes; trusted composition must
+independently enforce those schemes, approved target/occurrence binding, identity, policy, audit and service semantics.
+The supported subset is intentionally smaller than the [OpenAPI 3.1 specification](https://spec.openapis.org/oas/v3.1.0.html).
+The PostgreSQL controlled-gateway fixture verifies that a schema-invalid request creates no intent and acquires no
+credential, while a valid request reaches a fixture credential refusal and leaves an unresolved intent. Selector tests
+cover digest and endpoint changes, duplicate operation IDs, unsupported paths, references, dialects and status codes.
+
 A trusted service contract must explicitly choose terminal confirmation status codes from 200, 201 and 204, and must
 prove those statuses mean the effect is complete. A 202, redirect, unselected status, timeout, I/O failure or missing
 lookup is UNKNOWN, never proof of failure. Response bodies are not retained. Replay window is zero, so the ledger does
@@ -54,7 +68,7 @@ integrations, not real provider interoperability. The first Windows run exposed 
 classpath length limit; the saturation probe now uses a Java argument file. The loopback seam and credentials are
 fixtures, not provider interoperability or network isolation evidence.
 
-Before any production registration: implement approved OpenAPI operation selection and pinned versioning, prove
+Before any production registration: integrate an approved OpenAPI source and version lifecycle, prove
 per-call exchanged credential/audience and current authority, mandatory policy and audit, exact request/occurrence
 binding, service-specific terminal/refusal semantics, remote idempotency and lookup, transport retry/physical-termination
 behavior, bounded credential acquisition, encrypted secret handling and egress policy. Add actual enterprise-service
