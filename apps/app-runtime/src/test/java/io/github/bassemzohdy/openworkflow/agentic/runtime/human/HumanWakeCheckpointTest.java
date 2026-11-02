@@ -163,7 +163,7 @@ class HumanWakeCheckpointTest {
                     var group = new InboxListenGroup(wait.task(), InboxListenGroup.Strategy.ONE, List.of(HASH), InboxListenGroup.Stop.NONE,
                             List.of(), null, InboxListenGroup.snapshotFingerprint(SNAPSHOT));
                     if(crashBeforeCallback) {
-                        saveManifest(crashManifest,row,app.id(),wait,decision);
+                        saveManifest(crashManifest,row,app.id());
                         var crashingOwned=new JdbcOwnedInbox(dataSource,leases,inbox,proof,event->{
                             audit.record(event);
                             if(event.action().equals("event.dispatch.attempt"))Runtime.getRuntime().halt(78);
@@ -239,7 +239,7 @@ class HumanWakeCheckpointTest {
                     assertTrue(QuarkusTransaction.requiringNew().call(() -> em.find(CompletedTaskEntity.class, key) != null));
                     assertTrue(proof.consumed(wait, message));
                     if(crashManifest!=null) {
-                        saveManifest(crashManifest,row,app.id(),wait,decision);
+                        saveManifest(crashManifest,row,app.id());
                         Runtime.getRuntime().halt(77);
                     }
                     if (restore) {
@@ -283,9 +283,8 @@ class HumanWakeCheckpointTest {
             }
         }
     }
-    private static void saveManifest(java.nio.file.Path path,InstanceRecord row,String application,InboxWait wait,HumanDecision decision) throws Exception {
+    private static void saveManifest(java.nio.file.Path path,InstanceRecord row,String application) throws Exception {
         var saved=new Properties();saved.setProperty("instance",row.id().value());saved.setProperty("application",application);
-        saved.setProperty("task",decision.taskId().value());saved.setProperty("decision",decision.id().value());
         try(var out=java.nio.file.Files.newOutputStream(path)){saved.store(out,"isolated checkpoint process fixture");}
     }
     long acknowledgementAudits(InstanceRecord row) throws Exception {

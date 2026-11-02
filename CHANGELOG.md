@@ -1,5 +1,7 @@
 # Changelog
 
+- Exercise human-wake discovery across application-process restarts without passing decision IDs.
+
 - Add bounded tenant-scoped discovery of retained human decisions for recovery.
 
 - Reconstruct verified retained human-wake data for explicit recovery.

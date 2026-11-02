@@ -2,13 +2,11 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.human;
 
 import static org.junit.jupiter.api.Assertions.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.*;
-import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.HumanDecision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.event.HumanWakeRecovery;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import java.nio.file.*;
-import java.time.Duration;
 import java.util.Properties;
 import org.junit.jupiter.api.Test;
 
@@ -23,19 +21,29 @@ class HumanWakeProcessPhase extends HumanWakeCheckpointTest {
     @Test void restoreAfterReservationCrash() throws Exception {
         var p=new Properties();try(var in=Files.newInputStream(manifest())){p.load(in);}
         var row=registry.find("tenant",Ulid.parse(p.getProperty("instance"))).orElseThrow();
-        var task=Ulid.parse(p.getProperty("task"));
-        var retained=new HumanWakeRecovery(dataSource).load(row.tenant(),Ulid.parse(p.getProperty("decision"))).orElseThrow();
+        var retained=discover(row.tenant(),row.id());
         assertEquals(HumanWakeRecovery.State.STAGED,retained.state());var wait=retained.waitProfile();var decision=retained.decision();
-        assertEquals(task,decision.taskId());assertEquals(p.getProperty("application"),wait.applicationId());
+        assertEquals(p.getProperty("application"),wait.applicationId());
         restoreReservedWake(row,p.getProperty("application"),wait,decision);
+    }
+    private HumanWakeRecovery.Retained discover(String tenant,Ulid instance) {
+        var recovery=new HumanWakeRecovery(dataSource); Ulid cursor=null;
+        while(true) {
+            var page=recovery.scan(tenant,cursor,2);
+            if(page.isEmpty())throw new IllegalStateException("retained human decision was not discovered");
+            for(var id:page) {
+                var retained=recovery.load(tenant,id).orElseThrow();
+                if(retained.waitProfile().instanceId().equals(instance))return retained;
+                cursor=id;
+            }
+        }
     }
     @Test void restoreAfterCrash() throws Exception {
         var p=new Properties();try(var in=Files.newInputStream(manifest())){p.load(in);}
         var row=registry.find("tenant",Ulid.parse(p.getProperty("instance"))).orElseThrow();
-        var task=Ulid.parse(p.getProperty("task"));
-        var retained=new HumanWakeRecovery(dataSource).load(row.tenant(),Ulid.parse(p.getProperty("decision"))).orElseThrow();
+        var retained=discover(row.tenant(),row.id());
         assertEquals(HumanWakeRecovery.State.CHECKPOINTED,retained.state());var wait=retained.waitProfile();var decision=retained.decision();
-        assertEquals(task,decision.taskId());assertEquals(p.getProperty("application"),wait.applicationId());
+        assertEquals(p.getProperty("application"),wait.applicationId());
         var message=HumanDecisionWake.message(decision,wait);
         assertTrue(proof.consumed(wait,message));assertEquals("DISPATCHED",deliveryState(wait));
         assertEquals(0,acknowledgementAudits(row));
