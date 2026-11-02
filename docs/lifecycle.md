@@ -395,6 +395,12 @@ audit and a parent contract that no longer covers the child. The approval callba
 catalog is supplied. V78 and this fence are not installed in production, and the checks cannot stop an external effect
 already in flight.
 
+The explicit entry gate now refuses a returned JDK future, completion stage or publisher and permanently
+quarantines its slot, even if that object completes or is cancelled. Tests verify that the committed entry survives
+and the escaped control no longer works. This per-gate bound cannot detect hidden asynchronous work behind other
+values, stop a physical effect already started, or bound multiple independently constructed gates. Production
+composition still requires a trusted synchronous worker or a protocol that proves actual termination.
+
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`
 transition, suppressing the following failure only if it is the SDK timeout wrapping a cancellation; it then waits

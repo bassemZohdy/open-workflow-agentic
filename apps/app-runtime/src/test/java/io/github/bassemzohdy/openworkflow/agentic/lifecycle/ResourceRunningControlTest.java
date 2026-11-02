@@ -25,6 +25,85 @@ import org.junit.jupiter.api.Test;
 
 /** Real PG/control/identity mechanics. Fixture verifier and identity-only fence are NOT production composition. */
 class ResourceRunningControlTest {
+    @Test void observableAsynchronousResultsRefuseAndQuarantineCapacity() throws Exception {
+        try(var db=new Database()) {
+            db.migrate(null);
+            for(int kind=0;kind<4;kind++) {
+                var fixture=fixture(db,"a".repeat(64));
+                var control=new AtomicReference<Running>();
+                var stage=new CompletableFuture<String>();
+                var task=new FutureTask<>(()->"unstarted");
+                Flow.Publisher<String> publisher=subscriber->{throw new AssertionError("must not subscribe");};
+                Object result=switch(kind) {
+                    case 0 -> stage;
+                    case 1 -> stage.minimalCompletionStage();
+                    case 2 -> task;
+                    default -> publisher;
+                };
+                try(var gate=new JdbcResourceExecutionGate(db.owner,1)) {
+                    var paired=CredentialFence.pair(fixture.binding(),entry->{});
+                    var attempt=gate.openGoverned(fixture.binding(),fixture.entry(1),UUID.randomUUID(),paired);
+                    assertThrows(RefusedException.class,()->attempt.executeGoverned(r->{control.set(r);return result;}));
+                    assertNotNull(control.get());
+                    assertThrows(RefusedException.class,control.get()::requireCurrent);
+                    assertTrue(gate.find(fixture.binding().scope()).isPresent(),"the committed entry remains");
+                    assertEquals(1,gate.activeCount(),"uncertain detached work retains the slot");
+                    stage.cancel(true);task.cancel(true);
+                    assertEquals(1,gate.activeCount(),"future completion or cancellation does not prove physical termination");
+                    assertThrows(RefusedException.class,()->gate.openGoverned(
+                            fixture.binding(),fixture.entry(1),UUID.randomUUID(),paired));
+                    gate.close();
+                    assertEquals(1,gate.activeCount(),"close must not claim detached work terminated");
+                }
+                try(var reopened=new JdbcResourceExecutionGate(db.owner,1)) {
+                    var paired=CredentialFence.pair(fixture.binding(),entry->{});
+                    var retained=reopened.openGoverned(fixture.binding(),fixture.entry(1),UUID.randomUUID(),paired)
+                            .executeGoverned(r->{fail("retained entry must not dispatch again");return "duplicate";});
+                    assertEquals(Kind.RETAINED,retained.kind());
+                }
+            }
+        }
+    }
+
+    @Test void detachedWorkerCannotReuseControlAfterReturningAStage() throws Exception {
+        try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
+            db.migrate(null);var f=fixture(db,"a".repeat(64));var entered=new CountDownLatch(1);
+            var release=new CountDownLatch(1);var worker=Executors.newSingleThreadExecutor();
+            var stage=new CompletableFuture<String>();var work=new AtomicReference<Future<?>>();
+            try {
+                var paired=CredentialFence.pair(f.binding(),entry->{});
+                var attempt=gate.openGoverned(f.binding(),f.entry(1),UUID.randomUUID(),paired);
+                assertThrows(RefusedException.class,()->attempt.executeGoverned(r->{
+                    work.set(worker.submit(()->{
+                        entered.countDown();
+                        try {
+                            if(!release.await(8,TimeUnit.SECONDS))throw new IllegalStateException("test timed out");
+                            assertThrows(RefusedException.class,r::requireCurrent);
+                            stage.complete("finished");
+                        } catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+                    }));
+                    try {if(!entered.await(8,TimeUnit.SECONDS))throw new IllegalStateException("test timed out");}
+                    catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+                    return stage;
+                }));
+                assertEquals(1,gate.activeCount());
+                release.countDown();work.get().get(10,TimeUnit.SECONDS);
+                assertEquals("finished",stage.get(5,TimeUnit.SECONDS));
+                assertEquals(1,gate.activeCount(),"the gate cannot infer actual termination from a returned stage");
+            } finally {release.countDown();worker.shutdownNow();assertTrue(worker.awaitTermination(10,TimeUnit.SECONDS));}
+        }
+    }
+
+    @Test void legacyCallbackCannotReturnAStageEither() throws Exception {
+        try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
+            db.migrate(null);var f=fixture(db,"a".repeat(64));
+            var attempt=gate.open(f.binding(),f.entry(1),UUID.randomUUID(),entry->{});
+            assertThrows(RefusedException.class,()->attempt.execute(entry->CompletableFuture.completedFuture("value")));
+            assertEquals(1,gate.activeCount());
+            assertTrue(gate.find(f.binding().scope()).isPresent());
+        }
+    }
+
     @Test void onlyAFreshGovernedCallbackReceivesControlAndItCannotOutliveItsAttempt() throws Exception {
         try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
             db.migrate(null);var f=fixture(db,"a".repeat(64));var checks=new AtomicInteger();

@@ -20,6 +20,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Future;
+import java.util.concurrent.Flow;
 import javax.sql.DataSource;
 
 /**
@@ -31,6 +34,9 @@ import javax.sql.DataSource;
  *
  * <p>Attempts are bounded with no queue or internally spawned workers. Close invalidates promptly, but a running
  * attempt retains its slot and fence until the actual synchronous worker exits, even if JDBC ignores interruption.
+ * A returned future, completion stage or JDK publisher is refused and quarantines that gate slot permanently: its
+ * completion or cancellation does not prove that detached physical work stopped. This cannot detect hidden work
+ * behind other returned values or stop a side effect already in flight; callers must still be trusted and synchronous.
  * Callback failure, cancellation, post-commit refusal and uncertain replies retain the irreversible entry. They must
  * never be retried as a fresh call/epoch. The result and retained facts are data, not execution capabilities.
  */
@@ -179,7 +185,7 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         private final Running running;
         private final AtomicReference<ResourceExecutionFence> fence;
         private final AtomicBoolean invalid = new AtomicBoolean();
-        // 0 unstarted, 1 executing, 2 actually terminated (closing phase 1 must not release its slot).
+        // 0 unstarted, 1 executing, 2 terminated, 3 quarantined after an observable detached result.
         private final AtomicInteger phase = new AtomicInteger();
         private Attempt(ResourceCallBinding binding, ResourceExecutionEntry entry, UUID executor,
                         ResourceExecutionFence fence, boolean governed) {
@@ -215,15 +221,25 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         }
         private <T> Result<T> executeInternal(Function<Running, T> callback) {
             if (!phase.compareAndSet(0, 1)) throw new RefusedException("attempt already consumed");
+            boolean quarantine = false;
             try {
                 check();
                 Write write = isolated(true, c -> append(c, binding, entry, executor));
                 check(); // only after commit, connection cleanup AND ambient resume, never under the registry lock.
                 if (!write.fresh()) return new Result<>(Kind.RETAINED, write.fact(), null);
                 T value = callback.apply(running);
+                if (value instanceof Future<?> || value instanceof CompletionStage<?> || value instanceof Flow.Publisher<?>) {
+                    quarantine = true;
+                    throw new RefusedException("asynchronous callback result cannot prove work termination");
+                }
                 check(); // no private callback output after blocking work loses current permission.
                 return new Result<>(Kind.CALLED, write.fact(), value);
-            } finally { invalid.set(true); phase.set(2); fence.set(null); retire(this); }
+            } finally {
+                invalid.set(true);
+                fence.set(null);
+                phase.set(quarantine ? 3 : 2);
+                if (!quarantine) retire(this);
+            }
         }
         @Override public void close() {
             invalid.set(true);
