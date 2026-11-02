@@ -1,5 +1,7 @@
 # Changelog
 
+- Extend the isolated human-decision journal proposal to append its non-sensitive audit event in the same database transaction and keep workflow wakeup blocked. Audit failure rolls back the decision; production authority, schema and delivery remain open.
+
 - Add an isolated, unactivated human-decision storage proposal with concurrent retry, conflict, rollback and blocked-wakeup tests. Production schema, audit receipts, authority/lease checks and delivery remain open.
 
 - Add an unwired human-decision preflight that checks verified non-delegated caller authority, task facts, policy and post-policy expiry. Storage, commit-time rechecks, audit delivery and workflow wakeup remain open.

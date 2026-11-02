@@ -23,7 +23,9 @@ create table human_proposal.decision (
 -- A decision is never deliverable merely because its database transaction committed.
 create table human_proposal.pending (
   tenant text not null, decision_id char(26) not null,
-  audit_state text not null check (audit_state = 'PENDING'),
+  audit_event_id char(26) not null references audit.event(event_id),
+  audit_occurred_at timestamptz not null,
+  audit_state text not null check (audit_state = 'RECORDED'),
   wake_state text not null check (wake_state = 'BLOCKED'),
   primary key (tenant, decision_id),
   foreign key (tenant, decision_id) references human_proposal.decision (tenant, decision_id)
