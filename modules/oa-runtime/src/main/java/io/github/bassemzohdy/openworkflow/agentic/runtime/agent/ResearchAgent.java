@@ -51,6 +51,9 @@ public class ResearchAgent {
     @Inject
     JdbcNodeBudget nodeBudget;
 
+    @Inject
+    AgentNodeTelemetry nodeTelemetry = AgentNodeTelemetry.noop();
+
     /** Set by {@link #useAuditTrail}; tests may set a recording sink directly. */
     AuditSink audit;
 
@@ -161,7 +164,7 @@ public class ResearchAgent {
         var interceptor = NodeInterceptor.forLimits(approved.agent(), threadId, approved.task().limits(), audit, clock, budget);
         var trace = io.opentelemetry.context.Context.current();
         try {
-            return compile((name, action) -> GraphTraceContext.wrap(trace, interceptor.wrap(name, action)), approved);
+            return compile((name, action) -> GraphTraceContext.wrap(trace, interceptor.wrap(name, action, nodeTelemetry)), approved);
         } catch (Exception e) {
             throw new IllegalStateException("Agent graph could not be built for this run", e);
         }

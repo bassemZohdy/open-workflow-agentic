@@ -1,5 +1,7 @@
 # Changelog
 
+- Trace governed research graph nodes while preserving deadline, budget, and mandatory audit checks around telemetry.
+
 - Allow explicit governed tool tracing, carrying span context across isolated workers without baggage or caller thread-local values.
 
 - Propagate W3C traceparent on governed HTTP effects and lookups without forwarding tracing baggage or vendor state.

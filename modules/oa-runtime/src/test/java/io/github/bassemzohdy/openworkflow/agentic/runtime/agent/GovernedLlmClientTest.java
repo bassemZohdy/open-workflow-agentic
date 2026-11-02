@@ -438,4 +438,32 @@ class GovernedLlmClientTest {
         assertEquals(3, audit.events.size(), "each provider call has its own audited decision");
         assertTrue(state.text(ResearchState.REVIEW).isPresent());
     }
+
+    @Test
+    void checkpointedGraphLinksNodeAndModelSpansWithoutExportingState() throws Exception {
+        var exporter=io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter.create();
+        try(var sdk=io.opentelemetry.sdk.trace.SdkTracerProvider.builder()
+                .addSpanProcessor(io.opentelemetry.sdk.trace.export.SimpleSpanProcessor.create(exporter)).build()) {
+            DataSource ds=AgentTestDatabase.dataSource(); var provider=new CountingProvider(); var audit=new Audit();
+            var context=freshGraphApproval();
+            var client=new GovernedLlmClient(provider,pep(new Engine(DecisionOutcome.ALLOW),audit),context);
+            client.telemetry=new ModelCallTelemetry(sdk.get("model"));
+            var agent=agent(ds,client);agent.nodeTelemetry=new AgentNodeTelemetry(sdk.get("nodes"));
+            String thread="trace-graph-"+UUID.randomUUID();prepareGraph(agent,ds,context,thread);
+            var parent=sdk.get("caller").spanBuilder("parent").startSpan();
+            try(var scope=parent.makeCurrent()) {assertTrue(agent.run(thread,"private-topic").text(ResearchState.REVIEW).isPresent());}
+            finally {parent.end();}
+            var spans=exporter.getFinishedSpanItems();
+            var nodes=spans.stream().filter(s->s.getName().equals("oa.agent.node")).toList();
+            var models=spans.stream().filter(s->s.getName().equals("oa.model.call")).toList();
+            assertEquals(3,nodes.size());assertEquals(3,models.size());assertEquals(3,provider.calls.get());
+            for(var node:nodes) {
+                assertEquals(parent.getSpanContext().getTraceId(),node.getTraceId());
+                assertEquals(parent.getSpanContext().getSpanId(),node.getParentSpanId());
+                assertEquals(1,models.stream().filter(model->model.getParentSpanId().equals(node.getSpanId())).count());
+                assertFalse(node.toString().contains("private-topic"));assertTrue(node.getEvents().isEmpty());
+            }
+            for(var model:models) {assertFalse(model.toString().contains("private-topic"));assertTrue(model.getEvents().isEmpty());}
+        }
+    }
 }

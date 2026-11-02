@@ -218,6 +218,40 @@ class NodeInterceptorTest {
     }
 
     @Test
+    void deadlineReachedDuringTraceSetupRefusesBeforeTheNodeRuns() {
+        var clock = new MovingClock(); var audit = new Audit(); var node = new Counting();
+        var interceptor = new NodeInterceptor(GovernedLlmClientTest.AGENT, "run-1", 2, Duration.ofSeconds(5), audit, clock);
+        var tracer = (io.opentelemetry.api.trace.Tracer)java.lang.reflect.Proxy.newProxyInstance(
+                io.opentelemetry.api.trace.Tracer.class.getClassLoader(), new Class<?>[]{io.opentelemetry.api.trace.Tracer.class},
+                (p,m,a) -> { clock.now = clock.now.plusSeconds(5); throw new IllegalStateException("trace unavailable"); });
+        assertThrows(NodeRefused.class, () -> interceptor.wrap("plan", node, new AgentNodeTelemetry(tracer)).apply(STATE));
+        assertEquals(0, node.runs.get());
+        assertEquals(1, interceptor.stepsCounted());
+    }
+
+    @Test
+    void deadlineReachedDuringTraceCompletionWithholdsTheNodeResult() {
+        var clock = new MovingClock(); var audit = new Audit(); var node = new Counting();
+        var interceptor = new NodeInterceptor(GovernedLlmClientTest.AGENT, "run-1", 2, Duration.ofSeconds(5), audit, clock);
+        try (var sdk = io.opentelemetry.sdk.trace.SdkTracerProvider.builder().build()) {
+            var real = sdk.get("test").spanBuilder("delegate").startSpan();
+            var span = (io.opentelemetry.api.trace.Span)java.lang.reflect.Proxy.newProxyInstance(
+                    io.opentelemetry.api.trace.Span.class.getClassLoader(), new Class<?>[]{io.opentelemetry.api.trace.Span.class}, (p,m,a) -> {
+                        if(m.getName().equals("end"))clock.now=clock.now.plusSeconds(5);
+                        try {return m.invoke(real,a);} catch(java.lang.reflect.InvocationTargetException e){throw e.getCause();}
+                    });
+            var builder = (io.opentelemetry.api.trace.SpanBuilder)java.lang.reflect.Proxy.newProxyInstance(
+                    io.opentelemetry.api.trace.SpanBuilder.class.getClassLoader(), new Class<?>[]{io.opentelemetry.api.trace.SpanBuilder.class},
+                    (p,m,a)->m.getName().equals("startSpan")?span:p);
+            var tracer = (io.opentelemetry.api.trace.Tracer)java.lang.reflect.Proxy.newProxyInstance(
+                    io.opentelemetry.api.trace.Tracer.class.getClassLoader(), new Class<?>[]{io.opentelemetry.api.trace.Tracer.class}, (p,m,a)->builder);
+            assertThrows(NodeRefused.class, () -> interceptor.wrap("plan", node, new AgentNodeTelemetry(tracer)).apply(STATE));
+            assertEquals(1, node.runs.get());
+            assertFalse(audit.actions().contains("agent.node.completed"));
+        }
+    }
+
+    @Test
     void justBeforeTheDeadlineStillRuns() throws Exception {
         var clock = new MovingClock();
         var node = new Counting();

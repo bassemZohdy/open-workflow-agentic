@@ -123,6 +123,17 @@ public final class NodeInterceptor {
         };
     }
 
+    /** Trace setup and completion may block; the ordinary deadline/budget checks surround them. */
+    <S extends AgentState> NodeAction<S> wrap(String node, NodeAction<S> action, AgentNodeTelemetry telemetry) {
+        Objects.requireNonNull(telemetry, "telemetry");
+        Objects.requireNonNull(action, "action");
+        return wrap(node, state -> telemetry.call(() -> {
+            // Recheck after trace setup and immediately before the node action.
+            requireCurrentDeadline(node, steps.get());
+            return action.apply(state);
+        }));
+    }
+
     private int admit(String node) {
         requireCurrentDeadline(node, steps.get());
         while (true) {
