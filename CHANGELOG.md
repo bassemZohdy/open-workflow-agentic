@@ -1,5 +1,7 @@
 # Changelog
 
+- Define a reference-only human-decision wake envelope tied to the exact wait; no event producer, SDK matcher or workflow delivery is activated.
+
 - Prove an isolated human decision and audit survive an abrupt writer-process exit after commit and are read back once. Restart of the real workflow and delivery remain open.
 
 - Test the human-decision proposal against real workflow registry and inbox wait registration, including cancellation and expiry during commit. It does not implement dispatch ownership, checkpoint proof or wakeup delivery.
