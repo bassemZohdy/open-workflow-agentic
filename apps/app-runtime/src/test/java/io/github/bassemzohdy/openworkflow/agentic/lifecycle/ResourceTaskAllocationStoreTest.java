@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.EffectAuditDeliveryStoreTest.invoke;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.EffectAuditDeliveryStoreTest.wrapping;
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionMigrationTest.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
@@ -63,6 +64,62 @@ class ResourceTaskAllocationStoreTest {
         assertEquals(1,rows());assertEquals(a,first.allocation());assertEquals(0,first.createdAt().getNano()%1000);
         assertFalse(first.deadline().isAfter(first.createdAt().plus(a.contract().limits().maxWallClock())));
         assertEquals(0,count(data,"select count(*) from task.resource_execution"));
+    }
+
+    @Test void taskFenceChecksOriginalAllocationAndRefusesAfterTargetRevocation() throws Exception {
+        var allocation=store.allocate(a);var entry=f.entry(1);var approved=new AtomicBoolean(true);
+        var reads=new AtomicInteger();
+        try(var taskFence=new ResourceTaskExecutionFence(data,manager,entry,allocation,(checked,task)->{
+            assertEquals(entry,checked);assertEquals(allocation,task);reads.incrementAndGet();
+            if(!approved.get())throw new IllegalStateException("fixture approval revoked");
+        });var gate=new JdbcResourceExecutionGate(data,manager,1)) {
+            assertDoesNotThrow(()->taskFence.requireCurrent(entry));
+            assertThrows(IllegalStateException.class,()->taskFence.requireCurrent(f.entry(2)));
+            assertThrows(Exception.class,()->new ObjectMapper().writeValueAsString(taskFence));
+            var builder=CompositeExecutionFence.builder();var auditChecks=new AtomicInteger();
+            for(var check:CompositeExecutionFence.Check.values()) {
+                if(check==CompositeExecutionFence.Check.TASK_AND_TARGET)builder.with(check,taskFence);
+                else if(check==CompositeExecutionFence.Check.AUDIT)builder.with(check,ignored->{
+                    if(auditChecks.incrementAndGet()==2)approved.set(false);
+                });
+                else builder.with(check,ignored->{});
+            }
+            // Other checks and the approval source are fixtures; this is not production authorization.
+            var paired=JdbcResourceExecutionGate.CredentialFence.pair(f.binding(),builder.build());
+            var callbacks=new AtomicInteger();
+            var attempt=gate.openGoverned(f.binding(),entry,UUID.randomUUID(),paired);
+            assertThrows(IllegalStateException.class,()->attempt.executeGoverned(r->{callbacks.incrementAndGet();return "private";}));
+            assertEquals(0,callbacks.get(),"target revocation during audit must prevent callback entry");
+            assertTrue(gate.find(a.scope()).isPresent(),"the committed entry must be retained");
+            assertThrows(IllegalStateException.class,()->gate.openGoverned(f.binding(),entry,UUID.randomUUID(),paired)
+                    .executeGoverned(r->{callbacks.incrementAndGet();return "duplicate";}));
+            assertTrue(reads.get()>=3);
+            taskFence.close();
+            assertThrows(IllegalStateException.class,()->taskFence.requireCurrent(entry));
+        }
+    }
+
+    @Test void taskFenceRechecksDatabaseDeadlineAfterBlockingApproval() throws Exception {
+        var original=a.contract();var profile=a.modelProfile();
+        var shortContract=new AgentTaskContract(original.id(),original.goal(),original.permittedTools(),
+                original.permittedDataScopes(),original.riskTier(),new ExecutionLimits(5,Duration.ofSeconds(8),5000),
+                original.requestingSubject(),original.delegationGrantId());
+        var shortProfile=new ApprovedModelProfile(profile.id(),profile.version(),profile.configurationFingerprint(),
+                profile.agent(),profile.modelId(),profile.maxModelCalls(),profile.perCallCeilingMicros(),
+                Duration.ofSeconds(1),profile.maxOutputTokens());
+        var shortAllocation=new ResourceTaskAllocation(a.scope(),a.parentTaskId(),shortContract,shortProfile);
+        var retained=store.allocate(shortAllocation);var entered=new AtomicBoolean();
+        try(var fence=new ResourceTaskExecutionFence(data,manager,f.entry(1),retained,(entry,task)->{
+            entered.set(true);
+            long until=System.nanoTime()+Duration.ofSeconds(20).toNanos();
+            try {
+                while(databaseNow(data).isBefore(task.deadline()) && System.nanoTime()<until)Thread.sleep(25);
+                if(databaseNow(data).isBefore(task.deadline()))throw new IllegalStateException("test timed out");
+            } catch(Exception e){throw new IllegalStateException(e);}
+        })) {
+            assertThrows(IllegalStateException.class,()->fence.requireCurrent(f.entry(1)));
+            assertTrue(entered.get(),"the original allocation must have been live before approval blocked");
+        }
     }
     @Test void aFreshAllocationAtomicallyCreatesTheBoundBudgetAndRetryDoesNotResetIt() throws Exception {
         var allocated=store.allocate(a);
