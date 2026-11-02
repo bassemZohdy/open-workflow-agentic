@@ -1471,7 +1471,8 @@
       "progress": {
         "status": "partial",
         "implemented": [
-          "An explicitly composed local tool gateway validates registered input/output schemas, the approved task allow-list and an audited policy decision. It requires a matching retained tool profile and rechecks approval and a durable budget around policy, audit and tool execution, including on the worker; start and completion audit records are mandatory, with refusal/failure records attempted best effort. Registered callbacks have an explicit bounded wait and a shared eight-worker, no-queue bulkhead. Each call uses a fresh thread without inheritable caller thread-locals. A timed-out callback may continue and occupies capacity until it stops; its output is withheld and mutating effects remain uncertain. It does not activate any tool or provide MCP, trusted approval source, verified code identity, transport-level cancellation or effect-ledger integration."
+          "An explicitly composed local tool gateway validates registered input/output schemas, the approved task allow-list and an audited policy decision. It requires a matching retained tool profile and rechecks approval and a durable budget around policy, audit and tool execution, including on the worker; start and completion audit records are mandatory, with refusal/failure records attempted best effort. Registered callbacks have an explicit bounded wait and a shared eight-worker, no-queue bulkhead. Each call uses a fresh thread without inheritable caller thread-locals. A timed-out callback may continue and occupies capacity until it stops; its output is withheld and mutating effects remain uncertain. It does not activate any tool or provide MCP, trusted approval source, verified code identity, transport-level cancellation or effect-ledger integration.",
+          "ResourceToolCall defines canonical tool-node and effect-command identity: exact private arguments and profile are fingerprinted, while retry, worker and execution-epoch changes do not create a new effect key. This is data only; a trusted occurrence producer, live execution fence and actual effect-ledger dispatch/reconciliation are not wired."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -1480,7 +1481,9 @@
         ],
         "evidence": [
           "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedToolGateway.java",
-          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedToolGatewayTest.java"
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedToolGatewayTest.java",
+          "modules/oa-contracts/src/main/java/io/github/bassemzohdy/openworkflow/agentic/contracts/agent/ResourceToolCall.java",
+          "modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/agent/ResourceToolCallTest.java"
         ]
       }
     },
