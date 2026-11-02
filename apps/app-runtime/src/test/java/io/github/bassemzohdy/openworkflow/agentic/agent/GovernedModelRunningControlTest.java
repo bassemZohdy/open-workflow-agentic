@@ -160,6 +160,7 @@ class GovernedModelRunningControlTest {
         final AtomicInteger lookups = new AtomicInteger();
         volatile Runnable during = () -> { };
         final long budget;
+        volatile String model = "fixture-model";
 
         Context(long budget) {
             this.budget = budget;
@@ -169,7 +170,7 @@ class GovernedModelRunningControlTest {
         public Optional<Approved> current() {
             lookups.incrementAndGet();
             during.run();
-            return Optional.of(new Approved(AGENT, TASK, "fixture-model", budget));
+            return Optional.of(new Approved(AGENT, TASK, model, budget));
         }
     }
 
@@ -493,6 +494,56 @@ class GovernedModelRunningControlTest {
         });
         assertEquals(1, rig.audit.events.size());
         assertEquals(0, rig.provider.calls.get());
+    }
+
+    @Test
+    void approvalChangedDuringAuditCannotAuthorizeAProviderCall() throws Exception {
+        var rig = new Rig();
+        rig.audit.during = () -> rig.context.model = "different-model";
+        inCallback((running, entry, checks) -> {
+            assertThrows(ModelCallRefused.class, () -> rig.client.complete(running, entry, "sys", "usr"));
+            return null;
+        });
+        assertEquals(1, rig.audit.events.size());
+        assertEquals(0, rig.provider.calls.get());
+    }
+
+    @Test
+    void approvalChangedDuringTheProviderCallWithholdsTheAnswer() throws Exception {
+        var rig = new Rig();
+        rig.provider.during = () -> rig.context.model = "different-model";
+        inCallback((running, entry, checks) -> {
+            var failure = assertThrows(RuntimeException.class, () -> rig.client.complete(running, entry, "sys", "usr"));
+            assertEquals("ApprovalLostAfterCall", failure.getClass().getSimpleName());
+            return null;
+        });
+        assertEquals(1, rig.provider.calls.get());
+    }
+
+    @Test
+    void providerRefusalAfterCallIsReportedAsAProviderFailure() throws Exception {
+        var rig = new Rig();
+        rig.provider.during = () -> { throw new ModelCallRefused("provider private detail"); };
+        inCallback((running, entry, checks) -> {
+            var failure = assertThrows(RuntimeException.class, () -> rig.client.complete(running, entry, "sys", "usr"));
+            assertEquals("ProviderCallFailed", failure.getClass().getSimpleName());
+            assertFalse(String.valueOf(failure.getMessage()).contains("provider private detail"));
+            return null;
+        });
+        assertEquals(1, rig.provider.calls.get());
+    }
+
+    @Test
+    void controlClosedDuringFinalApprovalLookupWithholdsTheAnswer() {
+        var rig = new Rig();
+        inClosingCallback((running, entry, checks) -> {
+            rig.context.during = () -> {
+                if (rig.context.lookups.get() == 3) running.close();
+            };
+            assertThrows(RefusedException.class, () -> rig.client.complete(running, entry, "sys", "usr"));
+            return null;
+        });
+        assertEquals(1, rig.provider.calls.get());
     }
 
     /** BASELINE, not a feature: the legacy two-argument path carries no control, so it cannot honour a closed one. */
