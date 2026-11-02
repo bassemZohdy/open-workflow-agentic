@@ -45,7 +45,7 @@ class EventStartBindingMigrationTest {
                 Callable<InstanceStore.Insertion> insert=()->{gate.await();var candidate=InstanceRecord.starting(UlidGenerator.shared().next(),request,now);
                     return store.insertIfAbsent(candidate,"event.start",OWNER,(c,id)->{
                         authority.insert(c,new InstanceAuthority(id,"tenant",OWNER,grant,null,InstanceAuthority.State.AUTHORIZED,null,now,now));
-                        JdbcEventStartBinding.insert(c,id,binding);
+                        JdbcEventStartBinding.insert(c,id,binding,java.time.Duration.ofSeconds(1));
                     });};
                 var a=workers.submit(insert);var b=workers.submit(insert);gate.countDown();
                 var first=a.get(15,TimeUnit.SECONDS);var second=b.get(15,TimeUnit.SECONDS);
@@ -87,18 +87,86 @@ class EventStartBindingMigrationTest {
             }
         }
     }
+    @Test void terminalExpiredPayloadCanBeRedactedWithoutLosingDuplicateIdentity() throws Exception {
+        try(var db=new ResourceExecutionMigrationTest.Database()) {
+            db.migrate(null);try(var c=db.owner.getConnection()){apply(c);}
+            var e=event(1);var request=request(e);var grant=UlidGenerator.shared().next();var binding=binding(e,request,grant);
+            var store=new JdbcInstanceStore(db.owner);var authority=new InstanceAuthorityStore(db.owner);var now=Instant.now();
+            var candidate=InstanceRecord.starting(UlidGenerator.shared().next(),request,now);
+            store.insertIfAbsent(candidate,"event.start",OWNER,(c,id)->{
+                authority.insert(c,new InstanceAuthority(id,"tenant",OWNER,grant,null,InstanceAuthority.State.AUTHORIZED,null,now,now));
+                JdbcEventStartBinding.insert(c,id,binding,java.time.Duration.ofSeconds(2));
+            });
+            try(var c=db.owner.getConnection()) {
+                c.setAutoCommit(false);
+                assertFalse(JdbcEventStartBinding.redact(c,"tenant",candidate.id()),"active work retains its event");
+                c.commit();
+            }
+            var stored=store.findByKey("tenant",request.idempotencyKey()).orElseThrow();
+            var terminal=stored.successor(Instant.now(),InstanceStatus.FAILED,null,0,"failed",null);
+            store.replace(terminal,stored.version(),"failed",OWNER);
+            try(var c=db.owner.getConnection()) {
+                c.setAutoCommit(false);
+                try(var q=c.prepareStatement("select greatest(0,extract(epoch from retain_until-clock_timestamp())) "
+                        + "from task.event_start_binding where instance_id=?")) {
+                    q.setString(1,candidate.id().value());
+                    try(var r=q.executeQuery()) {
+                        assertTrue(r.next());double remaining=r.getDouble(1);
+                        if(remaining>0.2) assertFalse(JdbcEventStartBinding.redact(c,"tenant",candidate.id()),"unexpired payload is retained");
+                        c.commit();
+                        Thread.sleep((long)Math.ceil(remaining*1000)+150);
+                    }
+                }
+                assertFalse(JdbcEventStartBinding.redact(c,"other",candidate.id()));c.commit();
+                assertTrue(JdbcEventStartBinding.redact(c,"tenant",candidate.id()));c.rollback();
+                assertTrue(JdbcEventStartBinding.read(c,"tenant",binding.startKey()).isPresent(),"rollback restores payload");
+                assertTrue(JdbcEventStartBinding.redact(c,"tenant",candidate.id()));c.commit();
+                assertThrows(JdbcEventStartBinding.ReceiptRedacted.class,()->JdbcEventStartBinding.read(c,"tenant",binding.startKey()));
+                assertTrue(JdbcEventStartBinding.matches(c,candidate.id(),binding));
+                assertFalse(JdbcEventStartBinding.matches(c,candidate.id(),binding(event(2),request,grant)));
+                assertFalse(JdbcEventStartBinding.redact(c,"tenant",candidate.id()));c.commit();
+                try(var s=c.createStatement()) { assertThrows(SQLException.class,()->s.executeUpdate("delete from task.event_start_binding"));c.rollback(); }
+            }
+        }
+    }
+
+    @Test void expiredPayloadIsRetainedWhileInstanceCanStillRun() throws Exception {
+        try(var db=new ResourceExecutionMigrationTest.Database()) {
+            db.migrate(null);try(var c=db.owner.getConnection()){apply(c);}
+            var e=event(1);var request=request(e);var grant=UlidGenerator.shared().next();var binding=binding(e,request,grant);
+            var store=new JdbcInstanceStore(db.owner);var authority=new InstanceAuthorityStore(db.owner);var now=Instant.now();
+            var candidate=InstanceRecord.starting(UlidGenerator.shared().next(),request,now);
+            store.insertIfAbsent(candidate,"event.start",OWNER,(c,id)->{
+                authority.insert(c,new InstanceAuthority(id,"tenant",OWNER,grant,null,InstanceAuthority.State.AUTHORIZED,null,now,now));
+                JdbcEventStartBinding.insert(c,id,binding,java.time.Duration.ofSeconds(1));
+            });
+            Thread.sleep(1200);
+            try(var c=db.owner.getConnection()) {
+                c.setAutoCommit(false);
+                assertFalse(JdbcEventStartBinding.redact(c,"tenant",candidate.id()));
+                assertTrue(JdbcEventStartBinding.read(c,"tenant",binding.startKey()).isPresent());
+                try(var s=c.createStatement()) {
+                    assertThrows(SQLException.class,()->s.executeUpdate(
+                            "update task.event_start_binding set event_envelope=null,redacted_at=clock_timestamp()"));
+                    c.rollback();
+                }
+                assertTrue(JdbcEventStartBinding.matches(c,candidate.id(),binding));c.commit();
+            }
+        }
+    }
+
     @Test void failedBindingRollsBackRegistryAndAuthority() throws Exception {
         try(var db=new ResourceExecutionMigrationTest.Database()) {
             db.migrate(null);try(var c=db.owner.getConnection()){apply(c);}
             var e=event(1);var request=request(e);var grant=UlidGenerator.shared().next();var binding=binding(e,request,grant);
             var store=new JdbcInstanceStore(db.owner);var now=Instant.now();var candidate=InstanceRecord.starting(UlidGenerator.shared().next(),request,now);
             assertThrows(RuntimeException.class,()->store.insertIfAbsent(candidate,"event.start",OWNER,
-                    (c,id)->JdbcEventStartBinding.insert(c,id,binding))); // Missing required initial authority.
+                    (c,id)->JdbcEventStartBinding.insert(c,id,binding,java.time.Duration.ofSeconds(1)))); // Missing required initial authority.
             assertTrue(store.findByKey("tenant",request.idempotencyKey()).isEmpty());
             var authority=new InstanceAuthorityStore(db.owner);
             assertThrows(RuntimeException.class,()->store.insertIfAbsent(candidate,"event.start",OWNER,(c,id)->{
                 authority.insert(c,new InstanceAuthority(id,"tenant",OWNER,grant,null,InstanceAuthority.State.AUTHORIZED,null,now,now));
-                JdbcEventStartBinding.insert(c,id,binding);
+                JdbcEventStartBinding.insert(c,id,binding,java.time.Duration.ofSeconds(1));
                 throw new SQLException("simulated failure after binding");
             }));
             assertTrue(store.findByKey("tenant",request.idempotencyKey()).isEmpty());

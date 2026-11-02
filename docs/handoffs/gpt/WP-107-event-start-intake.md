@@ -71,9 +71,13 @@ compares the retained instance, authority and complete fingerprint. Concurrent P
 changed content/grant, immutability and transaction rollback. The proposed row now retains the bounded canonical
 payload and route/producer attribution in that transaction. Readback reconstructs the event identity and fingerprint,
 checks the original authority and refuses corrupt content or inconsistent authority. It returns retained data, not
-permission to disclose it, resume, or launch. This schema is outside Flyway, retains payload in plaintext indefinitely,
-and has no retention, tombstone, encrypted-storage or recovery-queue policy; it must not be deployed as-is. Its insert
-guard checks matching retained facts but does not prove that the instance was created in the same transaction. The caller must enforce new-instance-only insertion and current
+permission to disclose it, resume, or launch. The proposal now requires an explicit one-second-to-30-day retention
+period, and an explicit transaction can redact an expired payload only once the registry instance is terminal. The
+immutable tombstone keeps duplicate matching but cannot reconstruct the deleted event. This is not a scheduled cleanup,
+and the payload is plaintext until redaction; identity metadata and workflow input can also contain retained data.
+Encryption, comprehensive privacy/retention policy, cleanup deployment, tombstone expiry and a recovery queue remain
+open, so the schema must not be deployed as-is. Its insert guard checks matching retained facts but does not prove that
+the instance was created in the same transaction. The caller must enforce new-instance-only insertion and current
 authorization; neither this primitive nor a matching row grants permission. Producer authentication, policy, audit,
 approved routes, current-grant checks, event retention, recovery, launch fencing, role grants and deployment remain open.
 There is no public endpoint, CDI consumer or production start implementation.

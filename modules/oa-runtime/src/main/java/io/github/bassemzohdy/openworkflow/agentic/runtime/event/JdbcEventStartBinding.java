@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -17,18 +18,28 @@ public final class JdbcEventStartBinding {
     private JdbcEventStartBinding() { }
 
     /** Invoke only in the new-instance insert hook after creating the original authority on the same transaction. */
-    public static void insert(Connection c, Ulid instance, EventStartBinding b) throws SQLException {
-        Objects.requireNonNull(c); Objects.requireNonNull(instance); Objects.requireNonNull(b);
+    public static void insert(Connection c, Ulid instance, EventStartBinding b, Duration retention) throws SQLException {
+        Objects.requireNonNull(c); Objects.requireNonNull(instance); Objects.requireNonNull(b); Objects.requireNonNull(retention);
+        if (retention.isNegative() || retention.isZero() || retention.getNano()!=0
+                || retention.compareTo(Duration.ofDays(30))>0)
+            throw new IllegalArgumentException("retention must be whole seconds between 1 second and 30 days");
         if (c.getAutoCommit()) throw new IllegalArgumentException("an existing transaction is required");
         try (var q = c.prepareStatement("insert into task.event_start_binding "
                 + "(tenant,start_key,instance_id,request_fingerprint,owner_kind,owner_id,initial_grant_id,binding_fingerprint,"
-                + "producer_kind,producer_id,binding_id,binding_version,event_envelope) values (?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
+                + "producer_kind,producer_id,binding_id,binding_version,event_envelope,retain_until) "
+                + "values (?,?,?,?,?,?,?,?,?,?,?,?,?,statement_timestamp()+(? * interval '1 second'))")) {
             q.setString(1,b.tenant()); q.setString(2,b.startKey()); q.setString(3,instance.value());
             q.setString(4,b.requestFingerprint()); q.setString(5,b.owner().kind().name()); q.setString(6,b.owner().id());
             q.setString(7,b.originalGrant().value()); q.setString(8,b.fingerprint());
             q.setString(9,b.producer().kind().name()); q.setString(10,b.producer().id()); q.setString(11,b.bindingId());
-            q.setString(12,b.bindingVersion()); q.setString(13,b.event().canonicalEnvelope()); q.executeUpdate();
+            q.setString(12,b.bindingVersion()); q.setString(13,b.event().canonicalEnvelope());
+            q.setLong(14,retention.toSeconds()); q.executeUpdate();
         }
+    }
+
+    /** A tombstone exists, but its original payload has been removed. */
+    public static final class ReceiptRedacted extends SQLException {
+        public ReceiptRedacted() { super("event start payload was redacted"); }
     }
 
     /** Retained data only. It is not permission to disclose, recover, or launch an instance. */
@@ -59,6 +70,7 @@ public final class JdbcEventStartBinding {
             try (var r=q.executeQuery()) {
                 if (!r.next()) return Optional.empty();
                 if (!r.getBoolean(12)) throw new SQLException("retained event start no longer matches instance authority");
+                if (r.getString(11)==null) throw new ReceiptRedacted();
                 try {
                     String envelope = r.getString(11);
                     var event = StructuredEvent.read(new ByteArrayInputStream(envelope.getBytes(StandardCharsets.UTF_8)));
@@ -79,8 +91,47 @@ public final class JdbcEventStartBinding {
     /** Exact retained-data comparison after duplicate insertion; callers must separately reauthorize before readback. */
     public static boolean matches(Connection c, Ulid instance, EventStartBinding b) throws SQLException {
         Objects.requireNonNull(instance); Objects.requireNonNull(b);
-        var retained = read(c,b.tenant(),b.startKey());
-        return retained.isPresent() && retained.get().instance().equals(instance)
-                && retained.get().binding().fingerprint().equals(b.fingerprint());
+        try {
+            var retained = read(c,b.tenant(),b.startKey());
+            return retained.isPresent() && retained.get().instance().equals(instance)
+                    && retained.get().binding().fingerprint().equals(b.fingerprint());
+        } catch (ReceiptRedacted redacted) {
+            // A tombstone still pins identity and the original contract, but cannot recover the payload.
+            try (var q=c.prepareStatement("select 1 from task.event_start_binding b "
+                    + "join task.instance i on i.id=b.instance_id join identity.instance_authority a on a.instance_id=i.id "
+                    + "where b.tenant=? and b.start_key=? and b.instance_id=? and b.request_fingerprint=? "
+                    + "and b.owner_kind=? and b.owner_id=? and b.initial_grant_id=? and b.binding_fingerprint=? "
+                    + "and b.producer_kind=? and b.producer_id=? and b.binding_id=? and b.binding_version=? "
+                    + "and b.event_envelope is null and b.redacted_at is not null and i.tenant=b.tenant "
+                    + "and i.idempotency_key=b.start_key and i.request_fingerprint=b.request_fingerprint "
+                    + "and i.owner_kind=b.owner_kind and i.owner_id=b.owner_id and a.tenant=b.tenant "
+                    + "and a.subject_kind=b.owner_kind and a.subject_id=b.owner_id and a.initial_grant_known "
+                    + "and a.initial_grant_id=b.initial_grant_id")) {
+                q.setString(1,b.tenant());q.setString(2,b.startKey());q.setString(3,instance.value());
+                q.setString(4,b.requestFingerprint());q.setString(5,b.owner().kind().name());q.setString(6,b.owner().id());
+                q.setString(7,b.originalGrant().value());q.setString(8,b.fingerprint());
+                q.setString(9,b.producer().kind().name());q.setString(10,b.producer().id());
+                q.setString(11,b.bindingId());q.setString(12,b.bindingVersion());
+                try(var r=q.executeQuery()){return r.next();}
+            }
+        }
+    }
+
+    /** Remove only an expired payload for a terminal instance; the immutable identity tombstone remains. */
+    public static boolean redact(Connection c, String tenant, Ulid instance) throws SQLException {
+        Objects.requireNonNull(c);Objects.requireNonNull(instance);
+        Checks.requireText("tenant",tenant,256);CanonicalEncoder.strictUtf8(tenant);
+        if(c.getAutoCommit())throw new IllegalArgumentException("an existing transaction is required");
+        // Match registry-first lock order used by lifecycle and instance creation.
+        try(var q=c.prepareStatement("select status from task.instance where tenant=? and id=? for update")) {
+            q.setString(1,tenant);q.setString(2,instance.value());
+            try(var r=q.executeQuery()) {
+                if(!r.next() || !java.util.Set.of("COMPLETED","FAILED","CANCELLED").contains(r.getString(1)))return false;
+            }
+        }
+        try(var q=c.prepareStatement("update task.event_start_binding set event_envelope=null,redacted_at=clock_timestamp() "
+                + "where tenant=? and instance_id=? and event_envelope is not null and retain_until<=clock_timestamp()")) {
+            q.setString(1,tenant);q.setString(2,instance.value());return q.executeUpdate()==1;
+        }
     }
 }
