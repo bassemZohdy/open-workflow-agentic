@@ -9,6 +9,7 @@ import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.*;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -46,7 +47,7 @@ class InstanceLifetimePinTest {
     }
     private static LifecycleSettings settings(Optional<Duration> max) {
         return new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120), Duration.ofSeconds(60), 3,
-                Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofHours(24), 100, Optional.empty(), max);
+                Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofHours(24), 100, Optional.empty(), max, true);
     }
     private static final class Engine implements WorkflowEngine {
         final AtomicInteger starts = new AtomicInteger(), cancels = new AtomicInteger();
@@ -65,10 +66,164 @@ class InstanceLifetimePinTest {
     }
     private InstanceService service(Engine engine, Optional<Duration> max) {
         return new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start, ZoneOffset.UTC),
-                UlidGenerator.shared(), settings(max));
+                UlidGenerator.shared(), settings(max), db);
     }
     private StartRequest request() {
         return new StartRequest("tenant-" + UUID.randomUUID(), owner, definition, Map.of(), "key");
+    }
+    private Reconciler reconciler(WorkflowEngine engine, StartRequest request, Instant now) {
+        var config = settings(Optional.empty());
+        var sync = new EngineStatusSync(store, scan, config, Clock.fixed(now, ZoneOffset.UTC));
+        return new Reconciler(store, engine, sync, scan, new RepairStore(db), config, db,
+                Clock.fixed(now, ZoneOffset.UTC), request.tenant()::equals);
+    }
+
+    @Test void expiredStartWithoutEngineIdIsCancelledBeforeRecoveryCanPrepareIt() {
+        var request = request(); var attempts = new AtomicInteger();
+        WorkflowEngine engine = new WorkflowEngine() {
+            public boolean hasDefinition(DefinitionRef ignored) { return true; }
+            public EngineLaunch prepare(DefinitionRef ignored, Map<String, Object> input) {
+                attempts.incrementAndGet(); throw new IllegalStateException("unavailable");
+            }
+        };
+        var service = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start, ZoneOffset.UTC),
+                UlidGenerator.shared(), settings(Optional.of(Duration.ofMinutes(10))), db);
+        var row = service.start(request).record();
+        assertEquals(InstanceStatus.STARTING, row.status());
+        var repair = reconciler(engine, request, start.plus(Duration.ofMinutes(11)));
+        repair.reconcileOnce();
+        assertEquals(InstanceStatus.CANCELLED, store.find(request.tenant(), row.id()).orElseThrow().status());
+        repair.retry(request.tenant(), row.id().value());
+        assertEquals(1, attempts.get());
+    }
+
+    @Test void expiredStartWithAnEngineIdRequestsCancellation() {
+        var request = request(); var cancels = new AtomicInteger();
+        WorkflowEngine engine = new WorkflowEngine() {
+            public boolean hasDefinition(DefinitionRef ignored) { return true; }
+            public EngineLaunch prepare(DefinitionRef ignored, Map<String, Object> input) {
+                return new EngineLaunch() {
+                    public String engineInstanceId() { return "engine-" + request.tenant(); }
+                    public void start() { throw new IllegalStateException("unconfirmed"); }
+                };
+            }
+            public Optional<ActiveInstance> activeInstance(DefinitionRef ignored, String id) {
+                return Optional.of(new ActiveInstance(id, EngineStatus.RUNNING));
+            }
+            public boolean cancel(DefinitionRef ignored, String id) { cancels.incrementAndGet(); return true; }
+        };
+        var service = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start, ZoneOffset.UTC),
+                UlidGenerator.shared(), settings(Optional.of(Duration.ofMinutes(10))), db);
+        var row = service.start(request).record();
+        assertEquals(InstanceStatus.STARTING, row.status());
+        reconciler(engine, request, start.plus(Duration.ofMinutes(11))).recover(request.tenant(), row.id().value());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(request.tenant(), row.id()).orElseThrow().status());
+        assertEquals(1, cancels.get());
+    }
+
+    @Test void rolloutFlagExcludesStartingRowsFromBothLifetimeScans() {
+        var request = request();
+        WorkflowEngine engine = new WorkflowEngine() {
+            public boolean hasDefinition(DefinitionRef ignored) { return true; }
+            public EngineLaunch prepare(DefinitionRef ignored, Map<String, Object> input) { throw new IllegalStateException(); }
+        };
+        var service = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start, ZoneOffset.UTC),
+                UlidGenerator.shared(), settings(Optional.of(Duration.ofMinutes(10))), db);
+        var row = service.start(request).record();
+        var now = start.plus(Duration.ofMinutes(11));
+        for (var cutoff : List.of(Optional.<Instant>empty(), Optional.of(now.minus(Duration.ofMinutes(10))))) {
+            assertFalse(scan.livePastLifetime(now, cutoff, 100, false).stream().anyMatch(ref -> ref.id().equals(row.id().value())));
+            assertTrue(scan.livePastLifetime(now, cutoff, 100, true).stream().anyMatch(ref -> ref.id().equals(row.id().value())));
+        }
+        var config = new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120), Duration.ofSeconds(60),
+                3, Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofHours(24), 100, Optional.empty(), Optional.empty());
+        var repair = new Reconciler(store, engine, new EngineStatusSync(store, scan, config, Clock.fixed(now, ZoneOffset.UTC)),
+                scan, new RepairStore(db), config, db, Clock.fixed(now, ZoneOffset.UTC), request.tenant()::equals);
+        repair.recover(request.tenant(), row.id().value());
+        assertEquals(InstanceStatus.STARTING, store.find(request.tenant(), row.id()).orElseThrow().status());
+    }
+
+    @Test void expiredStartMissingFromLocalEngineRemainsAwaitingCancellation() {
+        var request = request(); var cancelAttempts = new AtomicInteger();
+        WorkflowEngine engine = new WorkflowEngine() {
+            public boolean hasDefinition(DefinitionRef ignored) { return true; }
+            public EngineLaunch prepare(DefinitionRef ignored, Map<String, Object> input) {
+                return new EngineLaunch() {
+                    public String engineInstanceId() { return "engine-" + request.tenant(); }
+                    public void start() { throw new IllegalStateException("unconfirmed"); }
+                };
+            }
+            public boolean cancel(DefinitionRef ignored, String id) { cancelAttempts.incrementAndGet(); return false; }
+        };
+        var service = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start, ZoneOffset.UTC),
+                UlidGenerator.shared(), settings(Optional.of(Duration.ofMinutes(10))), db);
+        var row = service.start(request).record();
+        reconciler(engine, request, start.plus(Duration.ofMinutes(11))).recover(request.tenant(), row.id().value());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(request.tenant(), row.id()).orElseThrow().status());
+        assertEquals(1, cancelAttempts.get());
+    }
+
+    @Test void expiryWaitsForInFlightStartAndCancelsItOnTheNextPass() throws Exception {
+        var request = request(); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        var cancels = new AtomicInteger();
+        WorkflowEngine engine = new WorkflowEngine() {
+            public boolean hasDefinition(DefinitionRef ignored) { return true; }
+            public EngineLaunch prepare(DefinitionRef ignored, Map<String, Object> input) {
+                return new EngineLaunch() {
+                    public String engineInstanceId() { return "engine-" + request.tenant(); }
+                    public void start() {
+                        entered.countDown();
+                        try { if (!release.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("timed out"); }
+                        catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                    }
+                };
+            }
+            public Optional<ActiveInstance> activeInstance(DefinitionRef ignored, String id) {
+                return Optional.of(new ActiveInstance(id, EngineStatus.RUNNING));
+            }
+            public boolean cancel(DefinitionRef ignored, String id) { cancels.incrementAndGet(); return true; }
+        };
+        var service = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start, ZoneOffset.UTC),
+                UlidGenerator.shared(), settings(Optional.of(Duration.ofMinutes(10))), db);
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var future = executor.submit(() -> service.start(request));
+            assertTrue(entered.await(10, TimeUnit.SECONDS));
+            var row = store.findByKey(request.tenant(), request.idempotencyKey()).orElseThrow();
+            var repair = reconciler(engine, request, start.plus(Duration.ofMinutes(11)));
+            assertTrue(repair.reconcileOnce().count("busy") >= 1);
+            assertEquals(0, cancels.get());
+            release.countDown(); future.get(10, TimeUnit.SECONDS);
+            repair.reconcileOnce();
+            assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(request.tenant(), row.id()).orElseThrow().status());
+            assertEquals(1, cancels.get());
+        } finally { release.countDown(); executor.shutdownNow(); }
+    }
+
+    @Test void expiryWinningBeforeTheStartLockPreventsPreparation() throws Exception {
+        var request = request(); var inserted = new CountDownLatch(1); var release = new CountDownLatch(1);
+        var engine = new Engine();
+        var faults = new LifecycleFaults((String) null) {
+            @Override public void hit(String point) {
+                if (!AFTER_INSERT.equals(point)) return;
+                inserted.countDown();
+                try { if (!release.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("timed out"); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+            }
+        };
+        var service = new InstanceService(store, engine, faults, Clock.fixed(start, ZoneOffset.UTC),
+                UlidGenerator.shared(), settings(Optional.of(Duration.ofMinutes(10))), db);
+        var executor = Executors.newSingleThreadExecutor();
+        try {
+            var future = executor.submit(() -> service.start(request));
+            assertTrue(inserted.await(10, TimeUnit.SECONDS));
+            var row = store.findByKey(request.tenant(), request.idempotencyKey()).orElseThrow();
+            reconciler(engine, request, start.plus(Duration.ofMinutes(11))).reconcileOnce();
+            release.countDown();
+            assertEquals(InstanceStatus.CANCELLED, future.get(10, TimeUnit.SECONDS).record().status());
+            assertEquals(InstanceStatus.CANCELLED, store.find(request.tenant(), row.id()).orElseThrow().status());
+            assertEquals(0, engine.starts.get());
+        } finally { release.countDown(); executor.shutdownNow(); }
     }
     @Test void cancelledDuringRecoveryPreparationDiscardsTheUnregisteredEngineInstance() {
         for (int discardOutcome = 0; discardOutcome < 3; discardOutcome++) {

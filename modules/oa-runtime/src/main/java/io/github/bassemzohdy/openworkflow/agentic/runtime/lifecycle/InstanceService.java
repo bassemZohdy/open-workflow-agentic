@@ -17,6 +17,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.sql.SQLException;
+import javax.sql.DataSource;
 import org.jboss.logging.Logger;
 
 /**
@@ -62,25 +64,38 @@ public class InstanceService {
     private final UlidGenerator ids;
     @Inject PersistenceCommitGate checkpoints;
     private final LifecycleSettings lifetimeSettings;
+    private final DataSource launchLocks;
 
     @Inject
-    public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, LifecycleSettings settings) {
-        this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared(), settings);
+    public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, LifecycleSettings settings,
+                           DataSource launchLocks) {
+        this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared(), settings,
+                Objects.requireNonNull(launchLocks, "launchLocks"));
     }
 
     /** Explicit callers without a configured limit retain the documented unbounded default. */
     public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults) {
-        this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared(), LifecycleSettings.defaults());
+        this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared(), LifecycleSettings.defaults(), locksFor(store));
     }
 
     InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, Clock clock,
                     UlidGenerator ids, LifecycleSettings settings) {
+        this(store, engine, faults, clock, ids, settings, locksFor(store));
+    }
+
+    InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, Clock clock,
+                    UlidGenerator ids, LifecycleSettings settings, DataSource launchLocks) {
         this.store = Objects.requireNonNull(store, "store");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.faults = Objects.requireNonNull(faults, "faults");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.ids = Objects.requireNonNull(ids, "ids");
         this.lifetimeSettings = Objects.requireNonNull(settings, "settings");
+        this.launchLocks = launchLocks;
+    }
+
+    private static DataSource locksFor(InstanceStore store) {
+        return store instanceof JdbcInstanceStore jdbc ? jdbc.lockDataSource() : null;
     }
 
     /**
@@ -203,7 +218,20 @@ public class InstanceService {
             return new StartResult(row, false);
         }
         faults.hit(LifecycleFaults.AFTER_INSERT);
-        return launch(row, request);
+        if (launchLocks == null) return launch(row, request); // In-memory explicit callers have no database reconciler.
+        try {
+            var lock = Reconciler.AdvisoryLock.tryAcquire(launchLocks, "instance:" + row.id().value());
+            if (lock.isEmpty()) return new StartResult(store.find(row.tenant(), row.id()).orElse(row), true);
+            try (var held = lock.orElseThrow()) {
+                InstanceRecord current = store.find(row.tenant(), row.id()).orElseThrow();
+                // A reconciler may have acquired the lock immediately after the insert and already acted.
+                if (current.version() != row.version() || current.status() != InstanceStatus.STARTING)
+                    return new StartResult(current, true);
+                return launch(current, request);
+            }
+        } catch (SQLException e) {
+            throw new StoreUnavailableException("the registry database failed while coordinating a start", e);
+        }
     }
 
     /** The instance with this id in this tenant. Reads only the registry, never the engine's tables. */
