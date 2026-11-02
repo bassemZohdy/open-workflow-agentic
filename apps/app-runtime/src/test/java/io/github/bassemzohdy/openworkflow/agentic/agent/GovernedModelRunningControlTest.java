@@ -9,6 +9,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ApprovedModelProfile;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ApprovedToolProfile;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceTaskAllocation;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceToolCall;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ExecutionLimits;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.RiskTier;
@@ -27,10 +32,18 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.PolicyDecisionPoint;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ApprovedModelContext;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedLlmClient;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedToolGateway;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ControlledToolEffects;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.LlmClient;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ModelCallRefused;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.NoApprovedModelContext;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.JdbcEffectLedger;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectState;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectKey;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.DelegationGrantStore;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.DelegationGrants;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IdentityAudit;
@@ -639,6 +652,144 @@ class GovernedModelRunningControlTest {
                 pool.shutdown();
                 assertTrue(pool.awaitTermination(15, TimeUnit.SECONDS), "worker joined before callback returns");
             }
+            return null;
+        });
+    }
+
+    // Fixture-only effect target and approvals; production registry, schema validation and identity are not implied.
+    private static final class ToolEffectRig {
+        final AtomicInteger dispatches = new AtomicInteger();
+        final AtomicInteger admissions = new AtomicInteger();
+        final JdbcEffectLedger ledger = new JdbcEffectLedger(db.owner);
+        final AllocatedResourceTask allocation;
+        final ApprovedToolProfile profile;
+        final GovernedToolGateway.Approval approved;
+        final GovernedToolGateway.ToolBudget budget;
+        final ControlledToolEffects controlled;
+        volatile Runnable during = () -> { };
+        final EffectTarget target = new EffectTarget() {
+            @Override public String target() { return "registered:test"; }
+            @Override public Reply execute(String key) {
+                dispatches.incrementAndGet(); during.run(); return new Reply(Outcome.CONFIRMED, "confirmed");
+            }
+        };
+
+        ToolEffectRig(ResourceExecutionEntry entry) {
+            var task = new AgentTaskContract(UlidGenerator.shared().next(), "tool fixture", Set.of("tool:research"),
+                    Set.of(), RiskTier.LOW, new ExecutionLimits(10, Duration.ofMinutes(10), 1000),
+                    entry.scope().owner(), UlidGenerator.shared().next());
+            var model = new ApprovedModelProfile("fixture", "1", "c".repeat(64), AGENT, "fixture-model", 2,
+                    100, Duration.ofSeconds(2), 100);
+            var resource = new ResourceTaskAllocation(entry.scope(), null, task, model);
+            allocation = new AllocatedResourceTask(resource, NOW, NOW.plusSeconds(120));
+            profile = new ApprovedToolProfile("fixture", "1", "d".repeat(64), AGENT,
+                    Set.of("tool:research"), 3, Duration.ofSeconds(2));
+            approved = new GovernedToolGateway.Approval(AGENT, task, 1000);
+            budget = new GovernedToolGateway.ToolBudget() {
+                @Override public void admit(GovernedToolGateway.Approval approval) { assertEquals(approved, approval); admissions.incrementAndGet(); }
+                @Override public void requireCurrent(GovernedToolGateway.Approval approval) { assertEquals(approved, approval); }
+                @Override public void requireProfile(GovernedToolGateway.Approval approval, ApprovedToolProfile expected) {
+                    assertEquals(approved, approval); assertEquals(profile, expected);
+                }
+            };
+            var pep = new Pep(request -> new Decision("fixture", DecisionOutcome.ALLOW, "allow", POLICY, NOW),
+                    event -> { }, Duration.ofSeconds(5), CLOCK);
+            controlled = new ControlledToolEffects(new DurableEffects(ledger, Clock.systemUTC()), pep, () -> Optional.of(approved));
+        }
+
+        ToolCall call(String args) { return new ToolCall(allocation.allocation().contract().id(), "tool:research", args); }
+        ResourceToolCall occurrence(Running running, ResourceExecutionEntry entry, ToolCall call) {
+            return ResourceToolCall.of(allocation, profile, entry, running.executor(), "graph/tool/iteration/1", call);
+        }
+        io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Effect run(
+                Running running, ResourceExecutionEntry entry, ToolCall call) {
+            return controlled.execute(running, entry, allocation, profile, occurrence(running, entry, call), call,
+                    budget, "registered:test", target);
+        }
+    }
+
+    @Test void controlledToolEffectUsesOneDurableOccurrenceAcrossExactRetries() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{\"query\":\"one\"}");
+            var first = rig.run(running, entry, call);
+            assertEquals(EffectState.CONFIRMED, first.state());
+            assertEquals(first, rig.run(running, entry, call));
+            assertEquals(1, rig.dispatches.get()); assertEquals(1, rig.admissions.get());
+            assertThrows(IllegalStateException.class, () -> rig.run(running, entry, rig.call("{\"query\":\"changed\"}")));
+            assertEquals(1, rig.dispatches.get());
+            return null;
+        });
+    }
+
+    @Test void aClosedOrMismatchedControlCannotDispatchAToolEffect() {
+        inClosingCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{}");
+            var wrong = new ResourceToolCall(entry, UUID.randomUUID(), "graph/tool/iteration/1", call.toolName(),
+                    ResourceToolCall.requestFingerprint(call, rig.profile));
+            assertThrows(RefusedException.class, () -> rig.controlled.execute(running, entry, rig.allocation, rig.profile,
+                    wrong, call, rig.budget, "registered:test", rig.target));
+            running.close();
+            assertThrows(RefusedException.class, () -> rig.run(running, entry, call));
+            assertEquals(0, rig.dispatches.get()); assertEquals(0, rig.admissions.get());
+            return null;
+        });
+    }
+
+    @Test void knownEffectOutcomeIsRetainedButNotReleasedAfterControlLoss() throws Exception {
+        var key = new AtomicReference<EffectKey>();
+        var ledger = new JdbcEffectLedger(db.owner);
+        inClosingCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{}");
+            key.set(rig.occurrence(running, entry, call).effectCommand("registered:test").key());
+            rig.during = running::close;
+            assertThrows(RefusedException.class, () -> rig.run(running, entry, call));
+            assertEquals(1, rig.dispatches.get());
+            return null;
+        });
+        assertEquals(EffectState.CONFIRMED, ledger.find(key.get()).orElseThrow().state());
+    }
+
+    @Test void policyDenialCannotCreateAnEffectOrReachTheTarget() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{}");
+            var pep = new Pep(request -> new Decision("fixture", DecisionOutcome.DENY, "deny", POLICY, NOW),
+                    event -> { }, Duration.ofSeconds(5), CLOCK);
+            var denied = new ControlledToolEffects(new DurableEffects(rig.ledger, Clock.systemUTC()), pep, () -> Optional.of(rig.approved));
+            var occurrence = rig.occurrence(running, entry, call);
+            assertThrows(PolicyDenied.class, () -> denied.execute(running, entry, rig.allocation, rig.profile,
+                    occurrence, call, rig.budget, "registered:test", rig.target));
+            assertTrue(rig.ledger.find(occurrence.effectCommand("registered:test").key()).isEmpty());
+            assertEquals(0, rig.dispatches.get()); assertEquals(0, rig.admissions.get());
+            return null;
+        });
+    }
+
+    @Test void exhaustedBudgetDoesNotDispatchAndLeavesTheAttemptForReconciliation() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{}");
+            var exhausted = new GovernedToolGateway.ToolBudget() {
+                @Override public void admit(GovernedToolGateway.Approval approval) { throw new ModelCallRefused("exhausted"); }
+                @Override public void requireCurrent(GovernedToolGateway.Approval approval) { }
+                @Override public void requireProfile(GovernedToolGateway.Approval approval, ApprovedToolProfile profile) { }
+            };
+            var result = rig.controlled.execute(running, entry, rig.allocation, rig.profile,
+                    rig.occurrence(running, entry, call), call, exhausted, "registered:test", rig.target);
+            assertEquals(EffectState.INTENDED, result.state());
+            assertEquals(0, rig.dispatches.get());
+            return null;
+        });
+    }
+
+    @Test void unknownTargetOutcomeRemainsUnresolvedWithoutASecondDispatch() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{}");
+            rig.during = () -> { throw new IllegalStateException("fixture timeout"); };
+            var first = rig.run(running, entry, call);
+            assertEquals(EffectState.INTENDED, first.state());
+            var retried = rig.run(running, entry, call);
+            assertEquals(EffectState.INTENDED, retried.state());
+            assertEquals(first.key(), retried.key());
+            assertEquals(1, rig.dispatches.get()); assertEquals(1, rig.admissions.get());
             return null;
         });
     }
