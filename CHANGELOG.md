@@ -1,5 +1,7 @@
 # Changelog
 
+- Rotate stale-start and cancellation scans independently, so held locks or unconfirmed cancellations do not block later recovery work.
+
 - Rotate overdue wait scans across passes so a held lock on an older wait does not block later waits.
 
 - Rotate lifetime expiry scans by deadline and instance id, so an older locked row does not monopolize every batch; the cursor resets on process restart.
