@@ -5,7 +5,7 @@ originally failed because the restored SDK instance was `PENDING` and refused ca
 explicit test-only reader, proposed receipt schema and receipt writer: the packaged application is stopped across the
 deadline, then restarted, and the registry reaches `CANCELLED` without restarting the expired workflow. This is not
 production wiring; it does not establish safe mixed-version deployment, live replica fencing or recovery from a crash
-after receipt commit.
+after receipt commit. Each test-class run uses its own process-log filenames so readiness and effect assertions cannot read a previous run’s output. All three lifecycle process-recovery scenarios passed together with these isolated logs.
 
 The pinned SDK's `WorkflowMutableInstance.internalCancel` checks whether the current status is active and refuses a
 `PENDING` instance. Starting the expired workflow merely to cancel it could execute work after its deadline; it is not
