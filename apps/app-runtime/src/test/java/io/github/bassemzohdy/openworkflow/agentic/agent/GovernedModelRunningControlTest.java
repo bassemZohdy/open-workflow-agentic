@@ -886,6 +886,65 @@ class GovernedModelRunningControlTest {
         });
     }
 
+    @Test void pinnedOpenApiToolSendsOneValidatedRequestThroughLedger() throws Exception {
+        var calls = new AtomicInteger(); var payload = new AtomicReference<String>();
+        var idempotency = new AtomicReference<String>(); var authorization = new AtomicReference<String>();
+        var server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/orders", exchange -> {
+            try {
+                calls.incrementAndGet(); payload.set(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+                idempotency.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+                authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+                exchange.sendResponseHeaders(200, -1);
+            } finally { exchange.close(); }
+        });
+        server.start();
+        try {
+            inCallback((running, entry, checks) -> {
+                var rig = new ToolEffectRig(entry);
+                String document = """
+                        {"openapi":"3.1.0","components":{"schemas":{"Order":{"type":"object",
+                         "required":["amount"],"properties":{"amount":{"type":"integer","minimum":1}}}},
+                         "requestBodies":{"OrderBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}}},
+                         "responses":{"Done":{"description":"done"}}},
+                         "paths":{"/orders":{"post":{"operationId":"createOrder","requestBody":{"$ref":"#/components/requestBodies/OrderBody"},
+                         "responses":{"200":{"$ref":"#/components/responses/Done"}}}}}}
+                        """;
+                String digest = io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder.sha256Hex(
+                        io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder.strictUtf8(document));
+                var op = io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.http.LoopbackOpenApiFixture.select(
+                        document, digest, "createOrder", server.getAddress().getPort());
+                var grant = UlidGenerator.shared().next();
+                var expectation = new io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.http.PinnedHttpEffectTarget.CredentialExpectation(
+                        "issuer", grant, Set.of("orders:write"));
+                var registration = op.registration("registered:test", "orders", "corr", Duration.ofSeconds(2), Set.of(200),
+                        expectation, (audience, action) -> action.run(new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken(
+                                io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Credential.of("fixture-token"), audience,
+                                Set.of("orders:write"), Instant.now().plusSeconds(60), "issuer", "jti", List.of("worker"), grant)), token -> { });
+                var registry = Map.of("tool:research", registration);
+                var profile = new ApprovedToolProfile("fixture", "1", GovernedToolGateway.configurationFingerprint(registry),
+                        AGENT, Set.of("tool:research"), 3, Duration.ofSeconds(2));
+                var budget = new GovernedToolGateway.ToolBudget() {
+                    public void admit(GovernedToolGateway.Approval approval) { }
+                    public void requireCurrent(GovernedToolGateway.Approval approval) { }
+                    public void requireProfile(GovernedToolGateway.Approval approval, ApprovedToolProfile expected) { assertEquals(profile, expected); }
+                };
+                var pep = new Pep(request -> new Decision("fixture", DecisionOutcome.ALLOW, "allow", POLICY, NOW),
+                        event -> { }, Duration.ofSeconds(5), CLOCK);
+                var gateway = new GovernedToolGateway(registry, () -> Optional.of(rig.approved), profile, pep,
+                        event -> { }, budget, CLOCK, new DurableEffects(rig.ledger, Clock.systemUTC()));
+                var call = rig.call("{\"amount\":10}");
+                var occurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/http", call);
+                assertEquals(EffectState.CONFIRMED, gateway.invokeEffect(running, entry, rig.allocation, occurrence, call).state());
+                assertEquals(EffectState.CONFIRMED, gateway.invokeEffect(running, entry, rig.allocation, occurrence, call).state());
+                assertEquals(1, calls.get()); assertEquals(call.argumentsJson(), payload.get());
+                assertEquals(occurrence.effectCommand("registered:test").key().idempotencyKey(), idempotency.get());
+                assertEquals("Bearer fixture-token", authorization.get());
+                return null;
+            });
+        } finally { server.stop(0); }
+    }
+
     @Test void registeredEffectRetainsConfirmedFactWhenTargetWithholdsAfterAuthorityLoss() throws Exception {
         inCallback((running, entry, checks) -> {
             var rig = new ToolEffectRig(entry); var call = rig.call("{}");

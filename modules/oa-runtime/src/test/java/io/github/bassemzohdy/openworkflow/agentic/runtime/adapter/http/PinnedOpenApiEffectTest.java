@@ -29,6 +29,14 @@ class PinnedOpenApiEffectTest {
               "requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}},
               "responses":{"200":{"description":"complete"}}}}}}
             """;
+    private static final String OBJECT_REFS = """
+            {"openapi":"3.1.0","components":{"schemas":{"Order":{"type":"object"}},
+             "requestBodies":{"OrderBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}}},
+             "responses":{"Done":{"description":"done"}}},
+             "paths":{"/orders":{"post":{"operationId":"createOrder",
+              "requestBody":{"$ref":"#/components/requestBodies/OrderBody"},
+              "responses":{"200":{"$ref":"#/components/responses/Done"}}}}}}
+            """;
     private static final PinnedHttpEffectTarget.CredentialExpectation EXPECTED =
             new PinnedHttpEffectTarget.CredentialExpectation("issuer", Ulid.parse("01ARZ3NDEKTSV4RRFFQ69G5FAV"), Set.of("orders:write"));
 
@@ -58,6 +66,7 @@ class PinnedOpenApiEffectTest {
         assertThrows(IllegalArgumentException.class, () -> operation(DOC.replace("\"paths\":{\"/orders\":", "\"paths\":{\"/other\":{\"get\":{\"operationId\":\"createOrder\"}},\"/orders\":"), "createOrder", ORIGIN));
         assertThrows(IllegalArgumentException.class, () -> operation(DOC.replace("\"openapi\":\"3.1.0\"", "\"openapi\":\"3.1.0\",\"openapi\":\"3.1.0\""), "createOrder", ORIGIN));
         assertThrows(IllegalArgumentException.class, () -> operation(DOC, "createOrder", URI.create("http://orders.example")));
+        assertThrows(IllegalArgumentException.class, () -> operation(DOC, "createOrder", URI.create("http://127.0.0.1:8080")));
         assertThrows(IllegalArgumentException.class, () -> operation(DOC, "createOrder", URI.create("https://orders.example/api")));
     }
 
@@ -86,5 +95,15 @@ class PinnedOpenApiEffectTest {
                 chain.toString()).replace("#/components/schemas/Order", "#/components/schemas/S0");
         assertTrue(deep.contains("\"S34\""));
         assertThrows(IllegalArgumentException.class, () -> operation(deep, "createOrder", ORIGIN));
+    }
+
+    @Test void resolvesLocalRequestAndResponseObjectsButRefusesUnsafeReferences() {
+        assertNotNull(registration(operation(OBJECT_REFS, "createOrder", ORIGIN), Set.of(200)));
+        assertThrows(IllegalArgumentException.class, () -> operation(OBJECT_REFS.replace("#/components/requestBodies/OrderBody", "https://example.com/body"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(OBJECT_REFS.replace("#/components/responses/Done", "#/components/requestBodies/OrderBody"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(OBJECT_REFS.replace("#/components/responses/Done", "#/components/responses/Missing"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(OBJECT_REFS.replace("\"Done\":{\"description\":\"done\"}", "\"Done\":{\"$ref\":\"#/components/responses/Done\"}"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(OBJECT_REFS.replace("\"Done\":{\"description\":\"done\"}", "\"Done\":{}"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(OBJECT_REFS.replace("\"$ref\":\"#/components/requestBodies/OrderBody\"", "\"$ref\":\"#/components/requestBodies/OrderBody\",\"required\":true"), "createOrder", ORIGIN));
     }
 }

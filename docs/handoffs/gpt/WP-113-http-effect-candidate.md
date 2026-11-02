@@ -27,8 +27,9 @@ and a fixed literal path. The caller supplies a trusted HTTPS origin: document-l
 operation server overrides, parameters, path templates and custom schema dialects are refused. Schema references may
 only be pure, acyclic references to named components in the same pinned document; expansion depth, node count and
 result size are bounded. Remote references, references with sibling keywords and references in instance-valued schema
-fields are refused. Confirmed status codes must
-also be documented inline. The gateway fingerprint covers the exact document digest, selected operation, origin,
+fields are refused. Request-body and response objects may likewise reference matching local components without siblings;
+missing, cyclic, cross-kind and remote references are refused. Confirmed status codes must be documented with response
+descriptions. The gateway fingerprint covers the exact document digest, selected operation, origin,
 target, timeout, correlation, confirmation codes and token expectations. The gateway validates arguments against the
 selected schema before binding; no credential or network call occurs at registration. This narrow selector is not a
 complete OpenAPI validator, approval workflow or interpretation of OpenAPI security schemes; trusted composition must
@@ -39,6 +40,10 @@ credential, while a valid request reaches a fixture credential refusal and leave
 case resolves nested component schemas and rejects a value below the referenced minimum before acquiring credentials.
 Selector tests cover digest and endpoint changes, duplicate operation IDs, unsupported paths, local-reference cycles,
 remote references, dialects and status codes.
+Another controlled gateway fixture selects locally referenced request and response objects and calls an IPv4 loopback
+HTTP service through the real ledger. It checks the bound request, credential and idempotency key and confirms that an
+exact retry does not send again. The test-only loopback seam does not enable plaintext production transport; the fixture
+credential, service and policy do not establish provider interoperability or approval.
 
 A trusted service contract must explicitly choose terminal confirmation status codes from 200, 201 and 204, and must
 prove those statuses mean the effect is complete. A 202, redirect, unselected status, timeout, I/O failure or missing

@@ -1,5 +1,7 @@
 # Changelog
 
+- Support bounded local OpenAPI request-body and response references in the governed effect selector, and verify a ledger-backed loopback request and retry.
+
 - Resolve bounded, acyclic local component schemas in the pinned OpenAPI effect selector; reject remote and recursive references.
 
 - Add an opt-in, digest-pinned OpenAPI JSON POST selector for governed effect registrations, with a trusted origin and schema validation; production approval and identity integration remain open.

@@ -27,8 +27,15 @@ public final class PinnedOpenApiEffect {
     private final String documentDigest, operationId, schema;
     private final URI endpoint;
     private final Set<Integer> documentedResponses;
+    private final boolean loopbackTest;
 
     public PinnedOpenApiEffect(String document, String expectedSha256, String operationId, URI trustedOrigin) {
+        this(document, expectedSha256, operationId, trustedOrigin, false);
+    }
+
+    // Package-local seam for the IPv4 loopback integration fixture; public composition requires HTTPS.
+    PinnedOpenApiEffect(String document, String expectedSha256, String operationId, URI trustedOrigin, boolean loopbackTest) {
+        this.loopbackTest = loopbackTest;
         byte[] bytes = CanonicalEncoder.strictUtf8(Objects.requireNonNull(document));
         if (bytes.length > 262_144) throw new IllegalArgumentException("OpenAPI document exceeds 256 KiB");
         this.documentDigest = CanonicalEncoder.sha256Hex(bytes);
@@ -38,7 +45,9 @@ public final class PinnedOpenApiEffect {
             throw new IllegalArgumentException("invalid operation ID");
         this.operationId = operationId;
         Objects.requireNonNull(trustedOrigin);
-        if (!"https".equals(trustedOrigin.getScheme()) || trustedOrigin.getHost() == null
+        boolean permittedScheme = "https".equals(trustedOrigin.getScheme()) || (loopbackTest
+                && "http".equals(trustedOrigin.getScheme()) && "127.0.0.1".equals(trustedOrigin.getHost()));
+        if (!permittedScheme || trustedOrigin.getHost() == null
                 || trustedOrigin.getRawUserInfo() != null || trustedOrigin.getRawQuery() != null
                 || trustedOrigin.getRawFragment() != null || !(trustedOrigin.getRawPath().isEmpty() || "/".equals(trustedOrigin.getRawPath())))
             throw new IllegalArgumentException("trusted origin must be an HTTPS origin without a path");
@@ -64,9 +73,9 @@ public final class PinnedOpenApiEffect {
                 || selectedPath.has("$ref") || selectedPath.has("parameters") || selected.has("parameters")
                 || selectedPath.has("servers") || selected.has("servers"))
             throw new IllegalArgumentException("operation must be unique, fixed-path and parameter-free");
-        JsonNode request = selected.path("requestBody");
+        JsonNode request = resolveObject(selected.path("requestBody"), root.path("components").path("requestBodies"), "requestBodies");
         JsonNode input = request.path("content").path("application/json").path("schema");
-        if (!request.isObject() || request.has("$ref") || !request.path("required").isBoolean() || !request.path("required").asBoolean() || !input.isObject())
+        if (!request.path("required").isBoolean() || !request.path("required").asBoolean() || !input.isObject())
             throw new IllegalArgumentException("required JSON object schema is required");
         JsonNode resolved = resolveSchema(input, root.path("components").path("schemas"), new java.util.HashSet<>(), new int[]{0}, 0);
         if (!"object".equals(resolved.path("type").asText())) throw new IllegalArgumentException("JSON object schema required");
@@ -77,7 +86,12 @@ public final class PinnedOpenApiEffect {
         var allowed = new java.util.HashSet<Integer>();
         for (int code : new int[]{200, 201, 204}) {
             JsonNode response = responses.get(Integer.toString(code));
-            if (response != null && response.isObject() && !response.has("$ref")) allowed.add(code);
+            if (response != null) {
+                JsonNode resolvedResponse = resolveObject(response, root.path("components").path("responses"), "responses");
+                if (!resolvedResponse.path("description").isTextual())
+                    throw new IllegalArgumentException("documented response description required");
+                allowed.add(code);
+            }
         }
         this.documentedResponses = Set.copyOf(allowed);
         this.endpoint = URI.create(trustedOrigin.toString().replaceAll("/$", "") + path);
@@ -88,7 +102,7 @@ public final class PinnedOpenApiEffect {
             Duration timeout, Set<Integer> confirmed, PinnedHttpEffectTarget.CredentialExpectation expectation,
             PinnedHttpEffectTarget.CredentialProvider credentials, PinnedHttpEffectTarget.PreSendFence fence) {
         Objects.requireNonNull(expectation); Set<Integer> statuses = Set.copyOf(confirmed);
-        if (!documentedResponses.containsAll(statuses)) throw new IllegalArgumentException("confirmation response is not documented inline");
+        if (!documentedResponses.containsAll(statuses)) throw new IllegalArgumentException("confirmation response is not documented");
         var encoder = new CanonicalEncoder("oa.openapi.effect.v1").text(documentDigest).text(operationId)
                 .text(endpoint.toASCIIString()).text(target).text(audience).text(correlation)
                 .number(timeout.getSeconds()).number(timeout.getNano()).text(expectation.issuer())
@@ -97,10 +111,26 @@ public final class PinnedOpenApiEffect {
         encoder.number(statuses.size()); statuses.stream().sorted().forEach(s -> encoder.number(s));
         String fingerprint = CanonicalEncoder.sha256Hex(encoder.toBytes());
         // Construct once at registration to reject malformed pinned configuration before any tool call.
-        new PinnedHttpEffectTarget(target, endpoint, audience, correlation, "{}", timeout, statuses, expectation, credentials, fence);
+        new PinnedHttpEffectTarget(target, endpoint, audience, correlation, "{}", timeout, statuses, expectation, credentials, fence, loopbackTest);
         return GovernedToolGateway.Registration.effectful(schema, "{}", timeout, fingerprint, target,
                 body -> new PinnedHttpEffectTarget(target, endpoint, audience, correlation, body, timeout,
-                        statuses, expectation, credentials, fence));
+                        statuses, expectation, credentials, fence, loopbackTest));
+    }
+
+    private static JsonNode resolveObject(JsonNode node, JsonNode components, String category) {
+        var visited = new java.util.HashSet<String>();
+        String prefix = "#/components/" + category + "/";
+        while (node.isObject() && node.has("$ref")) {
+            JsonNode ref = node.get("$ref");
+            if (node.size() != 1 || !ref.isTextual() || !ref.textValue().startsWith(prefix))
+                throw new IllegalArgumentException("only pure local component references are supported");
+            String name = ref.textValue().substring(prefix.length());
+            if (!name.matches("[A-Za-z0-9._-]{1,128}") || !visited.add(name) || visited.size() > 32)
+                throw new IllegalArgumentException("invalid or cyclic component reference");
+            node = components.path(name);
+        }
+        if (!node.isObject()) throw new IllegalArgumentException("missing or invalid component object");
+        return node;
     }
 
     private static void requireSelfContained(JsonNode node) {
