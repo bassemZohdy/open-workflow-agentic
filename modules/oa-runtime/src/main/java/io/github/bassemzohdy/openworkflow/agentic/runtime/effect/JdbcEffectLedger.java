@@ -304,6 +304,11 @@ public class JdbcEffectLedger implements EffectLedger {
             throw new IllegalArgumentException("invalid manual effect decision");
         Objects.requireNonNull(currentAuthority);Objects.requireNonNull(recheckPolicy);
         return boundedTransaction(c -> {
+            // Serialize the terminal mutation with automatic dispatch/reconciliation, which holds the same
+            // session advisory lock across target I/O. The transaction lock is bounded by lock_timeout.
+            try(var q=c.prepareStatement("select pg_advisory_xact_lock(?, ?)")) {
+                q.setInt(1,LOCK_CLASS);q.setInt(2,lockKey(key));q.execute();
+            }
             lockManualInstance(c,key);
             Effect current=locked(c,key).effect();
             try(var q=c.prepareStatement("select desired_state,actor_kind,actor_id,source_key from effect.manual_decision where decision_id=? and thread_name=? and node_id=? and idempotency_key=? for update")) {
@@ -419,10 +424,7 @@ public class JdbcEffectLedger implements EffectLedger {
     }
 
     private <T> T claim(EffectKey key,Supplier<T> work) {
-        byte[] digest = java.util.HexFormat.of().parseHex(CanonicalEncoder.sha256Hex(
-                new CanonicalEncoder("oa.effect.lock.v1").text(key.threadId().value())
-                        .text(key.nodeId()).text(key.idempotencyKey()).toBytes()));
-        int lock = ByteBuffer.wrap(digest).getInt();
+        int lock = lockKey(key);
         try (Connection c = dataSource.getConnection()) {
             c.setAutoCommit(true);
             try (PreparedStatement s = c.prepareStatement("select pg_try_advisory_lock(?, ?)")) {
@@ -439,6 +441,13 @@ public class JdbcEffectLedger implements EffectLedger {
                 }
             }
         } catch (SQLException e) { throw new StoreUnavailableException("effect claim database failed", e); }
+    }
+
+    private static int lockKey(EffectKey key) {
+        byte[] digest=java.util.HexFormat.of().parseHex(CanonicalEncoder.sha256Hex(
+                new CanonicalEncoder("oa.effect.lock.v1").text(key.threadId().value())
+                        .text(key.nodeId()).text(key.idempotencyKey()).toBytes()));
+        return ByteBuffer.wrap(digest).getInt();
     }
 
     public static class EffectBusyException extends RuntimeException {

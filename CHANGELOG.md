@@ -1,5 +1,7 @@
 # Changelog
 
+- Serialize manual effect decisions with automatic execution using the same bounded per-effect lock.
+
 - Verify process-loss recovery of resource-scoped audited effects.
 
 - Exercise the audited governed effect path against a pinned OpenAPI HTTP target.

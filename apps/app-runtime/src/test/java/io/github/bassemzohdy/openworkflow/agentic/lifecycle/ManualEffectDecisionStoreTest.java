@@ -431,6 +431,35 @@ class ManualEffectDecisionStoreTest {
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
     }
 
+    @Test void manualResolutionCannotRaceAnOwnedEffectAttempt() throws Exception {
+        var f=unresolved("occur-active-attempt");var authority=authority(f,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var resolver=resolver(allowingPep(),new AuditAppendOnce(support.db.owner));var request=UlidGenerator.shared().next();
+        var held=new CountDownLatch(1);var release=new CountDownLatch(1);var pool=Executors.newSingleThreadExecutor();
+        try {
+            var target=new io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget() {
+                public String target(){return f.command().target();}
+                public java.time.Duration replayWindow(){return java.time.Duration.ZERO;}
+                public Reply execute(String key){throw new AssertionError("an unknown outcome must not be resent");}
+                public Reply lookup(String key) throws Exception {
+                    held.countDown();if(!release.await(15,TimeUnit.SECONDS))throw new IllegalStateException("fixture timed out");
+                    return new Reply(Outcome.UNKNOWN,null);
+                }
+            };
+            var worker=pool.submit(()->new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects(ledger)
+                    .execute(f.command(),target));
+            assertTrue(held.await(5,TimeUnit.SECONDS));
+            var failure=assertThrows(io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException.class,
+                    ()->resolver.resolve(authority,f.command().key(),request,EffectState.FAILED,"TARGET_REJECTED"));
+            assertEquals("55P03",assertInstanceOf(SQLException.class,failure.getCause()).getSQLState());
+            assertEquals(EffectState.INTENDED,ledger.find(f.command().key()).orElseThrow().state());
+            assertEquals(0,count("select count(*) from effect.manual_decision_applied"));
+            release.countDown();assertEquals(EffectState.INTENDED,worker.get(5,TimeUnit.SECONDS).state());
+            assertEquals(EffectState.FAILED,resolver.resolve(authority,f.command().key(),request,EffectState.FAILED,"TARGET_REJECTED").state());
+            assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+            assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        } finally {release.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(5,TimeUnit.SECONDS));}
+    }
+
     @Test void concurrentSameRequestUsesOneDecisionOneAuditEventAndOneOutcome() throws Exception {
         var f=unresolved("occur-concurrent");var authority=authority(f,Clock.systemUTC(),Instant.now().plusSeconds(600));
         var policy=new PolicyRef("test.resolve-effect","1");var pep=new Pep(request->
