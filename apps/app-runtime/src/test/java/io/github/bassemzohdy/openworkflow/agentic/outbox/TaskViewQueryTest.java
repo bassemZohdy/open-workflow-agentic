@@ -108,8 +108,18 @@ class TaskViewQueryTest {
         OutboxAdmin.Lag lag = admin.lag();
         assertTrue(lag.unpublished() >= 1, "the unpublished start is counted");
         assertTrue(lag.oldestUnpublishedAgeSeconds() >= 1.0, "its age is measured");
-        assertTrue(registry.get(OutboxMetrics.UNPUBLISHED).gauge().value() >= 1.0);
-        assertTrue(registry.get(OutboxMetrics.OLDEST_AGE).gauge().value() >= 1.0);
+        // Gauges trigger an asynchronous, cached observation; their first read can precede its completion.
+        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(15).toNanos();
+        double unpublished;
+        double oldest;
+        do {
+            unpublished = registry.get(OutboxMetrics.UNPUBLISHED).gauge().value();
+            oldest = registry.get(OutboxMetrics.OLDEST_AGE).gauge().value();
+            if (unpublished >= 1.0 && oldest >= 1.0) break;
+            Thread.sleep(100);
+        } while (System.nanoTime() < deadline);
+        assertTrue(unpublished >= 1.0, "unpublished gauge did not observe the row: " + unpublished);
+        assertTrue(oldest >= 1.0, "oldest-age gauge did not observe the row: " + oldest);
 
         relay(dataSource, projector).drainAll(100_000);
         assertTrue(views.list(TaskViewFilter.forTenant(tenant), PageRequest.firstPage()).items()
