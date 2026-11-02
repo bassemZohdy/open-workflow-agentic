@@ -1,12 +1,11 @@
 # Restored pending instance refuses deadline cancellation
 
 The process-level regression `LifecycleRecoveryIT#aWaitWhoseDeadlinePassesWhileStoppedIsCancelledBeforeItCanResume`
-currently fails. It starts a packaged application with PostgreSQL, waits for the workflow to reach `WAITING` and for
-the preceding effect step to be persisted, kills the application, and waits until the stored deadline has passed.
-On restart, the startup reconciler records `reconciler.deadline.passed`, but the restored SDK instance is `PENDING`
-and its `cancel()` returns false. Repeated reconciliation leaves the registry in `CANCEL_REQUESTED`; the desired
-`CANCELLED` state is not reached within 60 seconds. The test is intentionally failing and remains isolated from the
-integration branch until a fix is verified.
+originally failed because the restored SDK instance was `PENDING` and refused cancellation. It now passes with an
+explicit test-only reader, proposed receipt schema and receipt writer: the packaged application is stopped across the
+deadline, then restarted, and the registry reaches `CANCELLED` without restarting the expired workflow. This is not
+production wiring; it does not establish safe mixed-version deployment, live replica fencing or recovery from a crash
+after receipt commit.
 
 The pinned SDK's `WorkflowMutableInstance.internalCancel` checks whether the current status is active and refuses a
 `PENDING` instance. Starting the expired workflow merely to cancel it could execute work after its deadline; it is not

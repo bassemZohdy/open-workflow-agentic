@@ -314,6 +314,15 @@ class LifecycleRecoveryIT {
             } catch (Exception e) { return false; }
         });
         first.kill();
+        // The proposed schema is test-only. Apply it after the first process creates the SDK tables.
+        try (var sql = LifecycleRecoveryIT.class.getClassLoader()
+                .getResourceAsStream("db/proposed/V81__pending_cancellation_receipt.sql")) {
+            assertNotNull(sql);
+            try (var connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
+                 var statement = connection.createStatement()) {
+                statement.execute(new String(sql.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            }
+        }
         await("the original deadline to pass while the process is down", Duration.ofSeconds(60), () -> {
             try {
                 return count("select count(*) from task.instance where id = ? and status = 'WAITING' "
@@ -321,12 +330,17 @@ class LifecycleRecoveryIT {
             } catch (Exception e) { return false; }
         });
 
-        ManagedProcess restarted = app("deadline-run2", port, true, deadlineSetting);
+        ManagedProcess restarted = app("deadline-run2", port, true,
+                Map.of("agentic.reconciler.wait-deadline", "PT45S", "agentic.test.pending-cancellation-reader", "true"));
         await(restarted, id, tenant, "CANCELLED");
         assertEquals(1L, count("select count(*) from task.instance_event where instance_id = ? "
                 + "and reason = 'reconciler.deadline.passed'", id));
         assertEquals(0L, count("select resume_epoch from task.instance where id = ?", id),
                 "expired restored work must not be started");
+        assertEquals(1L, count("select count(*) from task.pending_cancellation_receipt where instance_id = ?", id),
+                "cancellation must retain its committed receipt");
+        assertFalse(read(restarted.logFile()).contains("probe-effect received instance=" + engineId),
+                "the expired workflow must not invoke the effect after restart");
         assertEquals(1L, count("select count(*) from task.instance where tenant = ? and idempotency_key = ?",
                 tenant, key));
     }

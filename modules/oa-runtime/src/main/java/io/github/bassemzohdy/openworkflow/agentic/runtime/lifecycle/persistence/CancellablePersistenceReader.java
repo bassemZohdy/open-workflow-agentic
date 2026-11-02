@@ -15,7 +15,7 @@ import java.util.stream.Stream;
 
 /**
  * Explicit candidate reader for guarded restored instances. It uses the pinned SDK's persistence operations and
- * preserves the source stream's close handler. This is not installed by CDI and does not establish cross-replica
+ * preserves the source stream's close handler. This is not installed by default and does not establish cross-replica
  * fencing, crash-safe terminal reconciliation or production readiness. Trusted composition must use exactly one
  * reader per WorkflowApplication; in-flight stale snapshots are held behind per-definition cancellation tombstones.
  * Tombstones are bounded for this reader's lifetime; saturation refuses further pending cancellation.
