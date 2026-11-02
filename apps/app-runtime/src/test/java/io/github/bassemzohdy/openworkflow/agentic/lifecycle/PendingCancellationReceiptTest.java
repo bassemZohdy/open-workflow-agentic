@@ -174,6 +174,91 @@ class PendingCancellationReceiptTest {
         });
     }
 
+    private record SdkSnapshot(byte[] input, Timestamp started, short status, String name, String namespace, String version) { }
+    private SdkSnapshot snapshot(String appId, String engineId) throws Exception {
+        try (var c = data.getConnection(); var q = c.prepareStatement("""
+                select input,startedat,status,workflowname,workflownamespace,workflowversion
+                from public.workflowinstanceentity where applicationid=? and instanceid=?
+                """)) {
+            q.setString(1, appId); q.setString(2, engineId);
+            try (var r = q.executeQuery()) {
+                assertTrue(r.next()); return new SdkSnapshot(r.getBytes(1), r.getTimestamp(2), r.getShort(3),
+                        r.getString(4), r.getString(5), r.getString(6));
+            }
+        }
+    }
+    private void insertSdkSnapshot(Connection c, String appId, String engineId, SdkSnapshot snapshot) throws SQLException {
+        try (var q = c.prepareStatement("""
+                insert into public.workflowinstanceentity
+                    (applicationid,instanceid,input,startedat,status,workflowname,workflownamespace,workflowversion)
+                values (?,?,?,?,?,?,?,?)
+                """)) {
+            q.setQueryTimeout(5); q.setString(1, appId); q.setString(2, engineId); q.setBytes(3, snapshot.input());
+            q.setTimestamp(4, snapshot.started()); q.setShort(5, snapshot.status()); q.setString(6, snapshot.name());
+            q.setString(7, snapshot.namespace()); q.setString(8, snapshot.version()); q.executeUpdate();
+        }
+    }
+
+    @Test void committedReceiptFencesStaleSdkWorkflowAndTaskWrites() throws Exception {
+        withRestored((instance, row, appId, gate) -> {
+            var old = snapshot(appId, instance.id());
+            assertTrue(instance.cancelFuture().get(10, TimeUnit.SECONDS));
+            try (var c = data.getConnection()) {
+                var failure = assertThrows(SQLException.class, () -> insertSdkSnapshot(c, appId, instance.id(), old));
+                assertEquals("P0001", failure.getSQLState());
+            }
+            try (var c = data.getConnection(); var q = c.prepareStatement("""
+                    insert into public.taskinfoentity(task_type,applicationid,iteration,jsonpointer,workflowinstanceid)
+                    values (0,?,0,'do/0/stale',?)
+                    """)) {
+                q.setString(1, appId); q.setString(2, instance.id());
+                var failure = assertThrows(SQLException.class, q::executeUpdate);
+                assertEquals("P0001", failure.getSQLState());
+            }
+            assertEquals(0, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+        });
+    }
+
+    @Test void staleSdkInsertWaitingBehindCancellationSeesTheCommittedReceipt() throws Exception {
+        withRestored((instance, row, appId, gate) -> {
+            var old = snapshot(appId, instance.id());
+            var pool = Executors.newSingleThreadExecutor();
+            var started = new CountDownLatch(1);
+            try (var transaction = data.getConnection()) {
+                transaction.setAutoCommit(false);
+                try {
+                    try (var q = transaction.prepareStatement("""
+                            insert into task.pending_cancellation_receipt
+                                (instance_id,application_id,engine_instance_id,definition_id,definition_version)
+                            values (?,?,?,?,?)
+                            """)) {
+                        q.setString(1, row.id().value()); q.setString(2, appId); q.setString(3, instance.id());
+                        q.setString(4, "agentic-test/receipt-case"); q.setString(5, "1.0.0"); q.executeUpdate();
+                    }
+                    for (String table : List.of("taskinfoentity", "workflowmetadataentity")) {
+                        try (var q = transaction.prepareStatement("delete from public." + table + " where applicationid=? and workflowinstanceid=?")) {
+                            q.setString(1, appId); q.setString(2, instance.id()); q.executeUpdate();
+                        }
+                    }
+                    try (var q = transaction.prepareStatement("delete from public.workflowinstanceentity where applicationid=? and instanceid=?")) {
+                        q.setString(1, appId); q.setString(2, instance.id()); assertEquals(1, q.executeUpdate());
+                    }
+                    var stale = pool.submit(() -> {
+                        try (var c = data.getConnection()) {
+                            started.countDown(); insertSdkSnapshot(c, appId, instance.id(), old); return "accepted";
+                        } catch (SQLException expected) { return expected.getSQLState(); }
+                    });
+                    assertTrue(started.await(5, TimeUnit.SECONDS));
+                    assertThrows(TimeoutException.class, () -> stale.get(300, TimeUnit.MILLISECONDS));
+                    transaction.commit();
+                    assertEquals("P0001", stale.get(10, TimeUnit.SECONDS));
+                } finally { if (!transaction.getAutoCommit()) transaction.rollback(); }
+            } finally { pool.shutdownNow(); }
+            assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+            assertEquals(0, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+        });
+    }
+
     @Test void mismatchCannotCreateAReceipt() throws Exception {
         withRestored((instance, row, appId, gate) -> {
             try (var c = data.getConnection(); var q = c.prepareStatement("""

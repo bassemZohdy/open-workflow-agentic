@@ -47,3 +47,31 @@ create function task.pending_cancel_immutable() returns trigger language plpgsql
 begin raise exception 'pending cancellation receipts are immutable'; end $$;
 create trigger pending_cancel_immutable before update or delete on task.pending_cancellation_receipt
     for each row execute function task.pending_cancel_immutable();
+
+-- The registry row is the cross-version serialization point. A stale SDK writer waiting behind a committed
+-- cancellation must observe its receipt before it can insert or update either checkpoint table. Deletes remain
+-- permitted for the cancellation writer. The exact application ID prevents a receipt fencing another SDK app.
+create function task.pending_cancel_fence_sdk_write() returns trigger language plpgsql as $$
+declare
+    bound_instance text;
+    engine_id text;
+begin
+    if tg_table_name = 'workflowinstanceentity' then
+        engine_id := new.instanceid;
+    else
+        engine_id := new.workflowinstanceid;
+    end if;
+    select id into bound_instance from task.instance where engine_instance_id = engine_id for update;
+    if found and exists (
+        select 1 from task.pending_cancellation_receipt
+        where instance_id = bound_instance and application_id = new.applicationid
+              and engine_instance_id = engine_id
+    ) then
+        raise exception 'cancelled SDK checkpoint cannot be written';
+    end if;
+    return new;
+end $$;
+create trigger pending_cancel_fence_workflow before insert or update on public.workflowinstanceentity
+    for each row execute function task.pending_cancel_fence_sdk_write();
+create trigger pending_cancel_fence_task before insert or update on public.taskinfoentity
+    for each row execute function task.pending_cancel_fence_sdk_write();
