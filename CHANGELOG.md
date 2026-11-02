@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify audited resource effects against a retained task allocation and database-backed tool budget.
+
 - Provide and test read-only resource provenance grants for manual effect recovery.
 
 - Revalidate resource-scoped effect provenance during manual resolution and replay.

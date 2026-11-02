@@ -361,6 +361,49 @@ class ResourceTaskAllocationStoreTest {
         assertEquals(1, calls.get());
     }
 
+    @Test void auditedEffectUsesRetainedProfileBudgetAndLiveTaskFence() throws Exception {
+        var calls=new AtomicInteger();
+        var target=new io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget() {
+            public String target(){return "test:payments";}
+            public Reply execute(String key){calls.incrementAndGet();return new Reply(Outcome.CONFIRMED,null);}
+        };
+        var registration=GovernedToolGateway.Registration.effectful("{\"type\":\"object\"}","{\"type\":\"object\"}",
+                Duration.ofSeconds(2),"d".repeat(64),"test:payments",args->target);
+        var registry=Map.of("tool:research",registration);
+        var profile=new ApprovedToolProfile("effect-profile","1",GovernedToolGateway.configurationFingerprint(registry),
+                a.modelProfile().agent(),Set.of("tool:research"),1,Duration.ofSeconds(2));
+        var allocated=store.allocateWithToolProfile(a,profile);
+        var budget=new JdbcToolCallBudget(data,manager).openProfiled(allocated,profile);
+        var approved=new GovernedToolGateway.Approval(profile.agent(),a.contract(),1000);
+        var pep=new Pep(request->new Decision("fixture",DecisionOutcome.ALLOW,"allowed",new PolicyRef("test","1"),Instant.now()),event->{});
+        var producer=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditProducer();
+        var ledger=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.JdbcEffectLedger(data,manager,producer);
+        var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(data);
+        var delivery=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditDelivery(data,manager,producer,central::appendOnce);
+        var history=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditHistory(data,manager,producer,delivery);
+        var gateway=new GovernedToolGateway(registry,()->Optional.of(approved),profile,pep,event->{},budget,Clock.systemUTC(),
+                new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects(ledger),
+                new io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ToolCallTelemetry(io.opentelemetry.api.OpenTelemetry.noop()),history);
+        var entry=f.entry(1);var executor=UUID.randomUUID();
+        try(var taskFence=new ResourceTaskExecutionFence(data,manager,entry,allocated,f.binding(),(checked,task)->{});
+            var gate=new JdbcResourceExecutionGate(data,manager,1)) {
+            var paired=JdbcResourceExecutionGate.CredentialFence.pair(f.binding(),taskFence);
+            var attempt=gate.openGoverned(f.binding(),entry,executor,paired);
+            var result=attempt.executeGoverned(running->{
+                var call=new io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall(a.contract().id(),"tool:research","{}");
+                var first=ResourceToolCall.of(allocated,profile,entry,running.executor(),"graph/tool/1",call);
+                assertEquals(EffectState.CONFIRMED,gateway.invokeEffect(running,entry,allocated,first,call).state());
+                assertEquals(EffectState.CONFIRMED,gateway.invokeEffect(running,entry,allocated,first,call).state());
+                var second=ResourceToolCall.of(allocated,profile,entry,running.executor(),"graph/tool/2",call);
+                assertEquals(EffectState.INTENDED,gateway.invokeEffect(running,entry,allocated,second,call).state());
+                return "done";
+            });
+            assertEquals(JdbcResourceExecutionGate.Kind.CALLED,result.kind());assertEquals("done",result.value());
+        }
+        assertEquals(1,calls.get());assertEquals("1",scalar("select calls::text from task.agent_tool_budget"));
+        assertEquals(6,count(data,"select count(*) from audit.event where event_type like 'effect.%'"));
+    }
+
     @Test void retainedProfileCorruptionRefusesBeforeTheToolAndDoesNotConsumeBudget() throws Exception {
         var calls = new AtomicInteger();
         var entry = new GovernedToolGateway.Registration("{\"type\":\"object\"}", "{\"type\":\"object\"}",
