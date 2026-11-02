@@ -35,7 +35,8 @@ import java.util.concurrent.TimeoutException;
 
 /**
  * Explicitly composed local tool boundary. Registration and approval are trusted inputs, never request fields.
- * This class is not a CDI producer, MCP client, durable call budget or effect-ledger integration.
+ * A composed budget must be durable in production. This class is not a CDI producer, MCP client, task-start
+ * authority, or effect-ledger integration.
  * Approval lookups must work on the caller and worker threads; a missing worker context refuses before the tool.
  * A caller must not treat this partial boundary as production tool execution until those controls are supplied.
  */
@@ -64,6 +65,12 @@ public final class GovernedToolGateway implements ToolGateway {
     /** Runs on a bounded worker; credentials and context must be explicitly bound, not read from caller thread locals. */
     @FunctionalInterface public interface Tool { String invoke(String argumentsJson) throws Exception; }
 
+    /** A trusted durable budget must commit each admission and recheck its deadline independently. */
+    public interface ToolBudget {
+        void admit(Approval approval);
+        void requireCurrent(Approval approval);
+    }
+
     /** A tool is registered by trusted composition with fixed schemas and declared side-effect semantics. */
     public static final class Registration {
         private final Schema input;
@@ -86,13 +93,14 @@ public final class GovernedToolGateway implements ToolGateway {
     private final Pep pep;
     private final Clock clock;
     private final AuditSink audit;
+    private final ToolBudget budget;
     private static final Subject GATEWAY = new Subject(SubjectKind.SERVICE, "tool-gateway");
 
     public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
-                               Pep pep, AuditSink audit, Clock clock) {
+                               Pep pep, AuditSink audit, ToolBudget budget, Clock clock) {
         this.registry = Map.copyOf(registry); this.approvals = Objects.requireNonNull(approvals);
         this.pep = Objects.requireNonNull(pep); this.audit = Objects.requireNonNull(audit);
-        this.clock = Objects.requireNonNull(clock);
+        this.budget = Objects.requireNonNull(budget); this.clock = Objects.requireNonNull(clock);
     }
 
     @Override public ToolResult invoke(ToolCall call) {
@@ -120,10 +128,15 @@ public final class GovernedToolGateway implements ToolGateway {
             return reject(call, approved, attempt, "tool start audit is unavailable");
         if (!same(approved)) return reject(call, approved, attempt, "tool approval changed");
         if (Thread.currentThread().isInterrupted()) return reject(call, approved, attempt, "tool caller was interrupted");
+        try { budget.admit(approved); }
+        catch (RuntimeException unavailable) { return reject(call, approved, attempt, "tool budget exhausted or unavailable"); }
+        if (!same(approved) || !budgetCurrent(approved) || !same(approved))
+            return reject(call, approved, attempt, "tool approval or budget changed");
         var mayStart = new java.util.concurrent.atomic.AtomicBoolean(true);
         if (!WORKER_SLOTS.tryAcquire()) return reject(call, approved, attempt, "tool capacity is unavailable");
         var future = new FutureTask<String>(() -> {
-            if (!same(approved) || !mayStart.compareAndSet(true, false)) throw new ApprovalExpired();
+            if (!same(approved) || !budgetCurrent(approved) || !same(approved)
+                    || !mayStart.compareAndSet(true, false)) throw new ApprovalExpired();
             return entry.tool.invoke(call.argumentsJson());
         });
         try {
@@ -154,10 +167,11 @@ public final class GovernedToolGateway implements ToolGateway {
                 return reject(call, approved, attempt, "tool approval changed before execution");
             return failed(call, approved, attempt, entry);
         }
-        if (!same(approved)) return failed(call, approved, attempt, entry);
+        if (!same(approved) || !budgetCurrent(approved) || !same(approved)) return failed(call, approved, attempt, entry);
         JsonNode output = parse(answer);
         if (output == null || !valid(entry.output, output) || !same(approved)) return failed(call, approved, attempt, entry);
-        if (!record(call, approved, attempt, "agent.tool.completed") || !same(approved))
+        if (!record(call, approved, attempt, "agent.tool.completed") || !same(approved)
+                || !budgetCurrent(approved) || !same(approved))
             return failed(call, approved, attempt, entry);
         return new ToolResult.Completed(answer);
     }
@@ -167,6 +181,10 @@ public final class GovernedToolGateway implements ToolGateway {
         catch (RuntimeException unavailable) { return null; }
     }
     private boolean same(Approval expected) { return expected.equals(current()); }
+    private boolean budgetCurrent(Approval expected) {
+        try { budget.requireCurrent(expected); return true; }
+        catch (RuntimeException unavailable) { return false; }
+    }
     private static final class ApprovalExpired extends Exception { }
     private ToolResult.Rejected reject(ToolCall call, Approval approval, String attempt, String reason) {
         record(call, approval, attempt, "agent.tool.refused");

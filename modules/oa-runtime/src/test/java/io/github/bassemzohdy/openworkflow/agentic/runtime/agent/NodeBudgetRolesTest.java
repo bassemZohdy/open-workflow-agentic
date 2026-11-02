@@ -34,6 +34,20 @@ class NodeBudgetRolesTest {
             var unprivileged = as(db.dataSource(), outsider);
             var task = task();
             new JdbcNodeBudget(db.dataSource()).registerNew("role-test-thread", AGENT, task);
+            new JdbcToolCallBudget(allocate).registerForFreshTask("role-test-thread", AGENT, task, 2);
+            var toolBudget = new JdbcToolCallBudget(run).openExisting("role-test-thread", AGENT, task);
+            var approved = new GovernedToolGateway.Approval(AGENT, task, 1000);
+            toolBudget.admit(approved); toolBudget.requireCurrent(approved);
+            assertThrows(StoreUnavailableException.class,
+                    () -> new JdbcToolCallBudget(run).registerForFreshTask("role-test-thread", AGENT, task, 2));
+            denied(run, "update task.agent_tool_budget set max_calls=3");
+            denied(run, "delete from task.agent_tool_budget");
+            denied(run, "truncate task.agent_tool_budget");
+            assertEquals("23514", sqlFailure(run,"update task.agent_tool_budget set calls=0").getSQLState());
+            denied(allocate, "update task.agent_tool_budget set calls=calls+1");
+            denied(unprivileged, "select * from task.agent_tool_budget");
+            toolBudget.admit(approved);
+            assertThrows(NodeRefused.class, () -> toolBudget.admit(approved));
             var budget = new JdbcNodeBudget(run).openExisting("role-test-thread", AGENT, task);
             budget.admit(); budget.requireCurrent();
             assertThrows(StoreUnavailableException.class, () -> new JdbcNodeBudget(run).registerNew("forged", AGENT, task()));

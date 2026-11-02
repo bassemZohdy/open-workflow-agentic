@@ -6,3 +6,9 @@ grant usage on schema task to __BUDGET_ALLOCATOR_ROLE__, __BUDGET_EXECUTOR_ROLE_
 grant select, insert on task.agent_node_budget to __BUDGET_ALLOCATOR_ROLE__;
 grant select on task.agent_node_budget to __BUDGET_EXECUTOR_ROLE__;
 grant update (steps) on task.agent_node_budget to __BUDGET_EXECUTOR_ROLE__;
+
+-- V77.4: only the trusted allocator can create a tool budget; execution can only consume it.
+revoke all on task.agent_tool_budget from public;
+grant select, insert on task.agent_tool_budget to __BUDGET_ALLOCATOR_ROLE__;
+grant select on task.agent_tool_budget to __BUDGET_EXECUTOR_ROLE__;
+grant update (calls) on task.agent_tool_budget to __BUDGET_EXECUTOR_ROLE__;
