@@ -1,5 +1,7 @@
 # Changelog
 
+- Encode the proposed human wake reference as a canonical structured CloudEvent and verify it with the real inbox decoder. Delivery and SDK predicate integration remain open.
+
 - Define a reference-only human-decision wake envelope tied to the exact wait; no event producer, SDK matcher or workflow delivery is activated.
 
 - Prove an isolated human decision and audit survive an abrupt writer-process exit after commit and are read back once. Restart of the real workflow and delivery remain open.
