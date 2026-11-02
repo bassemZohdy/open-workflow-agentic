@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
@@ -136,7 +137,33 @@ class GovernedLlmClientTest {
         });
         var client = new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.ALLOW), new Audit()), APPROVED);
 
-        assertThrows(IllegalStateException.class, () -> client.complete("sys", "usr"));
+        assertThrows(GovernedLlmClient.ProviderCallFailed.class, () -> client.complete("sys", "usr"));
+        assertEquals(1, provider.calls.get());
+    }
+
+    @Test
+    void approvalLostDuringPolicyRefusesBeforeThePhysicalProviderCall() {
+        var approved = new AtomicReference<>(APPROVED.current().orElseThrow());
+        ApprovedModelContext context = () -> Optional.ofNullable(approved.get());
+        var provider = new CountingProvider();
+        var engine = new Engine(request -> {
+            approved.set(null);
+            return new Decision("model.test", DecisionOutcome.ALLOW, "allowed", POLICY, NOW);
+        });
+        var client = new GovernedLlmClient(provider, pep(engine, new Audit()), context);
+
+        assertThrows(ModelCallRefused.class, () -> client.complete("sys", "usr"));
+        assertEquals(0, provider.calls.get());
+    }
+
+    @Test
+    void approvalLostDuringProviderWithholdsItsAnswer() {
+        var approved = new AtomicReference<>(APPROVED.current().orElseThrow());
+        ApprovedModelContext context = () -> Optional.ofNullable(approved.get());
+        var provider = new CountingProvider(n -> { approved.set(null); return OK; });
+        var client = new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.ALLOW), new Audit()), context);
+
+        assertThrows(GovernedLlmClient.ApprovalLostAfterCall.class, () -> client.complete("sys", "usr"));
         assertEquals(1, provider.calls.get());
     }
 
@@ -294,7 +321,7 @@ class GovernedLlmClientTest {
     }
 
     @Test
-    void theLegacyTwoArgumentPathIsUnchangedByTheControlledOverload() {
+    void theTwoArgumentPathStillRequiresApproval() {
         var provider = new CountingProvider();
         var client = new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.ALLOW), new Audit()), APPROVED);
 
@@ -315,6 +342,26 @@ class GovernedLlmClientTest {
         agent.outputValidator = new AgentOutputValidator(new ObjectMapper(), target -> false);
         agent.build();
         return agent;
+    }
+
+    @Test
+    void aGraphCannotCompleteWhenApprovalDisappearsDuringTheModelCall() throws Exception {
+        DataSource ds = AgentTestDatabase.dataSource();
+        var task = new AgentTaskContract(io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator.shared().next(),
+                TASK.goal(), TASK.permittedTools(), TASK.permittedDataScopes(), TASK.riskTier(), TASK.limits(),
+                TASK.requestingSubject(), TASK.delegationGrantId());
+        var approved = new AtomicReference<>(new ApprovedModelContext.Approved(AGENT, task, "gpt-test", 500_000L));
+        ApprovedModelContext context = () -> Optional.ofNullable(approved.get());
+        var provider = new CountingProvider(n -> { approved.set(null); return OK; });
+        var agent = agent(ds, new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.ALLOW), new Audit()), context));
+        agent.approvedContext = context; agent.audit = new Audit(); agent.nodeBudget = new JdbcNodeBudget(ds);
+        String thread = "governed-stale-output-" + UUID.randomUUID();
+        agent.nodeBudget.registerNew(thread, AGENT, task);
+
+        assertThrows(Exception.class, () -> agent.run(thread, "topic"));
+
+        assertEquals(1, provider.calls.get());
+        assertTrue(new ResearchRunInspector(ds).inspect(thread).kind() != Kind.COMPLETE);
     }
 
     @Test

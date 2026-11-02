@@ -43,19 +43,14 @@ public class GovernedLlmClient {
         this.context = Objects.requireNonNull(context, "context");
     }
 
-    /** Completes through the provider only after an audited ALLOW; otherwise throws and the provider is not touched. */
+    /** Completes only after an audited ALLOW and matching approval; lost approval withholds a returned answer. */
     public String complete(String system, String user) {
         Objects.requireNonNull(system, "system");
         Objects.requireNonNull(user, "user");
         var approved = context.current()
                 .orElseThrow(() -> new ModelCallRefused("no approved context for this model call"));
-        if (approved.budgetRemainingMicros() == 0L) {
-            // refused here, not by policy: a permissive policy may ignore the budget it is shown
-            throw new ModelCallRefused("no model budget remaining for this model call");
-        }
-        var decision = pep.modelCall(approved.agent(), approved.task(), approved.modelId(),
-                approved.budgetRemainingMicros());
-        return Pep.guard(decision, () -> provider.complete(system, user));
+        // Use the same pinned-approval boundary as the gateway. The graph calls this overload directly.
+        return complete(approved, system, user);
     }
 
     /**

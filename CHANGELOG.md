@@ -1,5 +1,7 @@
 # Changelog
 
+- Recheck the approved model context around research graph provider calls, withholding answers when the context changes; live identity and durable reservations remain separate gates.
+
 - Provide a tested, opt-in budget-table grant template separating allocator insertion from executor consumption; deployed identities and datasource wiring remain open.
 
 - Prepare atomic node-budget creation with new opt-in resource-task allocations; V78 and the production approval path remain unactivated.
