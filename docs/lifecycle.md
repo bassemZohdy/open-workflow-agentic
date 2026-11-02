@@ -345,6 +345,13 @@ evaluation, preserves one ordinary filtered workflow, and cancels restored JPA i
 in same-process tests. This does not prove compatibility with Quarkus's jq scope or other expression providers,
 durable cancellation under process loss, concurrent starts, or multi-replica ownership. It is not wired into recovery.
 
+Another JPA experiment manually changes a restored pending instance to `RUNNING` and cancels it without starting it.
+The persisted record is removed, but the cancelled instance remains registered in the definition. A holder of that
+instance can call `start()` afterward: the restored implementation resets its status and enters the workflow input
+filter. The test arms an experimental filter guard to stop there, before any task runs. This status manipulation also
+emits a `RUNNING` status change for work that never ran; it is not a production cancellation solution. The test uses
+one process and does not establish cross-replica safety or recovery after a crash.
+
 ### 9.6 Entry points for 105d
 
 Java methods on `Reconciler`, to be exposed by the operations API with its own authorization:
