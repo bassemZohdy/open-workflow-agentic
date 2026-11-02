@@ -705,13 +705,14 @@ Implementation status: **partial**.
 - Implemented: WP-108 preparation supplies bounded OTel effect/dispatch/lookup/compensation spans using pinned existing Quarkus3.39.5 BOM/API1.62.0, custom schema1 and disabled SDK by default. Five in-process SDK/fault cases pass; actual ledger/CDI trace execution and end-to-end Flow/agent/tool/model, async/restart propagation, collector/runbook/dashboard/alert/SLO evidence remain open. No full observability deliverable or acceptance promotion.
 - Implemented: Effect trace producte2dc636 executed in39376019493 SUCCESS both Linux lanes: ledger/CDI3 and SDK/fault5 zero skips, plus existing service/guard/provider regressions. This proves only component emission/privacy/failure semantics; production collector/deployment, complete Flow/agent/tool/model and async/restart/outbound correlation, runbook/dashboard/alert/SLO gates remain open.
 - Implemented: Operational outbox signals landed (PR 129): five bounded gauges re-registered per application lifecycle, Prometheus rules and dashboard as code, promtool/preview validation tooling and the observability workflow, with an endpoint test scraping the real application. This does not complete end-to-end Flow/agent/tool/model tracing, collector deployment or SLO evidence.
+- Implemented: Governed model-call attempts emit an optional OpenTelemetry span with fixed schema and outcome only; no prompt, response, identity, model name or exception details are added by this instrumentation. Approval and execution fences run after span setup and again before releasing results. Research graph nodes explicitly carry the current OpenTelemetry context across the graph executor; this is not identity propagation. Complete Flow/graph/tool/model tracing, restart propagation and production collection remain open.
 
 Remaining gates:
 
 - Add OpenTelemetry across workflow, graph, tool and model spans under one correlation ID.
 - Finish structured operational logs and dashboards as code; document collection and alerting.
 
-Evidence: [README.md](../../README.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](../../docs/handoffs/gpt/WP-108-tracing.md), [docs/operations-observability.md](../../docs/operations-observability.md), [deploy/observability/outbox-rules.json](../../deploy/observability/outbox-rules.json)
+Evidence: [README.md](../../README.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](../../docs/handoffs/gpt/WP-108-tracing.md), [docs/operations-observability.md](../../docs/operations-observability.md), [deploy/observability/outbox-rules.json](../../deploy/observability/outbox-rules.json), [docs/handoffs/gpt/WP-112-model-tracing.md](../../docs/handoffs/gpt/WP-112-model-tracing.md)
 
 Reuse: quarkus-flow-opentelemetry, langgraph4j-opentelemetry, quarkus-opentelemetry
 

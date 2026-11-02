@@ -159,8 +159,9 @@ public class ResearchAgent {
         // An absent checkpoint cannot prove this task never ran before an upgrade or crash.
         var budget = nodeBudget.openExisting(threadId, approved.agent(), approved.task());
         var interceptor = NodeInterceptor.forLimits(approved.agent(), threadId, approved.task().limits(), audit, clock, budget);
+        var trace = io.opentelemetry.context.Context.current();
         try {
-            return compile(interceptor::wrap, approved);
+            return compile((name, action) -> GraphTraceContext.wrap(trace, interceptor.wrap(name, action)), approved);
         } catch (Exception e) {
             throw new IllegalStateException("Agent graph could not be built for this run", e);
         }

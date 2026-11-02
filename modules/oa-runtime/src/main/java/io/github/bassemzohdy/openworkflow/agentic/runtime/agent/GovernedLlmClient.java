@@ -39,6 +39,9 @@ public class GovernedLlmClient {
     @Inject
     ApprovedModelContext context;
 
+    @Inject
+    ModelCallTelemetry telemetry = ModelCallTelemetry.noop();
+
     // Explicit trusted composition only; the CDI/default path does not activate reservations.
     private ResourceModelCalls reservations;
 
@@ -89,16 +92,17 @@ public class GovernedLlmClient {
         }
         var decision = pep.modelCall(expected.agent(), expected.task(), expected.modelId(), expected.budgetRemainingMicros());
         return Pep.guard(decision, () -> {
-            requireProviderModel(expected.modelId());
-            requireSameApproval(expected);
-            final String output;
-            try {
-                output = maxOutputTokens == null ? provider.complete(system, user)
-                        : provider.complete(system, user, maxOutputTokens);
-            } catch (RuntimeException providerFailure) {
-                // Provider exceptions must never masquerade as a refusal before the provider was reached.
-                throw new ProviderCallFailed();
-            }
+            String output = telemetry.call(() -> {
+                // Telemetry setup can block, so approval and provider identity are checked inside the span.
+                requireProviderModel(expected.modelId());
+                requireSameApproval(expected);
+                try {
+                    return maxOutputTokens == null ? provider.complete(system, user)
+                            : provider.complete(system, user, maxOutputTokens);
+                } catch (RuntimeException providerFailure) {
+                    throw new ProviderCallFailed();
+                }
+            });
             try {
                 requireSameApproval(expected);
             } catch (ModelCallRefused lost) {
@@ -170,17 +174,15 @@ public class GovernedLlmClient {
         var decision = pep.modelCall(approved.agent(), approved.task(), approved.modelId(),
                 approved.budgetRemainingMicros()); // may block in policy and audit; recheck on ALLOW below
         return Pep.guard(decision, () -> {
-            control.requireCurrent(expected);
-            requireProviderModel(approved.modelId());
-            control.requireCurrent(expected);
-            requireSameApproval(approved);
-            control.requireCurrent(expected); // approval lookup can itself block
-            final String output;
-            try {
-                output = provider.complete(system, user);
-            } catch (RuntimeException providerFailure) {
-                throw new ProviderCallFailed();
-            }
+            String output = telemetry.call(() -> {
+                control.requireCurrent(expected);
+                requireProviderModel(approved.modelId());
+                control.requireCurrent(expected);
+                requireSameApproval(approved);
+                control.requireCurrent(expected);
+                try { return provider.complete(system, user); }
+                catch (RuntimeException providerFailure) { throw new ProviderCallFailed(); }
+            });
             control.requireCurrent(expected);
             try {
                 requireSameApproval(approved);
@@ -233,7 +235,7 @@ public class GovernedLlmClient {
                         control.requireCurrent(entry, occurrence.executor());
                         requireSameApproval(approved);
                         control.requireCurrent(entry, occurrence.executor());
-                        return () -> {
+                        return () -> telemetry.call(() -> {
                             control.requireCurrent(entry, occurrence.executor());
                             requireSameApproval(approved);
                             control.requireCurrent(entry, occurrence.executor());
@@ -243,7 +245,7 @@ public class GovernedLlmClient {
                             control.requireCurrent(entry, occurrence.executor());
                             try { return transport.completeReserved(call.prompt(), call.maxOutputTokens(), reservation.callDeadline()); }
                             catch (RuntimeException providerFailure) { throw new ProviderCallFailed(); }
-                        };
+                        });
                     });
                 });
         control.requireCurrent(entry, occurrence.executor());

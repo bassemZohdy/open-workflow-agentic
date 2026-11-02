@@ -1,5 +1,7 @@
 # Changelog
 
+- Trace governed model-call attempts with bounded, non-sensitive outcome attributes, preserving approval checks and research-graph trace context across node execution.
+
 - Allow the experimental workflow-owner coordinator to renew independent owners concurrently with a bounded worker pool.
 
 - Keep a cancellation request pending when a cause-free engine status poll reports a fault; a later cancellation or observed genuine fault can still resolve it.
