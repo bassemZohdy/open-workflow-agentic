@@ -30,6 +30,9 @@ class GovernedToolGatewayTest {
         final AtomicInteger calls = new AtomicInteger();
         final AtomicInteger decisions = new AtomicInteger();
         final AtomicInteger audits = new AtomicInteger();
+        final java.util.List<String> boundaryEvents = new java.util.ArrayList<>();
+        final java.util.List<io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent> records = new java.util.ArrayList<>();
+        java.util.function.Consumer<String> duringBoundaryAudit = action -> { };
         GovernedToolGateway.Tool tool = args -> { calls.incrementAndGet(); return "{\"result\":\"ok\"}"; };
         DecisionOutcome outcome = DecisionOutcome.ALLOW;
         Runnable duringAudit = () -> { };
@@ -38,7 +41,8 @@ class GovernedToolGatewayTest {
             var registration = new GovernedToolGateway.Registration(INPUT, OUTPUT, mutating, tool);
             var pep = new Pep(request -> { decisions.incrementAndGet(); return new Decision("test", outcome, "test", POLICY, NOW); },
                     event -> { audits.incrementAndGet(); duringAudit.run(); }, Duration.ofSeconds(5), CLOCK);
-            return new GovernedToolGateway(Map.of("search", registration), () -> Optional.ofNullable(approval.get()), pep, CLOCK);
+            return new GovernedToolGateway(Map.of("search", registration), () -> Optional.ofNullable(approval.get()), pep,
+                    event -> { records.add(event); boundaryEvents.add(event.action()); duringBoundaryAudit.accept(event.action()); }, CLOCK);
         }
     }
 
@@ -47,6 +51,11 @@ class GovernedToolGatewayTest {
         var completed = assertInstanceOf(ToolResult.Completed.class, rig.gateway().invoke(CALL));
         assertEquals("{\"result\":\"ok\"}", completed.output());
         assertEquals(1, rig.decisions.get()); assertEquals(1, rig.audits.get()); assertEquals(1, rig.calls.get());
+        assertEquals(java.util.List.of("agent.tool.started", "agent.tool.completed"), rig.boundaryEvents);
+        assertEquals(rig.records.get(0).attributes().get("agent.tool.attempt"),
+                rig.records.get(1).attributes().get("agent.tool.attempt"));
+        assertFalse(rig.records.toString().contains("query"));
+        assertFalse(rig.records.toString().contains("result"));
     }
 
     @Test void missingOrMismatchedApprovalAndUnlistedToolsNeverCall() {
@@ -100,5 +109,51 @@ class GovernedToolGatewayTest {
             assertThrows(IllegalArgumentException.class,
                     () -> new GovernedToolGateway.Registration(schema, OUTPUT, false, args -> "{}"));
         }
+    }
+
+    @Test void missingStartAuditOrApprovalLostDuringItPreventsTheTool() {
+        var unavailable = new Rig();
+        unavailable.duringBoundaryAudit = action -> { if (action.equals("agent.tool.started")) throw new IllegalStateException(); };
+        assertInstanceOf(ToolResult.Rejected.class, unavailable.gateway().invoke(CALL));
+        assertEquals(0, unavailable.calls.get());
+        var lost = new Rig();
+        lost.duringBoundaryAudit = action -> { if (action.equals("agent.tool.started")) lost.approval.set(null); };
+        assertInstanceOf(ToolResult.Rejected.class, lost.gateway().invoke(CALL));
+        assertEquals(0, lost.calls.get());
+    }
+
+    @Test void completionAuditFailureOrApprovalLossWithholdsTheAnswer() {
+        for (boolean revoke : new boolean[] {false, true}) {
+            var rig = new Rig(); rig.mutating = true;
+            rig.duringBoundaryAudit = action -> {
+                if (action.equals("agent.tool.completed")) {
+                    if (revoke) rig.approval.set(null); else throw new IllegalStateException();
+                }
+            };
+            assertTrue(assertInstanceOf(ToolResult.Failed.class, rig.gateway().invoke(CALL)).effectMayHaveHappened());
+            assertEquals(1, rig.calls.get());
+            assertTrue(rig.boundaryEvents.contains("agent.tool.failed"));
+        }
+    }
+
+    @Test void schemaFormatsAreAssertionsRatherThanAnnotations() {
+        var rig = new Rig();
+        var reg = new GovernedToolGateway.Registration(
+                "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"format\":\"email\"}}}",
+                OUTPUT, false, rig.tool);
+        var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
+                event -> { }, Duration.ofSeconds(5), CLOCK);
+        var gateway = new GovernedToolGateway(Map.of("search", reg), () -> Optional.of(APPROVAL), pep, event -> { }, CLOCK);
+        assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(CALL));
+        assertEquals(0, rig.calls.get());
+    }
+
+    @Test void interruptionIsPreservedAndMutatingOutcomeIsUncertain() {
+        var rig = new Rig(); rig.mutating = true;
+        rig.tool = args -> { throw new InterruptedException("private"); };
+        try {
+            assertTrue(assertInstanceOf(ToolResult.Failed.class, rig.gateway().invoke(CALL)).effectMayHaveHappened());
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally { Thread.interrupted(); }
     }
 }

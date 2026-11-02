@@ -6,16 +6,21 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SchemaRegistryConfig;
 import com.networknt.schema.SpecificationVersion;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolGateway;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditDraft;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
@@ -65,36 +70,49 @@ public final class GovernedToolGateway implements ToolGateway {
     private final Supplier<Optional<Approval>> approvals;
     private final Pep pep;
     private final Clock clock;
+    private final AuditSink audit;
+    private static final Subject GATEWAY = new Subject(SubjectKind.SERVICE, "tool-gateway");
 
     public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
-                               Pep pep, Clock clock) {
+                               Pep pep, AuditSink audit, Clock clock) {
         this.registry = Map.copyOf(registry); this.approvals = Objects.requireNonNull(approvals);
-        this.pep = Objects.requireNonNull(pep); this.clock = Objects.requireNonNull(clock);
+        this.pep = Objects.requireNonNull(pep); this.audit = Objects.requireNonNull(audit);
+        this.clock = Objects.requireNonNull(clock);
     }
 
     @Override public ToolResult invoke(ToolCall call) {
         Objects.requireNonNull(call);
+        String attempt = UlidGenerator.shared().next().value();
         Approval approved = current();
-        if (approved == null || !approved.task().id().equals(call.taskId())) return reject("no matching task approval");
-        if (!approved.task().permitsTool(call.toolName())) return reject("tool is not permitted by the task");
-        if (approved.budgetRemainingMicros() == 0) return reject("no tool budget remaining");
+        if (approved == null || !approved.task().id().equals(call.taskId())) return reject(call, null, attempt, "no matching task approval");
+        if (!approved.task().permitsTool(call.toolName())) return reject(call, approved, attempt, "tool is not permitted by the task");
+        if (approved.budgetRemainingMicros() == 0) return reject(call, approved, attempt, "no tool budget remaining");
         Registration entry = registry.get(call.toolName());
-        if (entry == null) return reject("tool is not registered");
+        if (entry == null) return reject(call, approved, attempt, "tool is not registered");
         JsonNode arguments = parse(call.argumentsJson());
         if (arguments == null || !arguments.isObject() || !valid(entry.input, arguments))
-            return reject("tool arguments are invalid");
-        if (!same(approved)) return reject("tool approval changed");
+            return reject(call, approved, attempt, "tool arguments are invalid");
+        if (!same(approved)) return reject(call, approved, attempt, "tool approval changed");
         final Decision decision;
         try { decision = pep.toolCall(approved.agent(), approved.task(), call.toolName(), approved.budgetRemainingMicros()); }
-        catch (RuntimeException failure) { return reject("tool policy is unavailable"); }
-        if (!decision.allows()) return new ToolResult.Rejected(decision);
-        if (!same(approved)) return reject("tool approval changed");
+        catch (RuntimeException failure) { return reject(call, approved, attempt, "tool policy is unavailable"); }
+        if (!decision.allows()) {
+            record(call, approved, attempt, "agent.tool.refused");
+            return new ToolResult.Rejected(decision);
+        }
+        if (!same(approved)) return reject(call, approved, attempt, "tool approval changed");
+        if (!record(call, approved, attempt, "agent.tool.started"))
+            return reject(call, approved, attempt, "tool start audit is unavailable");
+        if (!same(approved)) return reject(call, approved, attempt, "tool approval changed");
         final String answer;
         try { answer = entry.tool.invoke(call.argumentsJson()); }
-        catch (Exception failure) { return failed(entry); }
-        if (!same(approved)) return failed(entry);
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return failed(call, approved, attempt, entry); }
+        catch (Exception failure) { return failed(call, approved, attempt, entry); }
+        if (!same(approved)) return failed(call, approved, attempt, entry);
         JsonNode output = parse(answer);
-        if (output == null || !valid(entry.output, output) || !same(approved)) return failed(entry);
+        if (output == null || !valid(entry.output, output) || !same(approved)) return failed(call, approved, attempt, entry);
+        if (!record(call, approved, attempt, "agent.tool.completed") || !same(approved))
+            return failed(call, approved, attempt, entry);
         return new ToolResult.Completed(answer);
     }
 
@@ -103,12 +121,23 @@ public final class GovernedToolGateway implements ToolGateway {
         catch (RuntimeException unavailable) { return null; }
     }
     private boolean same(Approval expected) { return expected.equals(current()); }
-    private ToolResult.Rejected reject(String reason) {
+    private ToolResult.Rejected reject(ToolCall call, Approval approval, String attempt, String reason) {
+        record(call, approval, attempt, "agent.tool.refused");
         return new ToolResult.Rejected(new Decision("tool-gateway", DecisionOutcome.DENY, reason,
                 PolicyRef.FAIL_CLOSED, clock.instant()));
     }
-    private static ToolResult.Failed failed(Registration entry) {
+    private ToolResult.Failed failed(ToolCall call, Approval approved, String attempt, Registration entry) {
+        record(call, approved, attempt, "agent.tool.failed");
         return new ToolResult.Failed("the tool call failed or its output was withheld", entry.mutating);
+    }
+    /** Best-effort for refusal/failure, mandatory for start and completion. No arguments or outputs are recorded. */
+    private boolean record(ToolCall call, Approval approval, String attempt, String action) {
+        try {
+            audit.record(AuditDraft.of(UlidGenerator.shared().next(), clock.instant(),
+                    approval == null ? GATEWAY : approval.agent(), action, "agent-tool", "tool:" + call.toolName(),
+                    Map.of("agent.task", call.taskId().value(), "agent.tool.attempt", attempt)));
+            return true;
+        } catch (RuntimeException unavailable) { return false; }
     }
     private static JsonNode parse(String text) {
         if (text == null || text.length() > MAX_JSON) return null;
@@ -128,7 +157,9 @@ public final class GovernedToolGateway implements ToolGateway {
         JsonNode node = parse(source);
         if (node == null || !node.isObject()) throw new IllegalArgumentException("invalid tool schema");
         requireSelfContained(node);
-        try { return SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12).getSchema(source); }
+        try { return SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12,
+                b -> b.schemaRegistryConfig(SchemaRegistryConfig.builder().formatAssertionsEnabled(true).build()))
+                .getSchema(source); }
         catch (RuntimeException invalid) { throw new IllegalArgumentException("invalid tool schema", invalid); }
     }
     private static void requireSelfContained(JsonNode node) {
