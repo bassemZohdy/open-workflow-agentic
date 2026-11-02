@@ -1,5 +1,7 @@
 # Changelog
 
+- Enforce fresh-entry transaction and attribution when retaining resource-entry audit sources.
+
 - Add opt-in atomic resource-entry audit sources and central receipt checks before callbacks.
 
 - Verify audited resource effects against a retained task allocation and database-backed tool budget.
