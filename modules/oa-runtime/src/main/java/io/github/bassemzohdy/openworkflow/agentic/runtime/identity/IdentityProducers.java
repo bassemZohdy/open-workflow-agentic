@@ -158,6 +158,9 @@ public class IdentityProducers {
                         "agentic.identity.exchange.client-id is required with a token endpoint")),
                 exchange.clientSecretName().orElseThrow(() -> new IllegalStateException(
                         "agentic.identity.exchange.client-secret-name is required with a token endpoint")),
-                secrets, grants, bindings, verifier, audit, Clock.systemUTC(), exchange.timeout());
+                secrets, grants, bindings, verifier, audit, Clock.systemUTC(), exchange.timeout(), null, exchange.maxConcurrent());
+    }
+    public void disposeTokenExchanger(@jakarta.enterprise.inject.Disposes TokenExchanger exchanger) {
+        if (exchanger instanceof Rfc8693TokenExchanger client) client.close();
     }
 }

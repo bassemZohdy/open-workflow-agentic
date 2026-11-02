@@ -80,5 +80,9 @@ public interface IdentitySettings {
         /** Timeout of one exchange request. */
         @WithDefault("PT5S")
         Duration timeout();
+
+        /** Maximum number of in-flight physical token requests, including timed-out calls still stopping. */
+        @WithDefault("16")
+        int maxConcurrent();
     }
 }
