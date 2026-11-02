@@ -315,7 +315,7 @@ public class InstanceService {
 
     private StartResult launch(InstanceRecord row, StartRequest request) {
         // A committed registry row is not authority to execute if its grant changed during insertion.
-        if (!currentStartAuthority(row)) return pendingStart(row);
+        if (!currentStartAuthority(row) || !startingLifetimeCurrent(row)) return pendingStart(row);
         WorkflowEngine.EngineLaunch launch;
         try {
             launch = engine.prepare(request.definition(), request.input());
@@ -352,6 +352,7 @@ public class InstanceService {
         if (!currentStartAuthority(current)) return pendingStart(current);
         current = store.find(prepared.tenant(), prepared.id()).orElseThrow();
         if (!samePendingStart(prepared,current)) return new StartResult(current,true);
+        if (!startingLifetimeCurrent(current)) return pendingStart(current);
         try {
             launch.start();
         } catch (RuntimeException e) {
@@ -360,6 +361,13 @@ public class InstanceService {
         faults.hit(LifecycleFaults.BEFORE_ACCEPT);
         InstanceRecord running = recordAccepted(prepared);
         return new StartResult(running, true);
+    }
+
+    /** The new row's original lifetime is pinned by this service in the same insert transaction. */
+    private boolean startingLifetimeCurrent(InstanceRecord row) {
+        if (!lifetimeSettings.startingLifetimeEnabled || lifetimeSettings.maxLifetime.isEmpty()) return true;
+        Instant deadline = row.createdAt().plus(lifetimeSettings.maxLifetime.orElseThrow()).truncatedTo(ChronoUnit.MICROS);
+        return now().isBefore(deadline);
     }
 
     private boolean currentStartAuthority(InstanceRecord row) {

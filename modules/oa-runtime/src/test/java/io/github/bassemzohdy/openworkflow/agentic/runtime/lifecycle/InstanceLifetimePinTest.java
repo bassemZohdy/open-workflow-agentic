@@ -9,6 +9,7 @@ import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.*;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
@@ -78,6 +79,47 @@ class InstanceLifetimePinTest {
         var sync = new EngineStatusSync(store, scan, config, Clock.fixed(now, ZoneOffset.UTC));
         return new Reconciler(store, engine, sync, scan, new RepairStore(db), config, db,
                 Clock.fixed(now, ZoneOffset.UTC), request.tenant()::equals);
+    }
+
+    private Clock controlledClock(AtomicReference<Instant> current) {
+        return new Clock() {
+            public ZoneId getZone() { return ZoneOffset.UTC; }
+            public Clock withZone(ZoneId zone) { return this; }
+            public Instant instant() { return current.get(); }
+        };
+    }
+
+    @Test void authorityDelayPastStartingLifetimePreventsPreparation() {
+        var instant=new AtomicReference<>(start);var clock=controlledClock(instant);var prepares=new AtomicInteger();
+        WorkflowEngine engine=new WorkflowEngine() {
+            public boolean hasDefinition(DefinitionRef ignored) {return true;}
+            public EngineLaunch prepare(DefinitionRef ignored,Map<String,Object> input) {
+                prepares.incrementAndGet();throw new AssertionError("expired start must not prepare");
+            }
+        };
+        var service=new InstanceService(store,engine,LifecycleFaults.none(),clock,UlidGenerator.shared(),settings(Optional.of(Duration.ofSeconds(1))),db);
+        service.startAuthority=row->{instant.set(start.plusSeconds(1));return ResumeGate.Decision.proceed();};
+        var result=service.start(request());
+        assertEquals(0,prepares.get());assertEquals(InstanceStatus.STARTING,result.record().status());
+        assertNull(result.record().engineInstanceId());
+    }
+
+    @Test void enginePreparationPastStartingLifetimePreventsExecution() {
+        var instant=new AtomicReference<>(start);var clock=controlledClock(instant);var starts=new AtomicInteger();
+        WorkflowEngine engine=new WorkflowEngine() {
+            public boolean hasDefinition(DefinitionRef ignored) {return true;}
+            public EngineLaunch prepare(DefinitionRef ignored,Map<String,Object> input) {
+                instant.set(start.plusSeconds(1));
+                return new EngineLaunch() {
+                    public String engineInstanceId() {return "expiry-"+UUID.randomUUID();}
+                    public void start() {starts.incrementAndGet();}
+                };
+            }
+        };
+        var service=new InstanceService(store,engine,LifecycleFaults.none(),clock,UlidGenerator.shared(),settings(Optional.of(Duration.ofSeconds(1))),db);
+        var result=service.start(request());
+        assertEquals(0,starts.get());assertEquals(InstanceStatus.STARTING,result.record().status());
+        assertNotNull(result.record().engineInstanceId());
     }
 
     @Test void unavailableStartAuthorityKeepsTheCommittedStartPending() {

@@ -302,7 +302,10 @@ instances started with no configured limit, and starts made by older replicas wi
 pin: the current setting applies to them. Update every replica before relying on pins across a rolling deployment;
 older reconcilers do not read them. The runtime database role needs access to `task.instance_lifetime`. To roll out
 starting-state expiry, keep `starting-lifetime-enabled` false until all replicas and other start writers have been
-upgraded and use the shared advisory lock, then enable it on reconcilers. The start holds a dedicated database
+upgraded and use the shared advisory lock, then enable it on all replicas. On a new start, the service also checks its
+original pinned lifetime after authority admission and immediately before the first engine execution. If either check
+finds expiry, the row remains pending for the reconciler; a prepared engine is not started by that call. This uses the
+service clock and does not stop an effect already in flight. The start holds a dedicated database
 connection for this lock while preparing and launching. Starts and reconciler repairs share a process-local budget
 for these locks which, for a recognized Agroal pool, leaves one slot outside the budget at initialization. It is not a reserved
 connection: registry operations and other components share the remaining pool and may still time
