@@ -36,6 +36,21 @@ token issuance, audit and caller freshness, and correct behavior with the
 supported real identity provider. Preserve the existing verified-caller,
 grant, audience, scope and expiry checks; a guard is not authorization.
 
+### Response-body timeout diagnostic
+
+On the local Windows/JDK environment, a separate loopback HTTP probe used the
+same JDK `HttpClient.send(..., BodyHandlers.ofInputStream())` and `readNBytes`
+pattern. The server flushed HTTP 200 headers, delayed its two-byte body by
+1,500 ms, then completed it. A request timeout of 500 ms still returned both
+bytes after 1,708 ms. This demonstrates that the request timeout alone did not
+bound the body read in that probe; it is not an end-to-end exchanger or
+supported-provider test. A stalled body can therefore keep the proposed guard
+permit occupied beyond the configured timeout. The identity owner should
+provide a bounded-body implementation and a deterministic actual-exchanger
+stall/cleanup test before activation. Any cancellation design must retain the
+concurrency bound until the physical read has stopped, and must not retry an
+exchange whose server-side outcome is unknown.
+
 At initial head `b4881b6`, 20 guard unit cases and six fake-provider exchange
 cases passed locally, the latter against isolated PostgreSQL 16. This is not
 real-provider evidence, independent review, full CI, or acceptance evidence.
