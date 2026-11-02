@@ -826,11 +826,11 @@ Implementation owner: **Claude**; reviewer: **GPT**; backlog: Claude-05. Shared 
 
 Implemented scope:
 
-- An explicitly composed local tool gateway validates registered input/output schemas, the approved task allow-list and an audited policy decision. It rechecks approval around policy, audit and tool execution; start and completion audit records are mandatory, with refusal/failure records attempted best effort. Invalid or stale output is withheld and uncertain mutating calls are marked for reconciliation. It does not activate any tool or provide MCP, timeout, durable call budget, trusted approval source or effect-ledger integration.
+- An explicitly composed local tool gateway validates registered input/output schemas, the approved task allow-list and an audited policy decision. It rechecks approval around policy, audit and tool execution, including on the worker; start and completion audit records are mandatory, with refusal/failure records attempted best effort. Registered tool callbacks have an explicit bounded wait and a shared eight-worker, no-queue bulkhead. A timed-out callback may continue and occupies capacity until it stops; its output is withheld and mutating effects remain uncertain. It does not activate any tool or provide MCP, durable call budget, trusted approval source, transport-level cancellation or effect-ledger integration.
 
 Additional closure/integration tasks:
 
-- [ ] Wire a trusted execution and tool registry, enforce durable tool-call limits and timeouts, integrate effect-ledger reconciliation and prevent bypass; make refusal/failure audit durable and prove concurrent and restart behaviour.
+- [ ] Wire a trusted execution and tool registry, enforce durable tool-call limits and end-to-end transport deadlines, integrate effect-ledger reconciliation and prevent bypass; make refusal/failure audit durable and prove concurrent and restart behaviour.
 - [ ] Wrap MCP calls so listener exceptions and timeout text cannot bypass denial/error handling; obtain exchanged per-call tokens rather than forwarding inbound credentials.
 
 Evidence: [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedToolGateway.java](modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedToolGateway.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedToolGatewayTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedToolGatewayTest.java)

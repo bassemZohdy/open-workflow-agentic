@@ -22,18 +22,35 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditDraft;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Explicitly composed local tool boundary. Registration and approval are trusted inputs, never request fields.
- * This class is not a CDI producer, MCP client, durable call budget, timeout executor or effect-ledger integration.
+ * This class is not a CDI producer, MCP client, durable call budget or effect-ledger integration.
+ * Approval lookups must work on the caller and worker threads; a missing worker context refuses before the tool.
  * A caller must not treat this partial boundary as production tool execution until those controls are supplied.
  */
 public final class GovernedToolGateway implements ToolGateway {
     private static final int MAX_JSON = 65_536;
+    /** No queue: a stuck tool retains its worker, limiting the number of unfinished physical calls. */
+    static final int MAX_IN_FLIGHT = 8;
+    private static final ThreadPoolExecutor WORKERS = new ThreadPoolExecutor(0, MAX_IN_FLIGHT, 30, TimeUnit.SECONDS,
+            new SynchronousQueue<>(), task -> {
+                var thread = new Thread(task, "governed-tool");
+                thread.setDaemon(true);
+                return thread;
+            }, new ThreadPoolExecutor.AbortPolicy());
     private static final ObjectMapper JSON = new ObjectMapper();
     static {
         JSON.getFactory().setStreamReadConstraints(StreamReadConstraints.builder()
@@ -51,6 +68,7 @@ public final class GovernedToolGateway implements ToolGateway {
         }
     }
 
+    /** Runs on a bounded worker; credentials and context must be explicitly bound, not read from caller thread locals. */
     @FunctionalInterface public interface Tool { String invoke(String argumentsJson) throws Exception; }
 
     /** A tool is registered by trusted composition with fixed schemas and declared side-effect semantics. */
@@ -59,10 +77,14 @@ public final class GovernedToolGateway implements ToolGateway {
         private final Schema output;
         private final boolean mutating;
         private final Tool tool;
+        private final Duration timeout;
 
-        public Registration(String inputSchema, String outputSchema, boolean mutating, Tool tool) {
+        public Registration(String inputSchema, String outputSchema, boolean mutating, Duration timeout, Tool tool) {
             this.input = schema(inputSchema); this.output = schema(outputSchema);
             this.mutating = mutating; this.tool = Objects.requireNonNull(tool);
+            this.timeout = Objects.requireNonNull(timeout);
+            if (timeout.compareTo(Duration.ofMillis(1)) < 0 || timeout.compareTo(Duration.ofMinutes(1)) > 0)
+                throw new IllegalArgumentException("tool timeout must be between 1 ms and 1 minute");
         }
     }
 
@@ -104,10 +126,30 @@ public final class GovernedToolGateway implements ToolGateway {
         if (!record(call, approved, attempt, "agent.tool.started"))
             return reject(call, approved, attempt, "tool start audit is unavailable");
         if (!same(approved)) return reject(call, approved, attempt, "tool approval changed");
+        if (Thread.currentThread().isInterrupted()) return reject(call, approved, attempt, "tool caller was interrupted");
+        var mayStart = new java.util.concurrent.atomic.AtomicBoolean(true);
+        final Future<String> future;
+        try { future = WORKERS.submit(() -> {
+            if (!same(approved) || !mayStart.compareAndSet(true, false)) throw new ApprovalExpired();
+            return entry.tool.invoke(call.argumentsJson());
+        }); }
+        catch (RejectedExecutionException saturated) { return reject(call, approved, attempt, "tool capacity is unavailable"); }
         final String answer;
-        try { answer = entry.tool.invoke(call.argumentsJson()); }
-        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return failed(call, approved, attempt, entry); }
-        catch (Exception failure) { return failed(call, approved, attempt, entry); }
+        try { answer = future.get(entry.timeout.toNanos(), TimeUnit.NANOSECONDS); }
+        catch (InterruptedException interrupted) {
+            mayStart.set(false);
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            return failed(call, approved, attempt, entry);
+        } catch (TimeoutException timedOut) {
+            mayStart.set(false);
+            future.cancel(true);
+            return failed(call, approved, attempt, entry);
+        } catch (ExecutionException failure) {
+            if (failure.getCause() instanceof ApprovalExpired)
+                return reject(call, approved, attempt, "tool approval changed before execution");
+            return failed(call, approved, attempt, entry);
+        }
         if (!same(approved)) return failed(call, approved, attempt, entry);
         JsonNode output = parse(answer);
         if (output == null || !valid(entry.output, output) || !same(approved)) return failed(call, approved, attempt, entry);
@@ -121,6 +163,7 @@ public final class GovernedToolGateway implements ToolGateway {
         catch (RuntimeException unavailable) { return null; }
     }
     private boolean same(Approval expected) { return expected.equals(current()); }
+    private static final class ApprovalExpired extends Exception { }
     private ToolResult.Rejected reject(ToolCall call, Approval approval, String attempt, String reason) {
         record(call, approval, attempt, "agent.tool.refused");
         return new ToolResult.Rejected(new Decision("tool-gateway", DecisionOutcome.DENY, reason,
