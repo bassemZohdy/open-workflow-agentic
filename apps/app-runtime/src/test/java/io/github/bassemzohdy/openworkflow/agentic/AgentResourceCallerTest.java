@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.AgentResource;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcNodeBudget;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.specification.RequestSpecification;
@@ -34,6 +35,9 @@ class AgentResourceCallerTest {
     @Inject
     DataSource dataSource;
 
+    @Inject
+    JdbcNodeBudget budgets;
+
     private static RequestSpecification caller(String tenant, String scopes) {
         RequestSpecification spec = given().header("X-Tenant", tenant).header("X-Subject", "alice");
         return scopes == null ? spec : spec.header("X-Scopes", scopes);
@@ -45,8 +49,11 @@ class AgentResourceCallerTest {
 
     @Test
     void agentGraphRunsAndCheckpoints() {
+        String thread = newThread();
+        TestModelGovernance.prepare(budgets, AgentResource.threadOf("t-agent",
+                new Subject(SubjectKind.USER, "alice"), "direct:" + thread).value());
         given().header("X-Tenant", "t-agent").header("X-Subject", "alice").header("X-Scopes", "oa.agent.run")
-                .contentType("application/json").body("{\"topic\":\"agentic workflows\"}")
+                .contentType("application/json").body("{\"topic\":\"agentic workflows\",\"threadId\":\"" + thread + "\"}")
                 .when().post("/agents/research")
                 .then().statusCode(200)
                 .body("threadId", notNullValue())
@@ -106,6 +113,8 @@ class AgentResourceCallerTest {
         String thread = newThread();
         // (tenant, user): alice and bob of A, alice of B all send the same visible thread id; alice of A twice
         for (String[] who : new String[][] {{tenantA, "alice"}, {tenantA, "bob"}, {tenantB, "alice"}, {tenantA, "alice"}}) {
+            TestModelGovernance.prepare(budgets, AgentResource.threadOf(who[0],
+                    new Subject(SubjectKind.USER, who[1]), "direct:" + thread).value());
             given().header("X-Tenant", who[0]).header("X-Subject", who[1]).header("X-Scopes", RUN)
                     .contentType("application/json")
                     .body("{\"topic\":\"agentic workflows\",\"threadId\":\"" + thread + "\"}")
