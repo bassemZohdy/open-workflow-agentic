@@ -6,6 +6,7 @@ import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.EffectAuditDe
 import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecutionMigrationTest.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.*;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
@@ -16,6 +17,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcToolCallBudg
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedToolGateway;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.NodeRefused;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
@@ -69,7 +71,7 @@ class ResourceTaskAllocationStoreTest {
     @Test void taskFenceChecksOriginalAllocationAndRefusesAfterTargetRevocation() throws Exception {
         var allocation=store.allocate(a);var entry=f.entry(1);var approved=new AtomicBoolean(true);
         var reads=new AtomicInteger();
-        try(var taskFence=new ResourceTaskExecutionFence(data,manager,entry,allocation,(checked,task)->{
+        try(var taskFence=new ResourceTaskExecutionFence(data,manager,entry,allocation,f.binding(),(checked,task)->{
             assertEquals(entry,checked);assertEquals(allocation,task);reads.incrementAndGet();
             if(!approved.get())throw new IllegalStateException("fixture approval revoked");
         });var gate=new JdbcResourceExecutionGate(data,manager,1)) {
@@ -109,7 +111,7 @@ class ResourceTaskAllocationStoreTest {
                 Duration.ofSeconds(1),profile.maxOutputTokens());
         var shortAllocation=new ResourceTaskAllocation(a.scope(),a.parentTaskId(),shortContract,shortProfile);
         var retained=store.allocate(shortAllocation);var entered=new AtomicBoolean();
-        try(var fence=new ResourceTaskExecutionFence(data,manager,f.entry(1),retained,(entry,task)->{
+        try(var fence=new ResourceTaskExecutionFence(data,manager,f.entry(1),retained,f.binding(),(entry,task)->{
             entered.set(true);
             long until=System.nanoTime()+Duration.ofSeconds(20).toNanos();
             try {
@@ -120,6 +122,95 @@ class ResourceTaskAllocationStoreTest {
             assertThrows(IllegalStateException.class,()->fence.requireCurrent(f.entry(1)));
             assertTrue(entered.get(),"the original allocation must have been live before approval blocked");
         }
+    }
+
+    @Test void taskFenceRequiresThisCredentialsLiveGrantAncestry() throws Exception {
+        var allocation=store.allocate(a);var entry=f.entry(1);var approvals=new AtomicInteger();
+        var now=databaseNow(data);
+        var refreshed=credential(support.db,f,now.minusSeconds(1),now.plusSeconds(90));
+        var actor=f.row().owner();var clock=Clock.systemUTC();var service=grants(clock);
+        var unrelated=service.grant(f.row().tenant(),actor,actor,
+                new Subject(SubjectKind.WORKFLOW,"unrelated-"+UUID.randomUUID()),
+                Set.of("oa.agent.run"),now.plusSeconds(300),null);
+        String issuer="https://unrelated-issuer.test",token=UUID.randomUUID().toString();
+        var expires=now.plusSeconds(90);
+        new JdbcIssuedTokenBindings(data,manager).bind(issuer,token,
+                new IssuedTokenBindings.Binding(unrelated.id(),f.row().tenant(),expires));
+        var wrong=new ResourceCallBinding(issuer,token,unrelated.id(),entry.scope(),now.minusSeconds(1),expires);
+        new JdbcResourceCallBindings(data,manager).bind(wrong);
+        ResourceTaskExecutionFence.CurrentApproval approval=(e,t)->approvals.incrementAndGet();
+        try(var original=new ResourceTaskExecutionFence(data,manager,entry,allocation,f.binding(),approval);
+            var sameGrant=new ResourceTaskExecutionFence(data,manager,entry,allocation,refreshed,approval);
+            var wrongGrant=new ResourceTaskExecutionFence(data,manager,entry,allocation,wrong,approval)) {
+            assertDoesNotThrow(()->original.requireCurrent(entry));
+            assertDoesNotThrow(()->sameGrant.requireCurrent(entry));
+            assertEquals(2,approvals.get());
+            assertThrows(IllegalStateException.class,()->wrongGrant.requireCurrent(entry));
+            assertEquals(2,approvals.get(),"unrelated grant must refuse before target approval");
+            var revokedDuringApproval=new AtomicBoolean();
+            try(var racing=new ResourceTaskExecutionFence(data,manager,entry,allocation,f.binding(),(e,t)->{
+                revokedDuringApproval.set(true);
+                service.revoke(a.contract().delegationGrantId(),actor,"fixture revocation",null);
+            })) {
+                assertThrows(IllegalStateException.class,()->racing.requireCurrent(entry));
+                assertTrue(revokedDuringApproval.get(),"grant must be live before the approval callback");
+            }
+            assertThrows(IllegalStateException.class,()->original.requireCurrent(entry));
+            assertThrows(IllegalStateException.class,()->sameGrant.requireCurrent(entry));
+            assertEquals(2,approvals.get(),"revoked task grant must refuse before target approval");
+        }
+    }
+
+    @Test void identityPolicyAndTaskMustPairTheSameCredentialAndEntry() throws Exception {
+        f=fixture(support.db,"a".repeat(64),Pep.AGENT_RESEARCH_RUN);a=support.candidate(f);
+        var allocated=store.allocate(a);var entry=f.entry(1);var binding=f.binding();
+        var clock=Clock.systemUTC();var actor=new DelegationGrantStore(data).find(binding.issuingGrantId()).orElseThrow().agent();
+        var issued=new JdbcIssuedTokenBindings(data,manager);var calls=new JdbcResourceCallBindings(data,manager);
+        var verified=new VerifiedToken(binding.issuer(),binding.scope().owner(),Set.of(binding.scope().audience()),
+                Set.of(AgentResourceAdmission.SCOPE),binding.scope().tenant(),binding.issuedAt(),binding.expiresAt(),
+                binding.tokenId(),List.of(actor.id()));
+        var guard=new ResourceTokenGuard((bearer,audience)->verified,binding.scope().audience(),
+                new JdbcReplayCache(data),grants(clock),issued,clock,1);
+        var admission=new AgentResourceAdmission(guard,calls,issued,binding.scope().audience(),clock);
+        var witness=admission.bind(admission.admitCall("fixture-only-bearer"),entry);
+        var canonical=calls.findBinding(witness.bindingKey()).orElseThrow();
+        var pep=new Pep(request->new Decision("fixture",DecisionOutcome.ALLOW,"fixture",
+                PolicyRef.FAIL_CLOSED,clock.instant()),event->{},Duration.ofSeconds(3),clock);
+        var now=databaseNow(data);var refreshed=credential(support.db,f,now.minusSeconds(1),now.plusSeconds(90));
+        try(var identity=new LiveIdentityResourceFence(admission,witness,entry,canonical,actor,calls);
+            var policy=new LiveResearchPolicyFence(admission,witness,entry,pep);
+            var task=new ResourceTaskExecutionFence(data,manager,entry,allocated,canonical,(e,t)->{});
+            var otherTask=new ResourceTaskExecutionFence(data,manager,entry,allocated,refreshed,(e,t)->{});
+            var gate=new JdbcResourceExecutionGate(data,manager,1)) {
+            var builder=CompositeExecutionFence.builder();
+            for(var check:CompositeExecutionFence.Check.values()) {
+                if(check==CompositeExecutionFence.Check.IDENTITY)builder.with(check,identity);
+                else if(check==CompositeExecutionFence.Check.POLICY)builder.with(check,policy);
+                else if(check==CompositeExecutionFence.Check.TASK_AND_TARGET)builder.with(check,task);
+                else builder.with(check,ignored->{});
+            }
+            var composite=builder.build();
+            assertThrows(IllegalStateException.class,()->identity.pair(composite,policy,otherTask));
+            var mismatched=CompositeExecutionFence.builder();
+            for(var check:CompositeExecutionFence.Check.values()) {
+                if(check==CompositeExecutionFence.Check.IDENTITY)mismatched.with(check,identity);
+                else if(check==CompositeExecutionFence.Check.POLICY)mismatched.with(check,policy);
+                else if(check==CompositeExecutionFence.Check.TASK_AND_TARGET)mismatched.with(check,otherTask);
+                else mismatched.with(check,ignored->{});
+            }
+            assertThrows(IllegalStateException.class,()->identity.pair(mismatched.build(),policy,otherTask),
+                    "the task and identity must carry the same exact credential");
+            var paired=identity.pair(composite,policy,task);
+            assertThrows(IllegalStateException.class,()->gate.openGoverned(refreshed,entry,UUID.randomUUID(),paired));
+            var callsMade=new AtomicInteger();
+            var result=gate.openGoverned(canonical,entry,UUID.randomUUID(),paired)
+                    .executeGoverned(r->{r.requireCurrent(entry);callsMade.incrementAndGet();return "fixture";});
+            assertEquals(JdbcResourceExecutionGate.Kind.CALLED,result.kind());
+            var again=gate.openGoverned(canonical,entry,UUID.randomUUID(),paired)
+                    .executeGoverned(r->{callsMade.incrementAndGet();return "duplicate";});
+            assertEquals(JdbcResourceExecutionGate.Kind.RETAINED,again.kind());
+            assertEquals(1,callsMade.get());
+        } finally {admission.close();}
     }
     @Test void aFreshAllocationAtomicallyCreatesTheBoundBudgetAndRetryDoesNotResetIt() throws Exception {
         var allocated=store.allocate(a);

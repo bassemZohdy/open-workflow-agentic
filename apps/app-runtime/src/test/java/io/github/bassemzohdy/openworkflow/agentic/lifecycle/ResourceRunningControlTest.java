@@ -130,13 +130,13 @@ class ResourceRunningControlTest {
                 var pep=new Pep(request->new Decision("fixture",DecisionOutcome.ALLOW,"fixture",
                         PolicyRef.FAIL_CLOSED,clock.instant()),event->{},Duration.ofSeconds(3),clock);
                 var policy=new LiveResearchPolicyFence(admission,first,f.entry(1),pep);
-                assertThrows(IllegalStateException.class,()->identity.pair(wrongComposite.build(),policy));
+                assertThrows(IllegalStateException.class,()->identity.pair(wrongComposite.build(),policy,null));
                 var otherPolicy=new LiveResearchPolicyFence(admission,second,f.entry(1),pep);
                 var swappedPolicyComposite=CompositeExecutionFence.builder();
                 for(var check:CompositeExecutionFence.Check.values())
                     swappedPolicyComposite.with(check,check==CompositeExecutionFence.Check.IDENTITY?identity:
                             check==CompositeExecutionFence.Check.POLICY?otherPolicy:ignored->{});
-                assertThrows(IllegalStateException.class,()->identity.pair(swappedPolicyComposite.build(),otherPolicy));
+                assertThrows(IllegalStateException.class,()->identity.pair(swappedPolicyComposite.build(),otherPolicy,null));
                 var policyEntered=new CountDownLatch(1);var policyRelease=new CountDownLatch(1);
                 var blockingPep=new Pep(request->{
                     policyEntered.countDown();

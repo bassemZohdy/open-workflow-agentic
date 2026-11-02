@@ -204,7 +204,8 @@ class WorkflowOwnerExecutionBoundaryTest {
                     else builder.with(check, ignored -> {});
                 }
                 // The PDP, task/target, audit and token verifier are fixtures.
-                var paired = identityCheck.pair(builder.build(), policyCheck);
+                // This fixture has no V78 task allocation, so it does not claim the complete paired path.
+                var paired = JdbcResourceExecutionGate.CredentialFence.pair(canonical, builder.build());
                 var wrongCredential = new ResourceCallBinding(canonical.issuer(), UUID.randomUUID().toString(),
                         canonical.issuingGrantId(), canonical.scope(), canonical.issuedAt(), canonical.expiresAt());
                 assertThrows(JdbcResourceExecutionGate.RefusedException.class,

@@ -61,6 +61,11 @@ public final class CompositeExecutionFence implements ResourceExecutionFence {
         return policy != null && checks.get(Check.POLICY) == policy;
     }
 
+    /** Identity comparison for trusted task pairing; does not itself authorize an entry. */
+    public boolean usesTask(ResourceExecutionFence task) {
+        return task != null && checks.get(Check.TASK_AND_TARGET) == task;
+    }
+
     @Override public void requireCurrent(ResourceExecutionEntry entry) {
         Objects.requireNonNull(entry, "entry");
         for (Check check : Check.values()) check(entry, check);

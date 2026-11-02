@@ -8,6 +8,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceExecuti
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceInvocations;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.CompositeExecutionFence;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.ResourceTaskExecutionFence;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -62,15 +63,18 @@ public final class LiveIdentityResourceFence implements ResourceExecutionFence, 
 
     /**
      * Pairs the same credential with a composite containing this exact identity delegate and a policy delegate bound
-     * to the same witness and entry. The trusted composition root must supply the remaining delegates.
+     * to the same witness and entry, and a task check bound to this exact credential and entry. The trusted
+     * composition root must supply the remaining delegates.
      */
     public JdbcResourceExecutionGate.CredentialFence pair(CompositeExecutionFence composite,
-                                                          LiveResearchPolicyFence policy) {
+                                                          LiveResearchPolicyFence policy, ResourceTaskExecutionFence task) {
         if (closed.get() || Thread.currentThread().isInterrupted()) throw refused("identity context unavailable");
         if (!Objects.requireNonNull(composite, "composite").usesIdentity(this))
             throw refused("composite identity differs");
         if (policy == null || !composite.usesPolicy(policy) || !policy.boundTo(bound, entry))
             throw refused("composite policy differs");
+        if (task == null || !composite.usesTask(task) || !task.boundTo(entry, binding))
+            throw refused("composite task or credential differs");
         return JdbcResourceExecutionGate.CredentialFence.pair(binding, composite);
     }
 
