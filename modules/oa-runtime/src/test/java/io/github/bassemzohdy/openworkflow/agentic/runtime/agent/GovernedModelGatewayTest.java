@@ -81,6 +81,18 @@ class GovernedModelGatewayTest {
         assertEquals(0, provider.calls.get());
     }
 
+    @Test void approvalLostDuringProviderCallWithholdsTheModelOutput() {
+        var current = new java.util.concurrent.atomic.AtomicReference<>(APPROVED.current());
+        ApprovedModelContext context = current::get;
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        LlmClient providerThatLosesApproval = (system, user) -> {
+            calls.incrementAndGet(); current.set(Optional.empty()); return "private model output";
+        };
+        var result = assertInstanceOf(ModelResult.Failed.class, gateway(context, COST, providerThatLosesApproval).complete(CALL));
+        assertEquals(1, calls.get(), "an already-started provider call cannot be undone");
+        assertFalse(result.reason().contains("private model output"));
+    }
+
     @Test void aPolicyDenyIsRejectedCarryingTheRefusingDecision() {
         var denying = new Engine(DecisionOutcome.DENY);
         var gateway = new GovernedModelGateway(new GovernedLlmClient(provider, pep(denying, audit), APPROVED), APPROVED,
