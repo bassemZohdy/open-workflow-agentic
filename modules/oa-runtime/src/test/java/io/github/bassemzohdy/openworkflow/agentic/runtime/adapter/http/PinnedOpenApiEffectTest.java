@@ -21,6 +21,14 @@ class PinnedOpenApiEffectTest {
                 {"type":"object","required":["amount"],"properties":{"amount":{"type":"integer"}}}}}},
               "responses":{"200":{"description":"complete"},"202":{"description":"accepted"}}}}}}
             """;
+    private static final String COMPONENT_DOC = """
+            {"openapi":"3.1.0","components":{"schemas":{
+              "Order":{"type":"object","required":["amount"],"properties":{"amount":{"$ref":"#/components/schemas/Amount"}}},
+              "Amount":{"type":"integer","minimum":1}}},
+             "paths":{"/orders":{"post":{"operationId":"createOrder",
+              "requestBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}},
+              "responses":{"200":{"description":"complete"}}}}}}
+            """;
     private static final PinnedHttpEffectTarget.CredentialExpectation EXPECTED =
             new PinnedHttpEffectTarget.CredentialExpectation("issuer", Ulid.parse("01ARZ3NDEKTSV4RRFFQ69G5FAV"), Set.of("orders:write"));
 
@@ -62,5 +70,21 @@ class PinnedOpenApiEffectTest {
         var op = operation(DOC, "createOrder", ORIGIN);
         assertThrows(IllegalArgumentException.class, () -> registration(op, Set.of(201)));
         assertThrows(IllegalArgumentException.class, () -> registration(op, Set.of(202)));
+    }
+
+    @Test void resolvesOnlyBoundedAcyclicLocalSchemaComponents() {
+        var component = operation(COMPONENT_DOC, "createOrder", ORIGIN);
+        assertNotNull(registration(component, Set.of(200)));
+        assertThrows(IllegalArgumentException.class, () -> operation(COMPONENT_DOC.replace("#/components/schemas/Amount", "https://evil/schema"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(COMPONENT_DOC.replace("#/components/schemas/Amount", "#/components/schemas/Order"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(COMPONENT_DOC.replace("#/components/schemas/Amount", "#/components/schemas/Missing"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(COMPONENT_DOC.replace("\"$ref\":\"#/components/schemas/Amount\"", "\"$ref\":\"#/components/schemas/Amount\",\"minimum\":5"), "createOrder", ORIGIN));
+        var chain = new StringBuilder();
+        for (int i=0; i<34; i++) chain.append("\"S").append(i).append("\":{\"$ref\":\"#/components/schemas/S").append(i+1).append("\"},");
+        chain.append("\"S34\":{\"type\":\"object\"}");
+        String deep = COMPONENT_DOC.replace("\"Order\":{\"type\":\"object\",\"required\":[\"amount\"],\"properties\":{\"amount\":{\"$ref\":\"#/components/schemas/Amount\"}}}",
+                chain.toString()).replace("#/components/schemas/Order", "#/components/schemas/S0");
+        assertTrue(deep.contains("\"S34\""));
+        assertThrows(IllegalArgumentException.class, () -> operation(deep, "createOrder", ORIGIN));
     }
 }

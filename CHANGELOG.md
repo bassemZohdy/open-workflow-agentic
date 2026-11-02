@@ -1,5 +1,7 @@
 # Changelog
 
+- Resolve bounded, acyclic local component schemas in the pinned OpenAPI effect selector; reject remote and recursive references.
+
 - Add an opt-in, digest-pinned OpenAPI JSON POST selector for governed effect registrations, with a trusted origin and schema validation; production approval and identity integration remain open.
 
 - Preserve unknown effect outcomes for reconciliation and propagate lost-authority refusals without replaying a refused lookup.

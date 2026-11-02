@@ -15,7 +15,7 @@ import java.util.Set;
 
 /** Explicit, trusted composition of a digest-pinned OpenAPI 3.1 JSON POST with the governed effect gateway.
  * This narrow subset is not a general OpenAPI validator, approval source, credential verifier or CDI wiring.
- * The trusted base URI overrides document servers; parameters, references and path templates are unsupported.
+ * The trusted base URI overrides document servers; parameters, remote references and path templates are unsupported.
  */
 public final class PinnedOpenApiEffect {
     private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
@@ -66,11 +66,12 @@ public final class PinnedOpenApiEffect {
             throw new IllegalArgumentException("operation must be unique, fixed-path and parameter-free");
         JsonNode request = selected.path("requestBody");
         JsonNode input = request.path("content").path("application/json").path("schema");
-        if (!request.isObject() || request.has("$ref") || !request.path("required").isBoolean() || !request.path("required").asBoolean() || !input.isObject()
-                || !"object".equals(input.path("type").asText()))
-            throw new IllegalArgumentException("required inline JSON object schema is required");
-        requireSelfContained(input);
-        this.schema = input.toString();
+        if (!request.isObject() || request.has("$ref") || !request.path("required").isBoolean() || !request.path("required").asBoolean() || !input.isObject())
+            throw new IllegalArgumentException("required JSON object schema is required");
+        JsonNode resolved = resolveSchema(input, root.path("components").path("schemas"), new java.util.HashSet<>(), new int[]{0}, 0);
+        if (!"object".equals(resolved.path("type").asText())) throw new IllegalArgumentException("JSON object schema required");
+        this.schema = resolved.toString();
+        if (CanonicalEncoder.strictUtf8(schema).length > 65_536) throw new IllegalArgumentException("resolved schema exceeds 64 KiB");
         JsonNode responses = selected.path("responses");
         if (!responses.isObject()) throw new IllegalArgumentException("documented responses required");
         var allowed = new java.util.HashSet<Integer>();
@@ -106,5 +107,39 @@ public final class PinnedOpenApiEffect {
         if (node.isObject()) for (String key : new String[]{"$ref", "$dynamicRef", "$recursiveRef", "$id", "$schema"})
             if (node.has(key)) throw new IllegalArgumentException("schema references are unsupported");
         node.elements().forEachRemaining(PinnedOpenApiEffect::requireSelfContained);
+    }
+
+    /** Resolve only pure, acyclic references to named schemas in this exact pinned document. */
+    private static JsonNode resolveSchema(JsonNode node, JsonNode components, Set<String> active, int[] count, int depth) {
+        if (++count[0] > 10_000 || active.size() > 32 || depth > 128) throw new IllegalArgumentException("schema expansion limit exceeded");
+        if (node.isObject()) {
+            if (node.has("$ref")) {
+                JsonNode ref = node.get("$ref");
+                if (node.size() != 1 || !ref.isTextual() || !ref.textValue().matches("#/components/schemas/[A-Za-z0-9._-]{1,128}"))
+                    throw new IllegalArgumentException("only pure local component schema references are supported");
+                String name = ref.textValue().substring("#/components/schemas/".length());
+                JsonNode target = components.get(name);
+                if (target == null || !target.isObject() || !active.add(name))
+                    throw new IllegalArgumentException("missing or cyclic component schema");
+                try { return resolveSchema(target, components, active, count, depth + 1); }
+                finally { active.remove(name); }
+            }
+            for (String key : new String[]{"$dynamicRef", "$recursiveRef", "$id", "$schema"})
+                if (node.has(key)) throw new IllegalArgumentException("schema references are unsupported");
+            var out = JSON.createObjectNode();
+            node.fields().forEachRemaining(entry -> {
+                // Instance-valued annotations and assertions must never be interpreted as schema references.
+                if (Set.of("const", "default", "enum", "examples", "example").contains(entry.getKey())) {
+                    requireSelfContained(entry.getValue()); out.set(entry.getKey(), entry.getValue().deepCopy());
+                } else out.set(entry.getKey(), resolveSchema(entry.getValue(), components, active, count, depth + 1));
+            });
+            return out;
+        }
+        if (node.isArray()) {
+            var out = JSON.createArrayNode();
+            node.forEach(item -> out.add(resolveSchema(item, components, active, count, depth + 1)));
+            return out;
+        }
+        return node.deepCopy();
     }
 }

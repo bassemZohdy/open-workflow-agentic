@@ -22,9 +22,12 @@ for reconciliation and propagates the refusal. A refused lookup cannot trigger a
 This does not imply that an already dispatched network operation was cancelled or that a queue write always succeeds.
 
 `PinnedOpenApiEffect` explicitly composes a digest-pinned OpenAPI 3.1 JSON document with the controlled tool
-registration and HTTP candidate. It selects one unique POST by operation ID, an inline required JSON object schema,
+registration and HTTP candidate. It selects one unique POST by operation ID, a required JSON object schema,
 and a fixed literal path. The caller supplies a trusted HTTPS origin: document-level servers are ignored, and path or
-operation server overrides, parameters, path templates, custom schema dialects and schema references are refused. Confirmed status codes must
+operation server overrides, parameters, path templates and custom schema dialects are refused. Schema references may
+only be pure, acyclic references to named components in the same pinned document; expansion depth, node count and
+result size are bounded. Remote references, references with sibling keywords and references in instance-valued schema
+fields are refused. Confirmed status codes must
 also be documented inline. The gateway fingerprint covers the exact document digest, selected operation, origin,
 target, timeout, correlation, confirmation codes and token expectations. The gateway validates arguments against the
 selected schema before binding; no credential or network call occurs at registration. This narrow selector is not a
@@ -32,8 +35,10 @@ complete OpenAPI validator, approval workflow or interpretation of OpenAPI secur
 independently enforce those schemes, approved target/occurrence binding, identity, policy, audit and service semantics.
 The supported subset is intentionally smaller than the [OpenAPI 3.1 specification](https://spec.openapis.org/oas/v3.1.0.html).
 The PostgreSQL controlled-gateway fixture verifies that a schema-invalid request creates no intent and acquires no
-credential, while a valid request reaches a fixture credential refusal and leaves an unresolved intent. Selector tests
-cover digest and endpoint changes, duplicate operation IDs, unsupported paths, references, dialects and status codes.
+credential, while a valid request reaches a fixture credential refusal and leaves an unresolved intent. The same gateway
+case resolves nested component schemas and rejects a value below the referenced minimum before acquiring credentials.
+Selector tests cover digest and endpoint changes, duplicate operation IDs, unsupported paths, local-reference cycles,
+remote references, dialects and status codes.
 
 A trusted service contract must explicitly choose terminal confirmation status codes from 200, 201 and 204, and must
 prove those statuses mean the effect is complete. A 202, redirect, unselected status, timeout, I/O failure or missing

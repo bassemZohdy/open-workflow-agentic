@@ -838,9 +838,12 @@ class GovernedModelRunningControlTest {
         inCallback((running, entry, checks) -> {
             var rig = new ToolEffectRig(entry);
             String document = """
-                    {"openapi":"3.1.0","paths":{"/orders":{"post":{"operationId":"createOrder",
+                    {"openapi":"3.1.0","components":{"schemas":{"Order":
+                    {"type":"object","required":["amount"],"properties":{"amount":{"$ref":"#/components/schemas/Amount"}}},
+                    "Amount":{"type":"integer","minimum":1}}},
+                    "paths":{"/orders":{"post":{"operationId":"createOrder",
                     "requestBody":{"required":true,"content":{"application/json":{"schema":
-                    {"type":"object","required":["amount"],"properties":{"amount":{"type":"integer"}}}}}},
+                    {"$ref":"#/components/schemas/Order"}}}},
                     "responses":{"200":{"description":"done"}}}}}}
                     """;
             var digest = io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder.sha256Hex(
@@ -868,8 +871,12 @@ class GovernedModelRunningControlTest {
             var invalid = rig.call("{}");
             var invalidOccurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/1", invalid);
             assertThrows(ModelCallRefused.class, () -> gateway.invokeEffect(running, entry, rig.allocation, invalidOccurrence, invalid));
+            var belowMinimum = rig.call("{\"amount\":0}");
+            var belowOccurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/low", belowMinimum);
+            assertThrows(ModelCallRefused.class, () -> gateway.invokeEffect(running, entry, rig.allocation, belowOccurrence, belowMinimum));
             assertEquals(0, acquisitions.get());
             assertTrue(rig.ledger.find(invalidOccurrence.effectCommand("registered:test").key()).isEmpty());
+            assertTrue(rig.ledger.find(belowOccurrence.effectCommand("registered:test").key()).isEmpty());
             var valid = rig.call("{\"amount\":10}");
             var occurrence = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/2", valid);
             assertThrows(AuthorityLostException.class, () -> gateway.invokeEffect(running, entry, rig.allocation, occurrence, valid));
