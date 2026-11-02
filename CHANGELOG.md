@@ -1,5 +1,7 @@
 # Changelog
 
+- Revalidate resource-scoped effect provenance during manual resolution and replay.
+
 - Provide and test least-privilege scope-key grants for the legacy effect guard.
 
 - Refuse legacy execution or compensation of an audited scoped effect.

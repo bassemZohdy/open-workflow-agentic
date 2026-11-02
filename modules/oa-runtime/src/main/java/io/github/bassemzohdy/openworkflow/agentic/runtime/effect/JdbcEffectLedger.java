@@ -311,6 +311,8 @@ public class JdbcEffectLedger implements EffectLedger {
             }
             lockManualInstance(c,key);
             Effect current=locked(c,key).effect();
+            // Retained attribution must remain intact even when replaying an already-applied decision.
+            projection.bound(c,key).orElseThrow(()->new IllegalStateException("effect audit scope is unavailable"));
             try(var q=c.prepareStatement("select desired_state,actor_kind,actor_id,source_key from effect.manual_decision where decision_id=? and thread_name=? and node_id=? and idempotency_key=? for update")) {
                 q.setLong(1,decisionId);bind(q,key,2);
                 try(var r=q.executeQuery()) {

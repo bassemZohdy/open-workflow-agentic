@@ -431,6 +431,34 @@ class ManualEffectDecisionStoreTest {
         assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
     }
 
+    @Test void resourceScopedUnknownEffectCanBeResolvedAndRejectsCorruptReplay() throws Exception {
+        var f=fixture(support.db,"a".repeat(64));var scope=f.binding().scope();
+        var command=EffectCommand.of(scope.threadId(),"tool:charge",scope.key(),"approved-fixture","{}");
+        ledger.prepareResourceScoped(scope,command,Duration.ZERO,Instant.now());ledger.markAttempted(command.key());
+        ledger.requireManualResolution(command.key(),"effect.outcome.unknown");
+        var ready=new Ready(scope.owner(),f.row(),command);
+        var authority=authority(ready,Clock.systemUTC(),Instant.now().plusSeconds(600));
+        var request=UlidGenerator.shared().next();var resolver=resolver(allowingPep(),new AuditAppendOnce(support.db.owner));
+        assertEquals(EffectState.CONFIRMED,resolver.resolve(authority,command.key(),request,EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
+        assertEquals(EffectState.CONFIRMED,resolver.resolve(authority,command.key(),request,EffectState.CONFIRMED,"TARGET_CONFIRMED").state());
+        var delivery=new EffectAuditDelivery(support.db.owner,manager,producer,new AuditAppendOnce(support.db.owner)::appendOnce);
+        var history=new EffectAuditHistory(support.db.owner,manager,producer,delivery);
+        assertEquals(4,history.observedResourceHistory(scope,command.key(),128).size());
+        assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+        assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+        // Privileged corruption is confined to this disposable database; replay must revalidate the call.
+        Transactions.inTransaction(support.db.owner,c->{
+            try(var q=c.createStatement()){q.execute("set local session_replication_role=replica");}
+            try(var q=c.prepareStatement("update task.resource_call set fingerprint=? where call_key=?")) {
+                q.setString(1,scope.fingerprint().equals("f".repeat(64))?"e".repeat(64):"f".repeat(64));q.setString(2,scope.key());assertEquals(1,q.executeUpdate());
+            }
+            return null;
+        });
+        assertThrows(IllegalStateException.class,()->resolver.resolve(authority,command.key(),request,EffectState.CONFIRMED,"TARGET_CONFIRMED"));
+        assertEquals(1,count("select count(*) from effect.manual_decision_applied"));
+        assertEquals(1,count("select count(*) from audit.event where event_type='effect.manual-resolution-requested'"));
+    }
+
     @Test void manualResolutionCannotRaceAnOwnedEffectAttempt() throws Exception {
         var f=unresolved("occur-active-attempt");var authority=authority(f,Clock.systemUTC(),Instant.now().plusSeconds(600));
         var resolver=resolver(allowingPep(),new AuditAppendOnce(support.db.owner));var request=UlidGenerator.shared().next();
