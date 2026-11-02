@@ -41,8 +41,11 @@ This deadline case is a single-node kind test, not a node-loss or split-brain pr
 A separate `verify_node_failover.py` run placed the two replicas on separate kind
 workers, killed the waiting workflow owner’s worker, and observed its member
 lease transfer to a replacement on the surviving worker. That replacement
-restored and completed the workflow after an event. This node test does not
-cover a deadline, network partition, duplicate-effect prevention or T12.
+restored and completed the workflow after an event. Its `--deadline` mode
+separately stopped the owner worker before the deadline; the surviving replica
+remained ready, and a replacement cancelled the expired workflow without resume
+or a post-takeover effect, using the proposed schema and test-only reader. These
+node tests do not prove network partition safety, duplicate-effect prevention or T12.
 
 The Maven profile `wp109-kube-experiment` adds the Kubernetes extension only to
 an explicitly selected experimental build. Build the app with that profile and
@@ -74,11 +77,12 @@ kubectl --kubeconfig "$PWD/target/wp109-kubeconfig" -n owa-wp109 get pods,leases
 For the automated scenario, build and tag the bridge-enabled image as above,
 then run `python experiments/wp109-kubernetes/verify_failover.py` for pod and
 deadline cases or `python experiments/wp109-kubernetes/verify_node_failover.py`
-for the three-node case. Each creates and cleans up a uniquely named kind cluster. For the manual setup, remove only the
+for the three-node case; add `--deadline` to test expiry during worker loss.
+Each creates and cleans up a uniquely named kind cluster. For the manual setup, remove only the
 dedicated experiment with `kind delete cluster --name owa-wp109-failover`. Do
 not reuse its namespace or credentials in a shared environment.
 
 The cluster resources, test profile and embedded credentials are intentionally
 isolated and are not a production-ready Kubernetes configuration. The bridge is not enabled in the default build. Production rollout, compatibility
-across extension versions, deadline failover and in-flight side-effect fencing
-remain open.
+across extension versions, production deadline failover and in-flight side-effect
+fencing remain open.
