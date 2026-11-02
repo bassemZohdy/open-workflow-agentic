@@ -1,6 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.agent;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Transactions;
@@ -9,6 +10,9 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.transaction.TransactionManager;
 import java.util.Objects;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import javax.sql.DataSource;
 
 /** Independently committed, per-approved-task graph node admissions and database-clock deadline. */
@@ -34,6 +38,30 @@ public class JdbcNodeBudget {
      */
     public NodeInterceptor.DurableBudget registerNew(String thread, Subject actor, AgentTaskContract task) {
         return open(thread, actor, task, true);
+    }
+
+    /**
+     * Insert only while creating the matching resource allocation in the SAME owned transaction. This is not an
+     * authority check or a way to backfill historical allocations. A conflict fails the entire allocation.
+     */
+    public static void insertForFreshAllocation(Connection connection, AllocatedResourceTask allocated) throws SQLException {
+        Objects.requireNonNull(connection); Objects.requireNonNull(allocated);
+        if (connection.getAutoCommit()) throw new IllegalArgumentException("fresh allocation requires an owned transaction");
+        var allocation = allocated.allocation();
+        var task = allocation.contract();
+        var thread = allocation.scope().threadId().value();
+        var actor = allocation.modelProfile().agent();
+        if (!allocated.deadline().isAfter(allocated.createdAt())
+                || allocated.deadline().isAfter(allocated.createdAt().plus(task.limits().maxWallClock())))
+            throw new IllegalArgumentException("allocation deadline exceeds approved task");
+        try (var q = connection.prepareStatement("""
+                insert into task.agent_node_budget(task_id,binding,max_steps,started_at,deadline)
+                values (?,?,?,?,?)
+                """)) {
+            q.setString(1,task.id().value()); q.setString(2,binding(thread,actor,task));
+            q.setInt(3,task.limits().maxIterations()); q.setTimestamp(4,Timestamp.from(allocated.createdAt()));
+            q.setTimestamp(5,Timestamp.from(allocated.deadline())); q.executeUpdate();
+        }
     }
 
     /** Refuses an unregistered task, including when no checkpoint exists. */

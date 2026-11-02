@@ -1,5 +1,7 @@
 # Changelog
 
+- Prepare atomic node-budget creation with new opt-in resource-task allocations; V78 and the production approval path remain unactivated.
+
 - Enforce pre-registered research-agent node attempts and deadlines in PostgreSQL across retries and concurrent runtimes; unregistered tasks refuse until a trusted start producer is wired. Token, cost, tool-call accounting and exhaustion escalation remain open.
 
 - Withhold agent-node results when their wall-clock limit expires during the node action or its completion audit.

@@ -4,6 +4,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceTaskAllocations;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcNodeBudget;
 import jakarta.transaction.TransactionManager;
 import java.sql.*;
 import java.util.Objects;
@@ -43,6 +44,7 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
             }
             existing = read(connection, candidate.scope());
             if (existing.isPresent()) return same(existing.get(), candidate);
+            int inserted;
             try (var insert = connection.prepareStatement("""
                     insert into task.resource_task_allocation(allocation_key,call_key,call_fingerprint,parent_task_id,
                         contract_id,contract,contract_fingerprint,model_profile,profile_fingerprint,fingerprint)
@@ -54,9 +56,11 @@ public final class JdbcResourceTaskAllocations implements ResourceTaskAllocation
                 insert.setString(5, candidate.contract().id().value()); insert.setString(6, contract);
                 insert.setString(7, AgentTaskContractFingerprint.of(candidate.contract())); insert.setString(8, profile);
                 insert.setString(9, candidate.modelProfile().fingerprint()); insert.setString(10, candidate.fingerprint());
-                insert.executeUpdate();
+                inserted = insert.executeUpdate();
             }
-            return same(read(connection, candidate.scope()).orElseThrow(JdbcResourceTaskAllocations::conflict), candidate);
+            var allocated = same(read(connection, candidate.scope()).orElseThrow(JdbcResourceTaskAllocations::conflict), candidate);
+            if (inserted == 1) JdbcNodeBudget.insertForFreshAllocation(connection, allocated);
+            return allocated;
         });
     }
 
