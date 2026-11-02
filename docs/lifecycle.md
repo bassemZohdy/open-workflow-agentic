@@ -334,6 +334,11 @@ restored JPA listen instance and removed its database row in an isolated same-pr
 condition is false does not emit task-start at all. A failed listener future is swallowed by the SDK. These callbacks
 are therefore not a general cancellation fence, and none of the experimental callbacks is wired into recovery.
 
+A test-only task-executor wrapper also stopped a restored JPA listen instance before its task body and removed the
+persisted instance. It preserved original builder identities when linking tasks; a naive wrapper broke normal task
+transitions. However, the SDK evaluates a workflow input filter before the executor boundary: a failing input filter
+prevents the cancellation guard from running. This experiment is not wired into recovery and is not a general fix.
+
 ### 9.6 Entry points for 105d
 
 Java methods on `Reconciler`, to be exposed by the operations API with its own authorization:
