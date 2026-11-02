@@ -66,6 +66,12 @@ class ProgressValidationTest(unittest.TestCase):
         self.assertIn('**GPT:** WP-107', rendered)
         self.assertNotIn("review Claude's WP-102 design/evidence", rendered)
 
+    def test_delivery_plan_defers_independent_review_until_implementation_finishes(self):
+        rendered = '\n'.join(progress.agent_backlogs_md(self.plan))
+        self.assertIn('complete and test all remaining implementation work first', rendered)
+        self.assertIn('perform independent project review afterward', rendered)
+        self.assertNotIn('Before each implementation PR merges', rendered)
+
     def test_a_package_cannot_be_silently_duplicated_between_agents(self):
         gpt, claude = self.plan['execution_plan']['agents']
         claude['backlog'].append(copy.deepcopy(gpt['backlog'][0]))

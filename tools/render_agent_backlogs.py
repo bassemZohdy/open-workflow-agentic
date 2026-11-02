@@ -87,14 +87,17 @@ def agent_backlogs_md(plan):
     packages = {w['id']: w for w in plan['work_packages']}
     owned = assignments(plan)
     execution = plan['execution_plan']
-    out = ['## Two-agent delivery plan', '', execution['status'] + '.', '',
+    out = ['## Delivery plan', '', execution['status'] + '.', '',
+           '**Delivery order:** complete and test all remaining implementation work first; '
+           'perform independent project review afterward. Domain owner and reviewer labels below '
+           'identify responsibilities and the intended final review, not a reason to pause implementation.', '',
            f"Assignment baseline: `{execution['baseline_commit']}` ({execution['date']}).", '',
            'Each backlog below owns the remaining scope of its packages; '
            'the detailed checklists later in this file remain the acceptance contract. Priority numbers can shift '
            'when completed rows are removed; use the stable WP ID in branches and handoffs.', '',
            '### Start here', '',
-           '- GPT and Claude may start their first owned packages concurrently on the merged baseline APIs. '
-           'WP-108 does not require a WP-102 design handoff.', '',
+           '- Start with the first unblocked package and continue across domain areas as needed. '
+           'WP-108 does not require a whole-package WP-102 design handoff.', '',
            '### Working and review agreement', '']
     for agent in execution['agents']:
         if agent['backlog']:
@@ -104,7 +107,7 @@ def agent_backlogs_md(plan):
     out += [f'{i}. {rule}' for i, rule in enumerate(execution['rules'], 1)]
     for agent in execution['agents']:
         out += ['', f"### {agent['id']} backlog — {len(agent['backlog'])} packages", '',
-                f"Owner: **{agent['id']}**. Reviewer: **{agent['reviewer']}**. {agent['focus']}.", '',
+                f"Domain owner: **{agent['id']}**. Intended final reviewer: **{agent['reviewer']}**. {agent['focus']}.", '',
                 '| Priority / work package | Start after merged handoffs | Deliver and verify | Integration boundary |',
                 '|---|---|---|---|']
         for task in agent['backlog']:
