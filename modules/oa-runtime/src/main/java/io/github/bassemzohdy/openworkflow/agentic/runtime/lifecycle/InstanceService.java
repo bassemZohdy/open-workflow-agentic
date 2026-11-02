@@ -126,9 +126,7 @@ public class InstanceService {
                 key, failed.id());
         Optional<InstanceRecord> same = store.findByKey(failed.tenant(), key);
         if (same.isPresent()) {
-            if (!same.get().requestFingerprint().equals(request.fingerprint())) {
-                throw new IdempotencyKeyReusedException(same.get().id());
-            }
+            requireSameStart(same.get(), request);
             return new StartResult(same.get(), false);
         }
         if (store.liveRetryOf(failed.tenant(), failed.id()).isPresent()) {
@@ -154,14 +152,19 @@ public class InstanceService {
         }
     }
 
+    /** The tenant-wide key must never release another owner's existing instance. */
+    private static void requireSameStart(InstanceRecord existing, StartRequest request) {
+        if (!existing.owner().equals(request.owner()) || !existing.requestFingerprint().equals(request.fingerprint())) {
+            throw new IdempotencyKeyReusedException(existing.id());
+        }
+    }
+
     private StartResult startAs(StartRequest request, String reason, Subject actor,
                                 InstanceStore.InsertHook onCreate) {
         if (checkpoints != null && !checkpoints.status().healthy()) {
             Optional<InstanceRecord> same = store.findByKey(request.tenant(), request.idempotencyKey());
             if (same.isPresent()) {
-                if (!same.get().requestFingerprint().equals(request.fingerprint())) {
-                    throw new IdempotencyKeyReusedException(same.get().id());
-                }
+                requireSameStart(same.get(), request);
                 return new StartResult(same.get(), false);
             }
             checkpoints.requireAvailable();
@@ -173,9 +176,7 @@ public class InstanceService {
         InstanceStore.Insertion insertion = store.insertIfAbsent(candidate, reason, actor, onCreate);
         InstanceRecord row = insertion.record();
         if (!insertion.created()) {
-            if (!row.requestFingerprint().equals(request.fingerprint())) {
-                throw new IdempotencyKeyReusedException(row.id());
-            }
+            requireSameStart(row, request);
             return new StartResult(row, false);
         }
         faults.hit(LifecycleFaults.AFTER_INSERT);

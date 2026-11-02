@@ -394,6 +394,7 @@ Deliverables:
 - Keep lifecycle history and version-scoped ownership in platform records; Flow JPA rows are execution state, not the sole source of truth
 
 Implementation status: **partial**.
+- Implemented: Lifecycle start and retry now require the original full owner as well as the request fingerprint when reusing a tenant-wide idempotency key, including while checkpoint storage is unavailable. A different owner receives a conflict without an instance ID; event-specific binding and delegated-grant replay identity remain open.
 - Implemented: WP-105a/b/c/d implement the registry, task state machines, outbox/projection, reconciler and operator APIs.
 - Implemented: Linked retry of FAILED instances and direct cancellation before engine preparation are implemented.
 - Implemented: Merged diagnostic90 exposes disabled-by-default actual engine snapshots and asynchronous dev-publish failure evidence. Actual postmerge99631cc passes1432 with verified archived reports; absent engine remains unknown and issue75 is not fixed by passing runs or diagnostics.

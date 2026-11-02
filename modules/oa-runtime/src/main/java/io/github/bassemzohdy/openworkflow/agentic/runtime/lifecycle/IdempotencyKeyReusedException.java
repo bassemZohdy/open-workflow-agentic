@@ -3,7 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 
 /**
- * The idempotency key was used before for a different request (another definition, version or input). The first
+ * The idempotency key was used before for a different request (another owner, definition, version or input). The first
  * request's instance is not changed.
  */
 public final class IdempotencyKeyReusedException extends RuntimeException {
