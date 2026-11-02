@@ -70,6 +70,39 @@ class InstanceLifetimePinTest {
     private StartRequest request() {
         return new StartRequest("tenant-" + UUID.randomUUID(), owner, definition, Map.of(), "key");
     }
+    @Test void cancelledDuringRecoveryPreparationDiscardsTheUnregisteredEngineInstance() {
+        for (int discardOutcome = 0; discardOutcome < 3; discardOutcome++) {
+            var request = request();
+            var initial = InstanceRecord.starting(UlidGenerator.shared().next(), request, start);
+            store.insertIfAbsent(initial, "test.start");
+            var starts = new AtomicInteger(); var discards = new AtomicInteger();
+            final int outcome = discardOutcome;
+            WorkflowEngine engine = new WorkflowEngine() {
+                public boolean hasDefinition(DefinitionRef ignored) { return true; }
+                public EngineLaunch prepare(DefinitionRef ignored, Map<String, Object> input) {
+                    store.replace(initial.successor(start, InstanceStatus.CANCELLED, null, 0, null, null),
+                            initial.version(), "test.cancel", owner);
+                    return new EngineLaunch() {
+                        public String engineInstanceId() { return "unregistered-engine"; }
+                        public void start() { starts.incrementAndGet(); }
+                        public boolean discard() {
+                            discards.incrementAndGet();
+                            if (outcome == 2) throw new IllegalStateException("discard unavailable");
+                            return outcome == 0;
+                        }
+                    };
+                }
+            };
+            var config = settings(Optional.empty());
+            var sync = new EngineStatusSync(store, scan, config, Clock.fixed(start, ZoneOffset.UTC));
+            var reconciler = new Reconciler(store, engine, sync, scan, new RepairStore(db), config, db,
+                    Clock.fixed(start, ZoneOffset.UTC), request.tenant()::equals);
+            reconciler.recover(request.tenant(), initial.id().value());
+            assertEquals(InstanceStatus.CANCELLED, store.find(request.tenant(), initial.id()).orElseThrow().status());
+            assertEquals(0, starts.get());
+            assertEquals(1, discards.get());
+        }
+    }
     @Test void startPinsOnceAndAChangedSettingCannotExtendIt() throws Exception {
         var engine = new Engine(); var request = request();
         var first = service(engine, Optional.of(Duration.ofMinutes(10))).start(request);
