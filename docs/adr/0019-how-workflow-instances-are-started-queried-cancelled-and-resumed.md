@@ -35,7 +35,7 @@ The request returns `202 Accepted` with the instance id. It does not wait for th
 
 **Retries.** The Flow HTTP client default of three retries is set to zero in configuration, so the only retry is the OWS `retry` policy in the definition. This is our rule, not an engine guarantee: a definition may use the OWS retry only for a call whose effect is recorded in the effect ledger with an idempotency key (WP-108). A definition review checks this rule; the engine does not enforce it.
 
-**Deadlines.** The absolute deadline of a wait is stored on the registry row when the wait starts. The reconciler enforces it, because a restored engine timer restarts from resume (Q03). The engine's own timeout remains as a second guard. When the deadline has passed and the engine holds the instance, the cancel request is recorded on the row first, so that the engine's cancelled report finds it; then the engine instance is cancelled. If the engine holds no instance, the row becomes `FAILED`.
+**Deadlines.** The absolute deadline of a wait is stored on the registry row when the wait starts. The reconciler enforces it, because a restored engine timer restarts from resume (Q03). The engine's own timeout remains as a second guard. When the deadline has passed and the engine holds the instance, the cancel request is recorded on the row first, so that the engine's cancelled report finds it; then the engine instance is cancelled. In the default single-replica mode, if the engine holds no instance, the row becomes `FAILED`. In the opt-in coordinated multi-replica mode, absence from one engine is not a global result: a recorded engine id stays `CANCEL_REQUESTED` until an engine reports its outcome. See the rollout limitations in `docs/lifecycle.md`.
 
 **Events.** Events for `listen` are stored by our inbox before any listener is registered (WP-107). The engine's in-memory event registration is used only to wake a listener that is already waiting.
 
@@ -68,3 +68,9 @@ The owner decided the five points below on 2026-10-19. The Decision text above n
 5. **Missed wait deadline.** Was: the reconciler enforces the deadline, without a rule for the engine's state. Now: the cancel request is recorded on the row before the engine instance is cancelled, and the row becomes `FAILED` if the engine holds nothing. Status: accepted as implemented. The implementation is in the WP-105c reconciler (merged in PR #20).
 
 Items 3 and 4 are implemented. No other part of this ADR is changed by the owner's decisions.
+
+## Multi-replica implementation extension
+
+The original missed-deadline decision remains the default. The optional multi-replica setting adds an explicit
+unconfirmed-outcome state when an engine id is absent locally, because a different replica may hold that instance.
+It does not establish a distributed lease or prove failover; the rollout and verification gates remain open.

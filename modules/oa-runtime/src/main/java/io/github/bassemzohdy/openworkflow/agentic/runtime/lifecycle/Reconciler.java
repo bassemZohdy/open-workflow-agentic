@@ -333,6 +333,11 @@ public class Reconciler {
                 adopt(row, view.get());
                 return;
             }
+            if (settings.multiReplica) {
+                // An absent local view does not establish whether another replica accepted the recorded start.
+                auditOnce("start", row.id().value(), "unconfirmed", "engine instance is not local", now);
+                return;
+            }
         }
         if (row.startAttempts() >= settings.startMaxAttempts) {
             fail(row, now, "start.exhausted");
@@ -527,6 +532,14 @@ public class Reconciler {
                                String detail) {
         String engineId = row.engineInstanceId();
         if (engineId == null || engine.activeInstance(row.definition(), engineId).isEmpty()) {
+            if (engineId != null && settings.multiReplica) {
+                // A different replica may still own this engine instance. Preserve the cancellation request
+                // until that owner (or a later restore) can report its actual outcome.
+                store.replace(row.successor(now, InstanceStatus.CANCEL_REQUESTED, engineId, row.startAttempts(),
+                        row.lastError(), null), row.version(), cancelReason, InstanceService.RUNTIME_ACTOR);
+                repairs.record(kind, row.id().value(), "awaiting-owner", detail + "; instance is not local");
+                return;
+            }
             store.replace(row.successor(now, InstanceStatus.FAILED, engineId, row.startAttempts(), row.lastError(), null),
                     row.version(), noEngineReason, InstanceService.RUNTIME_ACTOR);
             repairs.record(kind, row.id().value(), "failed", detail + " and the engine holds no instance");

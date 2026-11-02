@@ -40,6 +40,8 @@ public class LifecycleSettings {
     public final Optional<Duration> maxLifetime;
     /** Enable only after all start writers use the shared advisory lock. */
     public final boolean startingLifetimeEnabled;
+    /** In a coordinated multi-replica deployment, a missing local engine view is not a global outcome. */
+    public final boolean multiReplica;
     public final Optional<String> crashAt;
 
     /** Without a maximum lifetime. */
@@ -59,6 +61,15 @@ public class LifecycleSettings {
                 cancelReissueAfter, waitDeadline, batchSize, crashAt, maxLifetime, false);
     }
 
+    /** Preserve the existing single-replica behavior for explicitly constructed settings. */
+    public LifecycleSettings(
+            boolean reconcilerEnabled, Duration interval, Duration warmupTimeout, Duration startStaleAfter,
+            int startMaxAttempts, Duration startBackoffBase, Duration cancelReissueAfter, Duration waitDeadline,
+            int batchSize, Optional<String> crashAt, Optional<Duration> maxLifetime, boolean startingLifetimeEnabled) {
+        this(reconcilerEnabled, interval, warmupTimeout, startStaleAfter, startMaxAttempts, startBackoffBase,
+                cancelReissueAfter, waitDeadline, batchSize, crashAt, maxLifetime, startingLifetimeEnabled, false);
+    }
+
     /** For the container. Keys are the ones in docs/lifecycle.md. */
     @Inject
     public LifecycleSettings(
@@ -73,9 +84,11 @@ public class LifecycleSettings {
             @ConfigProperty(name = "agentic.reconciler.batch-size", defaultValue = "100") int batchSize,
             @ConfigProperty(name = "agentic.dev.fault.crash-at") Optional<String> crashAt,
             @ConfigProperty(name = "agentic.reconciler.max-lifetime") Optional<Duration> maxLifetime,
-            @ConfigProperty(name = "agentic.reconciler.starting-lifetime-enabled", defaultValue = "false") boolean startingLifetimeEnabled) {
+            @ConfigProperty(name = "agentic.reconciler.starting-lifetime-enabled", defaultValue = "false") boolean startingLifetimeEnabled,
+            @ConfigProperty(name = "agentic.reconciler.multi-replica", defaultValue = "false") boolean multiReplica) {
         this.reconcilerEnabled = reconcilerEnabled;
         this.startingLifetimeEnabled = startingLifetimeEnabled;
+        this.multiReplica = multiReplica;
         this.interval = positive("agentic.reconciler.interval", interval);
         this.warmupTimeout = positive("agentic.reconciler.warmup-timeout", warmupTimeout);
         this.startStaleAfter = positive("agentic.reconciler.start-stale-after", startStaleAfter);
