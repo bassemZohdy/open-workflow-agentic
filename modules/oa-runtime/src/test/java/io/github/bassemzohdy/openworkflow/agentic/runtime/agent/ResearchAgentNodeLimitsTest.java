@@ -108,13 +108,14 @@ class ResearchAgentNodeLimitsTest {
         var provider = new CountingProvider();
         var approved = contextWith(10);
         String thread = "node-limits-legacy-" + UUID.randomUUID();
-        var legacy = agent(ds, provider, approved, new NodeAudit());
-        legacy.approvedContext = NONE; // Model context remains approved; model a checkpoint from before budget support.
-        legacy.run(thread, "topic");
-        assertEquals(3, provider.calls.get());
+        var saver = org.bsc.langgraph4j.checkpoint.PostgresSaver.builder().datasource(ds).createTables(false)
+                .stateSerializer(new org.bsc.langgraph4j.serializer.std.ObjectStreamStateSerializer<>(ResearchState::new)).build();
+        saver.put(org.bsc.langgraph4j.RunnableConfig.builder().threadId(thread).build(),
+                org.bsc.langgraph4j.checkpoint.Checkpoint.builder().state(java.util.Map.of(ResearchState.TOPIC, "topic"))
+                        .nodeId("plan").nextNodeId("draft").build());
         var upgraded = agent(ds, provider, approved, new NodeAudit());
         assertThrows(NodeRefused.class, () -> upgraded.run(thread, "topic"));
-        assertEquals(3, provider.calls.get(), "legacy checkpoint must not receive a new budget");
+        assertEquals(0, provider.calls.get(), "legacy checkpoint must not receive a new budget");
     }
 
     @Test void eachRunGetsItsOwnInterceptorSoARunIsNeverChargedForAnotherRunsSteps() throws Exception {
@@ -158,7 +159,7 @@ class ResearchAgentNodeLimitsTest {
         assertEquals("agent.node.refused", nodeAudit.actions().getLast());
     }
 
-    @Test void withoutAnApprovedContextTheGraphStaysUnwrappedAndTheModelCallStillRefuses() throws Exception {
+    @Test void withoutAnApprovedContextTheGraphRefusesBeforeRunning() throws Exception {
         DataSource ds = AgentTestDatabase.dataSource();
         var provider = new CountingProvider();
         var nodeAudit = new NodeAudit();
@@ -168,5 +169,42 @@ class ResearchAgentNodeLimitsTest {
 
         assertEquals(0, provider.calls.get());
         assertTrue(nodeAudit.events.isEmpty(), "no interceptor without an approved task to take limits from");
+    }
+
+    @Test void approvalAppearingAfterEntryCannotStartAnUnbudgetedGraph() throws Exception {
+        DataSource ds = AgentTestDatabase.dataSource();
+        var provider = new CountingProvider();
+        var reads = new java.util.concurrent.atomic.AtomicInteger();
+        var approved = contextWith(10).current().orElseThrow();
+        ApprovedModelContext context = () -> reads.incrementAndGet() == 1 ? Optional.empty() : Optional.of(approved);
+        var candidate = agent(ds, provider, context, new NodeAudit());
+        assertThrows(ModelCallRefused.class, () -> candidate.run("late-approval-" + UUID.randomUUID(), "topic"));
+        assertEquals(1, reads.get());
+        assertEquals(0, provider.calls.get());
+    }
+
+    @Test void absentNodeAuditCannotStartAnUnbudgetedGraph() throws Exception {
+        DataSource ds = AgentTestDatabase.dataSource();
+        var provider = new CountingProvider();
+        var candidate = agent(ds, provider, contextWith(10), new NodeAudit());
+        candidate.audit = null;
+        assertThrows(ModelCallRefused.class, () -> candidate.run("missing-audit-" + UUID.randomUUID(), "topic"));
+        assertEquals(0, provider.calls.get());
+    }
+
+    @Test void aDifferentApprovalCannotBorrowTheOriginalTasksNodeBudget() throws Exception {
+        DataSource ds = AgentTestDatabase.dataSource();
+        var provider = new CountingProvider();
+        var original = contextWith(10).current().orElseThrow();
+        var replacement = contextWith(10).current().orElseThrow();
+        var current = new AtomicReference<>(original);
+        ApprovedModelContext context = () -> Optional.ofNullable(current.get());
+        var candidate = agent(ds, provider, context, new NodeAudit());
+        candidate.audit = event -> current.set(replacement);
+        String thread = "changed-task-" + UUID.randomUUID();
+        candidate.nodeBudget.registerNew(thread, original.agent(), original.task());
+
+        assertThrows(Exception.class, () -> candidate.run(thread, "topic"));
+        assertEquals(0, provider.calls.get(), "the replacement approval cannot use another task's budget");
     }
 }
