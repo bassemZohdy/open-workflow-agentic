@@ -77,7 +77,7 @@ public class DurableEffects {
         Reply result;
         if (!prepared.attempted()) {
             ledger.markAttempted(command.key()); // This commit MUST succeed before dispatch.
-            result = dispatch(target, command.key());
+            result = dispatch(target, command.key(), null);
         } else {
             result = lookup(target, command.key());
             Instant now = clock.instant();
@@ -85,7 +85,7 @@ public class DurableEffects {
             if (result.outcome() == EffectTarget.Outcome.UNKNOWN && prepared.replayUntil() != null
                     && now.isBefore(prepared.replayUntil()) && !window.isZero()
                     && now.isBefore(prepared.createdAt().plus(window))) {
-                result = dispatch(target, command.key());
+                result = dispatch(target, command.key(), prepared);
             }
         }
         if (result.outcome() == EffectTarget.Outcome.UNKNOWN) {
@@ -168,9 +168,18 @@ public class DurableEffects {
         if(Thread.currentThread().isInterrupted()) throw new CancellationException("effect caller interrupted");
     }
 
-    private Reply dispatch(EffectTarget target, EffectKey key) {
+    private Reply dispatch(EffectTarget target, EffectKey key, JdbcEffectLedger.Prepared replay) {
         return telemetry.target(EffectTelemetry.Operation.DISPATCH,()->{
             requireNotInterrupted(); // After blocking intent/attempt writes and telemetry setup, immediately before target I/O.
+            if (replay != null) {
+                // Setup may block and an adapter may withdraw or shorten its guarantee after the earlier lookup.
+                Duration currentWindow = Objects.requireNonNull(target.replayWindow(), "replayWindow");
+                requireNotInterrupted();
+                Instant now = clock.instant();
+                if (currentWindow.isZero() || currentWindow.isNegative() || !now.isBefore(replay.replayUntil())
+                        || !now.isBefore(replay.createdAt().plus(currentWindow)))
+                    return new Reply(EffectTarget.Outcome.UNKNOWN, null);
+            }
             try { return Objects.requireNonNull(target.execute(key.idempotencyKey()), "target reply"); }
             catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);

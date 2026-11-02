@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectTelemetry;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.JdbcEffectLedger;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException;
 import io.quarkus.test.junit.QuarkusTest;
@@ -84,6 +85,76 @@ class DurableEffectsTest {
             assertEquals(EffectState.INTENDED, later.execute(command, target).state());
             assertEquals(1, target.calls.get()); assertEquals(1, ledger.manualQueue(command.key().threadId(), 10).size());
         }
+    }
+
+    @Test
+    void replayIsWithheldWhenRetentionExpiresDuringDispatchTelemetry() {
+        for (int scenario = 0; scenario < 3; scenario++) {
+            boolean persistedLimit = scenario == 0;
+            boolean withdrawn = scenario == 2;
+            EffectCommand command = JdbcEffectLedgerTest.command("replay-telemetry-expiry");
+            Instant created = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+            Duration retained = persistedLimit ? Duration.ofMinutes(1) : Duration.ofHours(1);
+            Target target = new Target();
+            target.window = persistedLimit ? Duration.ofHours(1) : Duration.ofMinutes(1);
+            var prepared = ledger.prepare(command, retained, created);
+            Instant boundary = persistedLimit ? prepared.replayUntil() : prepared.createdAt().plusSeconds(60);
+            ledger.markAttempted(command.key());
+            var current = new java.util.concurrent.atomic.AtomicReference<>(created);
+            Clock clock = new Clock() {
+                @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+                @Override public Clock withZone(ZoneId zone) { return this; }
+                @Override public Instant instant() { return current.get(); }
+            };
+            var telemetry = new EffectTelemetry(io.opentelemetry.api.OpenTelemetry.noop()) {
+                @Override public EffectTarget.Reply target(Operation operation,
+                        java.util.function.Supplier<EffectTarget.Reply> work) {
+                    if (operation == Operation.DISPATCH) {
+                        if (withdrawn) target.window = Duration.ZERO;
+                        else current.set(boundary);
+                    }
+                    return super.target(operation, work);
+                }
+            };
+
+            Effect result = new DurableEffects(ledger, clock, telemetry).execute(command, target);
+
+            assertEquals(EffectState.INTENDED, result.state());
+            assertEquals(0, target.calls.get(), "replay must not begin after expiry or withdrawal");
+            assertEquals(1, ledger.manualQueue(command.key().threadId(), 10).size());
+        }
+    }
+
+    @Test
+    void compensationReplayIsWithheldWhenRetentionExpiresDuringDispatchTelemetry() {
+        EffectCommand original = JdbcEffectLedgerTest.command("replay-compensate-original");
+        Target target = new Target();
+        assertEquals(EffectState.CONFIRMED, effects.execute(original, target).state());
+        EffectCommand undo = EffectCommand.of(original.key().threadId(), "undo", "1", target.target(), "refund=10");
+        Instant created = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        target.window = Duration.ofMinutes(1);
+        var prepared = ledger.prepareCompensation(original.key(), undo, target.window, created);
+        ledger.markAttempted(undo.key());
+        var current = new java.util.concurrent.atomic.AtomicReference<>(created);
+        Clock clock = new Clock() {
+            @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+            @Override public Clock withZone(ZoneId zone) { return this; }
+            @Override public Instant instant() { return current.get(); }
+        };
+        var telemetry = new EffectTelemetry(io.opentelemetry.api.OpenTelemetry.noop()) {
+            @Override public EffectTarget.Reply target(Operation operation,
+                    java.util.function.Supplier<EffectTarget.Reply> work) {
+                if (operation == Operation.DISPATCH) current.set(prepared.replayUntil());
+                return super.target(operation, work);
+            }
+        };
+
+        Effect result = new DurableEffects(ledger, clock, telemetry).compensate(original.key(), undo, target);
+
+        assertEquals(EffectState.CONFIRMED, result.state(), "unknown compensation must not mark original undone");
+        assertEquals(EffectState.INTENDED, ledger.find(undo.key()).orElseThrow().state());
+        assertEquals(1, target.calls.get(), "only the original effect was sent");
+        assertFalse(ledger.manualQueue(original.key().threadId(), 10).isEmpty());
     }
 
     @Test
