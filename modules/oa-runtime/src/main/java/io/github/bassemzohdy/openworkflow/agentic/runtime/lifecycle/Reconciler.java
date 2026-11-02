@@ -107,6 +107,7 @@ public class Reconciler {
     private final Clock clock;
     private final Predicate<String> tenantScope;
     private RegistryScan.DeadlineRef lifetimeCursor;
+    private RegistryScan.DeadlineRef waitCursor;
     private final ResumeGate gate;
     private final RestoreCheckpointGate checkpoints;
     private final ScheduledExecutorService executor;
@@ -409,11 +410,28 @@ public class Reconciler {
 
     // ---- (vi) waits whose stored deadline has passed --------------------------------------------------------------
 
-    private void deadlinesPassed(ReconcileReport report, Instant now) {
-        for (RegistryScan.Ref ref : scan.waitsPastDeadline(now, settings.batchSize)) {
-            if (!tenantScope.test(ref.tenant())) {
-                continue;
+    private synchronized void deadlinesPassed(ReconcileReport report, Instant now) {
+        var selected = new ArrayList<RegistryScan.Ref>();
+        var start = waitCursor;
+        boolean wrapped = waitCursor == null;
+        while (selected.size() < settings.batchSize) {
+            var page = scan.waitDeadlinePage(now, settings.batchSize, waitCursor, wrapped ? start : null);
+            if (page.isEmpty()) {
+                if (waitCursor != null && !wrapped) { waitCursor = null; wrapped = true; continue; }
+                waitCursor = null;
+                break;
             }
+            for (var ref : page) {
+                waitCursor = ref;
+                if (tenantScope.test(ref.tenant())) selected.add(ref.ref());
+                if (selected.size() == settings.batchSize) break;
+            }
+            if (page.size() < settings.batchSize && selected.size() < settings.batchSize) {
+                if (wrapped) { waitCursor = null; break; }
+                waitCursor = null; wrapped = true;
+            }
+        }
+        for (var ref : selected) {
             report.bump(withInstance(ref.id(), () -> repairDeadline(ref, now)) ? "deadline.examined" : "busy");
         }
     }

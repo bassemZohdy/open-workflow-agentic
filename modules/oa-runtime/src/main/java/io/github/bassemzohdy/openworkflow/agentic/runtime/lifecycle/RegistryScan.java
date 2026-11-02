@@ -79,6 +79,20 @@ public class RegistryScan {
         }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
     }
 
+    List<DeadlineRef> waitDeadlinePage(Instant now, int limit, DeadlineRef after, DeadlineRef through) {
+        String lower = after == null ? "" : " and (wait_deadline, id) > (?, ?)";
+        String upper = through == null ? "" : " and (wait_deadline, id) <= (?, ?)";
+        return query("""
+                select id, tenant, wait_deadline from task.instance
+                 where status = 'WAITING' and wait_deadline is not null and wait_deadline < ?
+                """ + lower + upper + " order by wait_deadline, id limit ?", statement -> {
+            int i = 1; statement.setTimestamp(i++, Timestamp.from(now));
+            if (after != null) { statement.setTimestamp(i++, Timestamp.from(after.deadline())); statement.setString(i++, after.id()); }
+            if (through != null) { statement.setTimestamp(i++, Timestamp.from(through.deadline())); statement.setString(i++, through.id()); }
+            statement.setInt(i, limit);
+        }, rs -> new DeadlineRef(rs.getString("id"), rs.getString("tenant"), rs.getTimestamp("wait_deadline").toInstant()));
+    }
+
     /** Expired original pins or an expired stricter current setting, earliest effective deadline first. */
     public List<Ref> livePastLifetime(Instant now, Optional<Instant> currentCutoff, int limit) {
         return livePastLifetime(now, currentCutoff, limit, false);
