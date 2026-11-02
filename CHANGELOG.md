@@ -1,5 +1,7 @@
 # Changelog
 
+- Harden the isolated human-decision schema proposal with task-version, immutable-history and deferred decision/audit/wakeup consistency checks; real workflow authority and delivery remain open.
+
 - Prove same-decision recovery after a simulated lost commit reply in the isolated human journal; changed retained audit metadata fails closed. Actual process restart and workflow delivery remain open.
 
 - Extend the isolated human-decision journal proposal to append its non-sensitive audit event in the same database transaction and keep workflow wakeup blocked. Audit failure rolls back the decision; production authority, schema and delivery remain open.

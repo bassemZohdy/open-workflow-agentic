@@ -157,7 +157,8 @@ class HumanDecisionJournalTest {
     }
 
     @Test void reassignmentVersionChangeAndExpiryAreRefused() throws Exception {
-        for (String change : new String[] {"assignee_id='bob'", "version=1", "due_at='2026-10-19T10:00:00Z'"}) {
+        for (String change : new String[] {"assignee_id='bob',version=version+1", "version=1",
+                "due_at='2026-10-19T10:00:00Z',version=version+1"}) {
             var f = fixture("bob", "NONE");
             try (var c = owned.getConnection(); var q = c.prepareStatement("update human_proposal.task set " + change
                     + " where tenant=? and task_id=?")) {
@@ -206,8 +207,11 @@ class HumanDecisionJournalTest {
     @Test void missingPendingStateIsNotMistakenForASuccessfulReplay() throws Exception {
         var f = fixture("bob", "NONE");
         record(f, f.decision(), "wait");
-        try (var c = owned.getConnection(); var q = c.prepareStatement("delete from human_proposal.pending where tenant=? and decision_id=?")) {
-            q.setString(1, "tenant"); q.setString(2, f.decision().id().value()); q.executeUpdate();
+        try (var c = owned.getConnection(); var s = c.createStatement()) {
+            s.execute("alter table human_proposal.pending disable trigger human_pending_no_change");
+            try (var q = c.prepareStatement("delete from human_proposal.pending where tenant=? and decision_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.decision().id().value()); q.executeUpdate();
+            } finally { s.execute("alter table human_proposal.pending enable trigger human_pending_no_change"); }
         }
         assertThrows(HumanDecisionJournal.Conflict.class, () -> record(f, f.decision(), "wait"));
     }
@@ -215,9 +219,15 @@ class HumanDecisionJournalTest {
     @Test void changedRetainedWaitCannotReplayTheOldDecision() throws Exception {
         var f = fixture("bob", "NONE");
         record(f, f.decision(), "wait");
-        try (var c = owned.getConnection(); var q = c.prepareStatement("update human_proposal.task set wait_key='other' "
-                + "where tenant=? and task_id=?")) {
-            q.setString(1, "tenant"); q.setString(2, f.task().value()); q.executeUpdate();
+        try (var c = owned.getConnection(); var s = c.createStatement()) {
+            s.execute("alter table human_proposal.task disable trigger human_task_guard");
+            s.execute("alter table human_proposal.task disable trigger human_task_complete");
+            try (var q = c.prepareStatement("update human_proposal.task set wait_key='other' where tenant=? and task_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.task().value()); q.executeUpdate();
+            } finally {
+                s.execute("alter table human_proposal.task enable trigger human_task_complete");
+                s.execute("alter table human_proposal.task enable trigger human_task_guard");
+            }
         }
         assertThrows(HumanDecisionJournal.Conflict.class, () -> record(f, f.decision(), "wait"));
     }
@@ -225,9 +235,12 @@ class HumanDecisionJournalTest {
     @Test void changedRetainedAuditTimeCannotReplayTheOldDecision() throws Exception {
         var f = fixture("bob", "NONE");
         record(f, f.decision(), "wait");
-        try (var c = owned.getConnection(); var q = c.prepareStatement("update human_proposal.pending "
-                + "set audit_occurred_at=audit_occurred_at + interval '1 second' where tenant=? and decision_id=?")) {
-            q.setString(1, "tenant"); q.setString(2, f.decision().id().value()); q.executeUpdate();
+        try (var c = owned.getConnection(); var s = c.createStatement()) {
+            s.execute("alter table human_proposal.pending disable trigger human_pending_no_change");
+            try (var q = c.prepareStatement("update human_proposal.pending "
+                    + "set audit_occurred_at=audit_occurred_at + interval '1 second' where tenant=? and decision_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.decision().id().value()); q.executeUpdate();
+            } finally { s.execute("alter table human_proposal.pending enable trigger human_pending_no_change"); }
         }
         assertThrows(HumanDecisionJournal.Conflict.class, () -> record(f, f.decision(), "wait"));
     }
@@ -237,5 +250,37 @@ class HumanDecisionJournalTest {
             q.setString(1, f.decision().id().value());
             try (var r = q.executeQuery()) { r.next(); return r.getLong(1); }
         }
+    }
+
+    @Test void databaseRejectsUnversionedChangesAndCompletedTaskWithoutDecision() throws Exception {
+        var f = fixture("bob", "NONE");
+        try (var c = owned.getConnection()) {
+            try (var q = c.prepareStatement("update human_proposal.task set assignee_id='bob' where tenant=? and task_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.task().value());
+                assertThrows(SQLException.class, q::executeUpdate);
+            }
+            try (var q = c.prepareStatement("update human_proposal.task set status='COMPLETED',version=version+1 "
+                    + "where tenant=? and task_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.task().value());
+                assertThrows(SQLException.class, q::executeUpdate);
+            }
+        }
+        assertEquals(HumanDecisionJournal.Result.RECORDED, record(f, f.decision(), "wait"));
+    }
+
+    @Test void committedDecisionAndPendingRowsCannotBeRewritten() throws Exception {
+        var f = fixture("bob", "NONE");
+        record(f, f.decision(), "wait");
+        try (var c = owned.getConnection()) {
+            try (var q = c.prepareStatement("update human_proposal.decision set content='changed' where tenant=? and decision_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.decision().id().value());
+                assertThrows(SQLException.class, q::executeUpdate);
+            }
+            try (var q = c.prepareStatement("delete from human_proposal.pending where tenant=? and decision_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.decision().id().value());
+                assertThrows(SQLException.class, q::executeUpdate);
+            }
+        }
+        assertEquals(HumanDecisionJournal.Result.REPLAYED, record(f, f.decision(), "wait"));
     }
 }
