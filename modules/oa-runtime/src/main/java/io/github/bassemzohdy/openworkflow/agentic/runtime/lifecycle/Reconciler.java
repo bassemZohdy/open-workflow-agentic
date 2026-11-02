@@ -126,6 +126,13 @@ public class Reconciler {
                 checkpoints, Objects.requireNonNull(coordinationBudget, "coordinationBudget"));
     }
 
+    /** Existing explicit callers can provide a shared budget via the full constructor. */
+    public Reconciler(InstanceStore store, WorkflowEngine engine, EngineStatusSync sync, RegistryScan scan,
+                      RepairStore repairs, LifecycleSettings settings, DataSource dataSource, ResumeGate gate,
+                      RestoreCheckpointGate checkpoints) {
+        this(store, engine, sync, scan, repairs, settings, dataSource, Clock.systemUTC(), tenant -> true, gate, checkpoints);
+    }
+
     public Reconciler(InstanceStore store,WorkflowEngine engine,EngineStatusSync sync,RegistryScan scan,
                       RepairStore repairs,LifecycleSettings settings,DataSource dataSource,ResumeGate gate) {
         this(store,engine,sync,scan,repairs,settings,dataSource,Clock.systemUTC(),tenant->true,gate,RestoreCheckpointGate.ALLOW);
