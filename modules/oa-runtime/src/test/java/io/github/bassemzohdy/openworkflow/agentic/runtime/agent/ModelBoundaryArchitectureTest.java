@@ -32,6 +32,19 @@ class ModelBoundaryArchitectureTest {
     }
 
     @Test
+    void boundedAndReservedTransportsAreAlsoConfinedToTheGovernedClient() {
+        JavaClasses classes = new ClassFileImporter()
+                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages(ROOT);
+        var bounded = noClasses().that().doNotHaveFullyQualifiedName(GovernedLlmClient.class.getName())
+                .should().callMethod(LlmClient.class, "complete", String.class, String.class, int.class);
+        var reserved = noClasses().that().doNotHaveFullyQualifiedName(GovernedLlmClient.class.getName())
+                .should().callMethod(ReservedLlmClient.class, "completeReserved", String.class, int.class, java.time.Instant.class);
+        bounded.check(classes); reserved.check(classes);
+        Assertions.assertTrue(noClasses().should().callMethod(ReservedLlmClient.class, "completeReserved",
+                String.class, int.class, java.time.Instant.class).evaluate(classes).hasViolation());
+    }
+
+    @Test
     void theRuleSeesTheGovernedClientItselfCallingTheProvider() {
         // without the exemption the production call site is found, so the rule is looking at the right call
         JavaClasses classes = new ClassFileImporter()

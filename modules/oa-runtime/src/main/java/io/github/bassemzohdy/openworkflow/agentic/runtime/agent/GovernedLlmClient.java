@@ -1,6 +1,11 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.agent;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceModelCall;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ApprovedModelProfile;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ModelCall;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceModelCalls;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -34,6 +39,9 @@ public class GovernedLlmClient {
     @Inject
     ApprovedModelContext context;
 
+    // Explicit trusted composition only; the CDI/default path does not activate reservations.
+    private ResourceModelCalls reservations;
+
     public GovernedLlmClient() {
     }
 
@@ -41,6 +49,11 @@ public class GovernedLlmClient {
         this.provider = Objects.requireNonNull(provider, "provider");
         this.pep = Objects.requireNonNull(pep, "pep");
         this.context = Objects.requireNonNull(context, "context");
+    }
+
+    public GovernedLlmClient(LlmClient provider, Pep pep, ApprovedModelContext context, ResourceModelCalls reservations) {
+        this(provider, pep, context);
+        this.reservations = Objects.requireNonNull(reservations, "reservations");
     }
 
     /** Completes only after an audited ALLOW and matching approval; lost approval withholds a returned answer. */
@@ -178,4 +191,82 @@ public class GovernedLlmClient {
             return output;
         });
     }
+    /**
+     * Opt-in synchronous model consumer: a fresh durable reservation encloses the gateway's audited policy and one
+     * trusted deadline-enforcing transport attempt. The allocation, real node coordinates and private running handle
+     * come from trusted execution, not request fields. Reservation ceilings are held even after refusal or uncertainty;
+     * the returned string is not measured usage and is never evidence of a refund or approval for a retry.
+     */
+    public String completeReserved(JdbcResourceExecutionGate.Running control, AllocatedResourceTask allocation,
+                                   ResourceModelCall occurrence, ModelCall call) {
+        Objects.requireNonNull(control); Objects.requireNonNull(allocation); Objects.requireNonNull(occurrence);
+        Objects.requireNonNull(call);
+        if (reservations == null || !(provider instanceof ReservedLlmClient transport))
+            throw new ModelCallRefused("reserved model transport is unavailable");
+        var entry = occurrence.entry();
+        control.requireCurrent(entry, occurrence.executor());
+        var expected = ResourceModelCall.of(allocation, entry, occurrence.executor(), occurrence.nodeOccurrence(), call);
+        if (!expected.equals(occurrence)) throw new ModelCallRefused("model occurrence does not match the request");
+        var approved = context.current().orElse(null);
+        control.requireCurrent(entry, occurrence.executor());
+        var profile = allocation.allocation().modelProfile();
+        if (approved == null || !approved.agent().equals(profile.agent())
+                || !approved.task().equals(allocation.allocation().contract())
+                || !approved.modelId().equals(profile.modelId()) || approved.budgetRemainingMicros() == 0)
+            throw new ModelCallRefused("no matching model approval");
+        requireReservedTransport(transport, profile, call);
+        control.requireCurrent(entry, occurrence.executor());
+        requireSameApproval(approved);
+        control.requireCurrent(entry, occurrence.executor());
+        String result = reservations.invokeOnce(occurrence,
+                candidate -> control.requireCurrent(candidate, occurrence.executor()), reservation -> {
+                    if (!reservation.call().equals(occurrence) || !reservation.task().equals(allocation))
+                        throw new ModelCallRefused("model reservation differs from allocation");
+                    control.requireCurrent(entry, occurrence.executor());
+                    requireSameApproval(approved);
+                    control.requireCurrent(entry, occurrence.executor());
+                    requireReservedTransport(transport, profile, call);
+                    control.requireCurrent(entry, occurrence.executor());
+                    var decision = pep.modelCall(approved.agent(), approved.task(), approved.modelId(),
+                            reservation.protectedCallBudgetMicros());
+                    return Pep.guard(decision, () -> {
+                        control.requireCurrent(entry, occurrence.executor());
+                        requireSameApproval(approved);
+                        control.requireCurrent(entry, occurrence.executor());
+                        return () -> {
+                            control.requireCurrent(entry, occurrence.executor());
+                            requireSameApproval(approved);
+                            control.requireCurrent(entry, occurrence.executor());
+                            requireReservedTransport(transport, profile, call);
+                            control.requireCurrent(entry, occurrence.executor());
+                            requireSameApproval(approved);
+                            control.requireCurrent(entry, occurrence.executor());
+                            try { return transport.completeReserved(call.prompt(), call.maxOutputTokens(), reservation.callDeadline()); }
+                            catch (RuntimeException providerFailure) { throw new ProviderCallFailed(); }
+                        };
+                    });
+                });
+        control.requireCurrent(entry, occurrence.executor());
+        try { requireSameApproval(approved); }
+        catch (ModelCallRefused lost) { throw new ApprovalLostAfterCall(); }
+        control.requireCurrent(entry, occurrence.executor());
+        return result;
+    }
+
+    private void requireReservedTransport(ReservedLlmClient transport, ApprovedModelProfile profile, ModelCall call) {
+        requireProviderModel(profile.modelId());
+        final String actual;
+        final long ceiling;
+        try {
+            actual = transport.reservedConfigurationFingerprint();
+            ceiling = transport.maximumCostMicros(call.prompt(), call.maxOutputTokens());
+        } catch (RuntimeException unavailable) {
+            throw new ModelCallRefused("reserved transport configuration unavailable");
+        }
+        if (!profile.configurationFingerprint().equals(actual))
+            throw new ModelCallRefused("reserved transport configuration differs from approval");
+        if (ceiling < 0 || ceiling > profile.perCallCeilingMicros())
+            throw new ModelCallRefused("reserved transport price exceeds approval");
+    }
+
 }
