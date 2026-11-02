@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an explicitly composed, task-fenced targeted human-wake dispatcher.
+
 - Document and test restricted checkpoint-audit database grants.
 
 - Retain one audit identity across concurrent owned checkpoint acknowledgements, crashes and recovery.

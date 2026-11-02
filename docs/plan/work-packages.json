@@ -792,7 +792,8 @@
           "Checkpoint-recovery acknowledgement and its audit now commit in the same local PostgreSQL transaction, after rechecking the pinned receipt while holding the registry and delivery rows. A worker crash after the audit insert but before acknowledgement rolls back both; retry commits one audit and acknowledgement. Concurrent recovery and audit-failure rollback are tested. This does not establish remote audit delivery, a full application restart, production human dispatch or full acceptance.",
           "A test-only Quarkus application process halts immediately after the actual human-wake JPA checkpoint and receipt commit; a separate application process reads the retained state, repairs its acknowledgement and resumes after the listen without redelivery. PostgreSQL and the test parent stay alive, and the human decision, policy and callback remain fixtures. Production dispatch, authorized replay and full T02 remain open.",
           "Owned checkpoint acknowledgement and checkpoint recovery share an immutable per-checkpoint audit source (V77.7), retaining the original audit id and time. Idempotent append validates the source, event hash and recorded head under a source lock; concurrent owned attempts, a race with recovery and a lost audit reply reuse one event. A separate process halts after the owned audit commit and before acknowledgement, and recovery reuses the same event. Legacy claim-based JdbcInboxDispatch acknowledgement remains separate; production grant configuration, external audit delivery and full T02/T13 remain open.",
-          "An additive checkpoint-audit grant template is exercised by a fresh restricted PostgreSQL runtime role: missing grants refuse acknowledgement, the template enables actual checkpoint acknowledgement and retry, and update/delete/truncate on the retained audit source are denied. Existing registry and inbox grants are test prerequisites; deployed effective roles and datasource wiring remain unverified."
+          "An additive checkpoint-audit grant template is exercised by a fresh restricted PostgreSQL runtime role: missing grants refuse acknowledgement, the template enables actual checkpoint acknowledgement and retry, and update/delete/truncate on the retained audit source are denied. Existing registry and inbox grants are test prerequisites; deployed effective roles and datasource wiring remain unverified.",
+          "An explicitly composed isolated-schema human wake dispatcher checks the exact live SDK registration and predicate, stages the retained decision, obtains a task-owned audited reservation, installs the checkpoint marker and rechecks the lease before a targeted callback. Actual SDK/JPA tests cover another instance, concurrent calls and claim loss during audit. It is not wired to production, does not authenticate or approve a caller, and callback return is not checkpoint proof; production policy, listener capture, recovery and T02 remain open."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -810,7 +811,8 @@
           "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/HumanWakeSdkBehaviorTest.java",
           "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java",
           "docs/handoffs/gpt/WP-106-checkpoint-process-recovery.md",
-          "deploy/checkpoint-audit-roles.md"
+          "deploy/checkpoint-audit-roles.md",
+          "docs/handoffs/gpt/WP-106-targeted-human-dispatch.md"
         ]
       }
     },
