@@ -33,14 +33,20 @@ public class LangChain4jLlmClient implements LlmClient {
     Duration timeout;
 
     private ChatModel model;
+    private String pinnedModelId;
 
     @PostConstruct
     void build() {
+        String configured = java.util.Objects.requireNonNull(modelName, "modelName");
         this.model = OpenAiChatModel.builder()
-                .baseUrl(baseUrl).apiKey(apiKey).modelName(modelName)
+                .baseUrl(baseUrl).apiKey(apiKey).modelName(configured)
                 .timeout(timeout).maxRetries(0)
                 .build();
+        this.pinnedModelId = configured;
     }
+
+    @Override
+    public String configuredModelId() { return pinnedModelId; }
 
     @Override
     public String complete(String system, String user) {

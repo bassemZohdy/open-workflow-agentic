@@ -115,6 +115,9 @@ class GovernedModelRunningControlTest {
     static final class Provider implements LlmClient {
         final AtomicInteger calls = new AtomicInteger();
         volatile Runnable during = () -> { };
+        volatile String model = "fixture-model";
+
+        @Override public String configuredModelId() { return model; }
 
         @Override
         public String complete(String system, String user) {
@@ -252,6 +255,18 @@ class GovernedModelRunningControlTest {
         assertEquals(1, rig.provider.calls.get(), "exactly one provider call");
         assertEquals(1, rig.audit.events.size(), "the ALLOW was audited");
         assertEquals("ALLOW", rig.audit.events.get(0).attributes().get("policy.outcome"));
+    }
+
+    @Test
+    void aLiveControlCannotSendToAnUnapprovedProviderModel() throws Exception {
+        var rig = new Rig();
+        rig.provider.model = "different-model";
+        inCallback((running, entry, checks) -> {
+            assertThrows(ModelCallRefused.class, () -> rig.client.complete(running, entry, "sys", "usr"));
+            return null;
+        });
+        assertEquals(0, rig.provider.calls.get());
+        assertEquals(1, rig.audit.events.size());
     }
 
     // ------------------------------------------------------------------ before lookup
