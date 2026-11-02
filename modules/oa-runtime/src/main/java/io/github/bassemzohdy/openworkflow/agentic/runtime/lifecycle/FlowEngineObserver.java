@@ -2,6 +2,8 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 
 import io.quarkus.arc.Unremovable;
 import io.serverlessworkflow.impl.WorkflowStatus;
+import io.serverlessworkflow.impl.WorkflowContextData;
+import io.serverlessworkflow.impl.WorkflowException;
 import io.serverlessworkflow.impl.lifecycle.WorkflowCancelledEvent;
 import io.serverlessworkflow.impl.lifecycle.WorkflowCompletedEvent;
 import io.serverlessworkflow.impl.lifecycle.WorkflowExecutionListener;
@@ -10,6 +12,11 @@ import io.serverlessworkflow.impl.lifecycle.WorkflowStatusEvent;
 import io.serverlessworkflow.impl.lifecycle.WorkflowEvent;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import java.util.Collections;
+import java.util.Map;
+import java.util.WeakHashMap;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletionException;
 import org.jboss.logging.Logger;
 
 /**
@@ -28,6 +35,7 @@ public class FlowEngineObserver implements WorkflowExecutionListener {
     private static final Logger LOG = Logger.getLogger(FlowEngineObserver.class);
 
     private final EngineStatusSync sync;
+    private final Map<WorkflowContextData, Boolean> cancelledFaults = Collections.synchronizedMap(new WeakHashMap<>());
 
     @Inject
     public FlowEngineObserver(EngineStatusSync sync) {
@@ -36,6 +44,12 @@ public class FlowEngineObserver implements WorkflowExecutionListener {
 
     @Override
     public void onWorkflowStatusChanged(WorkflowStatusEvent event) {
+        // The pinned SDK can turn cancellation of a timed task into a timeout-shaped failure. Its cancellation
+        // sets CANCELLED first; defer this particular transition until the failed event reveals the actual cause.
+        if (event.previousStatus() == WorkflowStatus.CANCELLED && event.status() == WorkflowStatus.FAULTED) {
+            cancelledFaults.put(event.workflowContext(), Boolean.TRUE);
+            return;
+        }
         report(event, toEngine(event.status()));
     }
 
@@ -46,6 +60,11 @@ public class FlowEngineObserver implements WorkflowExecutionListener {
 
     @Override
     public void onWorkflowFailed(WorkflowFailedEvent event) {
+        boolean followedCancellation = cancelledFaults.remove(event.workflowContext()) != null;
+        if (followedCancellation && cancellationWrappedAsTimeout(event.cause())) {
+            LOG.debug("ignoring SDK timeout produced by a cancelled task; awaiting the cancellation report");
+            return;
+        }
         // The registry keeps no reason for a fault; the engine's cause goes to the log, truncated.
         Throwable cause = event.cause();
         if (cause != null) {
@@ -59,6 +78,15 @@ public class FlowEngineObserver implements WorkflowExecutionListener {
     @Override
     public void onWorkflowCancelled(WorkflowCancelledEvent event) {
         report(event, EngineStatus.CANCELLED);
+    }
+
+    private static boolean cancellationWrappedAsTimeout(Throwable cause) {
+        if (!(cause instanceof WorkflowException workflow) || workflow.getWorkflowError() == null
+                || !"https://serverlessworkflow.io/spec/1.0.0/errors/timeout".equals(workflow.getWorkflowError().type()))
+            return false;
+        Throwable nested = workflow.getCause();
+        for (int depth = 0; depth < 8 && nested instanceof CompletionException; depth++) nested = nested.getCause();
+        return nested instanceof CancellationException;
     }
 
     private void report(WorkflowEvent event, EngineStatus status) {

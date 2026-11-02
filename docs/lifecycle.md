@@ -323,11 +323,17 @@ lifetime after authority and checkpoint preparation. A deadline is expired when 
 the exact deadline instant. The reconciler requests cancellation or marks the instance failed even if the bounded
 deadline scan has not reached it; a cancellation request is not proof that the engine stopped. This check is not an atomic fence around the engine start or a multi-replica lease.
 
-**Open recovery defect:** the pinned Flow SDK refuses cancellation of a restored `PENDING` instance. A process-level
-test found that a deadline expiring while the application is down can leave the registry `CANCEL_REQUESTED` after
-restart; it remained there throughout the observed 60-second check. The intentionally failing reproduction is on
-the [reproduction branch](https://github.com/bassemZohdy/open-workflow-agentic/blob/codex/WP-109-process-deadline-recovery/docs/handoffs/WP-109-pending-cancellation-reproduction.md).
-Do not start expired work merely to make SDK cancellation succeed: that could execute a task after its deadline.
+**Open recovery defect:** the pinned Flow SDK refuses cancellation of a restored `PENDING` instance. The default
+production reader can therefore leave an expired workflow in `CANCEL_REQUESTED` after restart. A test-only reader,
+proposed receipt schema and writer pass the process and Kubernetes failover scenarios described in the
+[recovery handoff](handoffs/WP-109-pending-cancellation-reproduction.md), but production activation, crash recovery
+after receipt commit and replica fencing remain open. Do not start expired work merely to make cancellation succeed.
+
+When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
+timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`
+transition, suppressing the following failure only if it is the SDK timeout wrapping a cancellation; it then waits
+for the engine's cancellation report. Genuine timeout and unrelated failure reports remain failures. If that report
+is lost, the registry is not assumed cancelled and still requires reconciliation.
 
 SDK characterization narrows the options: a synchronous workflow-start callback can cancel before a task on a new
 in-memory instance, but the JPA-restored instance does not emit that callback. A task-start callback cancelled one
