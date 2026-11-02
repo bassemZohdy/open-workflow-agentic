@@ -759,6 +759,7 @@ Implemented scope:
 - An embedded plan/draft/review sample graph and PostgreSQL checkpoints exist.
 - Governed model boundary converged and enforced per run (PRs 134-137): GovernedModelGateway implements the ModelGateway contract over GovernedLlmClient (sealed Rejected/Failed/Completed, no model switching, explicit cost); NodeInterceptor enforces the wall-clock limit and is used per run in the research graph from the approved task's ExecutionLimits with mandatory node audit; the research checkpoint state is versioned and an incompatible stored run is refused before any node or provider call. Database-backed behaviour is CI-evidenced. Governed graph/catalog patterns (tool use, plan-and-execute, supervision) and state conversion between versions remain open, so WP-201 stays partial.
 - The research graph's direct model-client path now uses the same pinned approved-context checks as the model gateway: a changed or missing context after policy blocks the provider, and a change after the provider withholds its output. Context freshness depends on its trusted source; this is not a signed-identity fence, durable cost reservation or complete graph dispatch integration.
+- The model gateway rechecks its pinned approved context after cost calculation before returning output. A changed, missing or unavailable context produces a failed call after the provider ran; it does not invent a refund or claim a pre-call refusal.
 
 Additional closure/integration tasks:
 
@@ -766,7 +767,7 @@ Additional closure/integration tasks:
 - [ ] Convert stored checkpoint state between versions (today a different version is only refused) and add a compatibility test per supported version.
 - [ ] Wire the production approved-context source, execution-entry authority and durable model reservations into the graph; prove post-I/O identity and output fencing end to end.
 
-Evidence: [docs/architecture.md](docs/architecture.md), [docs/contracts.md](docs/contracts.md), [docs/handoffs/claude/WP-201-governed-model-gateway.md](docs/handoffs/claude/WP-201-governed-model-gateway.md), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedLlmClientTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedLlmClientTest.java)
+Evidence: [docs/architecture.md](docs/architecture.md), [docs/contracts.md](docs/contracts.md), [docs/handoffs/claude/WP-201-governed-model-gateway.md](docs/handoffs/claude/WP-201-governed-model-gateway.md), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedLlmClientTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedLlmClientTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedModelGatewayTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/GovernedModelGatewayTest.java)
 
 ### WP-202 Budgets and limits — partial
 

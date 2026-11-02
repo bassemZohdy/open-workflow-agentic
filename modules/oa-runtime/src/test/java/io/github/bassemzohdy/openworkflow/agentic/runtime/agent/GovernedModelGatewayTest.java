@@ -93,6 +93,32 @@ class GovernedModelGatewayTest {
         assertFalse(result.reason().contains("private model output"));
     }
 
+    @Test void approvalLostOrChangedDuringPricingWithholdsTheAnswer() {
+        var original = APPROVED.current().orElseThrow();
+        for (int scenario = 0; scenario < 3; scenario++) {
+            var value = new java.util.concurrent.atomic.AtomicReference<>(Optional.of(original));
+            var unavailable = new java.util.concurrent.atomic.AtomicBoolean();
+            ApprovedModelContext context = () -> {
+                if (unavailable.get()) throw new IllegalStateException("private context detail");
+                return value.get();
+            };
+            int testCase = scenario;
+            var calls = new java.util.concurrent.atomic.AtomicInteger();
+            LlmClient target = (system, user) -> { calls.incrementAndGet(); return "private output"; };
+            var result = gateway(context, (call, text) -> {
+                if (testCase == 0) value.set(Optional.empty());
+                else if (testCase == 1) value.set(Optional.of(new ApprovedModelContext.Approved(
+                        original.agent(), original.task(), original.modelId(), original.budgetRemainingMicros() - 1)));
+                else unavailable.set(true);
+                return 42L;
+            }, target).complete(CALL);
+
+            var failed = assertInstanceOf(ModelResult.Failed.class, result);
+            assertEquals(1, calls.get(), "the already-started provider cannot be undone");
+            assertFalse(failed.reason().contains("private"));
+        }
+    }
+
     @Test void unavailableApprovalSourceReportsWhetherTheProviderWasCalled() {
         var first = APPROVED.current().orElseThrow();
         for (int failureAt : new int[] {1, 2, 3, 4}) {
