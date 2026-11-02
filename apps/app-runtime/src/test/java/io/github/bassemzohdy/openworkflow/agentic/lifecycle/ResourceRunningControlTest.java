@@ -8,9 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceInvocations;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceCallBindings;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.CompositeExecutionFence;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import java.io.*;
@@ -117,17 +119,51 @@ class ResourceRunningControlTest {
                 var one=calls.findBinding(first.bindingKey()).orElseThrow();var two=calls.findBinding(second.bindingKey()).orElseThrow();
                 assertEquals(b,one);assertEquals(b2,two);assertNotEquals(first.bindingKey(),second.bindingKey());
                 var live=new LiveIdentityCheck(admission);var callbacks=new AtomicInteger();
+                assertThrows(IllegalArgumentException.class,
+                        ()->new LiveIdentityResourceFence(admission,first,f.entry(1),two,expectedWorkload,calls));
+                var identity=new LiveIdentityResourceFence(admission,first,f.entry(1),one,expectedWorkload,calls);
+                assertDoesNotThrow(()->identity.requireCurrent(f.entry(1)));
+                assertThrows(JsonProcessingException.class,()->new ObjectMapper().writeValueAsString(identity));
+                var wrongComposite=CompositeExecutionFence.builder();
+                for(var check:CompositeExecutionFence.Check.values())wrongComposite.with(check,ignored->{});
+                assertThrows(IllegalStateException.class,()->identity.pair(wrongComposite.build()));
                 var swapped=gate.openGoverned(one,f.entry(1),UUID.randomUUID(),CredentialFence.pair(one,
                         entry->live.requireLive(second,entry,expectedWorkload,one)));
                 assertThrows(AgentResourceAdmission.WitnessRefusedException.class,()->swapped.executeGoverned(r->{callbacks.incrementAndGet();return "unsafe";}));
                 assertTrue(gate.find(b.scope()).isEmpty());
                 var exact=gate.openGoverned(one,f.entry(1),UUID.randomUUID(),CredentialFence.pair(one,
-                        entry->live.requireLive(first,entry,expectedWorkload,one)));
+                        identity));
                 assertEquals(Kind.CALLED,exact.executeGoverned(r->{r.requireCurrent(f.entry(1));callbacks.incrementAndGet();return "fixture";}).kind());
                 var refreshed=gate.openGoverned(two,f.entry(1),UUID.randomUUID(),CredentialFence.pair(two,
                         entry->live.requireLive(second,entry,expectedWorkload,two)));
                 assertEquals(Kind.RETAINED,refreshed.executeGoverned(r->{callbacks.incrementAndGet();return "unsafe";}).kind());
                 assertEquals(1,callbacks.get());assertEquals(one.key(),gate.find(b.scope()).orElseThrow().firstBindingKey());
+                var changed=new ResourceCallBinding(two.issuer(),two.tokenId(),two.issuingGrantId(),two.scope(),
+                        two.issuedAt().minusSeconds(1),two.expiresAt());
+                try(var mismatch=new LiveIdentityResourceFence(admission,second,f.entry(1),changed,expectedWorkload,calls)) {
+                    assertEquals(two.key(),changed.key());
+                    assertThrows(IllegalStateException.class,()->mismatch.requireCurrent(f.entry(1)));
+                }
+                var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
+                ResourceInvocations blocking=new ResourceInvocations() {
+                    public ResourceCallBinding bind(ResourceCallBinding value){return calls.bind(value);}
+                    public Optional<ResourceCallBinding> find(String issuer,String token){return calls.find(issuer,token);}
+                    public Optional<ResourceCallScope> findInvocation(ResourceCallScope scope){return calls.findInvocation(scope);}
+                    public Optional<ResourceCallBinding> findBinding(String key){
+                        entered.countDown();
+                        try {if(!release.await(8,TimeUnit.SECONDS))throw new IllegalStateException("test timed out");}
+                        catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+                        return calls.findBinding(key);
+                    }
+                };
+                try(var closing=new LiveIdentityResourceFence(admission,first,f.entry(1),one,expectedWorkload,blocking)) {
+                    var checking=CompletableFuture.runAsync(()->closing.requireCurrent(f.entry(1)));
+                    try {assertTrue(entered.await(8,TimeUnit.SECONDS));closing.close();}
+                    finally {release.countDown();}
+                    assertThrows(CompletionException.class,checking::join);
+                }
+                identity.close();
+                assertThrows(IllegalStateException.class,()->identity.requireCurrent(f.entry(1)));
             } finally {admission.close();}
         }
     }

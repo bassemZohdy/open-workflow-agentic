@@ -39,7 +39,21 @@ class CompositeExecutionFenceTest {
         var seen = new ArrayList<Check>();
         recording(seen, null, null).build().requireCurrent(ENTRY);
         assertEquals(List.of(Check.IDENTITY, Check.POLICY, Check.TASK_AND_TARGET, Check.OWNER_AND_LEASE,
-                Check.AUDIT, Check.OWNER_AND_LEASE), seen);
+                Check.AUDIT, Check.IDENTITY, Check.OWNER_AND_LEASE), seen);
+    }
+
+    @Test void identityIsRecheckedAfterAuditRevokesIt() {
+        var live = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var checks = new java.util.concurrent.atomic.AtomicInteger();
+        var builder = CompositeExecutionFence.builder();
+        for (Check check : Check.values()) builder.with(check, entry -> {
+            if (check == Check.IDENTITY) {
+                checks.incrementAndGet();
+                if (!live.get()) throw new RefusedException("identity revoked");
+            } else if (check == Check.AUDIT) live.set(false);
+        });
+        assertThrows(RefusedException.class, () -> builder.build().requireCurrent(ENTRY));
+        assertEquals(2, checks.get());
     }
 
     @Test void ownerIsRecheckedAfterAuditBlocksOrChangesOwnership() {
