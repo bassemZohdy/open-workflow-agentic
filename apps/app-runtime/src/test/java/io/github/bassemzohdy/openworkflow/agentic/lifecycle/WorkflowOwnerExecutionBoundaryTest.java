@@ -2,12 +2,14 @@ package io.github.bassemzohdy.openworkflow.agentic.lifecycle;
 
 import static org.junit.jupiter.api.Assertions.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.execution.GovernedExecutionRoot;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.OwnerFencedJpaWriter;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.CancellablePersistenceReader;
@@ -109,6 +111,15 @@ class WorkflowOwnerExecutionBoundaryTest {
         exerciseOwnedResourceEntry(7);
     }
 
+    @Test void auditedRootCombinesActualOwnerTaskAndEntryReceipt() throws Exception {
+        try (var c = data.getConnection()) {
+            c.setAutoCommit(false);
+            try { ResourceTaskAllocationMigrationTest.apply(c); c.commit(); }
+            catch (Exception failure) { c.rollback(); throw failure; }
+        }
+        exerciseOwnedResourceEntry(8);
+    }
+
     // 0: current; 1/2: takeover; 3: grant revoked; 4: policy revoked; 5/6/7: deny, PDP or PEP audit failure.
     private void exerciseOwnedResourceEntry(int scenario) throws Exception {
         String appId = "resource-entry-owner-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
@@ -136,7 +147,7 @@ class WorkflowOwnerExecutionBoundaryTest {
                     .instance(Map.of());
             var binding = register(appId, tenant, instance);
             var leases = new JdbcWorkflowOwnerLease(data);
-            claim.set(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(25)).orElseThrow().claim());
+            claim.set(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(scenario == 8 ? 30 : 25)).orElseThrow().claim());
             instance.start();
             assertTrue(waiting.await(10, TimeUnit.SECONDS));
             var row = store.find(tenant, binding.instanceId()).orElseThrow();
@@ -181,6 +192,46 @@ class WorkflowOwnerExecutionBoundaryTest {
                 policyAudits.incrementAndGet();
                 if (scenario == 7) throw new IllegalStateException("fixture audit outage");
             }, Duration.ofSeconds(3), clock);
+            if (scenario == 8) {
+                var agent = new Subject(SubjectKind.AGENT, "audited-root-fixture");
+                var child = grants.delegate(grant.id(), workload, agent, Set.of("oa.agent.run"),
+                        now.plusSeconds(600), null);
+                var contract = new AgentTaskContract(ids.next(), "resource-request-sha256:" + scope.requestFingerprint(),
+                        Set.of(), Set.of(), RiskTier.HIGH, new ExecutionLimits(3, Duration.ofSeconds(90), 5000),
+                        row.owner(), child.id());
+                var profile = new ApprovedModelProfile("root-fixture", "1", "c".repeat(64), agent,
+                        "model", 1, 1000, Duration.ofSeconds(2), 256);
+                var allocation = new JdbcResourceTaskAllocations(data, transactions)
+                        .allocate(new ResourceTaskAllocation(scope, null, contract, profile));
+                var central = new AuditAppendOnce(data);
+                try (var identity = new LiveIdentityResourceFence(admission, witness, entry, canonical, workload, calls);
+                     var policy = new LiveResearchPolicyFence(admission, witness, entry, pep);
+                     var task = new ResourceTaskExecutionFence(data, transactions, entry, allocation, canonical, (e, t) -> {});
+                     var owner = new WorkflowOwnerResourceFence(entry, context.get(), bindings,
+                             InstanceRegistryFence.over(store), ownerFence);
+                     var root = GovernedExecutionRoot.audited(data, transactions, 1,
+                             JdbcResourceExecutionGate.IoBounds.defaults(), central::appendOnce)) {
+                    assertThrows(Exception.class, () -> new ObjectMapper().writeValueAsString(root));
+                    var result = root.execute(canonical, entry, UUID.randomUUID(), identity, policy, task, owner,
+                            ignored -> {}, running -> {
+                                running.requireCurrent(entry);
+                                callbacks.incrementAndGet();
+                                try (var c = data.getConnection(); var q = c.prepareStatement(
+                                        "select count(*) from audit.event where event_type='resource.execution.entered' and resource_id=?")) {
+                                    q.setString(1, entry.fingerprint());
+                                    try (var r = q.executeQuery()) { assertTrue(r.next()); assertEquals(1, r.getInt(1)); }
+                                } catch (Exception failure) { throw new IllegalStateException(failure); }
+                                return "private";
+                            });
+                    assertEquals(JdbcResourceExecutionGate.Kind.CALLED, result.kind());
+                    assertEquals("private", result.value());
+                    var retry = root.execute(canonical, entry, UUID.randomUUID(), identity, policy, task, owner,
+                            ignored -> {}, running -> { callbacks.incrementAndGet(); return "duplicate"; });
+                    assertEquals(JdbcResourceExecutionGate.Kind.RETAINED, retry.kind());
+                    assertEquals(1, callbacks.get());
+                } finally { admission.close(); }
+                return;
+            }
             try (var identityCheck = new LiveIdentityResourceFence(admission, witness, entry, canonical, workload, calls);
                  var policyCheck = new LiveResearchPolicyFence(admission, witness, entry, pep);
                  var ownerCheck = new WorkflowOwnerResourceFence(entry, context.get(), bindings,

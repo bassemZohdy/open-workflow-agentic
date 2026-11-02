@@ -1,5 +1,7 @@
 # Changelog
 
+- Compose the audited execution root with live task, identity, policy and workflow-owner checks.
+
 - Enforce fresh-entry transaction and attribution when retaining resource-entry audit sources.
 
 - Add opt-in atomic resource-entry audit sources and central receipt checks before callbacks.

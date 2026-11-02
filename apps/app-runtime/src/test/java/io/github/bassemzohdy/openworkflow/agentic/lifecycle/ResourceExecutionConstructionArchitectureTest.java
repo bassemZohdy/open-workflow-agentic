@@ -41,7 +41,7 @@ class ResourceExecutionConstructionArchitectureTest {
                                     ||(owner.equals(GATE)&&name.equals("executeGovernedAsync"))
                                     ||(owner.equals(GATE+"$CredentialFence")&&name.equals("pair"))
                                     ||(owner.equals(GATE+"$Attempt")&&name.equals("executeGoverned"))
-                                    ||(owner.equals(ROOT)&&name.equals("pair"));
+                                    ||(owner.equals(ROOT)&&Set.of("pair","audited","execute").contains(name));
                             if(legacy||(controlled&&!root))events.add(SimpleConditionEvent.violated(item,call.getDescription()));
                         }
                     }
@@ -55,7 +55,7 @@ class ResourceExecutionConstructionArchitectureTest {
     }
     @TestFactory Stream<DynamicTest> eachIndependentBypassFixtureIsRejected() {
         return Stream.of(ConstructorLeak.class,LegacyEntryLeak.class,LegacyCallbackLeak.class,FenceLeak.class,
-                        AsyncEntryLeak.class,RootPairLeak.class,GovernedExecutionRoot.class)
+                        AsyncEntryLeak.class,RootPairLeak.class,RootFactoryLeak.class,GovernedExecutionRoot.class)
                 .map(type->DynamicTest.dynamicTest(type.getSimpleName(),()->{
                     var imported=new ClassFileImporter().importClasses(type);
                     assertTrue(rule(Set.of(ROOT)).evaluate(imported).hasViolation(),"missing guard for "+type.getName());
@@ -92,6 +92,13 @@ class ResourceExecutionConstructionArchitectureTest {
                            ResourceTaskExecutionFence task,CompositeExecutionFence composite) {
             return io.github.bassemzohdy.openworkflow.agentic.runtime.execution.GovernedExecutionRoot
                     .pair(b,identity,policy,task,composite);
+        }
+    }
+    static class RootFactoryLeak {
+        static Object make(DataSource source, jakarta.transaction.TransactionManager transactions,
+                           io.github.bassemzohdy.openworkflow.agentic.contracts.port.IdempotentAuditSink sink) {
+            return io.github.bassemzohdy.openworkflow.agentic.runtime.execution.GovernedExecutionRoot
+                    .audited(source,transactions,1,JdbcResourceExecutionGate.IoBounds.defaults(),sink);
         }
     }
     // Same simple name is insufficient: only the exact reviewed production package can be allowed.
