@@ -1,5 +1,7 @@
 # Changelog
 
+- Reconstruct a workflow component from its real human-wake checkpoint and verify the completed listen is not registered again. An operating-system process restart remains unproved.
+
 - Verify corrupted retained audit bindings cannot stage human wake events, and give the lease-expiry test a wider timing margin.
 
 - Test repeat-safe component recovery of a checkpointed human wake before acknowledgement, without duplicate acknowledgement audit or redelivery. Process restart remains unproved.
