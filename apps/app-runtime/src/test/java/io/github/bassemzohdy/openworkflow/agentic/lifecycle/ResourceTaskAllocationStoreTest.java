@@ -10,6 +10,8 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceTaskAllocations;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.*;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcNodeBudget;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.NodeRefused;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.enterprise.inject.Instance;
@@ -60,6 +62,44 @@ class ResourceTaskAllocationStoreTest {
         assertFalse(first.deadline().isAfter(first.createdAt().plus(a.contract().limits().maxWallClock())));
         assertEquals(0,count(data,"select count(*) from task.resource_execution"));
     }
+    @Test void aFreshAllocationAtomicallyCreatesTheBoundBudgetAndRetryDoesNotResetIt() throws Exception {
+        var allocated=store.allocate(a);
+        var budget=new JdbcNodeBudget(data).openExisting(a.scope().threadId().value(),a.modelProfile().agent(),a.contract());
+        budget.admit();
+        assertEquals(allocated,store.allocate(a));
+        try(var c=data.getConnection();var q=c.prepareStatement(
+                "select steps,started_at,deadline from task.agent_node_budget where task_id=?")) {
+            q.setString(1,a.contract().id().value());
+            try(var r=q.executeQuery()) {
+                assertTrue(r.next()); assertEquals(1,r.getInt(1));
+                assertEquals(allocated.createdAt(),r.getTimestamp(2).toInstant());
+                assertEquals(allocated.deadline(),r.getTimestamp(3).toInstant());
+                assertFalse(r.next());
+            }
+        }
+        assertThrows(NodeRefused.class,()->new JdbcNodeBudget(data).openExisting(
+                a.scope().threadId().value(),new Subject(SubjectKind.AGENT,"other-agent"),a.contract()));
+    }
+
+    @Test void aBudgetWriteFailureRollsBackTheNewAllocation() throws Exception {
+        try(var c=data.getConnection();var s=c.createStatement()) {
+            s.execute("create function task.reject_budget_test() returns trigger language plpgsql as $$ begin raise exception 'test failure'; end $$");
+            s.execute("create trigger reject_budget_test before insert on task.agent_node_budget for each row execute function task.reject_budget_test()");
+        }
+        assertThrows(RuntimeException.class,()->store.allocate(a));
+        assertEquals(0,rows());
+        assertEquals(0,count(data,"select count(*) from task.agent_node_budget"));
+    }
+
+    @Test void anExistingAllocationWithoutABudgetIsNeverBackfilled() throws Exception {
+        var first=store.allocate(a);
+        corrupt("delete from task.agent_node_budget"); // Simulates a legacy allocation in this disposable fixture.
+        assertEquals(first,store.allocate(a));
+        assertEquals(0,count(data,"select count(*) from task.agent_node_budget"));
+        assertThrows(NodeRefused.class,()->new JdbcNodeBudget(data).openExisting(
+                a.scope().threadId().value(),a.modelProfile().agent(),a.contract()));
+    }
+
     @Test void conflictsAndFullScopeMismatchAreNotAbsenceOrAnotherAllocation() throws Exception {
         store.allocate(a);assertThrows(IllegalStateException.class,()->store.allocate(changed(a)));assertEquals(1,rows());
         var s=a.scope();var wrong=new ResourceCallScope(s.tenant(),s.instanceId(),s.owner(),s.applicationId(),s.engineInstanceId(),s.namespace(),s.definition(),s.version(),s.taskPosition(),s.iteration(),s.logicalOccurrence(),s.audience(),s.operation(),"d".repeat(64),s.requestFingerprint());
@@ -73,6 +113,7 @@ class ResourceTaskAllocationStoreTest {
             begin.countDown();var first=results.getFirst().get(15,TimeUnit.SECONDS);for(var r:results)assertEquals(first,r.get(15,TimeUnit.SECONDS));
         } finally {pool.shutdownNow();assertTrue(pool.awaitTermination(5,TimeUnit.SECONDS));}
         assertEquals(1,rows());
+        assertEquals(1,count(data,"select count(*) from task.agent_node_budget"));
     }
     @Test void originalLifetimeRemainsHistoricalAfterRegistryCompletionAndGrantRevocation() throws Exception {
         var first=store.allocate(a);var registry=new JdbcInstanceStore(data);var row=f.row();
@@ -101,6 +142,8 @@ class ResourceTaskAllocationStoreTest {
         }));
         assertThrows(StoreUnavailableException.class,()->new JdbcResourceTaskAllocations(lost,manager).allocate(a));
         var recovered=store.find(a.scope()).orElseThrow();assertEquals(recovered,store.allocate(a));assertEquals(1,rows());
+        assertEquals(1,count(data,"select count(*) from task.agent_node_budget"));
+        new JdbcNodeBudget(data).openExisting(a.scope().threadId().value(),a.modelProfile().agent(),a.contract()).admit();
     }
     @Test void actualCallerRollbackCannotEraseTheCommittedAllocation() throws Exception {
         caller.begin();AllocatedResourceTask first;
