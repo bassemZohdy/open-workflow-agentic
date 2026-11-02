@@ -202,6 +202,18 @@ class HumanDecisionJournalTest {
         }
     }
 
+    @Test void closingATaskCannotSilentlyChangeItsAssigneeOrDeadline() throws Exception {
+        for (String change : new String[] {"assignee_id='bob'", "due_at='2026-10-19T12:00:00Z'"}) {
+            var f = fixture("bob", "NONE");
+            try (var c = owned.getConnection(); var q = c.prepareStatement("update human_proposal.task set status='CANCELLED',"
+                    + change + ",version=version+1 where tenant=? and task_id=?")) {
+                q.setString(1, "tenant"); q.setString(2, f.task().value());
+                assertEquals("23514", assertThrows(SQLException.class, q::executeUpdate).getSQLState());
+            }
+            assertEquals(HumanDecisionJournal.Result.RECORDED, record(f, f.decision(), "wait"));
+        }
+    }
+
     @Test void concurrentExactRetriesRecordOneDecision() throws Exception {
         var f = fixture("bob", "NONE");
         var start = new CountDownLatch(1);
