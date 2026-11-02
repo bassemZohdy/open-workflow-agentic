@@ -1,5 +1,7 @@
 # Changelog
 
+- Test staged human wake delivery against the actual SDK and JPA checkpoint writer, including lost-owner rollback. The targeted callback is test-only; production dispatch and restart recovery remain open.
+
 - Reserve the internal human-decision event source against external ingress configuration and receipt. Internal producer authority and dispatch remain open.
 
 - Test unactivated atomic staging of a human decision wake with its inbox receipt and exact wait binding under a live task owner. Production dispatch, authorized replay and checkpoint proof remain open.
