@@ -1,5 +1,7 @@
 # Changelog
 
+- Bind a model gateway call to the exact approval it checked and recheck that approval after policy and audit before reaching the provider. Durable budget and execution authority remain separate.
+
 - Recheck the research graph node deadline after its started audit, preventing a delayed audit from allowing a late node to begin. Cross-restart budgets and exhaustion escalation remain open.
 
 - Harden the isolated human-task proposal against changing assignment or deadline while closing a task; separately versioned in-progress changes remain supported.

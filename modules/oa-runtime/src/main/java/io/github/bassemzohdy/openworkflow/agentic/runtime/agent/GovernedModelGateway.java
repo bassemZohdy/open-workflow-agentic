@@ -58,7 +58,7 @@ public final class GovernedModelGateway implements ModelGateway {
         if (!approved.modelId().equals(call.modelId())) return reject("the call names a model other than the approved one");
         String text;
         try {
-            text = governed.complete("", call.prompt());
+            text = governed.complete(approved, "", call.prompt());
         } catch (ModelCallRefused e) {
             return reject(e.getMessage());
         } catch (PolicyDenied e) {
