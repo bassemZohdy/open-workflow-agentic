@@ -121,4 +121,72 @@ class PinnedHttpEffectLedgerTest {
             assertEquals(1,ledger.manualQueue(thread,10).size());
         } finally {server.stop(0);executor.shutdownNow();executor.awaitTermination(3,TimeUnit.SECONDS);}
     }
+
+    @Test void authoritativeLookupRecoversLostAcknowledgmentWithoutResending() throws Exception {
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        var posts=new AtomicInteger();var lookups=new AtomicInteger();var key=new AtomicReference<String>();
+        server.createContext("/orders",exchange->{try {posts.incrementAndGet();key.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+            exchange.getRequestBody().readAllBytes();exchange.sendResponseHeaders(202,-1);} finally {exchange.close();}});
+        server.createContext("/lookup",exchange->{try {int attempt=lookups.incrementAndGet();
+            boolean same="GET".equals(exchange.getRequestMethod()) && key.get().equals(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+            exchange.sendResponseHeaders(same && attempt>1 ? 200 : 404,-1);} finally {exchange.close();}});
+        server.start();
+        try {
+            String base="http://127.0.0.1:"+server.getAddress().getPort();var grant=UlidGenerator.shared().next();
+            var expected=new PinnedHttpEffectTarget.CredentialExpectation("issuer",grant,Set.of("orders:write"));
+            var lookup=new PinnedHttpEffectTarget.Lookup(URI.create(base+"/lookup"),Set.of(200));
+            var target=new PinnedHttpEffectTarget("tool:orders",URI.create(base+"/orders"),"orders","correlation","{}",
+                    Duration.ofSeconds(5),Set.of(200),Set.of(),expected,(audience,action)->action.run(new IssuedToken(
+                    Credential.of("token"),audience,Set.of("orders:write"),Instant.now().plusSeconds(60),"issuer","jti",List.of("actor"),grant)),
+                    issued->{},true,false,lookup);
+            var thread=ThreadId.derive("http-lookup-test","alice",UUID.randomUUID().toString());
+            var command=EffectCommand.of(thread,"send","occurrence-1","tool:orders","{}");
+            assertEquals(EffectState.INTENDED,effects.execute(command,target).state());
+            assertEquals(1,ledger.manualQueue(thread,10).size());
+            assertEquals(EffectState.INTENDED,effects.execute(command,target).state());
+            assertEquals(1,posts.get());assertEquals(1,lookups.get());
+            assertEquals(EffectState.CONFIRMED,effects.execute(command,target).state());
+            assertEquals(EffectState.CONFIRMED,effects.execute(command,target).state());
+            assertEquals(1,posts.get());assertEquals(2,lookups.get());assertTrue(ledger.manualQueue(thread,10).isEmpty());
+        } finally {server.stop(0);}
+    }
+
+    @Test void lookupConfirmationIsRetainedWhenGrantIsRevokedDuringLookup() throws Exception {
+        String tenant="http-lookup-"+UUID.randomUUID();var user=new Subject(SubjectKind.USER,"alice");
+        var agent=new Subject(SubjectKind.AGENT,"worker");
+        var grant=grants.grant(tenant,user,user,agent,Set.of("orders:write"),Instant.now().plusSeconds(600),null);
+        var request=new StartRequest(tenant,user,new DefinitionRef("demo/start","1"),Map.of(),"start-key");
+        var now=Instant.now().truncatedTo(ChronoUnit.MICROS);
+        var row=instances.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(),request,now),"test.insert",
+                authorities.bindAtStart(tenant,user,grant.id(),"corr-test")).record();
+        String engineId="http-lookup-"+UUID.randomUUID();
+        instances.replace(row.successor(now,InstanceStatus.STARTING,engineId,0,null,null),row.version(),"test.prepared",user);
+        var creds=new GovernedAsyncDispatch.Credentials() {
+            public Optional<Credential> subject(InstanceAuthority a){return Optional.of(Credential.of("subject"));}
+            public Credential actor(){return Credential.of("actor");}
+        };
+        var dispatch=new GovernedAsyncDispatch(GovernedAsyncDispatch.over(authorities,grants),creds,exchange->
+                new IssuedToken(Credential.of("issued"),exchange.audience(),exchange.scopes(),Instant.now().plusSeconds(60),
+                        "issuer","jti",List.of("worker"),grant.id()),Clock.systemUTC());
+        var failure=new AtomicReference<Throwable>();var posts=new AtomicInteger();var lookups=new AtomicInteger();
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/orders",exchange->{try{posts.incrementAndGet();exchange.sendResponseHeaders(202,-1);}finally{exchange.close();}});
+        server.createContext("/lookup",exchange->{try{lookups.incrementAndGet();grants.revoke(grant.id(),user,"withdrawn during lookup",null);
+            exchange.sendResponseHeaders(200,-1);}catch(Throwable e){failure.set(e);try{exchange.sendResponseHeaders(500,-1);}catch(java.io.IOException ignored){}}
+            finally{exchange.close();}});server.start();
+        try {
+            String base="http://127.0.0.1:"+server.getAddress().getPort();
+            var target=new PinnedHttpEffectTarget("tool:orders",URI.create(base+"/orders"),"orders","correlation","{}",Duration.ofSeconds(5),
+                    Set.of(200),Set.of(),new PinnedHttpEffectTarget.CredentialExpectation("issuer",grant.id(),Set.of("orders:write")),
+                    new GovernedHttpCredentials(dispatch,engineId,Set.of("orders:write")),issued->dispatch.requireCurrentAuthority(engineId),
+                    true,false,new PinnedHttpEffectTarget.Lookup(URI.create(base+"/lookup"),Set.of(200)));
+            var thread=ThreadId.derive("http-lookup-revoked","alice",UUID.randomUUID().toString());
+            var command=EffectCommand.of(thread,"send","occurrence-1","tool:orders","{}");
+            assertEquals(EffectState.INTENDED,effects.execute(command,target).state());
+            assertThrows(AuthorityLostException.class,()->effects.execute(command,target));
+            assertEquals(EffectState.CONFIRMED,ledger.find(command.key()).orElseThrow().state());
+            assertEquals(1,posts.get());assertEquals(1,lookups.get());assertNull(failure.get());
+            assertTrue(ledger.manualQueue(thread,10).isEmpty());
+        } finally {server.stop(0);}
+    }
 }

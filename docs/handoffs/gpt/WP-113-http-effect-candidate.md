@@ -37,7 +37,8 @@ fields are refused. Request-body and response objects may likewise reference mat
 missing, cyclic, cross-kind and remote references are refused. Terminal status codes must be documented with response
 descriptions. The gateway fingerprint covers the exact document digest, selected operation, origin,
 target, timeout, correlation, confirmation and rejection codes, and token expectations. Fingerprint version 2 requires
-reapproval of prior profiles. The gateway validates arguments against the
+reapproval of earlier profiles. A configured lookup uses version 3 and additionally pins its exact endpoint and selected
+confirmation statuses; registrations without lookup retain version 2. The gateway validates arguments against the
 selected schema before binding; no credential or network call occurs at registration. The selected operation must
 require exactly one supported scheme: HTTP bearer with no declared roles, or OAuth2 with nonempty scopes declared in
 one flow and exactly matching the pinned token scopes. Operation-level security overrides the root declaration;
@@ -53,7 +54,8 @@ remote references, dialects and status codes.
 Another controlled gateway fixture selects locally referenced request and response objects and calls an IPv4 loopback
 HTTP service through the real ledger. It checks a templated path, constrained query, precise decimal body, credential
 and idempotency key, refuses traversal and query-injection attempts, and confirms that an
-exact retry does not send again. A separately documented rejection is recorded FAILED and is not resent. The test-only
+exact retry does not send again. A separately documented rejection is recorded FAILED and is not resent. A configured
+lookup recovers an unresolved response through the same gateway and ledger without another POST. The test-only
 loopback seam does not enable plaintext production transport; the fixture
 credential, service and policy do not establish provider interoperability or approval.
 
@@ -68,6 +70,13 @@ implementation; that transport behavior and the remote service's idempotency con
 notes that interruption does not guarantee when an exchange stops. A caller must account for network delay, in-flight
 effects, and clock/retention limits before relying on deduplication.
 
+An optional trusted lookup contract can query a fixed same-origin endpoint with GET, the original idempotency key,
+the same scoped credential and fresh authority checks. Only explicitly selected 200/204 responses establish CONFIRMED;
+404 and all other responses remain UNKNOWN, including when the original request may still be in flight. The lookup
+contract is supplied separately and is not inferred or approved from the OpenAPI document. A service must guarantee
+that selected statuses prove completion for that exact key; the same audience and scopes must authorize lookup. An
+uncertain lookup also reserves transport capacity. This is a candidate, not proof of a real provider's behavior.
+
 Sixteen slots are shared by candidate instances in one classloader and are acquired before credential acquisition.
 A completed refusal before target dispatch releases its slot; the supplier must independently bound any physical
 provider work that can outlive its return. Once HTTP dispatch starts, a selected terminal response releases the slot;
@@ -81,7 +90,9 @@ blocked credential acquisition. Scoped-dispatch tests exercise revocation before
 escaped or repeated callbacks, using a fixture exchanger and policy. A PostgreSQL case combines the actual grant store,
 identity dispatcher and ledger with a fixture exchanger and local service: revocation during a confirmed call retains
 the CONFIRMED fact while withholding the result; a selected rejection is retained as FAILED, and a non-confirming
-response under the same revocation remains INTENDED and enters reconciliation without returning an outcome. Separate cases cover withheld authoritative lookup and compensation;
+response under the same revocation remains INTENDED and enters reconciliation without returning an outcome. PostgreSQL
+fixtures exercise a 404 that remains unresolved followed by lookup recovery without a second POST, and revocation during lookup: the confirmation is retained
+but withheld from the revoked caller. Separate cases cover withheld authoritative lookup and compensation;
 a later authorized compensation retry reuses the retained confirmation. Another ledger case checks that a genuinely
 lost acknowledgement remains INTENDED and is not resent by the ledger. A separate PostgreSQL gateway fixture checks
 that an observed-outcome refusal propagates through the registered tool path, the ledger retains its confirmation,

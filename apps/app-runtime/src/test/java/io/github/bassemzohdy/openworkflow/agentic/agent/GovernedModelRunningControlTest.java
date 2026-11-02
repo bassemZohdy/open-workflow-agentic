@@ -887,7 +887,7 @@ class GovernedModelRunningControlTest {
     }
 
     @Test void pinnedOpenApiToolSendsOneValidatedRequestThroughLedger() throws Exception {
-        var calls = new AtomicInteger(); var payload = new AtomicReference<String>();
+        var calls = new AtomicInteger(); var lookupCalls = new AtomicInteger(); var payload = new AtomicReference<String>();
         var idempotency = new AtomicReference<String>(); var authorization = new AtomicReference<String>();
         var requestPath = new AtomicReference<String>();
         var requestQuery = new AtomicReference<String>();
@@ -899,7 +899,15 @@ class GovernedModelRunningControlTest {
                 requestQuery.set(exchange.getRequestURI().getRawQuery());
                 idempotency.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
                 authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
-                exchange.sendResponseHeaders(exchange.getRequestURI().getPath().endsWith("/reject") ? 422 : 200, -1);
+                String path = exchange.getRequestURI().getPath();
+                exchange.sendResponseHeaders(path.endsWith("/reject") ? 422 : path.endsWith("/pending") ? 202 : 200, -1);
+            } finally { exchange.close(); }
+        });
+        server.createContext("/lookup", exchange -> {
+            try { lookupCalls.incrementAndGet();
+                boolean match = "GET".equals(exchange.getRequestMethod())
+                        && idempotency.get().equals(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+                exchange.sendResponseHeaders(match ? 200 : 404, -1);
             } finally { exchange.close(); }
         });
         server.start();
@@ -928,7 +936,9 @@ class GovernedModelRunningControlTest {
                 var registration = op.registration("registered:test", "orders", "corr", Duration.ofSeconds(2), Set.of(200), Set.of(422),
                         expectation, (audience, action) -> action.run(new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken(
                                 io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Credential.of("fixture-token"), audience,
-                                Set.of("orders:write"), Instant.now().plusSeconds(60), "issuer", "jti", List.of("worker"), grant)), token -> { });
+                                Set.of("orders:write"), Instant.now().plusSeconds(60), "issuer", "jti", List.of("worker"), grant)), token -> { },
+                        new io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.http.PinnedHttpEffectTarget.Lookup(
+                                java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/lookup"), Set.of(200)));
                 var registry = Map.of("tool:research", registration);
                 var profile = new ApprovedToolProfile("fixture", "1", GovernedToolGateway.configurationFingerprint(registry),
                         AGENT, Set.of("tool:research"), 3, Duration.ofSeconds(2));
@@ -981,6 +991,11 @@ class GovernedModelRunningControlTest {
                 assertEquals(EffectState.FAILED, gateway.invokeEffect(running, entry, rig.allocation, third, rejection).state());
                 assertEquals(EffectState.FAILED, gateway.invokeEffect(running, entry, rig.allocation, third, rejection).state());
                 assertEquals(3, calls.get());
+                var pending = rig.call("{\"path\":{\"orderId\":\"pending\"},\"query\":{\"region\":\"west\"},\"body\":{\"amount\":10}}");
+                var fourth = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/http-4", pending);
+                assertEquals(EffectState.INTENDED, gateway.invokeEffect(running, entry, rig.allocation, fourth, pending).state());
+                assertEquals(EffectState.CONFIRMED, gateway.invokeEffect(running, entry, rig.allocation, fourth, pending).state());
+                assertEquals(4, calls.get()); assertEquals(1, lookupCalls.get());
                 return null;
             });
         } finally { server.stop(0); }

@@ -122,26 +122,38 @@ public final class PinnedOpenApiEffect {
     public GovernedToolGateway.Registration registration(String target, String audience, String correlation,
             Duration timeout, Set<Integer> confirmed, Set<Integer> rejected, PinnedHttpEffectTarget.CredentialExpectation expectation,
             PinnedHttpEffectTarget.CredentialProvider credentials, PinnedHttpEffectTarget.PreSendFence fence) {
+        return registration(target,audience,correlation,timeout,confirmed,rejected,expectation,credentials,fence,null);
+    }
+
+    /** A configured lookup is a separate trusted service contract; it is not inferred from this OpenAPI document. */
+    public GovernedToolGateway.Registration registration(String target, String audience, String correlation,
+            Duration timeout, Set<Integer> confirmed, Set<Integer> rejected, PinnedHttpEffectTarget.CredentialExpectation expectation,
+            PinnedHttpEffectTarget.CredentialProvider credentials, PinnedHttpEffectTarget.PreSendFence fence,
+            PinnedHttpEffectTarget.Lookup lookup) {
         Objects.requireNonNull(expectation); Set<Integer> statuses = Set.copyOf(confirmed), rejections = Set.copyOf(rejected);
         if (oauthScopes != null && !oauthScopes.equals(expectation.scopes()))
             throw new IllegalArgumentException("credential scopes differ from the OpenAPI operation");
         if (!documentedResponses.containsAll(statuses) || !documentedResponses.containsAll(rejections))
             throw new IllegalArgumentException("terminal response is not documented");
-        var encoder = new CanonicalEncoder("oa.openapi.effect.v2").text(documentDigest).text(operationId)
+        var encoder = new CanonicalEncoder(lookup == null ? "oa.openapi.effect.v2" : "oa.openapi.effect.v3").text(documentDigest).text(operationId)
                 .text(endpointTemplate).text(target).text(audience).text(correlation)
                 .number(timeout.getSeconds()).number(timeout.getNano()).text(expectation.issuer())
                 .text(expectation.grantId().toString()).number(expectation.scopes().size());
         expectation.scopes().stream().sorted().forEach(encoder::text);
         encoder.number(statuses.size()); statuses.stream().sorted().forEach(s -> encoder.number(s));
         encoder.number(rejections.size()); rejections.stream().sorted().forEach(s -> encoder.number(s));
+        if(lookup != null) {
+            encoder.text(lookup.endpoint().toASCIIString()).number(lookup.confirmed().size());
+            lookup.confirmed().stream().sorted().forEach(s -> encoder.number(s));
+        }
         String fingerprint = CanonicalEncoder.sha256Hex(encoder.toBytes());
         // Construct once at registration to reject malformed pinned configuration before any tool call.
-        new PinnedHttpEffectTarget(target, endpoint, audience, correlation, "{}", timeout, statuses, rejections, expectation, credentials, fence, loopbackTest, false);
+        new PinnedHttpEffectTarget(target, endpoint, audience, correlation, "{}", timeout, statuses, rejections, expectation, credentials, fence, loopbackTest, false, lookup);
         return GovernedToolGateway.Registration.effectful(schema, "{}", timeout, fingerprint, target,
                 arguments -> {
                     BoundRequest bound = bind(arguments);
                     return new PinnedHttpEffectTarget(target, bound.endpoint(), audience, correlation, bound.body(), timeout,
-                            statuses, rejections, expectation, credentials, fence, loopbackTest, true);
+                            statuses, rejections, expectation, credentials, fence, loopbackTest, true, lookup);
                 });
     }
 

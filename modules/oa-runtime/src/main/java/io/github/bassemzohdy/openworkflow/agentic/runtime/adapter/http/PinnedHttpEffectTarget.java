@@ -29,7 +29,7 @@ import java.util.concurrent.Flow;
  * statuses really establish completed application, bind the exact request to its ledger occurrence, provide fresh
  * target-scoped authority, and enforce policy/audit and network egress. The target must atomically deduplicate any
  * physical retries by the HTTP implementation; this candidate has not proven that transport behavior. No ledger-level
- * replay or authoritative target lookup is claimed.
+ * replay or real provider lookup contract is claimed.
  * Credential acquisition occupies a shared slot and must independently bound any detached provider work. Once HTTP
  * dispatch begins, a nonconfirmed call permanently reserves its slot: timeout/cancellation does not prove that remote
  * work stopped. Restarting the process or using another classloader is outside this bound.
@@ -67,6 +67,19 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
             for(String scope:scopes){Checks.requireText("scope",scope,256);CanonicalEncoder.strictUtf8(scope);}
         }
     }
+    /** The service must guarantee that selected responses prove completion for the supplied idempotency key. */
+    public record Lookup(URI endpoint, Set<Integer> confirmed) {
+        public Lookup {
+            Objects.requireNonNull(endpoint); confirmed=Set.copyOf(confirmed);
+            if(confirmed.isEmpty() || !Set.of(200,204).containsAll(confirmed))
+                throw new IllegalArgumentException("lookup confirmation statuses must be explicitly pinned");
+            if(endpoint.getHost()==null || endpoint.getUserInfo()!=null || endpoint.getRawQuery()!=null
+                    || endpoint.getRawFragment()!=null || !endpoint.normalize().equals(endpoint)
+                    || endpoint.getRawPath()==null || endpoint.getRawPath().length()>2048
+                    || !endpoint.getRawPath().matches("/(?:[A-Za-z0-9_~-]+(?:\\.[A-Za-z0-9_~-]+)*/?)+"))
+                throw new IllegalArgumentException("lookup endpoint must be fixed without query, userinfo or fragment");
+        }
+    }
     private final String target, audience, correlation, body;
     private final URI endpoint;
     private final Duration timeout;
@@ -74,6 +87,7 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     private final CredentialProvider credentials;
     private final CredentialExpectation expectation;
     private final PreSendFence fence;
+    private final Lookup lookup;
 
     public PinnedHttpEffectTarget(String target, URI endpoint, String audience, String correlation, String body,
                                   Duration timeout, Set<Integer> confirmed, CredentialExpectation expectation,
@@ -105,6 +119,12 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     PinnedHttpEffectTarget(String target, URI endpoint, String audience, String correlation, String body,
                            Duration timeout, Set<Integer> confirmed, Set<Integer> rejected, CredentialExpectation expectation,
                            CredentialProvider credentials, PreSendFence fence, boolean loopbackTest, boolean safeQuery) {
+        this(target,endpoint,audience,correlation,body,timeout,confirmed,rejected,expectation,credentials,fence,loopbackTest,safeQuery,null);
+    }
+
+    PinnedHttpEffectTarget(String target, URI endpoint, String audience, String correlation, String body,
+                           Duration timeout, Set<Integer> confirmed, Set<Integer> rejected, CredentialExpectation expectation,
+                           CredentialProvider credentials, PreSendFence fence, boolean loopbackTest, boolean safeQuery, Lookup lookup) {
         this.target=Checks.requireMatching("target",target,AgentTaskContract.TOKEN);
         this.endpoint=Objects.requireNonNull(endpoint);
         boolean permittedScheme="https".equals(endpoint.getScheme()) || (loopbackTest && "http".equals(endpoint.getScheme())
@@ -132,6 +152,11 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
             throw new IllegalArgumentException("unsupported terminal rejection status");
         this.expectation=Objects.requireNonNull(expectation);this.credentials=Objects.requireNonNull(credentials);
         this.fence=Objects.requireNonNull(fence);
+        if(lookup!=null && (!endpoint.getScheme().equals(lookup.endpoint().getScheme())
+                || !endpoint.getHost().equalsIgnoreCase(lookup.endpoint().getHost())
+                || endpoint.getPort()!=lookup.endpoint().getPort()))
+            throw new IllegalArgumentException("lookup must use the effect's exact origin");
+        this.lookup=lookup;
     }
 
     @Override public String target() { return target; }
@@ -146,6 +171,15 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     }
 
     @Override public Reply execute(String idempotencyKey) throws Exception {
+        return perform(idempotencyKey,false);
+    }
+
+    @Override public Reply lookup(String idempotencyKey) throws Exception {
+        if(lookup==null)return new Reply(Outcome.UNKNOWN,null);
+        return perform(idempotencyKey,true);
+    }
+
+    private Reply perform(String idempotencyKey, boolean lookupCall) throws Exception {
         if(idempotencyKey==null || !idempotencyKey.matches("[!-~]{1,200}"))
             throw new IllegalArgumentException("idempotency key must be bounded visible ASCII");
         if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
@@ -156,7 +190,7 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
                 if(Thread.currentThread()!=state.owner || !state.phase.compareAndSet(0,1))
                     throw new IllegalStateException("credential callback must run once on its owning thread");
                 try {
-                    state.observed=send(Objects.requireNonNull(issued,"issued token"),idempotencyKey,started,state);
+                    state.observed=send(Objects.requireNonNull(issued,"issued token"),idempotencyKey,started,state,lookupCall);
                     return state.observed;
                 } finally {state.phase.set(2);}
             });
@@ -177,7 +211,7 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
         }
     }
 
-    private Reply send(IssuedToken issued,String idempotencyKey,long started,CallState state) throws Exception {
+    private Reply send(IssuedToken issued,String idempotencyKey,long started,CallState state,boolean lookupCall) throws Exception {
         requireToken(issued);
         fence.requireCurrent(issued); // May block; expiry and the operation deadline are checked again afterward.
         requireToken(issued);
@@ -187,10 +221,11 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
         String token=issued.accessToken().reveal();
         if(token.length()>8192 || !token.matches("[A-Za-z0-9._~+/-]+=*"))
             throw new IllegalStateException("target-scoped credential unavailable");
-        var builder=HttpRequest.newBuilder(endpoint)
+        var builder=HttpRequest.newBuilder(lookupCall ? lookup.endpoint() : endpoint)
                 .header("Authorization","Bearer "+token).header("Idempotency-Key",idempotencyKey)
-                .header("X-Correlation-ID",correlation).header("Content-Type","application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(body,StandardCharsets.UTF_8));
+                .header("X-Correlation-ID",correlation);
+        if(lookupCall)builder.GET();
+        else builder.header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body,StandardCharsets.UTF_8));
         if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
         elapsed=System.nanoTime()-started;
         if(elapsed<0 || elapsed>=timeout.toNanos() || !issued.usableAt(Instant.now()))
@@ -202,11 +237,11 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
         if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
         state.dispatched=true;
         var response=CLIENT.send(request,headersOnly());
-        if(confirmed.contains(response.statusCode())) {
+        if((lookupCall ? lookup.confirmed() : confirmed).contains(response.statusCode())) {
             state.finished=true;
-            return new Reply(Outcome.CONFIRMED,"target confirmed");
+            return new Reply(Outcome.CONFIRMED,lookupCall ? "lookup confirmed" : "target confirmed");
         }
-        if(rejected.contains(response.statusCode())) {
+        if(!lookupCall && rejected.contains(response.statusCode())) {
             state.finished=true;
             return new Reply(Outcome.FAILED,"target rejected");
         }

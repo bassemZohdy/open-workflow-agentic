@@ -72,6 +72,29 @@ class PinnedHttpEffectTargetTest {
                     Set.of(200),Set.of(500),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false));
         } finally {server.stop(0);}
     }
+    @Test void scopedLookupUsesSameKeyAndOnlySelectedConfirmationIsFinal() throws Exception {
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);var calls=new AtomicInteger();
+        var key=new AtomicReference<String>();var auth=new AtomicReference<String>();
+        server.createContext("/lookup",exchange->{
+            try { assertEquals("GET",exchange.getRequestMethod()); key.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+                auth.set(exchange.getRequestHeaders().getFirst("Authorization"));
+                exchange.sendResponseHeaders(calls.incrementAndGet()==1 ? 404 : 200,-1);
+            } finally {exchange.close();}
+        });server.start();
+        try {
+            var lookup=new PinnedHttpEffectTarget.Lookup(uri(server,"/lookup"),Set.of(200));
+            var target=new PinnedHttpEffectTarget("tool:orders",uri(server,"/orders"),"audience:orders","trace-1","{}",TIMEOUT,
+                    Set.of(200),Set.of(),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false,lookup);
+            assertEquals(Outcome.UNKNOWN,target.lookup("stable-key").outcome());
+            assertEquals(Outcome.CONFIRMED,target.lookup("stable-key").outcome());
+            assertEquals("stable-key",key.get());assertEquals("Bearer token.value",auth.get());assertEquals(2,calls.get());
+            assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget.Lookup(uri(server,"/lookup?x=1"),Set.of(200)));
+            assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget.Lookup(uri(server,"/lookup"),Set.of(404)));
+            assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",uri(server,"/orders"),"audience:orders","trace-1","{}",TIMEOUT,
+                    Set.of(200),Set.of(),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false,
+                    new PinnedHttpEffectTarget.Lookup(URI.create("http://127.0.0.1:1/lookup"),Set.of(200))));
+        } finally {server.stop(0);}
+    }
     @Test void timeoutIsUnknownAndNeverARefusalOrSuccess() throws Exception {
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);var entered=new CountDownLatch(1);
         var executor=Executors.newSingleThreadExecutor();server.setExecutor(executor);

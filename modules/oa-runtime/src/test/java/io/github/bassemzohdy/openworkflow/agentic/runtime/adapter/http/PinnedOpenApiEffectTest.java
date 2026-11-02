@@ -172,4 +172,16 @@ class PinnedOpenApiEffectTest {
         assertThrows(IllegalArgumentException.class, () -> op.registration("tool:orders", "orders", "corr", Duration.ofSeconds(2), Set.of(200), Set.of(500), EXPECTED,
                 (audience, action) -> { throw new AssertionError(); }, token -> { }));
     }
+
+    @Test void lookupConfigurationIsBoundToProfileAndCannotChangeOrigin() {
+        var op=operation(DOC,"createOrder",ORIGIN);
+        var lookup=new PinnedHttpEffectTarget.Lookup(URI.create("https://orders.example/lookup"),Set.of(200));
+        var withLookup=op.registration("tool:orders","orders","corr",Duration.ofSeconds(2),Set.of(200),Set.of(),EXPECTED,
+                (audience,action)->{throw new AssertionError();},token->{},lookup);
+        assertNotEquals(fingerprint(registration(op,Set.of(200))),fingerprint(withLookup));
+        var other=new PinnedHttpEffectTarget.Lookup(URI.create("https://other.example/lookup"),Set.of(200));
+        assertThrows(IllegalArgumentException.class,()->op.registration("tool:orders","orders","corr",Duration.ofSeconds(2),Set.of(200),Set.of(),EXPECTED,
+                (audience,action)->{throw new AssertionError();},token->{},other));
+        assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget.Lookup(URI.create("https://orders.example/%2e%2e/lookup"),Set.of(200)));
+    }
 }

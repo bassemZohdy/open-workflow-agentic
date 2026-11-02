@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an opt-in, same-origin authoritative lookup for HTTP effect recovery, preserving unknown outcomes and refusing output after authority loss.
+
 - Allow explicitly documented service-contract rejection statuses to be retained as failed effects without retry; unselected statuses remain unknown.
 
 - Support bounded, declared string query parameters for pinned OpenAPI effects, tied to the same durable occurrence as the path and body.
