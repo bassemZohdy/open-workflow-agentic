@@ -96,8 +96,8 @@ class InstanceAuthoritiesTest {
         DelegationGrant replacement = grantFor(alice, planner, Duration.ofHours(2));
         InstanceRecord row = start(alice, old.id());
         InstanceAuthority observed = authorities.find(row.id()).orElseThrow();
-        assertTrue(authorityStore.markReauthorizationRequired(row.id(), old.id(), "grant.revoked", clock.instant()));
-        assertTrue(authorityStore.rebind(row.id(), old.id(), replacement.id(), clock.instant()));
+        assertTrue(authorityStore.markReauthorizationRequired(row.id(), old.id(), observed.revision(), "grant.revoked", clock.instant()));
+        assertTrue(authorityStore.rebind(row.id(), old.id(), authorityStore.find(row.id()).orElseThrow().revision(), replacement.id(), clock.instant()));
 
         authorities.require(observed, "grant.inactive");
 
@@ -105,8 +105,40 @@ class InstanceAuthoritiesTest {
         assertEquals(replacement.id(), current.grantId());
         assertEquals(InstanceAuthority.State.AUTHORIZED, current.state());
         assertNull(current.stateReason());
-        assertTrue(authorityStore.markReauthorizationRequired(row.id(), replacement.id(), "grant.revoked", clock.instant()));
+        assertTrue(authorityStore.markReauthorizationRequired(row.id(), replacement.id(), current.revision(), "grant.revoked", clock.instant()));
         assertEquals(InstanceAuthority.State.REAUTHORIZATION_REQUIRED, authorities.find(row.id()).orElseThrow().state());
+    }
+
+    @Test
+    void sameGrantRebindRejectsStaleHoldsAndStaleRenewalsEvenWhenClockDoesNotMove() {
+        DelegationGrant grant = grantFor(alice, planner, Duration.ofHours(1));
+        InstanceRecord row = start(alice, grant.id());
+        InstanceAuthority original = authorities.find(row.id()).orElseThrow();
+        assertTrue(authorityStore.markReauthorizationRequired(row.id(), grant.id(), original.revision(), "first", clock.instant()));
+        InstanceAuthority firstHold = authorities.find(row.id()).orElseThrow();
+        assertTrue(authorityStore.rebind(row.id(), grant.id(), firstHold.revision(), grant.id(), clock.instant()));
+        InstanceAuthority rebound = authorities.find(row.id()).orElseThrow();
+        assertEquals(original.stateSince(), rebound.stateSince());
+        assertTrue(rebound.revision() > original.revision());
+        authorities.require(original, "old.refusal");
+        assertEquals(InstanceAuthority.State.AUTHORIZED, authorities.find(row.id()).orElseThrow().state());
+        assertTrue(authorityStore.markReauthorizationRequired(row.id(), grant.id(), rebound.revision(), "second", clock.instant()));
+        assertFalse(authorityStore.rebind(row.id(), grant.id(), firstHold.revision(), grant.id(), clock.instant()));
+        assertEquals(InstanceAuthority.State.REAUTHORIZATION_REQUIRED, authorities.find(row.id()).orElseThrow().state());
+    }
+
+    @Test
+    void legacySqlUpdatesCannotSuppressTheRevisionAdvance() throws Exception {
+        DelegationGrant grant = grantFor(alice, planner, Duration.ofHours(1));
+        InstanceRecord row = start(alice, grant.id());
+        InstanceAuthority observed = authorities.find(row.id()).orElseThrow();
+        try (var connection = IdentityTestSupport.dataSource().getConnection();
+             var update = connection.prepareStatement("update identity.instance_authority set updated_at=updated_at, authority_revision=0 where instance_id=?")) {
+            update.setString(1, row.id().value());
+            assertEquals(1, update.executeUpdate());
+        }
+        assertEquals(observed.revision() + 1, authorities.find(row.id()).orElseThrow().revision());
+        assertFalse(authorityStore.markReauthorizationRequired(row.id(), grant.id(), observed.revision(), "stale", clock.instant()));
     }
 
     // ---- binding at start --------------------------------------------------------------------------------------------

@@ -203,6 +203,14 @@ class GovernedAsyncDispatchTest {
         assertTrue(released.isEmpty());
     }
 
+    @Test void sameGrantReboundAtTheSameTimeStillWithholdsTheOldResult() {
+        assertLost(Reason.REVOKED, () -> dispatch.run("engine-1", "tool-cases", Set.of("cases:read"), token -> {
+            registered = Optional.of(new InstanceAuthority(instanceId, "t1", USER, grantId, "corr-1",
+                    InstanceAuthority.State.AUTHORIZED, null, NOW, NOW, 2));
+            return "output";
+        }));
+    }
+
     @Test void interruptionDuringExchangeDoesNotEnterWork() {
         var ran = new AtomicReference<>(false);
         var original = exchanger;

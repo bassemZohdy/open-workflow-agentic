@@ -20,7 +20,10 @@ These are application-level observations across separate transactions. A grant c
 this is not a commit-time or physical-effect fence. The Flow production dispatch, credential source, supported issuer
 contract, real-provider/restart proof and full WP-102 acceptance remain open.
 
-The reauthorization-required update now compares the grant ID observed before the audit write. An old-grant refusal
-cannot put a different replacement grant on hold, while a refusal for the currently bound grant still can. The audit
-records the refusal attempt even when the conditional update changes no row. This comparison does not distinguish a
-later binding to the same grant ID; a generation or stronger version fence would be needed to cover that case.
+The reauthorization-required update and rebind compare the grant ID and database-maintained authority revision observed
+before their audit writes. V77.6 initializes existing rows and advances the revision on every update, including writes
+from an older replica. This detects rebinding to the same grant even when timestamps do not change. The dispatch
+authority comparisons also include the revision. The audit records the refusal attempt even if its conditional update
+changes no row. Migration must precede new-code rollout; old application replicas still lack the conditional checks and
+can perform stale updates until they are upgraded. The trigger makes their writes visible to new-code observations; it
+does not make their own decisions safe. This does not make the final authorization check atomic with an external effect.

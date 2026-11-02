@@ -20,9 +20,16 @@ import java.util.Objects;
  * @param stateReason   why the state is not AUTHORIZED (a short code such as {@code grant.expired}), or null
  * @param stateSince    when the state last changed
  * @param createdAt     when the row was created
+ * @param revision      database-maintained generation of the authority row
  */
 public record InstanceAuthority(Ulid instanceId, String tenant, Subject subject, Ulid grantId, String correlationId,
-                                State state, String stateReason, Instant stateSince, Instant createdAt) {
+                                State state, String stateReason, Instant stateSince, Instant createdAt, long revision) {
+
+    /** New, not-yet-inserted authority; PostgreSQL initializes its revision to zero. */
+    public InstanceAuthority(Ulid instanceId, String tenant, Subject subject, Ulid grantId, String correlationId,
+                             State state, String stateReason, Instant stateSince, Instant createdAt) {
+        this(instanceId, tenant, subject, grantId, correlationId, state, stateReason, stateSince, createdAt, 0);
+    }
 
     /** Whether the instance may continue under its grant. */
     public enum State { AUTHORIZED, REAUTHORIZATION_REQUIRED }
@@ -37,6 +44,7 @@ public record InstanceAuthority(Ulid instanceId, String tenant, Subject subject,
         }
         Objects.requireNonNull(stateSince, "stateSince");
         Objects.requireNonNull(createdAt, "createdAt");
+        if (revision < 0) throw new IllegalArgumentException("revision must not be negative");
     }
 
     /** True when the instance runs under a delegation grant. */

@@ -65,8 +65,8 @@ class PinnedHttpEffectLedgerTest {
         String engineId="http-rebind-"+UUID.randomUUID();
         instances.replace(row.successor(now,InstanceStatus.STARTING,engineId,0,null,null),row.version(),"test.prepared",user);
         Runnable rebind=()->{
-            assertTrue(authorityStore.markReauthorizationRequired(row.id(),oldGrant.id(),"test.rebind",Instant.now()));
-            assertTrue(authorityStore.rebind(row.id(),oldGrant.id(),newGrant.id(),Instant.now()));
+            assertTrue(authorityStore.markReauthorizationRequired(row.id(),oldGrant.id(),authorityStore.find(row.id()).orElseThrow().revision(),"test.rebind",Instant.now()));
+            assertTrue(authorityStore.rebind(row.id(),oldGrant.id(),authorityStore.find(row.id()).orElseThrow().revision(),newGrant.id(),Instant.now()));
         };
         var creds=new GovernedAsyncDispatch.Credentials() {
             public Optional<Credential> subject(InstanceAuthority a){return Optional.of(Credential.of("subject"));}

@@ -1,5 +1,7 @@
 # Changelog
 
+- Track a database-maintained authority revision to reject stale holds and renewals even after same-grant rebinding.
+
 - Refuse a changed or disappearing delegated authority even when ungoverned workflows are allowed.
 
 - Prevent a delayed refusal for an old grant from placing a different replacement grant on hold.

@@ -148,7 +148,7 @@ class InstanceAuthorityApiTest {
         var omitted = new LinkedHashMap<>(original); omitted.remove("delegationGrantId");
         given().header("Authorization", "Bearer " + alice).contentType("application/json").body(omitted)
                 .when().post("/instances").then().statusCode(409);
-        assertTrue(authorityStore.markReauthorizationRequired(Ulid.parse(id), first.id(), "grant.refused", Instant.now()));
+        assertTrue(authorityStore.markReauthorizationRequired(Ulid.parse(id), first.id(), authorityStore.find(Ulid.parse(id)).orElseThrow().revision(), "grant.refused", Instant.now()));
         reauthorize(alice, id, second.id().value()).statusCode(200);
         assertEquals(second.id().value(), scalar("select grant_id from identity.instance_authority where instance_id = ?", id));
         assertEquals(first.id().value(), scalar("select initial_grant_id from identity.instance_authority where instance_id = ?", id));
@@ -225,7 +225,7 @@ class InstanceAuthorityApiTest {
 
         reauthorize(alice, id, fresh.id().value()).statusCode(409);        // it does not wait for re-authorization
         grants.revoke(old.id(), new Subject(SubjectKind.USER, "alice"), "withdrawn", null);
-        assertTrue(authorityStore.markReauthorizationRequired(Ulid.parse(id), old.id(), "grant.revoked", Instant.now()));
+        assertTrue(authorityStore.markReauthorizationRequired(Ulid.parse(id), old.id(), authorityStore.find(Ulid.parse(id)).orElseThrow().revision(), "grant.revoked", Instant.now()));
         reauthorize(token("bob", tenant, "oa.operate"), id, fresh.id().value()).statusCode(403);
         reauthorize(token("alice", newTenant(), "oa.operate"), id, fresh.id().value()).statusCode(404);
         reauthorize(alice, id, null).statusCode(400);

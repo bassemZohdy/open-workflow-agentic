@@ -169,7 +169,7 @@ public class InstanceAuthorities implements ResumeGate {
         attributes.put("reason", reason);
         audit.record(RUNTIME, REQUIRED_EVENT, IdentityAudit.INSTANCE_AUTHORITY, authority.instanceId().value(),
                 authority.tenant(), authority.correlationId(), attributes);
-        store.markReauthorizationRequired(authority.instanceId(), authority.grantId(), reason, now());
+        store.markReauthorizationRequired(authority.instanceId(), authority.grantId(), authority.revision(), reason, now());
     }
 
     // ---- renewal ---------------------------------------------------------------------------------------------------
@@ -217,7 +217,7 @@ public class InstanceAuthorities implements ResumeGate {
         } catch (RuntimeException e) {
             throw new GrantException(GrantException.Code.UNAVAILABLE, "the renewal could not be recorded", e);
         }
-        if (!store.rebind(instanceId, authority.grantId(), newGrant, now())) {
+        if (!store.rebind(instanceId, authority.grantId(), authority.revision(), newGrant, now())) {
             throw new GrantException(GrantException.Code.INVALID_REQUEST, "the instance changed; read it and try again");
         }
         return store.find(instanceId).orElseThrow();

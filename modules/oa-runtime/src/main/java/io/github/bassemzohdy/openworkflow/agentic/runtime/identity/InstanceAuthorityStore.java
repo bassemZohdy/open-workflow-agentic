@@ -14,12 +14,12 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.sql.DataSource;
 
-/** JDBC access to {@code identity.instance_authority}. Identifiers only; see V62. */
+/** JDBC access to {@code identity.instance_authority}. Identifiers only; see V62 and V77.6. */
 public class InstanceAuthorityStore {
 
     private static final String COLUMNS = """
             instance_id, tenant, subject_kind, subject_id, grant_id, correlation_id, state, state_reason, state_since,
-            created_at""";
+            created_at, authority_revision""";
 
     private final DataSource dataSource;
 
@@ -85,7 +85,7 @@ public class InstanceAuthorityStore {
         return Transactions.inTransaction(dataSource, connection -> {
             try (PreparedStatement ps = connection.prepareStatement("""
                     select a.instance_id, a.tenant, a.subject_kind, a.subject_id, a.grant_id, a.correlation_id,
-                           a.state, a.state_reason, a.state_since, a.created_at
+                           a.state, a.state_reason, a.state_since, a.created_at, a.authority_revision
                       from identity.instance_authority a
                       join task.instance i on i.id = a.instance_id
                      where i.engine_instance_id = ?
@@ -99,24 +99,25 @@ public class InstanceAuthorityStore {
     }
 
     /**
-     * Marks the instance as needing re-authorization only while it is still bound to the observed grant. A row that
-     * already waits keeps its first reason and time; a replacement grant cannot be held by an old observation.
+     * Marks the instance as needing re-authorization only while it is still at the observed grant and revision. A row
+     * that already waits keeps its first reason and time; a stale observation cannot hold a renewed binding.
      *
      * @return true if this call changed the row
      */
-    public boolean markReauthorizationRequired(Ulid instanceId, Ulid expectedGrant, String reason, Instant at) {
+    public boolean markReauthorizationRequired(Ulid instanceId, Ulid expectedGrant, long expectedRevision, String reason, Instant at) {
         java.util.Objects.requireNonNull(expectedGrant, "expectedGrant");
         return Transactions.inTransaction(dataSource, connection -> {
             try (PreparedStatement ps = connection.prepareStatement("""
                     update identity.instance_authority
                        set state = 'REAUTHORIZATION_REQUIRED', state_reason = ?, state_since = ?, updated_at = ?
-                     where instance_id = ? and state = 'AUTHORIZED' and grant_id = ?
+                     where instance_id = ? and state = 'AUTHORIZED' and grant_id = ? and authority_revision = ?
                     """)) {
                 ps.setString(1, reason);
                 ps.setTimestamp(2, Timestamp.from(at));
                 ps.setTimestamp(3, Timestamp.from(at));
                 ps.setString(4, instanceId.value());
                 ps.setString(5, expectedGrant.value());
+                ps.setLong(6, expectedRevision);
                 return ps.executeUpdate() == 1;
             }
         });
@@ -124,22 +125,23 @@ public class InstanceAuthorityStore {
 
     /**
      * Binds a new grant and sets the state back to AUTHORIZED, only if the instance currently waits for re-authorization
-     * and runs under {@code expectedOldGrant}. Compare-and-set, so two people cannot both rebind.
+     * and runs under {@code expectedOldGrant} at the observed revision. Compare-and-set, so stale renewals cannot rebind.
      *
      * @return true if this call rebound the instance
      */
-    public boolean rebind(Ulid instanceId, Ulid expectedOldGrant, Ulid newGrant, Instant at) {
+    public boolean rebind(Ulid instanceId, Ulid expectedOldGrant, long expectedRevision, Ulid newGrant, Instant at) {
         return Transactions.inTransaction(dataSource, connection -> {
             try (PreparedStatement ps = connection.prepareStatement("""
                     update identity.instance_authority
                        set grant_id = ?, state = 'AUTHORIZED', state_reason = null, state_since = ?, updated_at = ?
-                     where instance_id = ? and grant_id = ? and state = 'REAUTHORIZATION_REQUIRED'
+                     where instance_id = ? and grant_id = ? and state = 'REAUTHORIZATION_REQUIRED' and authority_revision = ?
                     """)) {
                 ps.setString(1, newGrant.value());
                 ps.setTimestamp(2, Timestamp.from(at));
                 ps.setTimestamp(3, Timestamp.from(at));
                 ps.setString(4, instanceId.value());
                 ps.setString(5, expectedOldGrant.value());
+                ps.setLong(6, expectedRevision);
                 return ps.executeUpdate() == 1;
             }
         });
@@ -151,6 +153,7 @@ public class InstanceAuthorityStore {
                 new Subject(SubjectKind.valueOf(rs.getString("subject_kind")), rs.getString("subject_id")),
                 grant == null ? null : Ulid.parse(grant), rs.getString("correlation_id"),
                 InstanceAuthority.State.valueOf(rs.getString("state")), rs.getString("state_reason"),
-                rs.getTimestamp("state_since").toInstant(), rs.getTimestamp("created_at").toInstant());
+                rs.getTimestamp("state_since").toInstant(), rs.getTimestamp("created_at").toInstant(),
+                rs.getLong("authority_revision"));
     }
 }
