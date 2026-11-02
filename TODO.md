@@ -777,7 +777,7 @@ Implementation owner: **Claude**; reviewer: **GPT**; backlog: Claude-04. Shared 
 
 Implemented scope:
 
-- The research graph applies approved per-run iteration and wall-clock limits through its existing node interceptor. The interceptor now rechecks the deadline after the mandatory started audit, refusing execution if audit latency consumed the remaining time; the admitted attempt remains counted. Limits remain process-local and restart resets them.
+- The research graph applies approved per-run iteration and wall-clock limits through its existing node interceptor. The interceptor rechecks the deadline after the mandatory started audit, after the action and after the completed audit; a late result is withheld and the admitted attempt remains counted. Already-started actions are not interrupted or undone. Limits remain process-local and restart resets them.
 
 Additional closure/integration tasks:
 

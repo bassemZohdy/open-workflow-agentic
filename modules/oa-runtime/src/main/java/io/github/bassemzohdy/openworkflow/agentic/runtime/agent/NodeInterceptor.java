@@ -26,15 +26,18 @@ import org.bsc.langgraph4j.state.AgentState;
  *   <li>the step is counted against {@code maxSteps}; when the limit is already reached the node is refused;</li>
  *   <li>{@code agent.node.started} is recorded; if that record cannot be written the node is refused;</li>
  *   <li>the deadline is rechecked after the started audit; the node runs only while it is still current;</li>
- *   <li>{@code agent.node.completed} is recorded and the result is returned only after that write succeeds. If the
+ *   <li>the deadline is rechecked after the action, then {@code agent.node.completed} is recorded and the deadline is
+ *       checked again before the result is returned. If the
  *       write fails the result is dropped and the step fails, so graph state never advances on an unrecorded step.
  *       A node that throws is recorded as {@code agent.node.failed} (best effort) and its exception is rethrown.</li>
  * </ol>
- * A refused node is never run: zero executions of the node's action. A refusal for a limit is recorded as
- * {@code agent.node.refused}; if that record fails too, the refusal stands.
+ * A node refused before execution does not run. A deadline refusal after execution withholds the result but cannot
+ * undo work the action already performed. A limit refusal is recorded as {@code agent.node.refused}; if that record
+ * fails too, the refusal stands.
  *
  * <p>The deadline is {@code startedAt + maxWallClock}, fixed when the interceptor is made. It is checked when a node is
- * admitted, so a node already running is not interrupted (nothing here can stop it); the next node is refused. A
+ * admitted and before its result is released. A node already running is not interrupted, but its late result is
+ * withheld and the next node is refused. A
  * node refused before admission does not use a step. If the started audit takes the request past its deadline, the
  * attempt remains counted and the action is refused before it runs.
  *
@@ -101,7 +104,9 @@ public final class NodeInterceptor {
                 record("agent.node.failed", node, step, e.getClass().getSimpleName(), false);
                 throw e;
             }
+            requireCurrentDeadline(node, step, true);
             record("agent.node.completed", node, step, null, true);
+            requireCurrentDeadline(node, step, true);
             return result;
         };
     }
@@ -121,9 +126,13 @@ public final class NodeInterceptor {
     }
 
     private void requireCurrentDeadline(String node, int step) {
+        requireCurrentDeadline(node, step, false);
+    }
+
+    private void requireCurrentDeadline(String node, int step, boolean result) {
         if (deadline != null && !clock.instant().isBefore(deadline)) {
             record("agent.node.refused", node, step, "wall-clock limit " + maxWallClock + " reached", false);
-            throw new NodeRefused("wall-clock limit " + maxWallClock + " reached before node " + node);
+            throw new NodeRefused("wall-clock limit " + maxWallClock + (result ? " reached before releasing result of node " : " reached before node ") + node);
         }
     }
 
