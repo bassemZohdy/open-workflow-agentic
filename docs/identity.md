@@ -390,6 +390,9 @@ then the consent screen, then the authorization code); the workload token by cli
 | `agentic.identity.exchange.client-secret-name` | none | file name in the secrets directory |
 | `agentic.identity.exchange.timeout` | `PT5S` | deadline for the HTTP exchange, including response body |
 | `agentic.identity.exchange.max-concurrent` | `16` | maximum physical token requests per exchanger (1–1024); a timed-out request retains its slot until it stops |
+| `agentic.identity.exchange.circuit-enabled` | `true` | enable the token endpoint circuit breaker |
+| `agentic.identity.exchange.circuit-failure-threshold` | `5` | consecutive endpoint failures before opening the circuit |
+| `agentic.identity.exchange.circuit-open-for` | `PT30S` | open time before one recovery probe |
 | `agentic.secrets.dir` | none | directory of secret files |
 | `agentic.secrets.ttl` | `PT30S` | an unchanged file is re-read at least this often |
 | `agentic.secrets.max-stale` | `PT2M` | a cached secret may be used this long after the ttl while the file cannot be read |
@@ -397,6 +400,7 @@ then the consent screen, then the authorization code); the workload token by cli
 | `agentic.dev.header-seam-profiles` | `dev,test` | profiles where the seam may be on |
 
 A timed-out request may already have reached the authorization server. Its outcome is unknown, and the runtime does not retry it automatically. The deadline covers the HTTP request and response body; grant checks, secret lookup, verification and audit are outside that deadline.
+The circuit counts transport failures and unexpected HTTP statuses, while normal OAuth refusals do not open it. A timed-out worker contributes its failure when it actually stops; until then it retains its concurrency slot.
 
 ## 11. Operations
 

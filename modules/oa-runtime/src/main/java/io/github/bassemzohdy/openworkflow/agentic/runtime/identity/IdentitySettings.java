@@ -84,5 +84,17 @@ public interface IdentitySettings {
         /** Maximum number of in-flight physical token requests, including timed-out calls still stopping. */
         @WithDefault("16")
         int maxConcurrent();
+
+        /** Enable the token-endpoint circuit breaker. */
+        @WithDefault("true")
+        boolean circuitEnabled();
+
+        /** Consecutive endpoint failures needed to open the circuit. */
+        @WithDefault("5")
+        int circuitFailureThreshold();
+
+        /** How long an open circuit refuses requests before one recovery probe. */
+        @WithDefault("PT30S")
+        Duration circuitOpenFor();
     }
 }

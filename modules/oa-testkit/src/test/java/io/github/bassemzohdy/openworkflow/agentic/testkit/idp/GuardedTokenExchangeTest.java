@@ -156,4 +156,50 @@ class GuardedTokenExchangeTest {
             server.stop(0);
         }
     }
+
+    @Test
+    void productionProducerWiresTheConfiguredCircuitWithoutRetryingIssuance() throws Exception {
+        fx.clock.setInstant(java.time.Instant.now());
+        grant = fx.grants.grant(fx.tenant, ALICE, ALICE, PLANNER, SCOPES, fx.clock.instant().plus(Duration.ofHours(1)),
+                "production-guard");
+        userToken = fx.as.userToken("alice", fx.tenant, "oa-api", SCOPES, Duration.ofMinutes(30));
+        workload = fx.as.workloadToken("planner", fx.tenant, Duration.ofMinutes(30));
+        var settings = new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IdentitySettings.Exchange() {
+            public java.util.Optional<String> clientId() { return java.util.Optional.of(CLIENT_ID); }
+            public java.util.Optional<String> clientSecretName() { return java.util.Optional.of(CLIENT_SECRET_NAME); }
+            public Duration timeout() { return Duration.ofSeconds(2); }
+            public int maxConcurrent() { return 4; }
+            public boolean circuitEnabled() { return true; }
+            public int circuitFailureThreshold() { return 2; }
+            public Duration circuitOpenFor() { return Duration.ofMinutes(1); }
+        };
+        var mapping = (io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IdentitySettings)
+                java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),
+                        new Class<?>[] {io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IdentitySettings.class},
+                        (proxy, method, args) -> switch (method.getName()) {
+                            case "tokenEndpoint" -> java.util.Optional.of(fx.as.tokenEndpoint());
+                            case "issuer" -> java.util.Optional.of(fx.idp.issuer());
+                            case "exchange" -> settings;
+                            default -> throw new AssertionError("unexpected setting: " + method.getName());
+                        });
+        var producer = new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IdentityProducers();
+        var field = producer.getClass().getDeclaredField("settings");
+        field.setAccessible(true);
+        field.set(producer, mapping);
+        var produced = producer.tokenExchanger(fx.secrets, fx.grants, fx.bindings, fx.verifier, fx.audit());
+        try {
+            fx.as.fault(Fault.UNAVAILABLE);
+            for (int i = 0; i < 2; i++) {
+                assertEquals(Code.UNAVAILABLE, assertThrows(ExchangeException.class,
+                        () -> produced.exchange(request(AUDIENCE))).code());
+            }
+            assertEquals(2, fx.as.received().size());
+            var rejected = assertThrows(ExchangeException.class, () -> produced.exchange(request(AUDIENCE)));
+            assertEquals(Code.UNAVAILABLE, rejected.code());
+            assertTrue(rejected.getMessage().contains("CIRCUIT_OPEN"));
+            assertEquals(2, fx.as.received().size(), "the open circuit sends no request or retry");
+        } finally {
+            producer.disposeTokenExchanger(produced);
+        }
+    }
 }
