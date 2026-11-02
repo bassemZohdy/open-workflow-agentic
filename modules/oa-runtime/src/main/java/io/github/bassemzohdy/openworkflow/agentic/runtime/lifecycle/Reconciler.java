@@ -461,7 +461,7 @@ public class Reconciler {
 
     private void repairDeadline(RegistryScan.Ref ref, Instant now) {
         InstanceRecord row = load(ref);
-        if (row.status() != InstanceStatus.WAITING || row.waitDeadline() == null || !row.waitDeadline().isBefore(now)) {
+        if (row.status() != InstanceStatus.WAITING || row.waitDeadline() == null || row.waitDeadline().isAfter(now)) {
             return;
         }
         cancelOverdue(row, now, "deadline", "reconciler.deadline.no-engine-instance", "reconciler.deadline.passed",
@@ -508,7 +508,7 @@ public class Reconciler {
         Optional<Instant> current = settings.maxLifetime.map(row.createdAt()::plus);
         Instant deadline = pinned.isEmpty() ? current.orElse(null)
                 : current.isEmpty() || pinned.get().isBefore(current.get()) ? pinned.get() : current.get();
-        if (deadline == null || !deadline.isBefore(now)) return;
+        if (deadline == null || deadline.isAfter(now)) return;
         if (row.status() == InstanceStatus.STARTING && row.engineInstanceId() == null) {
             store.replace(row.successor(now, InstanceStatus.CANCELLED, null, row.startAttempts(), row.lastError(), null),
                     row.version(), "reconciler.lifetime.exceeded", InstanceService.RUNTIME_ACTOR);
