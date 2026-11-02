@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an internal transaction seam for inbox receipts and test atomic wait binding, rollback and duplicate receipt behavior. Producer authorization and delivery remain open.
+
 - Characterize a test-only targeted SDK callback that avoids cross-instance broadcast and rejects concurrent duplicate attempts in one process. Durable dispatch, leases and checkpoints remain open.
 
 - Exercise the human wake envelope in the pinned workflow SDK. A negative control confirms direct SDK broadcast also reaches another occurrence, so durable fenced dispatch remains unactivated.

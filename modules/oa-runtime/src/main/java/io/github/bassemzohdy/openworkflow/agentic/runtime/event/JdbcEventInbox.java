@@ -127,6 +127,20 @@ public class JdbcEventInbox {
 
     /** Duplicate receipt never changes the original payload, route or retention deadline. */
     public Received receive(InboxMessage message, Instant retainUntil) {
+        validateReceipt(message, retainUntil);
+        return Transactions.inTransaction(dataSource, c -> receiveValidated(c, message, retainUntil));
+    }
+
+    /**
+     * Internal transaction seam: caller owns the connection and must commit or roll back all related work. It does not
+     * authorize a producer, match a wait, deliver a callback or prove a checkpoint. No endpoint uses this seam.
+     */
+    Received receiveInTransaction(Connection connection, InboxMessage message, Instant retainUntil) throws SQLException {
+        validateReceipt(message, retainUntil);
+        return receiveValidated(connection, message, retainUntil);
+    }
+
+    private void validateReceipt(InboxMessage message, Instant retainUntil) {
         Objects.requireNonNull(message); Objects.requireNonNull(retainUntil);
         Instant now = clock.instant();
         if (!retainUntil.isAfter(now) || retainUntil.isAfter(now.plus(Duration.ofDays(30)))) {
@@ -136,32 +150,35 @@ public class JdbcEventInbox {
             var data = JSON.readTree(message.dataJson());
             if (data == null || data.isMissingNode()) throw new IllegalArgumentException("event data must be JSON");
         } catch (JsonProcessingException invalid) { throw new IllegalArgumentException("event data must be JSON", invalid); }
-        return Transactions.inTransaction(dataSource, c -> {
-            // Locks the target instance before the inbox, including on duplicate receipt.
-            status(c, message.tenant(), message.instanceId());
-            int inserted;
-            try (PreparedStatement s = c.prepareStatement("""
-                    insert into inbox.message (tenant, source, event_id, type, instance_id, correlation_key,
-                        data_json, fingerprint, retain_until) values (?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing
-                    """)) {
-                identity(s, message); s.setString(4, message.type()); s.setString(5, message.instanceId().value());
-                s.setString(6, message.correlationKey()); s.setString(7, message.dataJson());
-                s.setString(8, message.fingerprint()); s.setTimestamp(9, Timestamp.from(retainUntil));
-                inserted = s.executeUpdate();
-            }
-            // New statement at READ COMMITTED sees a winner that INSERT's snapshot could not see.
-            try (PreparedStatement s = c.prepareStatement("select fingerprint, retain_until from inbox.message "
-                    + "where tenant=? and source=? and event_id=? for update")) {
-                identity(s, message);
-                try (ResultSet r = s.executeQuery()) {
-                    if (!r.next()) throw new IllegalStateException("committed inbox message missing");
-                    if (!message.fingerprint().equals(r.getString(1))) {
-                        throw new IllegalStateException("event source/id is bound to different content or routing");
-                    }
-                    return new Received(message, r.getTimestamp(2).toInstant(), inserted == 1);
+    }
+
+    private Received receiveValidated(Connection connection, InboxMessage message, Instant retainUntil) throws SQLException {
+        Objects.requireNonNull(connection, "connection");
+        if (connection.getAutoCommit()) throw new IllegalArgumentException("an existing transaction is required");
+        // Locks the target instance before the inbox, including on duplicate receipt.
+        status(connection, message.tenant(), message.instanceId());
+        int inserted;
+        try (PreparedStatement s = connection.prepareStatement("""
+                insert into inbox.message (tenant, source, event_id, type, instance_id, correlation_key,
+                    data_json, fingerprint, retain_until) values (?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing
+                """)) {
+            identity(s, message); s.setString(4, message.type()); s.setString(5, message.instanceId().value());
+            s.setString(6, message.correlationKey()); s.setString(7, message.dataJson());
+            s.setString(8, message.fingerprint()); s.setTimestamp(9, Timestamp.from(retainUntil));
+            inserted = s.executeUpdate();
+        }
+        // New statement at READ COMMITTED sees a winner that INSERT's snapshot could not see.
+        try (PreparedStatement s = connection.prepareStatement("select fingerprint, retain_until from inbox.message "
+                + "where tenant=? and source=? and event_id=? for update")) {
+            identity(s, message);
+            try (ResultSet r = s.executeQuery()) {
+                if (!r.next()) throw new IllegalStateException("committed inbox message missing");
+                if (!message.fingerprint().equals(r.getString(1))) {
+                    throw new IllegalStateException("event source/id is bound to different content or routing");
                 }
+                return new Received(message, r.getTimestamp(2).toInstant(), inserted == 1);
             }
-        });
+        }
     }
 
     /**
