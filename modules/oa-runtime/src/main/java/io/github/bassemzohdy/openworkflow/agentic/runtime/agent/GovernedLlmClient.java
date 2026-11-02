@@ -89,7 +89,13 @@ public class GovernedLlmClient {
     static final class ApprovalLostAfterCall extends RuntimeException { }
 
     private void requireSameApproval(ApprovedModelContext.Approved expected) {
-        if (!context.current().filter(expected::equals).isPresent()) {
+        final boolean matches;
+        try {
+            matches = context.current().filter(expected::equals).isPresent();
+        } catch (RuntimeException unavailable) {
+            throw new ModelCallRefused("the approved model context is unavailable");
+        }
+        if (!matches) {
             throw new ModelCallRefused("the approved model context changed during this call");
         }
     }
