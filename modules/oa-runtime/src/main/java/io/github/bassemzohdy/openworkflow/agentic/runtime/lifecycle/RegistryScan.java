@@ -29,6 +29,11 @@ public class RegistryScan {
     public record Ref(String id, String tenant) {
     }
 
+    /** A stable position in a deadline-ordered scan. */
+    record DeadlineRef(String id, String tenant, Instant deadline) {
+        Ref ref() { return new Ref(id, tenant); }
+    }
+
     /** An agent run that is recorded as running, with the liveness fields the reconciler reads. */
     public record AgentRun(String taskId, String instanceId, AgentTaskStatus status, String bridge, Instant leaseUntil) {
     }
@@ -112,6 +117,45 @@ public class RegistryScan {
             statement.setTimestamp(4, cutoff); statement.setTimestamp(5, Timestamp.from(now));
             statement.setTimestamp(6, cutoff); statement.setInt(7, limit); statement.setInt(8, offset);
         }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
+    }
+
+    /** Keyset page: changes to earlier rows cannot shift the position of later rows. */
+    List<DeadlineRef> lifetimePage(Instant now, Optional<Instant> currentCutoff, int limit,
+                                   boolean includeStarting, DeadlineRef after, DeadlineRef through) {
+        String cursor = after == null ? "" : " and (deadline, id) > (?, ?)";
+        String upper = through == null ? "" : " and (deadline, id) <= (?, ?)";
+        if (currentCutoff.isEmpty()) {
+            return query("""
+                    select i.id, i.tenant, p.deadline from task.instance_lifetime p
+                      join task.instance i on i.id = p.instance_id
+                     where p.deadline < ? and i.status in ('STARTING', 'RUNNING', 'WAITING')
+                       and (? or i.status <> 'STARTING')
+                    """ + (after == null ? "" : " and (p.deadline, i.id) > (?, ?)")
+                    + (through == null ? "" : " and (p.deadline, i.id) <= (?, ?)")
+                    + " order by p.deadline, i.id limit ?", statement -> {
+                int i = 1; statement.setTimestamp(i++, Timestamp.from(now)); statement.setBoolean(i++, includeStarting);
+                if (after != null) { statement.setTimestamp(i++, Timestamp.from(after.deadline())); statement.setString(i++, after.id()); }
+                if (through != null) { statement.setTimestamp(i++, Timestamp.from(through.deadline())); statement.setString(i++, through.id()); }
+                statement.setInt(i, limit);
+            }, rs -> new DeadlineRef(rs.getString("id"), rs.getString("tenant"), rs.getTimestamp("deadline").toInstant()));
+        }
+        Timestamp cutoff = Timestamp.from(currentCutoff.orElseThrow());
+        return query("""
+                select id, tenant, deadline from (
+                  select i.id, i.tenant, least(p.deadline, i.created_at +
+                         (cast(? as timestamptz) - cast(? as timestamptz))) as deadline
+                    from task.instance i left join task.instance_lifetime p on p.instance_id = i.id
+                   where i.status in ('STARTING', 'RUNNING', 'WAITING') and (? or i.status <> 'STARTING')
+                     and (p.deadline < ? or i.created_at < ?)
+                ) eligible where true
+                """ + cursor + upper + " order by deadline, id limit ?", statement -> {
+            int i = 1; statement.setTimestamp(i++, Timestamp.from(now)); statement.setTimestamp(i++, cutoff);
+            statement.setBoolean(i++, includeStarting); statement.setTimestamp(i++, Timestamp.from(now));
+            statement.setTimestamp(i++, cutoff);
+            if (after != null) { statement.setTimestamp(i++, Timestamp.from(after.deadline())); statement.setString(i++, after.id()); }
+            if (through != null) { statement.setTimestamp(i++, Timestamp.from(through.deadline())); statement.setString(i++, through.id()); }
+            statement.setInt(i, limit);
+        }, rs -> new DeadlineRef(rs.getString("id"), rs.getString("tenant"), rs.getTimestamp("deadline").toInstant()));
     }
 
     /** The immutable original deadline, absent for unbounded or pre-migration starts. */
