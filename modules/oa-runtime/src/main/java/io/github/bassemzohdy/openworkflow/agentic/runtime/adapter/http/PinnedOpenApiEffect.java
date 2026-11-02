@@ -95,7 +95,7 @@ public final class PinnedOpenApiEffect {
         JsonNode responses = selected.path("responses");
         if (!responses.isObject()) throw new IllegalArgumentException("documented responses required");
         var allowed = new java.util.HashSet<Integer>();
-        for (int code : new int[]{200, 201, 204}) {
+        for (int code : new int[]{200, 201, 204, 400, 404, 409, 422}) {
             JsonNode response = responses.get(Integer.toString(code));
             if (response != null) {
                 JsonNode resolvedResponse = resolveObject(response, root.path("components").path("responses"), "responses");
@@ -115,24 +115,33 @@ public final class PinnedOpenApiEffect {
     public GovernedToolGateway.Registration registration(String target, String audience, String correlation,
             Duration timeout, Set<Integer> confirmed, PinnedHttpEffectTarget.CredentialExpectation expectation,
             PinnedHttpEffectTarget.CredentialProvider credentials, PinnedHttpEffectTarget.PreSendFence fence) {
-        Objects.requireNonNull(expectation); Set<Integer> statuses = Set.copyOf(confirmed);
+        return registration(target, audience, correlation, timeout, confirmed, Set.of(), expectation, credentials, fence);
+    }
+
+    /** Selected rejection codes require an approved service guarantee that the effect was not applied. */
+    public GovernedToolGateway.Registration registration(String target, String audience, String correlation,
+            Duration timeout, Set<Integer> confirmed, Set<Integer> rejected, PinnedHttpEffectTarget.CredentialExpectation expectation,
+            PinnedHttpEffectTarget.CredentialProvider credentials, PinnedHttpEffectTarget.PreSendFence fence) {
+        Objects.requireNonNull(expectation); Set<Integer> statuses = Set.copyOf(confirmed), rejections = Set.copyOf(rejected);
         if (oauthScopes != null && !oauthScopes.equals(expectation.scopes()))
             throw new IllegalArgumentException("credential scopes differ from the OpenAPI operation");
-        if (!documentedResponses.containsAll(statuses)) throw new IllegalArgumentException("confirmation response is not documented");
-        var encoder = new CanonicalEncoder("oa.openapi.effect.v1").text(documentDigest).text(operationId)
+        if (!documentedResponses.containsAll(statuses) || !documentedResponses.containsAll(rejections))
+            throw new IllegalArgumentException("terminal response is not documented");
+        var encoder = new CanonicalEncoder("oa.openapi.effect.v2").text(documentDigest).text(operationId)
                 .text(endpointTemplate).text(target).text(audience).text(correlation)
                 .number(timeout.getSeconds()).number(timeout.getNano()).text(expectation.issuer())
                 .text(expectation.grantId().toString()).number(expectation.scopes().size());
         expectation.scopes().stream().sorted().forEach(encoder::text);
         encoder.number(statuses.size()); statuses.stream().sorted().forEach(s -> encoder.number(s));
+        encoder.number(rejections.size()); rejections.stream().sorted().forEach(s -> encoder.number(s));
         String fingerprint = CanonicalEncoder.sha256Hex(encoder.toBytes());
         // Construct once at registration to reject malformed pinned configuration before any tool call.
-        new PinnedHttpEffectTarget(target, endpoint, audience, correlation, "{}", timeout, statuses, expectation, credentials, fence, loopbackTest);
+        new PinnedHttpEffectTarget(target, endpoint, audience, correlation, "{}", timeout, statuses, rejections, expectation, credentials, fence, loopbackTest, false);
         return GovernedToolGateway.Registration.effectful(schema, "{}", timeout, fingerprint, target,
                 arguments -> {
                     BoundRequest bound = bind(arguments);
                     return new PinnedHttpEffectTarget(target, bound.endpoint(), audience, correlation, bound.body(), timeout,
-                            statuses, expectation, credentials, fence, loopbackTest, true);
+                            statuses, rejections, expectation, credentials, fence, loopbackTest, true);
                 });
     }
 

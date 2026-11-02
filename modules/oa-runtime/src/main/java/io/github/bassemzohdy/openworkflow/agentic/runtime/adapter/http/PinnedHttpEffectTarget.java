@@ -38,6 +38,7 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     static final int CAPACITY = 16;
     private static final Semaphore SLOTS = new Semaphore(CAPACITY);
     private static final Set<Integer> TERMINAL_STATUSES = Set.of(200, 201, 204);
+    private static final Set<Integer> REJECTION_STATUSES = Set.of(400, 404, 409, 422);
     private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(64)
@@ -69,7 +70,7 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     private final String target, audience, correlation, body;
     private final URI endpoint;
     private final Duration timeout;
-    private final Set<Integer> confirmed;
+    private final Set<Integer> confirmed, rejected;
     private final CredentialProvider credentials;
     private final CredentialExpectation expectation;
     private final PreSendFence fence;
@@ -78,6 +79,13 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
                                   Duration timeout, Set<Integer> confirmed, CredentialExpectation expectation,
                                   CredentialProvider credentials, PreSendFence fence) {
         this(target,endpoint,audience,correlation,body,timeout,confirmed,expectation,credentials,fence,false);
+    }
+
+    /** Rejection codes must be proven by the service contract to mean that no effect was applied. */
+    public PinnedHttpEffectTarget(String target, URI endpoint, String audience, String correlation, String body,
+                                  Duration timeout, Set<Integer> confirmed, Set<Integer> rejected, CredentialExpectation expectation,
+                                  CredentialProvider credentials, PreSendFence fence) {
+        this(target,endpoint,audience,correlation,body,timeout,confirmed,rejected,expectation,credentials,fence,false,false);
     }
 
     // Test-only transport to an explicit IPv4 loopback literal; public composition always requires HTTPS.
@@ -90,6 +98,12 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     // Only the pinned operation binder may supply a constrained, canonical query string.
     PinnedHttpEffectTarget(String target, URI endpoint, String audience, String correlation, String body,
                            Duration timeout, Set<Integer> confirmed, CredentialExpectation expectation,
+                           CredentialProvider credentials, PreSendFence fence, boolean loopbackTest, boolean safeQuery) {
+        this(target,endpoint,audience,correlation,body,timeout,confirmed,Set.of(),expectation,credentials,fence,loopbackTest,safeQuery);
+    }
+
+    PinnedHttpEffectTarget(String target, URI endpoint, String audience, String correlation, String body,
+                           Duration timeout, Set<Integer> confirmed, Set<Integer> rejected, CredentialExpectation expectation,
                            CredentialProvider credentials, PreSendFence fence, boolean loopbackTest, boolean safeQuery) {
         this.target=Checks.requireMatching("target",target,AgentTaskContract.TOKEN);
         this.endpoint=Objects.requireNonNull(endpoint);
@@ -113,6 +127,9 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
         this.confirmed=Set.copyOf(confirmed);
         if(this.confirmed.isEmpty() || !TERMINAL_STATUSES.containsAll(this.confirmed))
             throw new IllegalArgumentException("terminal confirmation statuses must be explicitly pinned");
+        this.rejected=Set.copyOf(rejected);
+        if(!REJECTION_STATUSES.containsAll(this.rejected))
+            throw new IllegalArgumentException("unsupported terminal rejection status");
         this.expectation=Objects.requireNonNull(expectation);this.credentials=Objects.requireNonNull(credentials);
         this.fence=Objects.requireNonNull(fence);
     }
@@ -188,6 +205,10 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
         if(confirmed.contains(response.statusCode())) {
             state.finished=true;
             return new Reply(Outcome.CONFIRMED,"target confirmed");
+        }
+        if(rejected.contains(response.statusCode())) {
+            state.finished=true;
+            return new Reply(Outcome.FAILED,"target rejected");
         }
         return new Reply(Outcome.UNKNOWN,"target outcome unresolved");
     }

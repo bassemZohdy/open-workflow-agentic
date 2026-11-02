@@ -34,9 +34,10 @@ operation server overrides, header parameters, unsupported serialization and cus
 only be pure, acyclic references to named components in the same pinned document; expansion depth, node count and
 result size are bounded. Remote references, references with sibling keywords and references in instance-valued schema
 fields are refused. Request-body and response objects may likewise reference matching local components without siblings;
-missing, cyclic, cross-kind and remote references are refused. Confirmed status codes must be documented with response
+missing, cyclic, cross-kind and remote references are refused. Terminal status codes must be documented with response
 descriptions. The gateway fingerprint covers the exact document digest, selected operation, origin,
-target, timeout, correlation, confirmation codes and token expectations. The gateway validates arguments against the
+target, timeout, correlation, confirmation and rejection codes, and token expectations. Fingerprint version 2 requires
+reapproval of prior profiles. The gateway validates arguments against the
 selected schema before binding; no credential or network call occurs at registration. The selected operation must
 require exactly one supported scheme: HTTP bearer with no declared roles, or OAuth2 with nonempty scopes declared in
 one flow and exactly matching the pinned token scopes. Operation-level security overrides the root declaration;
@@ -52,12 +53,15 @@ remote references, dialects and status codes.
 Another controlled gateway fixture selects locally referenced request and response objects and calls an IPv4 loopback
 HTTP service through the real ledger. It checks a templated path, constrained query, precise decimal body, credential
 and idempotency key, refuses traversal and query-injection attempts, and confirms that an
-exact retry does not send again. The test-only loopback seam does not enable plaintext production transport; the fixture
+exact retry does not send again. A separately documented rejection is recorded FAILED and is not resent. The test-only
+loopback seam does not enable plaintext production transport; the fixture
 credential, service and policy do not establish provider interoperability or approval.
 
 A trusted service contract must explicitly choose terminal confirmation status codes from 200, 201 and 204, and must
-prove those statuses mean the effect is complete. A 202, redirect, unselected status, timeout, I/O failure or missing
-lookup is UNKNOWN, never proof of failure. Response bodies are not retained. Replay window is zero, so the ledger does
+prove those statuses mean the effect is complete. It may separately select 400, 404, 409 or 422 as terminal rejections
+only where the service guarantees that the selected response means no effect was applied. Selected rejections are
+recorded FAILED. A 202, redirect, unselected status, timeout, I/O failure or missing lookup is UNKNOWN. Response bodies
+are not retained. Replay window is zero, so the ledger does
 not automatically resend an unresolved effect. The target must atomically deduplicate any physical retries by the HTTP
 implementation; that transport behavior and the remote service's idempotency contract have not been proven. The
 [JDK 21 HttpClient documentation](https://docs.oracle.com/en/java/javase/21/docs/api/java.net.http/java/net/http/HttpClient.html)
@@ -66,7 +70,7 @@ effects, and clock/retention limits before relying on deduplication.
 
 Sixteen slots are shared by candidate instances in one classloader and are acquired before credential acquisition.
 A completed refusal before target dispatch releases its slot; the supplier must independently bound any physical
-provider work that can outlive its return. Once HTTP dispatch starts, a confirmed terminal response releases the slot;
+provider work that can outlive its return. Once HTTP dispatch starts, a selected terminal response releases the slot;
 an unresolved response, interruption or transport failure permanently reserves it because physical work may continue.
 Capacity exhaustion returns UNKNOWN, with no queue. A blocked supplier holds a slot but cannot be forcibly stopped;
 this can exhaust availability. Other classloaders, previous processes and remote work after restart are not bounded.
@@ -76,8 +80,8 @@ timeout uncertainty, invalid or expired tokens, authority refusal after acquisit
 blocked credential acquisition. Scoped-dispatch tests exercise revocation before and after the target call and reject
 escaped or repeated callbacks, using a fixture exchanger and policy. A PostgreSQL case combines the actual grant store,
 identity dispatcher and ledger with a fixture exchanger and local service: revocation during a confirmed call retains
-the CONFIRMED fact while withholding the result; a non-confirming response under the same revocation remains INTENDED
-and enters reconciliation without returning an outcome. Separate cases cover withheld authoritative lookup and compensation;
+the CONFIRMED fact while withholding the result; a selected rejection is retained as FAILED, and a non-confirming
+response under the same revocation remains INTENDED and enters reconciliation without returning an outcome. Separate cases cover withheld authoritative lookup and compensation;
 a later authorized compensation retry reuses the retained confirmation. Another ledger case checks that a genuinely
 lost acknowledgement remains INTENDED and is not resent by the ledger. A separate PostgreSQL gateway fixture checks
 that an observed-outcome refusal propagates through the registered tool path, the ledger retains its confirmation,

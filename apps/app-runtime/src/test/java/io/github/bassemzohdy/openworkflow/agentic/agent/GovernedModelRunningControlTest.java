@@ -899,7 +899,7 @@ class GovernedModelRunningControlTest {
                 requestQuery.set(exchange.getRequestURI().getRawQuery());
                 idempotency.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
                 authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
-                exchange.sendResponseHeaders(200, -1);
+                exchange.sendResponseHeaders(exchange.getRequestURI().getPath().endsWith("/reject") ? 422 : 200, -1);
             } finally { exchange.close(); }
         });
         server.start();
@@ -916,7 +916,7 @@ class GovernedModelRunningControlTest {
                          {"name":"region","in":"query","required":true,"schema":{"type":"string"}},
                          {"name":"channel","in":"query","schema":{"type":"string"}}],
                          "requestBody":{"$ref":"#/components/requestBodies/OrderBody"},
-                         "responses":{"200":{"$ref":"#/components/responses/Done"}}}}}}
+                         "responses":{"200":{"$ref":"#/components/responses/Done"},"422":{"description":"not applied"}}}}}}
                         """;
                 String digest = io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder.sha256Hex(
                         io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder.strictUtf8(document));
@@ -925,7 +925,7 @@ class GovernedModelRunningControlTest {
                 var grant = UlidGenerator.shared().next();
                 var expectation = new io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.http.PinnedHttpEffectTarget.CredentialExpectation(
                         "issuer", grant, Set.of("orders:write"));
-                var registration = op.registration("registered:test", "orders", "corr", Duration.ofSeconds(2), Set.of(200),
+                var registration = op.registration("registered:test", "orders", "corr", Duration.ofSeconds(2), Set.of(200), Set.of(422),
                         expectation, (audience, action) -> action.run(new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken(
                                 io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Credential.of("fixture-token"), audience,
                                 Set.of("orders:write"), Instant.now().plusSeconds(60), "issuer", "jti", List.of("worker"), grant)), token -> { });
@@ -976,6 +976,11 @@ class GovernedModelRunningControlTest {
                 var second = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/http-2", optionalOmitted);
                 assertEquals(EffectState.CONFIRMED, gateway.invokeEffect(running, entry, rig.allocation, second, optionalOmitted).state());
                 assertEquals(2, calls.get()); assertEquals("region=west", requestQuery.get());
+                var rejection = rig.call("{\"path\":{\"orderId\":\"reject\"},\"query\":{\"region\":\"west\"},\"body\":{\"amount\":10}}");
+                var third = ResourceToolCall.of(rig.allocation, profile, entry, running.executor(), "graph/openapi/http-3", rejection);
+                assertEquals(EffectState.FAILED, gateway.invokeEffect(running, entry, rig.allocation, third, rejection).state());
+                assertEquals(EffectState.FAILED, gateway.invokeEffect(running, entry, rig.allocation, third, rejection).state());
+                assertEquals(3, calls.get());
                 return null;
             });
         } finally { server.stop(0); }

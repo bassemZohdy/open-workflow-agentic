@@ -58,6 +58,20 @@ class PinnedHttpEffectTargetTest {
         try {assertEquals(Outcome.UNKNOWN,operation(uri(server,"/start"),TIMEOUT).execute("key").outcome());assertEquals(0,redirected.get());}
         finally {server.stop(0);}
     }
+    @Test void onlyExplicitlyPinnedBusinessRejectionsAreTerminal() throws Exception {
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);var calls=new AtomicInteger();
+        server.createContext("/orders",exchange->{calls.incrementAndGet();exchange.sendResponseHeaders(422,-1);exchange.close();});server.start();
+        try {
+            URI endpoint=uri(server,"/orders");
+            assertEquals(Outcome.UNKNOWN,operation(endpoint,TIMEOUT).execute("unconfigured").outcome());
+            var configured=new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",TIMEOUT,
+                    Set.of(200),Set.of(422),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false);
+            assertEquals(Outcome.FAILED,configured.execute("configured").outcome());
+            assertEquals(2,calls.get());
+            assertThrows(IllegalArgumentException.class,()->new PinnedHttpEffectTarget("tool:orders",endpoint,"audience:orders","trace-1","{}",TIMEOUT,
+                    Set.of(200),Set.of(500),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false));
+        } finally {server.stop(0);}
+    }
     @Test void timeoutIsUnknownAndNeverARefusalOrSuccess() throws Exception {
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);var entered=new CountDownLatch(1);
         var executor=Executors.newSingleThreadExecutor();server.setExecutor(executor);

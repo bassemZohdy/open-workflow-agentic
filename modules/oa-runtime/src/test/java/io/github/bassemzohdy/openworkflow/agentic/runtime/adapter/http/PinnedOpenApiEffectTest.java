@@ -159,4 +159,17 @@ class PinnedOpenApiEffectTest {
         assertThrows(IllegalArgumentException.class, () -> operation(query.replace("\"in\":\"query\"", "\"in\":\"query\",\"allowReserved\":true"), "createOrder", ORIGIN));
         assertThrows(IllegalArgumentException.class, () -> operation(query.replace("\"in\":\"query\"", "\"in\":\"query\",\"style\":\"deepObject\""), "createOrder", ORIGIN));
     }
+
+    @Test void rejectionCodesMustBeDocumentedAndPinnedInProfile() {
+        String documented = DOC.replace("\"202\":{\"description\":\"accepted\"}",
+                "\"202\":{\"description\":\"accepted\"},\"422\":{\"description\":\"not applied\"},\"500\":{\"description\":\"error\"}");
+        var op = operation(documented, "createOrder", ORIGIN);
+        var rejected = op.registration("tool:orders", "orders", "corr", Duration.ofSeconds(2), Set.of(200), Set.of(422), EXPECTED,
+                (audience, action) -> { throw new AssertionError(); }, token -> { });
+        assertNotEquals(fingerprint(registration(op, Set.of(200))), fingerprint(rejected));
+        assertThrows(IllegalArgumentException.class, () -> op.registration("tool:orders", "orders", "corr", Duration.ofSeconds(2), Set.of(200), Set.of(409), EXPECTED,
+                (audience, action) -> { throw new AssertionError(); }, token -> { }));
+        assertThrows(IllegalArgumentException.class, () -> op.registration("tool:orders", "orders", "corr", Duration.ofSeconds(2), Set.of(200), Set.of(500), EXPECTED,
+                (audience, action) -> { throw new AssertionError(); }, token -> { }));
+    }
 }

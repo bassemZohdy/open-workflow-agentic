@@ -51,6 +51,10 @@ class PinnedHttpEffectLedgerTest {
         revokeDuringCall(202, EffectState.INTENDED);
     }
 
+    @Test void revocationAfterDocumentedRejectionRetainsFailureWithoutReleasingIt() throws Exception {
+        revokeDuringCall(422, EffectState.FAILED);
+    }
+
     private void revokeDuringCall(int status, EffectState expectedState) throws Exception {
         String tenant="http-"+UUID.randomUUID();var user=new Subject(SubjectKind.USER,"alice");
         var agent=new Subject(SubjectKind.AGENT,"worker");
@@ -80,8 +84,8 @@ class PinnedHttpEffectLedgerTest {
             var endpoint=URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/orders");
             var expected=new PinnedHttpEffectTarget.CredentialExpectation("issuer",grant.id(),Set.of("orders:write"));
             var target=new PinnedHttpEffectTarget("tool:orders",endpoint,"orders","correlation","{}",Duration.ofSeconds(5),
-                    Set.of(200),expected,new GovernedHttpCredentials(dispatch,engineId,Set.of("orders:write")),
-                    issued->dispatch.requireCurrentAuthority(engineId),true);
+                    Set.of(200),Set.of(422),expected,new GovernedHttpCredentials(dispatch,engineId,Set.of("orders:write")),
+                    issued->dispatch.requireCurrentAuthority(engineId),true,false);
             var thread=ThreadId.derive("http-revocation-test","alice",UUID.randomUUID().toString());
             var command=EffectCommand.of(thread,"send","occurrence-1","tool:orders","{}");
             assertThrows(AuthorityLostException.class,()->effects.execute(command,target));

@@ -1,5 +1,7 @@
 # Changelog
 
+- Allow explicitly documented service-contract rejection statuses to be retained as failed effects without retry; unselected statuses remain unknown.
+
 - Support bounded, declared string query parameters for pinned OpenAPI effects, tied to the same durable occurrence as the path and body.
 
 - Support bounded string path parameters in pinned OpenAPI effect registrations, binding the resolved path and JSON body to the governed occurrence.
