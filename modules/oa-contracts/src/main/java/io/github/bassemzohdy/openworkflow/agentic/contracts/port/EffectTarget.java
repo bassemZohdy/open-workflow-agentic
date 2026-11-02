@@ -24,7 +24,11 @@ public interface EffectTarget {
 
     String target();
 
-    /** Guaranteed key retention after initial dispatch; zero disables automatic replay. */
+    /**
+     * Conservative replay window after initial dispatch; zero disables automatic replay. Implementations must leave
+     * enough margin for clock skew and the maximum delay until the target checks its deduplication record. Starting
+     * an outbound call before this deadline alone does not ensure that it reaches the target before retention ends.
+     */
     default Duration replayWindow() { return Duration.ZERO; }
 
     Reply execute(String idempotencyKey) throws Exception;
