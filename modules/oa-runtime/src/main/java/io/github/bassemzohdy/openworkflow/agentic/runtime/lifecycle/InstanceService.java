@@ -17,6 +17,10 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.jboss.logging.Logger;
@@ -65,12 +69,15 @@ public class InstanceService {
     @Inject PersistenceCommitGate checkpoints;
     private final LifecycleSettings lifetimeSettings;
     private final DataSource launchLocks;
+    private final StartAdmission admission;
+    private record StartKey(String tenant, String key) {}
+    private final ConcurrentHashMap<StartKey, CompletableFuture<InstanceRecord>> pending = new ConcurrentHashMap<>();
 
     @Inject
     public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, LifecycleSettings settings,
-                           DataSource launchLocks) {
+                           DataSource launchLocks, StartAdmission admission) {
         this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared(), settings,
-                Objects.requireNonNull(launchLocks, "launchLocks"));
+                Objects.requireNonNull(launchLocks, "launchLocks"), admission);
     }
 
     /** Explicit callers without a configured limit retain the documented unbounded default. */
@@ -85,6 +92,11 @@ public class InstanceService {
 
     InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, Clock clock,
                     UlidGenerator ids, LifecycleSettings settings, DataSource launchLocks) {
+        this(store, engine, faults, clock, ids, settings, launchLocks, new StartAdmission(4));
+    }
+
+    InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, Clock clock,
+                    UlidGenerator ids, LifecycleSettings settings, DataSource launchLocks, StartAdmission admission) {
         this.store = Objects.requireNonNull(store, "store");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.faults = Objects.requireNonNull(faults, "faults");
@@ -92,6 +104,7 @@ public class InstanceService {
         this.ids = Objects.requireNonNull(ids, "ids");
         this.lifetimeSettings = Objects.requireNonNull(settings, "settings");
         this.launchLocks = launchLocks;
+        this.admission = Objects.requireNonNull(admission, "admission");
     }
 
     private static DataSource locksFor(InstanceStore store) {
@@ -199,10 +212,56 @@ public class InstanceService {
 
     private StartResult startAs(StartRequest request, String reason, Subject actor,
                                 InstanceStore.InsertHook onCreate) {
+        var key = new StartKey(request.tenant(), request.idempotencyKey());
+        var mine = new CompletableFuture<InstanceRecord>();
+        var existing = pending.putIfAbsent(key, mine);
+        if (existing != null) return awaitPending(request, existing);
+        try {
+            if (!admission.tryAcquire()) {
+                Optional<InstanceRecord> same = store.findByKey(request.tenant(), request.idempotencyKey());
+                if (same.isPresent()) {
+                    requireSameStart(same.get(), request);
+                    mine.complete(same.get());
+                    return new StartResult(same.get(), false);
+                }
+                throw new StartCapacityException();
+            }
+            try { return startAdmitted(request, reason, actor, onCreate, mine); }
+            finally { admission.release(); }
+        } catch (RuntimeException | Error failed) {
+            mine.completeExceptionally(failed);
+            throw failed;
+        } finally {
+            pending.remove(key, mine);
+        }
+    }
+
+    private StartResult awaitPending(StartRequest request, CompletableFuture<InstanceRecord> future) {
+        InstanceRecord row;
+        try { row = future.get(); }
+        catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException("interrupted while awaiting the existing start");
+        } catch (ExecutionException failed) {
+            // A conflicting leader may have found an already committed row belonging to this caller.
+            var same = store.findByKey(request.tenant(), request.idempotencyKey());
+            if (same.isPresent()) { requireSameStart(same.get(), request); return new StartResult(same.get(), false); }
+            if (failed.getCause() instanceof RuntimeException runtime) throw runtime;
+            if (failed.getCause() instanceof Error error) throw error;
+            throw new IllegalStateException("start coordination failed", failed.getCause());
+        }
+        row = store.find(row.tenant(), row.id()).orElse(row);
+        requireSameStart(row, request);
+        return new StartResult(row, false);
+    }
+
+    private StartResult startAdmitted(StartRequest request, String reason, Subject actor,
+                                      InstanceStore.InsertHook onCreate, CompletableFuture<InstanceRecord> pendingResult) {
         if (checkpoints != null && !checkpoints.status().healthy()) {
             Optional<InstanceRecord> same = store.findByKey(request.tenant(), request.idempotencyKey());
             if (same.isPresent()) {
                 requireSameStart(same.get(), request);
+                pendingResult.complete(same.get());
                 return new StartResult(same.get(), false);
             }
             checkpoints.requireAvailable();
@@ -215,8 +274,10 @@ public class InstanceService {
         InstanceRecord row = insertion.record();
         if (!insertion.created()) {
             requireSameStart(row, request);
+            pendingResult.complete(row);
             return new StartResult(row, false);
         }
+        pendingResult.complete(row);
         faults.hit(LifecycleFaults.AFTER_INSERT);
         if (launchLocks == null) return launch(row, request); // In-memory explicit callers have no database reconciler.
         try {
