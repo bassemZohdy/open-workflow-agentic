@@ -1,5 +1,7 @@
 # Changelog
 
+- Return a failed model call when the provider supplies no answer instead of letting a null response escape the gateway contract.
+
 - Report provider-thrown refusal-shaped errors as failed calls, since the provider was already reached; never expose provider error details.
 
 - Fail closed when the model approval source is unavailable, preserving whether a model call was actually made and avoiding disclosure of source errors.
