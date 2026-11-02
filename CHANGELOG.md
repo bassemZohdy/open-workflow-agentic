@@ -1,5 +1,7 @@
 # Changelog
 
+- Provide and test least-privilege scope-key grants for the legacy effect guard.
+
 - Refuse legacy execution or compensation of an audited scoped effect.
 
 - Gate resource-scoped compensation on retained central audit history.

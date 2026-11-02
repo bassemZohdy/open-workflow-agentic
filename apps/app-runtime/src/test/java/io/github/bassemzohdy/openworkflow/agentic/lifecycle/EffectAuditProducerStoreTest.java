@@ -203,11 +203,29 @@ class EffectAuditProducerStoreTest {
             };
             var error=assertThrows(StoreUnavailableException.class,()->new DurableEffects(new JdbcEffectLedger(limited)).execute(f.command(),target));
             assertEquals("42501",assertInstanceOf(SQLException.class,error.getCause()).getSQLState());assertEquals(0,calls.get());
+            var root=java.nio.file.Path.of("").toAbsolutePath();
+            while(root!=null&&!java.nio.file.Files.isRegularFile(root.resolve("deploy/sql/effect-scope-check-grants.sql")))root=root.getParent();
+            assertNotNull(root,"scope check grant template not found");
+            var template=java.nio.file.Files.readString(root.resolve("deploy/sql/effect-scope-check-grants.sql"))
+                    .replace("__EFFECT_EXECUTOR_ROLE__",role);
             try(var c=owned.getConnection();var q=c.createStatement()) {
-                q.execute("grant select(thread_name,node_id,idempotency_key) on effect.audit_scope to "+role);
+                q.execute(template);
+                // Independently provisioned effect-ledger privileges, not supplied by the scope-check template.
+                q.execute("grant select,insert,update on effect.ledger,effect.manual_resolution to "+role);
+                q.execute("grant select,insert on effect.event to "+role);
+                // V77 deferred event guard also reads source IDs even for an unscoped event.
+                q.execute("grant select(source_event_id) on effect.audit_source to "+role);
+                q.execute("grant usage,select on all sequences in schema effect to "+role);
             }
             var scoped=assertThrows(IllegalStateException.class,()->new DurableEffects(new JdbcEffectLedger(limited)).execute(f.command(),target));
             assertTrue(scoped.getMessage().contains("scoped effect requires audited execution"));assertEquals(0,calls.get());
+            try(var c=limited.getConnection();var q=c.createStatement()) {
+                assertEquals("42501",assertThrows(SQLException.class,()->q.executeQuery("select tenant from effect.audit_scope")).getSQLState());
+                assertEquals("42501",assertThrows(SQLException.class,()->q.executeUpdate("delete from effect.audit_scope")).getSQLState());
+            }
+            var plain=f.scope().command("legacy-role-test","one",f.command().target(),"{}");
+            assertEquals(EffectState.CONFIRMED,new DurableEffects(new JdbcEffectLedger(limited)).execute(plain,target).state());
+            assertEquals(1,calls.get());
         } finally {
             try(var c=owned.getConnection();var q=c.createStatement()){q.execute("drop owned by "+role);q.execute("drop role "+role);}
         }
