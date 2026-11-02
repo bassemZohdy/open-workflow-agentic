@@ -366,6 +366,12 @@ checkpoint preparation; the test fixture permits the start and is not a producti
 acquisition cannot be retried in place. This composition is not installed in application startup. Trusted context
 provenance, pool and scheduler capacity, cross-process failure and production rollout remain open.
 
+An explicit owner-resource fence can bind one complete resource execution entry to the exact SDK context and check
+both its live lease and full-owner registry. Same-process SDK/PostgreSQL tests cover takeover and mismatched entry
+and application, interruption, closure during a blocked registry lookup and serialization refusal. Its composite-test identity, policy, task/target
+and audit delegates are permissive fixtures. It neither creates an execution entry nor installs production dispatch,
+and cannot fence an in-flight external call or establish safety across process failures or partitions.
+
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`
 transition, suppressing the following failure only if it is the SDK timeout wrapping a cancellation; it then waits

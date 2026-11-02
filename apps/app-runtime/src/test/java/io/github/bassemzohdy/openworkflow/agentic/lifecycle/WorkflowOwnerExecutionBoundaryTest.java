@@ -1,6 +1,8 @@
 package io.github.bassemzohdy.openworkflow.agentic.lifecycle;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
@@ -91,6 +93,99 @@ class WorkflowOwnerExecutionBoundaryTest {
         var row = store.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(), request, now), "test.insert").record();
         row = store.replace(row.successor(now, InstanceStatus.RUNNING, instance.id(), 0, null, null), row.version(), "test.running", actor);
         return new JdbcWorkflowOwnerLease.Binding(tenant, row.id(), appId, instance.id(), definition);
+    }
+
+    @Test void resourceOwnerCheckBindsExactEntryAndRejectsTakeover() throws Exception {
+        String appId = "resource-owner-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
+        String document = """
+                document: { dsl: '1.0.3', namespace: agentic-test, name: owner-boundary, version: '1.0.0' }
+                do:
+                  - wait:
+                      listen:
+                        to:
+                          one:
+                            with: { type: io.openworkflow.owner.resume }
+                """;
+        var waiting = new CountDownLatch(1);
+        var context = new AtomicReference<WorkflowContextData>();
+        var claim = new AtomicReference<JdbcWorkflowOwnerLease.Claim>();
+        try (var broker = broker(waiting);
+             var app = WorkflowApplication.builder().withId(appId).withEventConsumer(broker)
+                     .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                     .withListener(new WorkflowExecutionListener() {
+                         @Override public void onWorkflowStarted(WorkflowStartedEvent event) {
+                             context.set(event.workflowContext()); bindings.bind(event.workflowContext(), claim.get());
+                         }
+                     }).build()) {
+            var instance = app.workflowDefinition(WorkflowReader.readWorkflowFromString(document, WorkflowFormat.YAML))
+                    .instance(Map.of());
+            var binding = register(appId, tenant, instance);
+            var leases = new JdbcWorkflowOwnerLease(data);
+            claim.set(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(15)).orElseThrow().claim());
+            instance.start();
+            assertTrue(waiting.await(10, TimeUnit.SECONDS));
+            var row = store.find(tenant, binding.instanceId()).orElseThrow();
+            var scope = new ResourceCallScope(tenant, binding.instanceId(), row.owner(), appId, instance.id(),
+                    "agentic-test", "owner-boundary", "1.0.0", "do/0/wait", 1, "root", "aud", "op",
+                    "a".repeat(64), ResourceCallScope.requestFingerprint("{}"));
+            var entry = new ResourceExecutionEntry(scope, 1);
+            try (var fence = new WorkflowOwnerResourceFence(entry, context.get(), bindings,
+                    InstanceRegistryFence.over(store), ownerFence)) {
+                assertDoesNotThrow(() -> fence.requireCurrent(entry));
+                var compositeBuilder = CompositeExecutionFence.builder();
+                for (var check : CompositeExecutionFence.Check.values())
+                    compositeBuilder.with(check, check == CompositeExecutionFence.Check.OWNER_AND_LEASE ? fence : ignored -> {});
+                var composite = compositeBuilder.build();
+                assertDoesNotThrow(() -> composite.requireCurrent(entry));
+                var closed = new WorkflowOwnerResourceFence(entry, context.get(), bindings,
+                        InstanceRegistryFence.over(store), ownerFence);
+                closed.close();
+                assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> closed.requireCurrent(entry));
+                var enteredRegistry = new CountDownLatch(1);
+                var releaseRegistry = new CountDownLatch(1);
+                var blockingRegistry = new InstanceRegistryFence((t, id) -> {
+                    enteredRegistry.countDown();
+                    try {
+                        if (!releaseRegistry.await(8, TimeUnit.SECONDS)) throw new IllegalStateException("test timed out");
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt(); throw new IllegalStateException(e);
+                    }
+                    return store.find(t, id);
+                });
+                try (var duringClose = new WorkflowOwnerResourceFence(entry, context.get(), bindings,
+                        blockingRegistry, ownerFence)) {
+                    var checking = CompletableFuture.runAsync(() -> duringClose.requireCurrent(entry));
+                    try {
+                        assertTrue(enteredRegistry.await(8, TimeUnit.SECONDS));
+                        duringClose.close();
+                    } finally { releaseRegistry.countDown(); }
+                    assertThrows(CompletionException.class, checking::join);
+                }
+                try {
+                    Thread.currentThread().interrupt();
+                    assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> fence.requireCurrent(entry));
+                    assertTrue(Thread.currentThread().isInterrupted());
+                } finally { Thread.interrupted(); }
+                assertThrows(JdbcResourceExecutionGate.RefusedException.class,
+                        () -> fence.requireCurrent(new ResourceExecutionEntry(scope, 2)));
+                assertThrows(Exception.class, () -> new ObjectMapper().writeValueAsString(fence));
+                var differentApp = new ResourceCallScope(tenant, binding.instanceId(), row.owner(), "other-app",
+                        instance.id(), scope.namespace(), scope.definition(), scope.version(), scope.taskPosition(),
+                        scope.iteration(), scope.logicalOccurrence(), scope.audience(), scope.operation(),
+                        scope.targetFingerprint(), scope.requestFingerprint());
+                var wrongEntry = new ResourceExecutionEntry(differentApp, 1);
+                try (var wrong = new WorkflowOwnerResourceFence(wrongEntry, context.get(), bindings,
+                        InstanceRegistryFence.over(store), ownerFence)) {
+                    assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> wrong.requireCurrent(wrongEntry));
+                }
+                assertTrue(leases.release(claim.get()));
+                assertTrue(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(15)).isPresent());
+                assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> fence.requireCurrent(entry));
+                assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> composite.requireCurrent(entry));
+                fence.close();
+                assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> fence.requireCurrent(entry));
+            }
+        }
     }
 
     @Test void failedPostAcquisitionCheckRetiresContext() throws Exception {
