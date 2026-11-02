@@ -1,6 +1,6 @@
 # WP-113 candidate: pinned HTTP effect transport
 
-`PinnedHttpEffectTarget` is an explicitly constructed building block for a fixed JSON POST. It is not a CDI bean,
+`PinnedHttpEffectTarget` is an explicitly constructed building block for a JSON POST. It is not a CDI bean,
 OpenAPI parser, approved service catalog, production gateway, or substitute for the policy and identity boundaries.
 A public instance requires an HTTPS endpoint with no userinfo, query, fragment, or dot segments, uses a direct client
 with redirects disabled, validates bounded JSON with duplicate-key and trailing-data rejection, fixes the request bytes
@@ -23,11 +23,14 @@ This does not imply that an already dispatched network operation was cancelled o
 
 `PinnedOpenApiEffect` explicitly composes a digest-pinned OpenAPI 3.1 JSON document with the controlled tool
 registration and HTTP candidate. It selects one unique POST by operation ID and a required JSON object schema. Paths
-may contain bounded, explicitly declared string parameters occupying whole segments; values are restricted to ASCII
-letters, digits, underscore and hyphen, and both the path and body are bound to the tool occurrence. Templated calls
-use a `{ "path": { ... }, "body": { ... } }` input; the object body is serialized as JSON without converting numbers
+may contain bounded, explicitly declared string parameters occupying whole segments, and query parameters may be
+declared as required or optional strings. Values are restricted to ASCII letters, digits, underscore and hyphen;
+the resolved path, query and body are bound to the tool occurrence. Parameterized calls use a
+`{ "path": { ... }, "query": { ... }, "body": { ... } }` input, omitting unused parameter groups. Query keys
+are sorted and only present values are sent; the public direct transport still rejects arbitrary queries. The object
+body is serialized as JSON without converting numbers
 through binary floating point. The caller supplies a trusted HTTPS origin: document-level servers are ignored, and path or
-operation server overrides, query/header parameters and custom schema dialects are refused. Schema references may
+operation server overrides, header parameters, unsupported serialization and custom schema dialects are refused. Schema references may
 only be pure, acyclic references to named components in the same pinned document; expansion depth, node count and
 result size are bounded. Remote references, references with sibling keywords and references in instance-valued schema
 fields are refused. Request-body and response objects may likewise reference matching local components without siblings;
@@ -47,8 +50,8 @@ case resolves nested component schemas and rejects a value below the referenced 
 Selector tests cover digest and endpoint changes, duplicate operation IDs, unsupported paths, local-reference cycles,
 remote references, dialects and status codes.
 Another controlled gateway fixture selects locally referenced request and response objects and calls an IPv4 loopback
-HTTP service through the real ledger. It checks a templated path, precise decimal body, credential and idempotency key,
-refuses a traversal attempt, and confirms that an
+HTTP service through the real ledger. It checks a templated path, constrained query, precise decimal body, credential
+and idempotency key, refuses traversal and query-injection attempts, and confirms that an
 exact retry does not send again. The test-only loopback seam does not enable plaintext production transport; the fixture
 credential, service and policy do not establish provider interoperability or approval.
 

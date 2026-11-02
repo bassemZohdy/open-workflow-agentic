@@ -17,7 +17,7 @@ import java.util.Set;
 
 /** Explicit, trusted composition of a digest-pinned OpenAPI 3.1 JSON POST with the governed effect gateway.
  * This narrow subset is not a general OpenAPI validator, approval source, credential verifier or CDI wiring.
- * The trusted base URI overrides document servers; only bounded string path parameters are supported.
+ * The trusted base URI overrides document servers; only bounded string path and query parameters are supported.
  */
 public final class PinnedOpenApiEffect {
     private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
@@ -31,6 +31,8 @@ public final class PinnedOpenApiEffect {
     private final URI endpoint;
     private final String endpointTemplate;
     private final List<String> pathParameters;
+    private final List<String> queryParameters;
+    private final Set<String> requiredQuery;
     private final Set<Integer> documentedResponses;
     private final boolean loopbackTest;
     private final Set<String> oauthScopes;
@@ -87,7 +89,8 @@ public final class PinnedOpenApiEffect {
             throw new IllegalArgumentException("required JSON object schema is required");
         JsonNode resolved = resolveSchema(input, root.path("components").path("schemas"), new java.util.HashSet<>(), new int[]{0}, 0);
         if (!"object".equals(resolved.path("type").asText())) throw new IllegalArgumentException("JSON object schema required");
-        this.schema = requestSchema(resolved, selected.get("parameters"), root.path("components").path("schemas"), pathParameters);
+        ParameterPlan plan = requestSchema(resolved, selected.get("parameters"), root.path("components").path("schemas"), pathParameters);
+        this.schema = plan.schema(); this.queryParameters = plan.query(); this.requiredQuery = plan.requiredQuery();
         if (CanonicalEncoder.strictUtf8(schema).length > 65_536) throw new IllegalArgumentException("resolved schema exceeds 64 KiB");
         JsonNode responses = selected.path("responses");
         if (!responses.isObject()) throw new IllegalArgumentException("documented responses required");
@@ -129,25 +132,42 @@ public final class PinnedOpenApiEffect {
                 arguments -> {
                     BoundRequest bound = bind(arguments);
                     return new PinnedHttpEffectTarget(target, bound.endpoint(), audience, correlation, bound.body(), timeout,
-                            statuses, expectation, credentials, fence, loopbackTest);
+                            statuses, expectation, credentials, fence, loopbackTest, true);
                 });
     }
 
     private record BoundRequest(URI endpoint, String body) { }
 
     private BoundRequest bind(String arguments) {
-        if (pathParameters.isEmpty()) return new BoundRequest(endpoint, arguments);
+        if (pathParameters.isEmpty() && queryParameters.isEmpty()) return new BoundRequest(endpoint, arguments);
         try {
             JsonNode input = JSON.readTree(arguments);
-            if (input == null || !input.isObject() || input.size() != 2 || !input.path("path").isObject()
-                    || !input.path("body").isObject() || input.path("path").size() != pathParameters.size())
-                throw new IllegalArgumentException("invalid path and body arguments");
+            int fields = 1 + (pathParameters.isEmpty() ? 0 : 1) + (queryParameters.isEmpty() ? 0 : 1);
+            if (input == null || !input.isObject() || input.size() != fields || !input.path("body").isObject()
+                    || (!pathParameters.isEmpty() && (!input.path("path").isObject() || input.path("path").size() != pathParameters.size()))
+                    || (!queryParameters.isEmpty() && !input.path("query").isObject()))
+                throw new IllegalArgumentException("invalid parameter and body arguments");
             String target = endpointTemplate;
             for (String name : pathParameters) {
                 JsonNode value = input.path("path").get(name);
                 if (value == null || !value.isTextual() || !value.textValue().matches("[A-Za-z0-9_-]{1,128}"))
                     throw new IllegalArgumentException("invalid path parameter");
                 target = target.replace("{" + name + "}", value.textValue());
+            }
+            if (!queryParameters.isEmpty()) {
+                JsonNode query = input.path("query");
+                var supplied = new java.util.HashSet<String>(); query.fieldNames().forEachRemaining(supplied::add);
+                if (!queryParameters.containsAll(supplied) || !supplied.containsAll(requiredQuery))
+                    throw new IllegalArgumentException("unknown or missing query parameter");
+                var encoded = new StringBuilder();
+                for (String name : queryParameters) {
+                    JsonNode value = query.get(name); if (value == null) continue;
+                    if (!value.isTextual() || !value.textValue().matches("[A-Za-z0-9_-]{1,128}"))
+                        throw new IllegalArgumentException("invalid query parameter");
+                    if (!encoded.isEmpty()) encoded.append('&');
+                    encoded.append(name).append('=').append(value.textValue());
+                }
+                if (!encoded.isEmpty()) target += "?" + encoded;
             }
             return new BoundRequest(URI.create(target), input.path("body").toString());
         } catch (java.io.IOException invalid) { throw new IllegalArgumentException("invalid path and body arguments", invalid); }
@@ -169,43 +189,55 @@ public final class PinnedOpenApiEffect {
         return List.copyOf(names);
     }
 
-    private static String requestSchema(JsonNode body, JsonNode parameters, JsonNode components, List<String> names) {
-        if (names.isEmpty()) {
-            if (parameters != null) throw new IllegalArgumentException("parameters without path templates are unsupported");
-            return body.toString();
-        }
-        if (parameters == null || !parameters.isArray() || parameters.size() != names.size())
-            throw new IllegalArgumentException("all path parameters must be declared exactly once");
-        var properties = JSON.createObjectNode();
-        var found = new java.util.HashSet<String>();
+    private record ParameterPlan(String schema, List<String> query, Set<String> requiredQuery) { }
+
+    private static ParameterPlan requestSchema(JsonNode body, JsonNode parameters, JsonNode components, List<String> names) {
+        if (parameters == null && names.isEmpty()) return new ParameterPlan(body.toString(), List.of(), Set.of());
+        if (parameters == null || !parameters.isArray() || parameters.isEmpty() || parameters.size() > 32)
+            throw new IllegalArgumentException("bounded parameters must be declared");
+        var pathProperties = JSON.createObjectNode(); var queryProperties = JSON.createObjectNode();
+        var found = new java.util.HashSet<String>(); var query = new java.util.TreeSet<String>();
+        var requiredQuery = new java.util.HashSet<String>();
         for (JsonNode parameter : parameters) {
             if (parameter.isObject()) {
                 var fields = new java.util.HashSet<String>(); parameter.fieldNames().forEachRemaining(fields::add);
                 if (!Set.of("name", "in", "required", "schema", "description", "style", "explode", "deprecated").containsAll(fields))
-                    throw new IllegalArgumentException("unsupported path parameter field");
+                    throw new IllegalArgumentException("unsupported parameter field");
             }
-            if (!parameter.isObject() || parameter.has("$ref") || !"path".equals(parameter.path("in").asText())
-                    || !parameter.path("required").isBoolean() || !parameter.path("required").asBoolean()
-                    || (parameter.has("style") && !"simple".equals(parameter.path("style").asText()))
-                    || (parameter.has("explode") && (!parameter.path("explode").isBoolean() || parameter.path("explode").asBoolean()))
+            String location = parameter.path("in").asText(); boolean isPath = "path".equals(location);
+            if (!parameter.isObject() || parameter.has("$ref") || !(isPath || "query".equals(location))
+                    || (parameter.has("required") && !parameter.path("required").isBoolean())
+                    || (isPath && !parameter.path("required").asBoolean(false))
+                    || (parameter.has("style") && !(isPath ? "simple" : "form").equals(parameter.path("style").asText()))
+                    || (parameter.has("explode") && (!parameter.path("explode").isBoolean() || (isPath && parameter.path("explode").asBoolean())))
                     || parameter.has("content") || !parameter.path("name").isTextual())
-                throw new IllegalArgumentException("unsupported path parameter");
+                throw new IllegalArgumentException("unsupported parameter");
             String name = parameter.path("name").asText();
-            if (!names.contains(name) || !found.add(name) || !parameter.path("schema").isObject())
-                throw new IllegalArgumentException("unknown or duplicate path parameter");
+            if (!name.matches("[A-Za-z][A-Za-z0-9_-]{0,63}") || (isPath && !names.contains(name))
+                    || !found.add(location + ":" + name) || !parameter.path("schema").isObject())
+                throw new IllegalArgumentException("unknown or duplicate parameter");
+            if (!isPath) { query.add(name); if (query.size() > 16) throw new IllegalArgumentException("too many query parameters");
+                if (parameter.path("required").asBoolean(false)) requiredQuery.add(name); }
             JsonNode paramSchema = resolveSchema(parameter.path("schema"), components, new java.util.HashSet<>(), new int[]{0}, 0);
-            if (!"string".equals(paramSchema.path("type").asText())) throw new IllegalArgumentException("string path parameter required");
+            if (!"string".equals(paramSchema.path("type").asText())) throw new IllegalArgumentException("string parameter required");
             var combined = JSON.createObjectNode(); var allOf = combined.putArray("allOf");
             allOf.add(paramSchema); allOf.addObject().put("type", "string").put("pattern", "^[A-Za-z0-9_-]{1,128}$");
-            properties.set(name, combined);
+            (isPath ? pathProperties : queryProperties).set(name, combined);
         }
+        for (String name : names) if (!found.contains("path:" + name)) throw new IllegalArgumentException("missing path parameter");
         var root = JSON.createObjectNode(); root.put("type", "object"); root.put("additionalProperties", false);
-        var required = root.putArray("required"); required.add("path"); required.add("body");
+        var required = root.putArray("required"); required.add("body");
         var fields = root.putObject("properties"); fields.set("body", body);
-        var pathObject = fields.putObject("path"); pathObject.put("type", "object"); pathObject.put("additionalProperties", false);
-        var requiredPath = pathObject.putArray("required"); names.forEach(requiredPath::add);
-        pathObject.set("properties", properties);
-        return root.toString();
+        if (!names.isEmpty()) {
+            required.add("path"); var pathObject = fields.putObject("path"); pathObject.put("type", "object"); pathObject.put("additionalProperties", false);
+            var requiredPath = pathObject.putArray("required"); names.forEach(requiredPath::add); pathObject.set("properties", pathProperties);
+        }
+        if (!query.isEmpty()) {
+            required.add("query"); var queryObject = fields.putObject("query"); queryObject.put("type", "object"); queryObject.put("additionalProperties", false);
+            var requiredFields = queryObject.putArray("required"); query.stream().filter(requiredQuery::contains).forEach(requiredFields::add);
+            queryObject.set("properties", queryProperties);
+        }
+        return new ParameterPlan(root.toString(), List.copyOf(query), Set.copyOf(requiredQuery));
     }
 
     private static JsonNode resolveObject(JsonNode node, JsonNode components, String category) {

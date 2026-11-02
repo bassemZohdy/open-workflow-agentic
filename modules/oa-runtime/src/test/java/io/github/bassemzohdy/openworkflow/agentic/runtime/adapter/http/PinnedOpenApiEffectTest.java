@@ -148,4 +148,15 @@ class PinnedOpenApiEffectTest {
         assertThrows(IllegalArgumentException.class, () -> operation(templated.replace("/orders/{orderId}", "/orders/{orderId}/{orderId}"), "createOrder", ORIGIN));
         assertThrows(IllegalArgumentException.class, () -> operation(templated.replace("\"style\":\"simple\"", "\"style\":\"label\"").replace("\"in\":\"path\"", "\"in\":\"path\",\"style\":\"label\""), "createOrder", ORIGIN));
     }
+
+    @Test void acceptsDeclaredStringQueriesButRejectsAmbiguousParameters() {
+        String base = "{\"name\":\"region\",\"in\":\"query\",\"required\":true,\"schema\":{\"type\":\"string\"}}";
+        String query = DOC.replace("\"operationId\":\"createOrder\"", "\"operationId\":\"createOrder\",\"parameters\":[" + base + "]");
+        assertNotNull(registration(operation(query, "createOrder", ORIGIN), Set.of(200)));
+        assertThrows(IllegalArgumentException.class, () -> operation(query.replace(base, base + "," + base), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(query.replace("\"in\":\"query\"", "\"in\":\"header\""), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(query.replace("\"type\":\"string\"", "\"type\":\"array\""), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(query.replace("\"in\":\"query\"", "\"in\":\"query\",\"allowReserved\":true"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> operation(query.replace("\"in\":\"query\"", "\"in\":\"query\",\"style\":\"deepObject\""), "createOrder", ORIGIN));
+    }
 }

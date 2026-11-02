@@ -84,13 +84,23 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
     PinnedHttpEffectTarget(String target, URI endpoint, String audience, String correlation, String body,
                            Duration timeout, Set<Integer> confirmed, CredentialExpectation expectation,
                            CredentialProvider credentials, PreSendFence fence, boolean loopbackTest) {
+        this(target,endpoint,audience,correlation,body,timeout,confirmed,expectation,credentials,fence,loopbackTest,false);
+    }
+
+    // Only the pinned operation binder may supply a constrained, canonical query string.
+    PinnedHttpEffectTarget(String target, URI endpoint, String audience, String correlation, String body,
+                           Duration timeout, Set<Integer> confirmed, CredentialExpectation expectation,
+                           CredentialProvider credentials, PreSendFence fence, boolean loopbackTest, boolean safeQuery) {
         this.target=Checks.requireMatching("target",target,AgentTaskContract.TOKEN);
         this.endpoint=Objects.requireNonNull(endpoint);
         boolean permittedScheme="https".equals(endpoint.getScheme()) || (loopbackTest && "http".equals(endpoint.getScheme())
                 && "127.0.0.1".equals(endpoint.getHost()));
-        if (!permittedScheme || endpoint.getHost()==null || endpoint.getUserInfo()!=null || endpoint.getRawQuery()!=null
+        String query = endpoint.getRawQuery();
+        boolean permittedQuery = query == null || (safeQuery && query.length() <= 4096 && query.matches(
+                "[A-Za-z][A-Za-z0-9_-]{0,63}=[A-Za-z0-9_-]{1,128}(?:&[A-Za-z][A-Za-z0-9_-]{0,63}=[A-Za-z0-9_-]{1,128})*"));
+        if (!permittedScheme || endpoint.getHost()==null || endpoint.getUserInfo()!=null || !permittedQuery
                 || endpoint.getRawFragment()!=null || !endpoint.normalize().equals(endpoint))
-            throw new IllegalArgumentException("a pinned HTTPS endpoint without userinfo, query, fragment or dot segments is required");
+            throw new IllegalArgumentException("a pinned HTTPS endpoint with a permitted query and without userinfo, fragment or dot segments is required");
         this.audience=Checks.requireText("audience",audience,256);
         this.correlation=Checks.requireMatching("correlation",correlation,java.util.regex.Pattern.compile("[A-Za-z0-9._:-]{1,128}"));
         this.body=Objects.requireNonNull(body);

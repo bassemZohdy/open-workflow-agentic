@@ -1,5 +1,7 @@
 # Changelog
 
+- Support bounded, declared string query parameters for pinned OpenAPI effects, tied to the same durable occurrence as the path and body.
+
 - Support bounded string path parameters in pinned OpenAPI effect registrations, binding the resolved path and JSON body to the governed occurrence.
 
 - Require a declared supported OpenAPI bearer or OAuth2 security scheme, matching OAuth operation scopes to pinned credentials; real token verification and production approval remain separate.
