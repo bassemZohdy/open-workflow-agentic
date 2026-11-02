@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify human-wake checkpoint recovery after an abrupt application-process exit.
+
 - Commit checkpoint-recovery audits and acknowledgements atomically, including after a recovery-process crash.
 
 - Exercise human-wake checkpoint acknowledgement and retry in separate recovery processes.

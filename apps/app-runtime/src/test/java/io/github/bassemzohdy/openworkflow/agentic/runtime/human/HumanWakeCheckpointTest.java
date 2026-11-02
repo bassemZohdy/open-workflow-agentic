@@ -53,11 +53,11 @@ class HumanWakeCheckpointTest {
     @Inject JdbcInboxTaskLease leases;
     @Inject JdbcOwnedInbox owned;
     @Inject AuditTrail audit;
-    private static final Subject ALICE = new Subject(SubjectKind.USER, "alice");
+    static final Subject ALICE = new Subject(SubjectKind.USER, "alice");
     private static final String FILTER = "{\"with\":{\"source\":\"" + HumanDecisionWake.SOURCE
             + "\",\"type\":\"" + HumanDecisionWake.TYPE + "\"}}";
     private static final String SNAPSHOT = "{\"format\":\"oa.inbox.listen-snapshot.v1\",\"task\":{\"listen\":{\"to\":{\"one\":" + FILTER + "}}}}";
-    private static final String HASH = CanonicalEncoder.sha256Hex(new CanonicalEncoder("oa.inbox.event-filter.v1").text(FILTER).toBytes());
+    static final String HASH = CanonicalEncoder.sha256Hex(new CanonicalEncoder("oa.inbox.event-filter.v1").text(FILTER).toBytes());
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
     static final class Broker extends InMemoryEvents {
         final CompletableFuture<TypeEventRegistration> registration = new CompletableFuture<>();
@@ -81,7 +81,17 @@ class HumanWakeCheckpointTest {
     @Test void stagedWakeWithLostOwnerCannotCommitRealSdkCheckpoint() throws Exception { execute(true, false, false); }
     @Test void stagedWakeRecoversFromPersistedWorkflowWithoutRedelivery() throws Exception { execute(false, true, false); }
     @Test void separateRecoveryProcessesRepairRealCheckpointWithoutRepeatingAcknowledgement() throws Exception { execute(false, true, true); }
+    @Test void killedCheckpointWriterIsRestoredByAFreshApplicationProcess() throws Exception {
+        var manifest=java.nio.file.Files.createTempFile("human-process-checkpoint-", ".properties");
+        try {
+            quarkusProcess("checkpointAndCrash",77,manifest);
+            quarkusProcess("restoreAfterCrash",0,manifest);
+        } finally {java.nio.file.Files.deleteIfExists(manifest);}
+    }
     private void execute(boolean loseOwner, boolean restore, boolean processRecovery) throws Exception {
+        execute(loseOwner,restore,processRecovery,null);
+    }
+    void execute(boolean loseOwner, boolean restore, boolean processRecovery, java.nio.file.Path crashManifest) throws Exception {
         try (var gate = new PersistenceCommitGate(Duration.ofSeconds(15), Clock.systemUTC()); var broker = new Broker()) {
             var next = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();
             var guarded = new CheckpointingWriter(borrowed(), gate, (op,id) -> {});
@@ -147,6 +157,14 @@ class HumanWakeCheckpointTest {
                     assertFalse(completion.isDone());
                     assertTrue(QuarkusTransaction.requiringNew().call(() -> em.find(CompletedTaskEntity.class, key) != null));
                     assertTrue(proof.consumed(wait, message));
+                    if(crashManifest!=null) {
+                        var saved=new Properties();
+                        saved.setProperty("instance",row.id().value());saved.setProperty("application",app.id());
+                        saved.setProperty("position",wait.taskPosition());saved.setProperty("iteration",Integer.toString(wait.iteration()));
+                        saved.setProperty("task",taskId.value());saved.setProperty("decision",decision.id().value());
+                        try(var out=java.nio.file.Files.newOutputStream(crashManifest)){saved.store(out,"isolated checkpoint process fixture");}
+                        Runtime.getRuntime().halt(77);
+                    }
                     if (restore) {
                         gate.close(); // Stop the old workflow component before reconstructing it from JPA.
                         if (processRecovery) {
@@ -181,12 +199,12 @@ class HumanWakeCheckpointTest {
             }
         }
     }
-    private long acknowledgementAudits(InstanceRecord row) throws Exception {
+    long acknowledgementAudits(InstanceRecord row) throws Exception {
         try (var c=dataSource.getConnection(); var q=c.prepareStatement("select count(*) from audit.event where event_type='event.checkpoint.observed' and attributes->>'oa.instance'=?")) {
             q.setString(1,row.id().value());try(var r=q.executeQuery()){r.next();return r.getLong(1);}
         }
     }
-    private String deliveryState(InboxWait wait) throws Exception {
+    String deliveryState(InboxWait wait) throws Exception {
         try (var c=dataSource.getConnection();var q=c.prepareStatement("select state from inbox.delivery where tenant=? and instance_id=? and wait_key=?")) {
             q.setString(1,wait.tenant());q.setString(2,wait.instanceId().value());q.setString(3,wait.key());
             try(var r=q.executeQuery()){assertTrue(r.next());return r.getString(1);}
@@ -210,7 +228,25 @@ class HumanWakeCheckpointTest {
             } finally {if(child.isAlive()){child.destroyForcibly();child.waitFor(10,TimeUnit.SECONDS);}}
         } finally {java.nio.file.Files.deleteIfExists(args);java.nio.file.Files.deleteIfExists(output);}
     }
-    private void restoreCheckpoint(InstanceRecord row, String appId, InboxWait wait, InboxMessage message) throws Exception {
+    private void quarkusProcess(String phase,int expectedExit,java.nio.file.Path manifest) throws Exception {
+        String url;try(var c=dataSource.getConnection()){url=c.getMetaData().getURL();}
+        String classpath=System.getProperty("surefire.test.class.path",System.getProperty("java.class.path"));
+        var args=java.nio.file.Files.createTempFile("human-quarkus-process-", ".args");
+        var output=java.nio.file.Files.createTempFile("human-quarkus-process-", ".log");
+        try {
+            java.nio.file.Files.writeString(args,"-Dquarkus.http.test-port=0\n-Djava.util.logging.manager=org.jboss.logmanager.LogManager\n-cp\n\""+classpath.replace("\\","\\\\").replace("\"","\\\"")+"\"\n");
+            var builder=new ProcessBuilder(java.nio.file.Path.of(System.getProperty("java.home"),"bin","java").toString(),
+                    "@"+args,HumanQuarkusProcessRunner.class.getName(),phase).redirectErrorStream(true).redirectOutput(output.toFile());
+            builder.environment().put("HUMAN_CHECKPOINT_SHARED_URL",url);
+            builder.environment().put("HUMAN_CHECKPOINT_MANIFEST",manifest.toAbsolutePath().toString());
+            var child=builder.start();
+            try {
+                assertTrue(child.waitFor(180,TimeUnit.SECONDS),"application process did not stop");
+                assertEquals(expectedExit,child.exitValue(),java.nio.file.Files.readString(output));
+            } finally {if(child.isAlive()){child.destroyForcibly();child.waitFor(10,TimeUnit.SECONDS);}}
+        } finally {java.nio.file.Files.deleteIfExists(args);java.nio.file.Files.deleteIfExists(output);}
+    }
+    void restoreCheckpoint(InstanceRecord row, String appId, InboxWait wait, InboxMessage message) throws Exception {
         var resumed = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();
         var cleaned = new CompletableFuture<Void>(); var restoredBroker = new Broker();
         var recovery = new JdbcInboxCheckpointRecovery(dataSource, CheckpointRecoveryAudit::append, Clock.systemUTC());

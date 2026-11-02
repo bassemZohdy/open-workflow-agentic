@@ -27,6 +27,18 @@ public final class HumanSchemaResource implements QuarkusTestResourceLifecycleMa
     }
     @Override public Map<String, String> start() {
         try {
+            String shared = System.getenv("HUMAN_CHECKPOINT_SHARED_URL");
+            if (shared != null) {
+                var ds = new PGSimpleDataSource();
+                ds.setURL(shared);
+                ds.setUser(System.getenv().getOrDefault("DB_USER", "postgres"));
+                ds.setPassword(System.getenv().getOrDefault("DB_PASSWORD", "postgres"));
+                try (var c = ds.getConnection(); var s = c.createStatement(); var r = s.executeQuery("select current_database()")) {
+                    if (!r.next() || !r.getString(1).matches("owa_hcheckpoint_[0-9a-f]{32}"))
+                        throw new IllegalStateException("shared database is not an isolated human checkpoint test database");
+                }
+                return Map.of("quarkus.datasource.jdbc.url", ds.getURL());
+            }
             if (!database.matches("owa_hcheckpoint_[0-9a-f]{32}")) throw new IllegalStateException("invalid test database name");
             try (var c = data("postgres").getConnection(); var s = c.createStatement()) { s.execute("create database " + database); created = true; }
             var ds = data(database);
