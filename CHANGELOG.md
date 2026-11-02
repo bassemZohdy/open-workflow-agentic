@@ -1,5 +1,9 @@
 # Changelog
 
+- Continue lifetime scans past out-of-scope tenants before applying the repair batch limit, so scoped recovery is not hidden by earlier rows.
+
+- Support opt-in lifetime expiry for starting instances after all start writers are upgraded to coordinate with reconciliation; preserve unconfirmed engine starts as cancellation requests.
+
 - Ask the engine to discard a prepared instance when a concurrent registry change supersedes a reconciler start; refused or failed discards are logged and never reverse the registry change.
 
 - Pin configured instance lifetime deadlines at creation so a later configuration increase or removal cannot extend them; stricter current settings still apply. Legacy starts, rolling upgrades and reconciliation requirements are documented.

@@ -38,6 +38,8 @@ public class LifecycleSettings {
     public final int batchSize;
     /** The longest an instance may stay RUNNING or WAITING from creation; empty means no limit (the default). */
     public final Optional<Duration> maxLifetime;
+    /** Enable only after all start writers use the shared advisory lock. */
+    public final boolean startingLifetimeEnabled;
     public final Optional<String> crashAt;
 
     /** Without a maximum lifetime. */
@@ -46,6 +48,15 @@ public class LifecycleSettings {
             Duration waitDeadline, int batchSize, Optional<String> crashAt) {
         this(reconcilerEnabled, interval, warmupTimeout, startStaleAfter, startMaxAttempts, startBackoffBase,
                 cancelReissueAfter, waitDeadline, batchSize, crashAt, Optional.empty());
+    }
+
+    /** Preserve the prior constructor with STARTING lifetime enforcement off until rollout is complete. */
+    public LifecycleSettings(
+            boolean reconcilerEnabled, Duration interval, Duration warmupTimeout, Duration startStaleAfter,
+            int startMaxAttempts, Duration startBackoffBase, Duration cancelReissueAfter, Duration waitDeadline,
+            int batchSize, Optional<String> crashAt, Optional<Duration> maxLifetime) {
+        this(reconcilerEnabled, interval, warmupTimeout, startStaleAfter, startMaxAttempts, startBackoffBase,
+                cancelReissueAfter, waitDeadline, batchSize, crashAt, maxLifetime, false);
     }
 
     /** For the container. Keys are the ones in docs/lifecycle.md. */
@@ -61,8 +72,10 @@ public class LifecycleSettings {
             @ConfigProperty(name = "agentic.reconciler.wait-deadline", defaultValue = "PT24H") Duration waitDeadline,
             @ConfigProperty(name = "agentic.reconciler.batch-size", defaultValue = "100") int batchSize,
             @ConfigProperty(name = "agentic.dev.fault.crash-at") Optional<String> crashAt,
-            @ConfigProperty(name = "agentic.reconciler.max-lifetime") Optional<Duration> maxLifetime) {
+            @ConfigProperty(name = "agentic.reconciler.max-lifetime") Optional<Duration> maxLifetime,
+            @ConfigProperty(name = "agentic.reconciler.starting-lifetime-enabled", defaultValue = "false") boolean startingLifetimeEnabled) {
         this.reconcilerEnabled = reconcilerEnabled;
+        this.startingLifetimeEnabled = startingLifetimeEnabled;
         this.interval = positive("agentic.reconciler.interval", interval);
         this.warmupTimeout = positive("agentic.reconciler.warmup-timeout", warmupTimeout);
         this.startStaleAfter = positive("agentic.reconciler.start-stale-after", startStaleAfter);

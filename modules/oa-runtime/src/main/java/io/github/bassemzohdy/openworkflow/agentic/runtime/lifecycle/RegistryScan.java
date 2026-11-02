@@ -76,30 +76,41 @@ public class RegistryScan {
 
     /** Expired original pins or an expired stricter current setting, earliest effective deadline first. */
     public List<Ref> livePastLifetime(Instant now, Optional<Instant> currentCutoff, int limit) {
+        return livePastLifetime(now, currentCutoff, limit, false);
+    }
+
+    public List<Ref> livePastLifetime(Instant now, Optional<Instant> currentCutoff, int limit, boolean includeStarting) {
+        return livePastLifetime(now, currentCutoff, limit, includeStarting, 0);
+    }
+
+    List<Ref> livePastLifetime(Instant now, Optional<Instant> currentCutoff, int limit, boolean includeStarting, int offset) {
         Objects.requireNonNull(now); Objects.requireNonNull(currentCutoff);
         if (currentCutoff.isEmpty()) {
             // The default deployment has no current setting; use the pin index instead of scanning every instance.
             return query("""
                     select i.id, i.tenant from task.instance_lifetime p
                       join task.instance i on i.id = p.instance_id
-                     where p.deadline < ? and i.status in ('RUNNING', 'WAITING')
-                     order by p.deadline, i.id limit ?
+                     where p.deadline < ? and i.status in ('STARTING', 'RUNNING', 'WAITING')
+                       and (? or i.status <> 'STARTING')
+                     order by p.deadline, i.id limit ? offset ?
                     """, statement -> {
-                statement.setTimestamp(1, Timestamp.from(now)); statement.setInt(2, limit);
+                statement.setTimestamp(1, Timestamp.from(now)); statement.setBoolean(2, includeStarting); statement.setInt(3, limit);
+                statement.setInt(4, offset);
             }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
         }
         Timestamp cutoff = Timestamp.from(currentCutoff.orElseThrow());
         return query("""
                 select i.id, i.tenant from task.instance i
                   left join task.instance_lifetime p on p.instance_id = i.id
-                 where i.status in ('RUNNING', 'WAITING')
+                 where i.status in ('STARTING', 'RUNNING', 'WAITING')
+                   and (? or i.status <> 'STARTING')
                    and (p.deadline < ? or (cast(? as timestamptz) is not null and i.created_at < ?))
                  order by least(p.deadline, i.created_at + (cast(? as timestamptz) - cast(? as timestamptz))), i.id
-                 limit ?
+                 limit ? offset ?
                 """, statement -> {
-            statement.setTimestamp(1, Timestamp.from(now)); statement.setTimestamp(2, cutoff);
-            statement.setTimestamp(3, cutoff); statement.setTimestamp(4, Timestamp.from(now));
-            statement.setTimestamp(5, cutoff); statement.setInt(6, limit);
+            statement.setBoolean(1, includeStarting); statement.setTimestamp(2, Timestamp.from(now)); statement.setTimestamp(3, cutoff);
+            statement.setTimestamp(4, cutoff); statement.setTimestamp(5, Timestamp.from(now));
+            statement.setTimestamp(6, cutoff); statement.setInt(7, limit); statement.setInt(8, offset);
         }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
     }
 

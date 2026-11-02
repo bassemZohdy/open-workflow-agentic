@@ -21,6 +21,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -300,6 +301,9 @@ public class Reconciler {
         if (row.status() != InstanceStatus.STARTING) {
             return;
         }
+        repairLifetime(ref, now);
+        row = load(ref);
+        if (row.status() != InstanceStatus.STARTING) return;
         if (!force && !row.updatedAt().isBefore(now.minus(settings.startStaleAfter))) {
             return;
         }
@@ -426,8 +430,19 @@ public class Reconciler {
 
     private void lifetimesExceeded(ReconcileReport report, Instant now) {
         Optional<Instant> cutoff = settings.maxLifetime.map(now::minus);
-        for (RegistryScan.Ref ref : scan.livePastLifetime(now, cutoff, settings.batchSize)) {
-            if (!tenantScope.test(ref.tenant())) continue;
+        // Select before mutating: repairs remove rows from this query and would shift subsequent offsets.
+        var selected = new ArrayList<RegistryScan.Ref>();
+        int offset = 0;
+        while (selected.size() < settings.batchSize) {
+            var page = scan.livePastLifetime(now, cutoff, settings.batchSize, settings.startingLifetimeEnabled, offset);
+            for (var ref : page) {
+                if (tenantScope.test(ref.tenant())) selected.add(ref);
+                if (selected.size() == settings.batchSize) break;
+            }
+            if (page.size() < settings.batchSize) break;
+            offset += page.size();
+        }
+        for (RegistryScan.Ref ref : selected) {
             report.bump(withInstance(ref.id(), () -> repairLifetime(ref, now)) ? "lifetime.examined" : "busy");
         }
     }
@@ -435,12 +450,29 @@ public class Reconciler {
     /** Recheck both the original pin and any stricter current setting after acquiring the instance lock. */
     private void repairLifetime(RegistryScan.Ref ref, Instant now) {
         InstanceRecord row = load(ref);
-        if (row.status() != InstanceStatus.RUNNING && row.status() != InstanceStatus.WAITING) return;
+        if (row.status() != InstanceStatus.STARTING && row.status() != InstanceStatus.RUNNING
+                && row.status() != InstanceStatus.WAITING) return;
+        if (row.status() == InstanceStatus.STARTING && !settings.startingLifetimeEnabled) return;
         Optional<Instant> pinned = scan.pinnedLifetime(ref.id());
         Optional<Instant> current = settings.maxLifetime.map(row.createdAt()::plus);
         Instant deadline = pinned.isEmpty() ? current.orElse(null)
                 : current.isEmpty() || pinned.get().isBefore(current.get()) ? pinned.get() : current.get();
         if (deadline == null || !deadline.isBefore(now)) return;
+        if (row.status() == InstanceStatus.STARTING && row.engineInstanceId() == null) {
+            store.replace(row.successor(now, InstanceStatus.CANCELLED, null, row.startAttempts(), row.lastError(), null),
+                    row.version(), "reconciler.lifetime.exceeded", InstanceService.RUNTIME_ACTOR);
+            repairs.record("lifetime", row.id().value(), "cancelled", "maximum lifetime deadline " + deadline + " exceeded before preparation");
+            return;
+        }
+        if (row.status() == InstanceStatus.STARTING) {
+            // A missing local engine view cannot prove another replica never accepted the start.
+            store.replace(row.successor(now, InstanceStatus.CANCEL_REQUESTED, row.engineInstanceId(), row.startAttempts(),
+                    row.lastError(), null), row.version(), "reconciler.lifetime.exceeded", InstanceService.RUNTIME_ACTOR);
+            boolean accepted = engine.cancel(row.definition(), row.engineInstanceId());
+            repairs.record("lifetime", row.id().value(), accepted ? "cancel-requested" : "cancel-refused",
+                    "maximum lifetime deadline " + deadline + " exceeded during start");
+            return;
+        }
         cancelOverdue(row, now, "lifetime", "reconciler.lifetime.no-engine-instance", "reconciler.lifetime.exceeded",
                 "maximum lifetime deadline " + deadline + " exceeded");
     }

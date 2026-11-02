@@ -282,6 +282,7 @@ No sleep. The reconciler's startup pass is started by Flow's `WorkflowApplicatio
 | `agentic.reconciler.cancel-reissue-after` | `PT30S` | A `CANCEL_REQUESTED` row is sent to the engine again after this time |
 | `agentic.reconciler.wait-deadline` | `PT24H` | Wait given to a `WAITING` instance when the observer records it |
 | `agentic.reconciler.max-lifetime` | unset (no limit) | Maximum age from creation for `RUNNING` or `WAITING` instances; minimum one microsecond. New instances started with a limit retain an immutable absolute deadline, rounded down to database precision. A later tighter setting applies too, but a larger or removed setting cannot extend that original deadline. After the effective deadline, the reconciler requests cancellation or marks a missing engine instance `FAILED` (repair kind `lifetime`). |
+| `agentic.reconciler.starting-lifetime-enabled` | `false` | Enable lifetime expiry for `STARTING` only after every start writer is upgraded to use the same instance advisory lock. An expired start with no engine id is cancelled; with an engine id, cancellation is requested even if this replica cannot see it. |
 | `agentic.reconciler.batch-size` | `100` | Rows per page of the scans |
 | `agentic.dev.fault.crash-at` | unset | Dev only: halt the process (`137`) at `after-insert`, `after-prepare` or `before-accept` |
 | `agentic.dev.lifecycle-probes` | `false` | Dev only: expose `/dev/lifecycle/*` (probe effect, event injection). Never in a deployment. |
@@ -289,9 +290,15 @@ No sleep. The reconciler's startup pass is started by Flow's `WorkflowApplicatio
 The original deadline is inserted in the instance creation transaction. Instances created before this migration,
 instances started with no configured limit, and starts made by older replicas without this feature have no original
 pin: the current setting applies to them. Update every replica before relying on pins across a rolling deployment;
-older reconcilers do not read them. The runtime database role needs access to `task.instance_lifetime`. Enforcement
-still depends on reconciliation running and does not stop work already executing; `STARTING` instances, escalation
-and two-replica failover evidence remain outside this limit's current scope.
+older reconcilers do not read them. The runtime database role needs access to `task.instance_lifetime`. To roll out
+starting-state expiry, keep `starting-lifetime-enabled` false until all replicas and other start writers have been
+upgraded and use the shared advisory lock, then enable it on reconcilers. The start holds a dedicated database
+connection for this lock while preparing and launching; size the pool above peak concurrent starts plus other database
+operations, or those operations can time out waiting for a connection.
+An in-flight start can pass its deadline while holding the lock: expiry waits until a later reconciliation pass and
+does not interrupt engine work. A request with an unconfirmed engine id can remain `CANCEL_REQUESTED` until the
+engine confirms cancellation; absence from one replica's engine is not proof of termination. Enforcement depends on
+reconciliation running. Escalation and two-replica failover evidence remain outside this limit's current scope.
 
 ### 9.6 Entry points for 105d
 

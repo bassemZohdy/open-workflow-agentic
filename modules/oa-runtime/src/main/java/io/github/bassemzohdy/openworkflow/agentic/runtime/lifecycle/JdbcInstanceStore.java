@@ -45,6 +45,8 @@ public class JdbcInstanceStore implements InstanceStore {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
     }
 
+    DataSource lockDataSource() { return dataSource; }
+
     @Override
     public Insertion insertIfAbsent(InstanceRecord candidate, String reason, Subject actor, InsertHook hook) {
         requireInitial(candidate);
