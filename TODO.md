@@ -649,6 +649,7 @@ Implemented scope:
 Additional closure/integration tasks:
 
 - [ ] Complete deployed role grants and verify mixed-version rollout; implement escalation timers and prove deadline recovery across restart and replicas.
+- [ ] Prevent deadline scans from starving behind locked or unrepairable rows and bound start-lock connection use under load.
 - [ ] Run two execution replicas with durable Kubernetes lease mode; test node loss and post-warmup recovery.
 - [ ] Automate T12.
 
