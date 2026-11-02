@@ -1,0 +1,57 @@
+# WP-109 Kubernetes lease experiment
+
+This is an isolated development experiment, not a deployment recipe. It uses an
+empty PostgreSQL database, disposable credentials and the `itest` development
+profile. It must not be pointed at production data or a shared cluster.
+
+At integration commit `3af8965`, a local kind v1.36.1 cluster with two replicas
+and Quarkus Flow 1.2.0 reached PostgreSQL but neither application became ready.
+Flow's `PoolController` invokes `Scheduler.newJob()` without selecting an
+implementation. The project's db-scheduler 0.0.2 implementation throws
+`UnsupportedOperationException: Programmatic job scheduling is not supported by
+db-scheduler`. Lease readiness remained down and no leases were created. Thus the
+experiment did not reach failover and supplies no two-replica safety evidence.
+
+The [db-scheduler documentation](https://docs.quarkiverse.io/quarkus-db-scheduler/dev/index.html#_programmatic_scheduling)
+describes a composite scheduler with an explicit `Scheduled.SIMPLE` selection for
+programmatic jobs. The pinned Flow extension does not make that selection. A fix
+must preserve database-backed scheduling while running lease coordination on
+*each* replica, then repeat the failover and stale-owner tests. A second build
+with `quarkus.scheduler.use-composite-scheduler=true` also failed: the actual
+stack passed through `CompositeJobDefinition.schedule` into
+`DbSchedulerSchedulerImpl.newJob`, where the same exception was raised.
+
+The Maven profile `wp109-kube-experiment` adds the Kubernetes extension only to
+an explicitly selected experimental build. Build the app with that profile and
+copy the resulting `apps/app-runtime/target/quarkus-app` directory into this
+folder before building the local image named `owa-wp109-kube-experiment:local`.
+On a newly created kind cluster with a private kubeconfig, apply `database.yaml`,
+wait for `db` to become ready, load the image into kind, and apply `cluster.yaml`.
+Collect pod readiness, both pod logs and leases before cleaning up the dedicated
+cluster. The image uses a cached Maven/JDK base for the local experiment.
+
+For example, from a clean checkout on a machine with Java 21, Docker, kind and
+kubectl, the following uses a dedicated cluster and kubeconfig:
+
+```sh
+mvn -B -pl apps/app-runtime -am package -Pwp109-kube-experiment -DskipTests
+mkdir -p target/wp109-image
+cp -R apps/app-runtime/target/quarkus-app target/wp109-image/
+cp experiments/wp109-kubernetes/Dockerfile target/wp109-image/
+docker build -t owa-wp109-kube-experiment:local target/wp109-image
+kind create cluster --name owa-wp109-failover --kubeconfig "$PWD/target/wp109-kubeconfig"
+kind load docker-image owa-wp109-kube-experiment:local --name owa-wp109-failover
+kubectl --kubeconfig "$PWD/target/wp109-kubeconfig" apply -f experiments/wp109-kubernetes/database.yaml
+kubectl --kubeconfig "$PWD/target/wp109-kubeconfig" -n owa-wp109 wait --for=condition=Ready pod/db --timeout=180s
+kubectl --kubeconfig "$PWD/target/wp109-kubeconfig" apply -f experiments/wp109-kubernetes/cluster.yaml
+kubectl --kubeconfig "$PWD/target/wp109-kubeconfig" -n owa-wp109 get pods,leases
+```
+
+After collecting evidence, remove only the dedicated experiment with
+`kind delete cluster --name owa-wp109-failover`. Do not reuse its namespace or
+credentials in a shared environment.
+
+The cluster resources, test profile and embedded credentials are intentionally
+isolated and are not a production-ready Kubernetes configuration. Scheduled
+lease compatibility, actual takeover, deadline enforcement and in-flight side
+effect fencing all remain open.

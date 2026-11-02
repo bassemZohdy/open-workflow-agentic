@@ -63,4 +63,16 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <!-- Explicit experiment profile; the durable Kubernetes extension is not enabled in default builds. -->
+    <profile>
+      <id>wp109-kube-experiment</id>
+      <dependencies>
+        <dependency>
+          <groupId>io.quarkiverse.flow</groupId>
+          <artifactId>quarkus-flow-durable-kubernetes</artifactId>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 </project>

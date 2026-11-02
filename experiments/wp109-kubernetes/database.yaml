@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: owa-wp109
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: db
+  namespace: owa-wp109
+  labels: { app: db }
+spec:
+  containers:
+  - name: db
+    image: postgres:16-alpine
+    ports: [{ containerPort: 5432 }]
+    env:
+    - { name: POSTGRES_DB, value: agentic }
+    - { name: POSTGRES_USER, value: postgres }
+    - { name: POSTGRES_PASSWORD, value: localtest }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: owa-wp109
+spec:
+  selector: { app: db }
+  ports: [{ port: 5432, targetPort: 5432 }]
+---
