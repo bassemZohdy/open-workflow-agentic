@@ -38,7 +38,8 @@ import javax.sql.DataSource;
  * never one from HTTP/workflow fields. No identity/PDP/task/target/lease implementation or default allowance exists
  * here. Production adoption must supply all of those, mandatory audit and governed node/output propagation.
  *
- * <p>Attempts are bounded with no queue. The optional async entry uses bounded, gate-owned workers; its callback is
+ * <p>Attempts are bounded with no queue. The optional async entry uses gate-owned workers with an additional shared
+ * classloader-wide bound; its callback is
  * still synchronous and must not detach work. Close invalidates promptly, but a running
  * attempt retains its slot and fence until the actual synchronous worker exits, even if JDBC ignores interruption.
  * A returned future, completion stage or JDK publisher is refused and quarantines that gate slot permanently: its
@@ -48,6 +49,9 @@ import javax.sql.DataSource;
  * never be retried as a fresh call/epoch. The result and retained facts are data, not execution capabilities.
  */
 public final class JdbcResourceExecutionGate implements AutoCloseable {
+    /** Upper bound for managed async workers across gate instances in this classloader. */
+    public static final int PROCESS_WORKER_LIMIT = 64;
+    private static final Semaphore PROCESS_WORKERS = new Semaphore(PROCESS_WORKER_LIMIT);
     /** Reject accidental checkpoint/config serialization even when empty-bean serialization is enabled. */
     public static final class TransientControlSerializer extends JsonSerializer<Object> {
         @Override public void serialize(Object value, JsonGenerator generator, SerializerProvider provider) throws IOException {
@@ -132,6 +136,8 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
     public synchronized int activeCount() { return active.size(); }
     /** Slots reserved by gate-owned workers, including workers that have not yet started or have not exited. */
     public int reservedWorkerCount() { return limit - workerSlots.availablePermits(); }
+    /** Shared managed-worker slots in use or permanently quarantined in this classloader. */
+    public static int reservedProcessWorkerCount() { return PROCESS_WORKER_LIMIT - PROCESS_WORKERS.availablePermits(); }
     /** Legacy synchronous component callback. Production node composition must use openGoverned/executeGoverned. */
     public Attempt open(ResourceCallBinding binding, ResourceExecutionEntry entry, UUID executor,
                         ResourceExecutionFence trustedFence) {
@@ -148,7 +154,9 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
      * Explicit candidate async transport around a synchronous governed callback. No queue or caller-supplied executor
      * is used. Cancellation closes the attempt without interrupting the worker and cannot stop an in-flight effect;
      * capacity is retained until the
-     * gate-owned worker actually exits. It is not installed in the application and has no process-wide bound.
+     * gate-owned worker actually exits. Managed async workers also share a bounded classloader-wide pool. A detected
+     * detached result quarantines that shared slot permanently. Synchronous callers and other classloaders are outside
+     * this bound; this candidate is not installed in the application.
      */
     public <T> Future<Result<T>> executeGovernedAsync(ResourceCallBinding binding, ResourceExecutionEntry entry,
             UUID executor, CredentialFence trustedFence, Function<Running, T> callback) {
@@ -160,6 +168,12 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
             result.outcome.completeExceptionally(new RefusedException("worker capacity unavailable"));
             return result;
         }
+        if (!PROCESS_WORKERS.tryAcquire()) {
+            workerSlots.release();
+            attempt.close();
+            result.outcome.completeExceptionally(new RefusedException("process worker capacity unavailable"));
+            return result;
+        }
         try {
             workerFactory.newThread(() -> {
                 try {
@@ -169,10 +183,12 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
                     if (failure instanceof Error fatal) throw fatal;
                 } finally {
                     workerSlots.release();
+                    if (attempt.phase.get() != 3) PROCESS_WORKERS.release();
                 }
             }).start();
         } catch (RuntimeException | Error failure) {
             workerSlots.release();
+            PROCESS_WORKERS.release();
             attempt.close();
             throw failure;
         }

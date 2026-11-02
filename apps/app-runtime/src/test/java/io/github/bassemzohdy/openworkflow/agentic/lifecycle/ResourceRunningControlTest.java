@@ -134,15 +134,58 @@ class ResourceRunningControlTest {
     @Test void managedWorkerReturningAnotherStageStillQuarantinesEntry() throws Exception {
         try(var db=new Database();var gate=new JdbcResourceExecutionGate(db.owner,1)) {
             db.migrate(null);var f=fixture(db,"a".repeat(64));var detached=new CompletableFuture<String>();
+            int before=JdbcResourceExecutionGate.reservedProcessWorkerCount();
             var paired=CredentialFence.pair(f.binding(),entry->{});
             var result=gate.executeGovernedAsync(f.binding(),f.entry(1),UUID.randomUUID(),paired,r->detached);
             var refusal=assertThrows(ExecutionException.class,()->result.get(10,TimeUnit.SECONDS));
             assertInstanceOf(RefusedException.class,refusal.getCause());
             awaitWorkerCount(gate,0);
             assertEquals(1,gate.activeCount(),"detached work must retain the entry slot");
+            assertEquals(before+1,JdbcResourceExecutionGate.reservedProcessWorkerCount(),
+                    "uncertain detached work also retains shared capacity");
             detached.complete("finished");
             assertEquals(1,gate.activeCount(),"stage completion does not prove physical termination");
+            assertEquals(before+1,JdbcResourceExecutionGate.reservedProcessWorkerCount());
             assertTrue(gate.find(f.binding().scope()).isPresent());
+        }
+    }
+
+    @Test void managedWorkersShareABoundAcrossGateInstances() throws Exception {
+        try(var db=new Database();var first=new JdbcResourceExecutionGate(db.owner,JdbcResourceExecutionGate.PROCESS_WORKER_LIMIT);
+            var second=new JdbcResourceExecutionGate(db.owner,1)) {
+            db.migrate(null);var f=fixture(db,"a".repeat(64));
+            int before=JdbcResourceExecutionGate.reservedProcessWorkerCount();
+            int free=JdbcResourceExecutionGate.PROCESS_WORKER_LIMIT-before;
+            assertTrue(free>0,"shared worker budget is already exhausted");
+            var entered=new CountDownLatch(free);var release=new CountDownLatch(1);
+            var handles=new ArrayList<Future<?>>();
+            try {
+                var blocked=CredentialFence.pair(f.binding(),entry->{
+                    entered.countDown();
+                    try {if(!release.await(20,TimeUnit.SECONDS))throw new IllegalStateException("test timed out");}
+                    catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+                });
+                for(int i=0;i<free;i++)handles.add(first.executeGovernedAsync(
+                        f.binding(),f.entry(1),UUID.randomUUID(),blocked,r->{fail("cancelled admission cannot run");return "bad";}));
+                assertTrue(entered.await(15,TimeUnit.SECONDS),"all workers must enter their bound admission");
+                assertEquals(JdbcResourceExecutionGate.PROCESS_WORKER_LIMIT,
+                        JdbcResourceExecutionGate.reservedProcessWorkerCount());
+                var excess=second.executeGovernedAsync(f.binding(),f.entry(1),UUID.randomUUID(),
+                        CredentialFence.pair(f.binding(),entry->{}),r->"must not run");
+                var refusal=assertThrows(ExecutionException.class,()->excess.get(5,TimeUnit.SECONDS));
+                assertInstanceOf(RefusedException.class,refusal.getCause());
+                assertEquals(0,second.activeCount());assertEquals(0,second.reservedWorkerCount());
+                for(var handle:handles)assertTrue(handle.cancel(false));
+                assertEquals(free,first.reservedWorkerCount(),"cancellation is not worker termination");
+            } finally {
+                for(var handle:handles)handle.cancel(false);
+                release.countDown();
+                awaitWorkerCount(first,0);
+                long until=System.nanoTime()+Duration.ofSeconds(10).toNanos();
+                while(JdbcResourceExecutionGate.reservedProcessWorkerCount()!=before && System.nanoTime()<until)Thread.sleep(20);
+                assertEquals(before,JdbcResourceExecutionGate.reservedProcessWorkerCount());
+            }
+            assertTrue(first.find(f.binding().scope()).isEmpty(),"cancelled admissions must not retain entries");
         }
     }
 
