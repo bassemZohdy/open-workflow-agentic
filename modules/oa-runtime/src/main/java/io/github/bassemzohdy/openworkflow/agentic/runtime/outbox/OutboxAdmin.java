@@ -43,6 +43,15 @@ public class OutboxAdmin {
     }
 
     public Lag lag() {
+        return lag(0);
+    }
+
+    /** Bound the database statement used by a metrics scrape; connection acquisition has its own pool timeout. */
+    public Lag lagForMetrics() {
+        return lag(2);
+    }
+
+    private Lag lag(int queryTimeoutSeconds) {
         return Transactions.inTransaction(dataSource, connection -> {
             try (PreparedStatement select = connection.prepareStatement("""
                     select count(*) as unpublished,
@@ -50,10 +59,12 @@ public class OutboxAdmin {
                            coalesce(extract(epoch from now() - min(occurred_at))::float8, 0) as oldest
                       from task.outbox
                      where published_at is null
-                    """);
-                 ResultSet rs = select.executeQuery()) {
-                rs.next();
-                return new Lag(rs.getLong("unpublished"), rs.getLong("failed"), rs.getDouble("oldest"));
+                    """)) {
+                if (queryTimeoutSeconds > 0) select.setQueryTimeout(queryTimeoutSeconds);
+                try (ResultSet rs = select.executeQuery()) {
+                    rs.next();
+                    return new Lag(rs.getLong("unpublished"), rs.getLong("failed"), rs.getDouble("oldest"));
+                }
             }
         });
     }

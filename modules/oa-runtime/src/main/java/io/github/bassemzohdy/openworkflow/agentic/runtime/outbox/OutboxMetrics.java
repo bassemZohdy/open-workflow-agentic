@@ -41,7 +41,7 @@ public class OutboxMetrics {
 
     @Inject
     public OutboxMetrics(OutboxAdmin admin, MeterRegistry registry) {
-        this(Objects.requireNonNull(admin, "admin")::lag, registry, System::nanoTime);
+        this(Objects.requireNonNull(admin, "admin")::lagForMetrics, registry, System::nanoTime);
     }
 
     OutboxMetrics(Supplier<OutboxAdmin.Lag> read, MeterRegistry registry, LongSupplier nanos) {
@@ -69,7 +69,7 @@ public class OutboxMetrics {
                 .baseUnit("seconds").register(registry);
     }
 
-    /** One shared observation; cache limits attempt frequency, not query duration or maximum data age. */
+    /** One shared observation; cache limits attempt frequency, not connection acquisition or maximum data age. */
     private Observation current() {
         var observed=last;
         if (cached(observed) || !reading.compareAndSet(false,true)) return observed;
