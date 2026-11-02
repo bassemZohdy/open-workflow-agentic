@@ -102,6 +102,7 @@ class KeycloakDelegationIT {
         DelegationGrant grant = h.grant(READ_WRITE, Duration.ofHours(1));
 
         IssuedToken issued = h.exchanger.exchange(h.request(subject, TOOL, READ, grant));
+        assertTrue(h.exchangeGuard.stats().successes() > 0, "the real exchange passed through the guard");
 
         VerifiedToken verified = h.verifier.verify(issued.accessToken().reveal(), TOOL);
         assertEquals(h.alice, verified.subject(), "the user stays the subject");
