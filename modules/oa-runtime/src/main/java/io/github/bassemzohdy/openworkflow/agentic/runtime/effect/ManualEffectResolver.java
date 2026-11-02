@@ -24,6 +24,8 @@ import javax.sql.DataSource;
 public final class ManualEffectResolver {
     private static final Set<String> REQUIRED=Set.of("oa.recover");
     private static final Set<String> REASONS=Set.of("TARGET_CONFIRMED","TARGET_REJECTED","OPERATOR_VERIFIED");
+    // Shared across resolvers: a timed-out dependency may ignore interruption and keep running.
+    private static final BoundedChecks CHECKS = new BoundedChecks(64, 1, TimeUnit.SECONDS);
     private final DataSource dataSource;
     private final TransactionManager transactions;
     private final Pep pep;
@@ -167,12 +169,41 @@ public final class ManualEffectResolver {
         a.put("effect.policy.decidedAt",decision.decidedAt().toString());return a;
     }
     private static AuditEvent manualDraft(DecisionRow row,EffectKey key){return row.draft();}
-    private static <T> T bounded(Callable<T> work) {
-        var task=new FutureTask<>(work);Thread.ofVirtual().name("manual-effect-check").start(task);
-        try{return task.get(1,TimeUnit.SECONDS);}
-        catch(InterruptedException interrupted){Thread.currentThread().interrupt();task.cancel(true);throw new IllegalStateException("manual effect authorization check was interrupted",interrupted);}
-        catch(ExecutionException failed){Throwable cause=failed.getCause();if(cause instanceof RuntimeException runtime)throw runtime;if(cause instanceof Error error)throw error;throw new IllegalStateException("manual effect authorization check failed",cause);}
-        catch(TimeoutException timeout){task.cancel(true);throw new IllegalStateException("manual effect authorization check exceeded one second",timeout);}
+    private static <T> T bounded(Callable<T> work) { return CHECKS.call(work); }
+
+    /** Slots remain occupied until the actual worker exits, including after timeout/cancellation. */
+    static final class BoundedChecks {
+        private final Semaphore capacity;
+        private final long timeout;
+        private final TimeUnit unit;
+        BoundedChecks(int limit, long timeout, TimeUnit unit) {
+            if (limit < 1 || timeout < 1) throw new IllegalArgumentException("invalid authorization check limit");
+            this.capacity = new Semaphore(limit); this.timeout = timeout; this.unit = Objects.requireNonNull(unit);
+        }
+        <T> T call(Callable<T> work) {
+            Objects.requireNonNull(work);
+            if (!capacity.tryAcquire()) throw new IllegalStateException("manual effect authorization capacity exhausted");
+            var task = new FutureTask<>(work);
+            try {
+                Thread.ofVirtual().name("manual-effect-check").start(() -> {
+                    try { task.run(); } finally { capacity.release(); }
+                });
+            } catch (RuntimeException | Error failure) {
+                capacity.release(); throw failure;
+            }
+            try { return task.get(timeout, unit); }
+            catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt(); task.cancel(true);
+                throw new IllegalStateException("manual effect authorization check was interrupted", interrupted);
+            } catch (ExecutionException failed) {
+                Throwable cause = failed.getCause();
+                if (cause instanceof RuntimeException runtime) throw runtime;
+                if (cause instanceof Error error) throw error;
+                throw new IllegalStateException("manual effect authorization check failed", cause);
+            } catch (TimeoutException timeoutFailure) {
+                task.cancel(true); throw new IllegalStateException("manual effect authorization check timed out", timeoutFailure);
+            }
+        }
     }
     private static String scopeFingerprint(String tenant,String instance,String kind,String owner){return fingerprint("oa.effect.audit-scope.v1",tenant,instance,kind,owner);}
     private static String keyFingerprint(EffectKey key){return fingerprint("oa.effect.audit-key.v1",key.threadId().value(),key.nodeId(),key.idempotencyKey());}

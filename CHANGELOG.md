@@ -1,5 +1,7 @@
 # Changelog
 
+- Bound concurrent manual-effect authorization checks even when a dependency ignores cancellation.
+
 - Exercise human-wake discovery across application-process restarts without passing decision IDs.
 
 - Add bounded tenant-scoped discovery of retained human decisions for recovery.

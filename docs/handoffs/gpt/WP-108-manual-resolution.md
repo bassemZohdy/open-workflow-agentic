@@ -143,3 +143,5 @@ and independently ran 17 focused tests with no failures, errors or skips. PR CI
 The post-merge build `40799276896` passed. Lookup and retain resume failures,
 and failure of the real transaction manager to resume, are not covered. Deployment
 datasource and role configuration, V80 activation and WP-108/T03 remain open.
+
+Manual resolution now bounds its final authority and policy checks to 64 shared worker slots. A timeout or caller interruption cancels the task, but its slot is released only when the worker actually exits, even if a dependency ignores interruption. Saturation refuses new checks without starting more workers; this does not forcibly stop a stuck dependency. The resolver remains opt-in and V80 activation and deployment gates remain open.
