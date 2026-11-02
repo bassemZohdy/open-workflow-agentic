@@ -3,6 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic.lifecycle;
 import static org.junit.jupiter.api.Assertions.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.*;
@@ -102,9 +103,13 @@ class WorkflowOwnerExecutionBoundaryTest {
         exerciseOwnedResourceEntry(1);
         exerciseOwnedResourceEntry(2);
         exerciseOwnedResourceEntry(3);
+        exerciseOwnedResourceEntry(4);
+        exerciseOwnedResourceEntry(5);
+        exerciseOwnedResourceEntry(6);
+        exerciseOwnedResourceEntry(7);
     }
 
-    // 0: current; 1: takeover during callback; 2: takeover during audit; 3: grant revoked during audit.
+    // 0: current; 1/2: takeover; 3: grant revoked; 4: policy revoked; 5/6/7: deny, PDP or PEP audit failure.
     private void exerciseOwnedResourceEntry(int scenario) throws Exception {
         String appId = "resource-entry-owner-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
         String document = """
@@ -164,28 +169,42 @@ class WorkflowOwnerExecutionBoundaryTest {
             var canonical = calls.findBinding(witness.bindingKey()).orElseThrow();
             var callbacks = new AtomicInteger();
             var auditChecks = new AtomicInteger();
+            var policyAllowed = new AtomicBoolean(scenario != 5);
+            var policyRequest = new AtomicReference<AuthorizationRequest>();
+            var policyAudits = new AtomicInteger();
+            var pep = new Pep(request -> {
+                policyRequest.set(request);
+                if (scenario == 6) throw new IllegalStateException("fixture policy outage");
+                return new Decision("fixture", policyAllowed.get() ? DecisionOutcome.ALLOW : DecisionOutcome.DENY,
+                        "fixture policy", PolicyRef.FAIL_CLOSED, clock.instant());
+            }, event -> {
+                policyAudits.incrementAndGet();
+                if (scenario == 7) throw new IllegalStateException("fixture audit outage");
+            }, Duration.ofSeconds(3), clock);
             try (var identityCheck = new LiveIdentityResourceFence(admission, witness, entry, canonical, workload, calls);
+                 var policyCheck = new LiveResearchPolicyFence(admission, witness, entry, pep);
                  var ownerCheck = new WorkflowOwnerResourceFence(entry, context.get(), bindings,
                          InstanceRegistryFence.over(store), ownerFence);
                  var gate = new JdbcResourceExecutionGate(data, transactions, 1)) {
                 var builder = CompositeExecutionFence.builder();
                 for (var check : CompositeExecutionFence.Check.values()) {
                     if (check == CompositeExecutionFence.Check.IDENTITY) builder.with(check, identityCheck);
+                    else if (check == CompositeExecutionFence.Check.POLICY) builder.with(check, policyCheck);
                     else if (check == CompositeExecutionFence.Check.OWNER_AND_LEASE) builder.with(check, ownerCheck);
                     else if (check == CompositeExecutionFence.Check.AUDIT) builder.with(check, ignored -> {
-                        if ((scenario == 2 || scenario == 3) && auditChecks.incrementAndGet() == 2) {
+                        if ((scenario == 2 || scenario == 3 || scenario == 4) && auditChecks.incrementAndGet() == 2) {
                             if (scenario == 2) {
                                 assertTrue(leases.release(claim.get()));
                                 assertTrue(leases.acquire(binding, UUID.randomUUID(), Duration.ofSeconds(15)).isPresent());
-                            } else {
+                            } else if (scenario == 3) {
                                 grants.revoke(grant.id(), row.owner(), "fixture revocation", null);
-                            }
+                            } else policyAllowed.set(false);
                         }
                     });
                     else builder.with(check, ignored -> {});
                 }
-                // Policy, task/target and audit are fixtures. The token verifier is also a fixture.
-                var paired = identityCheck.pair(builder.build());
+                // The PDP, task/target, audit and token verifier are fixtures.
+                var paired = identityCheck.pair(builder.build(), policyCheck);
                 var wrongCredential = new ResourceCallBinding(canonical.issuer(), UUID.randomUUID().toString(),
                         canonical.issuingGrantId(), canonical.scope(), canonical.issuedAt(), canonical.expiresAt());
                 assertThrows(JdbcResourceExecutionGate.RefusedException.class,
@@ -201,7 +220,8 @@ class WorkflowOwnerExecutionBoundaryTest {
                 };
                 if (scenario != 0) {
                     assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> attempt.executeGoverned(callback));
-                    assertTrue(gate.find(scope).isPresent(), "the committed entry must remain after authority loss");
+                    assertEquals(scenario < 5, gate.find(scope).isPresent(),
+                            "a pre-entry denial must not create a fact; a post-commit refusal retains it");
                     var retry = gate.openGoverned(canonical, entry, UUID.randomUUID(), paired);
                     assertThrows(JdbcResourceExecutionGate.RefusedException.class, () -> retry.executeGoverned(callback));
                 } else {
@@ -214,6 +234,11 @@ class WorkflowOwnerExecutionBoundaryTest {
                 }
                 assertEquals(scenario >= 2 ? 0 : 1, callbacks.get(),
                         "callback must not start after takeover or run twice for a retained entry");
+                assertNotNull(policyRequest.get());
+                assertEquals(row.owner(), policyRequest.get().subject());
+                assertEquals(Set.of(AgentResourceAdmission.SCOPE), policyRequest.get().context().scopes());
+                assertEquals(Pep.AGENT_RESEARCH_RUN, policyRequest.get().resource());
+                assertTrue(policyAudits.get() > 0, "the PEP must record its decision");
             } finally { admission.close(); }
         }
     }

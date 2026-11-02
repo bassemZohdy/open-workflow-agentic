@@ -377,8 +377,13 @@ the callback while retaining the committed entry. The composite also rechecks id
 witness, canonical binding, server-pinned workload and live grant checks. Its explicit pairing requires the exact
 identity delegate in the composite and supplies the same credential to the entry gate. The combined test refuses a grant revoked
 during post-commit audit, while retaining the entry. Token verification, policy, task/target and audit are fixtures;
-real provider interoperability and production composition remain open. A credential or lease can still expire
-immediately after any check, and this does not prove cross-process or external-effect safety.
+real provider interoperability and production composition remain open. An explicit research-policy delegate now
+uses the same opaque witness to supply verified subject and scopes to the PEP, and the composite rechecks policy
+after audit. Tests exercise denial, policy and decision-audit failures, and a post-commit policy change using fixture
+decisions and audit. The pairing requires identity and policy delegates for the same witness and entry. Task/target
+approval, tenant-specific policy, central audit and real policy/provider composition remain open; the current research
+PEP call carries subject and scopes, not tenant or task-specific policy facts. A decision, credential or lease can still
+become stale immediately after any check; this does not prove cross-process or external-effect safety.
 
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`

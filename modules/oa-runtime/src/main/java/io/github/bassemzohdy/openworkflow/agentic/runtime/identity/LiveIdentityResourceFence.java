@@ -61,13 +61,16 @@ public final class LiveIdentityResourceFence implements ResourceExecutionFence, 
     }
 
     /**
-     * Pairs the same credential with a composite containing this exact identity delegate. The remaining delegates
-     * must still be supplied by the trusted composition root; this method does not validate their provenance.
+     * Pairs the same credential with a composite containing this exact identity delegate and a policy delegate bound
+     * to the same witness and entry. The trusted composition root must supply the remaining delegates.
      */
-    public JdbcResourceExecutionGate.CredentialFence pair(CompositeExecutionFence composite) {
+    public JdbcResourceExecutionGate.CredentialFence pair(CompositeExecutionFence composite,
+                                                          LiveResearchPolicyFence policy) {
         if (closed.get() || Thread.currentThread().isInterrupted()) throw refused("identity context unavailable");
         if (!Objects.requireNonNull(composite, "composite").usesIdentity(this))
             throw refused("composite identity differs");
+        if (policy == null || !composite.usesPolicy(policy) || !policy.boundTo(bound, entry))
+            throw refused("composite policy differs");
         return JdbcResourceExecutionGate.CredentialFence.pair(binding, composite);
     }
 

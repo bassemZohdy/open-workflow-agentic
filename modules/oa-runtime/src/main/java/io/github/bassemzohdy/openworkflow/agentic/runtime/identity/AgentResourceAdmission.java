@@ -273,6 +273,20 @@ public class AgentResourceAdmission {
         }
     }
 
+    /** Policy uses only the private verified token; workflow and HTTP fields cannot supply its subject or scopes. */
+    void requireResearchPolicy(BoundCall bound, ResourceExecutionEntry expected, Pep pep) {
+        Objects.requireNonNull(bound, "bound");
+        Objects.requireNonNull(expected, "entry");
+        Objects.requireNonNull(pep, "pep");
+        requireNotInterrupted();
+        requireOpen(bound.admitted);
+        if (!bound.entry.equals(expected)) throw new WitnessRefusedException("entry differs from the retained one");
+        var decision = pep.agentInvocation(bound.admitted.token.subject(), bound.admitted.token.scopes());
+        requireNotInterrupted();
+        requireOpen(bound.admitted);
+        if (decision == null || !decision.allows()) throw new WitnessRefusedException("research policy did not allow");
+    }
+
     /**
      * The durable invocation attribution of this verified token, found by the VERIFIED issuer and token id only (never a
      * header or body field) and compared field by field. A missing binding, a disagreement or an unavailable store

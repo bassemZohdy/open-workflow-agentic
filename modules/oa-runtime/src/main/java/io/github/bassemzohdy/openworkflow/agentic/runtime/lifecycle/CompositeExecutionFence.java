@@ -12,7 +12,7 @@ import java.util.Objects;
  * authority: every category must be supplied by the trusted composition root, and a missing category, a refusal, any
  * unexpected failure or an interrupted thread refuses. There is no default allowance and no partial composition.
  *
- * <p>Checks run in the fixed {@link Check} order, then identity and ownership are checked again after potentially
+ * <p>Checks run in the fixed {@link Check} order, then policy, identity and ownership are checked again after potentially
  * blocking audit I/O. They stop at the first refusal. Even the final check can immediately become stale; it is not a lock on later
  * work. The result is only as strong as the
  * delegates: identity must be the pairing-aware check on the SAME admitted credential, and the gate (not this class)
@@ -56,9 +56,15 @@ public final class CompositeExecutionFence implements ResourceExecutionFence {
         return identity != null && checks.get(Check.IDENTITY) == identity;
     }
 
+    /** Identity comparison for trusted policy pairing; does not itself authorize an entry. */
+    public boolean usesPolicy(ResourceExecutionFence policy) {
+        return policy != null && checks.get(Check.POLICY) == policy;
+    }
+
     @Override public void requireCurrent(ResourceExecutionEntry entry) {
         Objects.requireNonNull(entry, "entry");
         for (Check check : Check.values()) check(entry, check);
+        check(entry, Check.POLICY);
         check(entry, Check.IDENTITY);
         check(entry, Check.OWNER_AND_LEASE);
         if (Thread.currentThread().isInterrupted())

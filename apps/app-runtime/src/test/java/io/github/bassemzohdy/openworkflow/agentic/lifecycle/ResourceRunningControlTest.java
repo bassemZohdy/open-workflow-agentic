@@ -6,6 +6,7 @@ import static io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResourceExecu
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceInvocations;
@@ -126,7 +127,29 @@ class ResourceRunningControlTest {
                 assertThrows(JsonProcessingException.class,()->new ObjectMapper().writeValueAsString(identity));
                 var wrongComposite=CompositeExecutionFence.builder();
                 for(var check:CompositeExecutionFence.Check.values())wrongComposite.with(check,ignored->{});
-                assertThrows(IllegalStateException.class,()->identity.pair(wrongComposite.build()));
+                var pep=new Pep(request->new Decision("fixture",DecisionOutcome.ALLOW,"fixture",
+                        PolicyRef.FAIL_CLOSED,clock.instant()),event->{},Duration.ofSeconds(3),clock);
+                var policy=new LiveResearchPolicyFence(admission,first,f.entry(1),pep);
+                assertThrows(IllegalStateException.class,()->identity.pair(wrongComposite.build(),policy));
+                var otherPolicy=new LiveResearchPolicyFence(admission,second,f.entry(1),pep);
+                var swappedPolicyComposite=CompositeExecutionFence.builder();
+                for(var check:CompositeExecutionFence.Check.values())
+                    swappedPolicyComposite.with(check,check==CompositeExecutionFence.Check.IDENTITY?identity:
+                            check==CompositeExecutionFence.Check.POLICY?otherPolicy:ignored->{});
+                assertThrows(IllegalStateException.class,()->identity.pair(swappedPolicyComposite.build(),otherPolicy));
+                var policyEntered=new CountDownLatch(1);var policyRelease=new CountDownLatch(1);
+                var blockingPep=new Pep(request->{
+                    policyEntered.countDown();
+                    try {if(!policyRelease.await(8,TimeUnit.SECONDS))throw new IllegalStateException("test timed out");}
+                    catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+                    return new Decision("fixture",DecisionOutcome.ALLOW,"fixture",PolicyRef.FAIL_CLOSED,clock.instant());
+                },event->{},Duration.ofSeconds(10),clock);
+                try(var closingPolicy=new LiveResearchPolicyFence(admission,first,f.entry(1),blockingPep)) {
+                    var checking=CompletableFuture.runAsync(()->closingPolicy.requireCurrent(f.entry(1)));
+                    try {assertTrue(policyEntered.await(8,TimeUnit.SECONDS));closingPolicy.close();}
+                    finally {policyRelease.countDown();}
+                    assertThrows(CompletionException.class,checking::join);
+                }
                 var swapped=gate.openGoverned(one,f.entry(1),UUID.randomUUID(),CredentialFence.pair(one,
                         entry->live.requireLive(second,entry,expectedWorkload,one)));
                 assertThrows(AgentResourceAdmission.WitnessRefusedException.class,()->swapped.executeGoverned(r->{callbacks.incrementAndGet();return "unsafe";}));
