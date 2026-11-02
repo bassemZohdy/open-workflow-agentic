@@ -302,7 +302,9 @@ reconciliation running. Escalation and two-replica failover evidence remain outs
 
 Lifetime and overdue-wait scans rotate through a stable deadline and instance-id ordering across passes, so locked older rows do not
 permanently consume the whole batch while the reconciler continues running. The cursor is held in each reconciler's
-memory and resets on restart; it is not a durable failover guarantee. Stale-row scans do not yet have this rotation.
+memory and resets on restart; it is not a durable failover guarantee. Stale starts and unconfirmed cancellations
+use independent cursors with the same limitation, so a held lock or a missing engine confirmation does not keep
+later stale rows out of every batch.
 
 ### 9.6 Entry points for 105d
 

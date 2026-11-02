@@ -52,6 +52,7 @@ class InstanceLifetimePinTest {
     private static final class Engine implements WorkflowEngine {
         final AtomicInteger starts = new AtomicInteger(), cancels = new AtomicInteger();
         EngineStatus status = EngineStatus.RUNNING;
+        final Set<String> invisible = new HashSet<>();
         @Override public boolean hasDefinition(DefinitionRef definition) { return true; }
         @Override public EngineLaunch prepare(DefinitionRef definition, Map<String,Object> input) {
             String id = "engine-" + UUID.randomUUID();
@@ -61,7 +62,7 @@ class InstanceLifetimePinTest {
             };
         }
         @Override public Optional<ActiveInstance> activeInstance(DefinitionRef definition, String id) {
-            return Optional.of(new ActiveInstance(id, status));
+            return invisible.contains(id) ? Optional.empty() : Optional.of(new ActiveInstance(id, status));
         }
         @Override public boolean cancel(DefinitionRef definition, String id) { cancels.incrementAndGet(); return true; }
     }
@@ -77,6 +78,56 @@ class InstanceLifetimePinTest {
         var sync = new EngineStatusSync(store, scan, config, Clock.fixed(now, ZoneOffset.UTC));
         return new Reconciler(store, engine, sync, scan, new RepairStore(db), config, db,
                 Clock.fixed(now, ZoneOffset.UTC), request.tenant()::equals);
+    }
+
+    @Test void lockedStaleStartDoesNotStarveLaterStarts() throws Exception {
+        var engine = new Engine(); var firstRequest = request();
+        var secondRequest = new StartRequest(firstRequest.tenant(), owner, definition, Map.of(), "second");
+        var first = InstanceRecord.starting(UlidGenerator.shared().next(), firstRequest, start.minusSeconds(120));
+        var second = InstanceRecord.starting(UlidGenerator.shared().next(), secondRequest, start.minusSeconds(119));
+        store.insertIfAbsent(first, "test.start"); store.insertIfAbsent(second, "test.start");
+        var config = new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120), Duration.ofSeconds(60),
+                3, Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofHours(24), 1, Optional.empty());
+        var repair = new Reconciler(store, engine, new EngineStatusSync(store, scan, config, Clock.fixed(start, ZoneOffset.UTC)),
+                scan, new RepairStore(db), config, db, Clock.fixed(start, ZoneOffset.UTC), firstRequest.tenant()::equals);
+        try (var held = Reconciler.AdvisoryLock.tryAcquire(db, "instance:" + first.id().value()).orElseThrow()) {
+            assertTrue(repair.reconcileOnce().count("busy") >= 1);
+            repair.reconcileOnce();
+            assertEquals(InstanceStatus.RUNNING, store.find(firstRequest.tenant(), second.id()).orElseThrow().status());
+        }
+        repair.reconcileOnce();
+        assertEquals(InstanceStatus.RUNNING, store.find(firstRequest.tenant(), first.id()).orElseThrow().status());
+        assertEquals(2, engine.starts.get());
+    }
+
+    @Test void lockedOrUnconfirmedCancelsDoNotStarveLaterCancels() throws Exception {
+        for (boolean lockFirst : List.of(false, true)) {
+            var engine = new Engine(); var firstRequest = request();
+            var secondRequest = new StartRequest(firstRequest.tenant(), owner, definition, Map.of(), "second");
+            var first = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start.minusSeconds(120), ZoneOffset.UTC),
+                    UlidGenerator.shared(), settings(Optional.empty()), db).start(firstRequest).record();
+            var second = new InstanceService(store, engine, LifecycleFaults.none(), Clock.fixed(start.minusSeconds(119), ZoneOffset.UTC),
+                    UlidGenerator.shared(), settings(Optional.empty()), db).start(secondRequest).record();
+            first = store.replace(first.successor(start.minusSeconds(120), InstanceStatus.CANCEL_REQUESTED,
+                    first.engineInstanceId(), 0, null, null), first.version(), "test.cancel", owner);
+            second = store.replace(second.successor(start.minusSeconds(119), InstanceStatus.CANCEL_REQUESTED,
+                    second.engineInstanceId(), 0, null, null), second.version(), "test.cancel", owner);
+            if (!lockFirst) engine.invisible.add(first.engineInstanceId());
+            var config = new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120), Duration.ofSeconds(60),
+                    3, Duration.ofSeconds(5), Duration.ofSeconds(30), Duration.ofHours(24), 1, Optional.empty());
+            var repair = new Reconciler(store, engine, new EngineStatusSync(store, scan, config, Clock.fixed(start, ZoneOffset.UTC)),
+                    scan, new RepairStore(db), config, db, Clock.fixed(start, ZoneOffset.UTC), firstRequest.tenant()::equals);
+            var held = lockFirst ? Reconciler.AdvisoryLock.tryAcquire(db, "instance:" + first.id().value()).orElseThrow() : null;
+            try {
+                repair.reconcileOnce();
+                assertEquals(0, engine.cancels.get());
+                repair.reconcileOnce();
+                assertEquals(1, engine.cancels.get());
+            } finally { if (held != null) held.close(); }
+            engine.invisible.clear();
+            repair.reconcileOnce();
+            assertEquals(2, engine.cancels.get());
+        }
     }
 
     @Test void aLockedOldestLifetimeDoesNotStarveLaterRows() throws Exception {

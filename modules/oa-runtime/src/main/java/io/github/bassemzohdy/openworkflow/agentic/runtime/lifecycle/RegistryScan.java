@@ -34,6 +34,10 @@ public class RegistryScan {
         Ref ref() { return new Ref(id, tenant); }
     }
 
+    record StaleRef(String id, String tenant, Instant updatedAt) {
+        Ref ref() { return new Ref(id, tenant); }
+    }
+
     /** An agent run that is recorded as running, with the liveness fields the reconciler reads. */
     public record AgentRun(String taskId, String instanceId, AgentTaskStatus status, String bridge, Instant leaseUntil) {
     }
@@ -65,6 +69,18 @@ public class RegistryScan {
             statement.setTimestamp(next, Timestamp.from(updatedBefore));
             statement.setInt(next + 1, limit);
         }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
+    }
+
+    List<StaleRef> stalePage(InstanceStatus status, Instant before, int limit, StaleRef after, StaleRef through) {
+        String lower = after == null ? "" : " and (updated_at, id) > (?, ?)";
+        String upper = through == null ? "" : " and (updated_at, id) <= (?, ?)";
+        return query("select id, tenant, updated_at from task.instance where status = ? and updated_at < ?"
+                + lower + upper + " order by updated_at, id limit ?", statement -> {
+            int i = 1; statement.setString(i++, status.name()); statement.setTimestamp(i++, Timestamp.from(before));
+            if (after != null) { statement.setTimestamp(i++, Timestamp.from(after.updatedAt())); statement.setString(i++, after.id()); }
+            if (through != null) { statement.setTimestamp(i++, Timestamp.from(through.updatedAt())); statement.setString(i++, through.id()); }
+            statement.setInt(i, limit);
+        }, rs -> new StaleRef(rs.getString("id"), rs.getString("tenant"), rs.getTimestamp("updated_at").toInstant()));
     }
 
     /** Waiting rows whose wait deadline has passed at {@code now} (ADR 0019, Deadlines). */

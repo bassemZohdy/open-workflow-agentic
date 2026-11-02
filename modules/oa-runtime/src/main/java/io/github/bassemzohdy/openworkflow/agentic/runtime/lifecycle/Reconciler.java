@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.EnumSet;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -108,6 +109,8 @@ public class Reconciler {
     private final Predicate<String> tenantScope;
     private RegistryScan.DeadlineRef lifetimeCursor;
     private RegistryScan.DeadlineRef waitCursor;
+    private RegistryScan.StaleRef startingCursor;
+    private RegistryScan.StaleRef cancelCursor;
     private final ResumeGate gate;
     private final RestoreCheckpointGate checkpoints;
     private final ScheduledExecutorService executor;
@@ -290,10 +293,7 @@ public class Reconciler {
 
     private void startingRows(ReconcileReport report, Instant now) {
         Instant stale = now.minus(settings.startStaleAfter);
-        for (RegistryScan.Ref ref : scan.staleInStatus(EnumSet.of(InstanceStatus.STARTING), stale, settings.batchSize)) {
-            if (!tenantScope.test(ref.tenant())) {
-                continue;
-            }
+        for (RegistryScan.Ref ref : staleBatch(InstanceStatus.STARTING, stale)) {
             report.bump(withInstance(ref.id(), () -> repairStarting(ref, now, false)) ? "starting.examined" : "busy");
         }
     }
@@ -678,12 +678,38 @@ public class Reconciler {
 
     private void stuckCancels(ReconcileReport report, Instant now) {
         Instant stale = now.minus(settings.cancelReissueAfter);
-        for (RegistryScan.Ref ref : scan.staleInStatus(EnumSet.of(InstanceStatus.CANCEL_REQUESTED), stale, settings.batchSize)) {
-            if (!tenantScope.test(ref.tenant())) {
-                continue;
-            }
+        for (RegistryScan.Ref ref : staleBatch(InstanceStatus.CANCEL_REQUESTED, stale)) {
             report.bump(withInstance(ref.id(), () -> repairCancel(ref, now, false)) ? "cancel.examined" : "busy");
         }
+    }
+
+    /** Rotate independently for starting and cancellation rows; repair changes cannot shift a keyset position. */
+    private synchronized List<RegistryScan.Ref> staleBatch(InstanceStatus status, Instant before) {
+        boolean starting = status == InstanceStatus.STARTING;
+        if (!starting && status != InstanceStatus.CANCEL_REQUESTED) throw new IllegalArgumentException("unsupported stale status");
+        var cursor = starting ? startingCursor : cancelCursor;
+        var start = cursor;
+        boolean wrapped = cursor == null;
+        var selected = new ArrayList<RegistryScan.Ref>();
+        while (selected.size() < settings.batchSize) {
+            var page = scan.stalePage(status, before, settings.batchSize, cursor, wrapped ? start : null);
+            if (page.isEmpty()) {
+                if (cursor != null && !wrapped) { cursor = null; wrapped = true; continue; }
+                cursor = null;
+                break;
+            }
+            for (var ref : page) {
+                cursor = ref;
+                if (tenantScope.test(ref.tenant())) selected.add(ref.ref());
+                if (selected.size() == settings.batchSize) break;
+            }
+            if (page.size() < settings.batchSize && selected.size() < settings.batchSize) {
+                if (wrapped) { cursor = null; break; }
+                cursor = null; wrapped = true;
+            }
+        }
+        if (starting) startingCursor = cursor; else cancelCursor = cursor;
+        return selected;
     }
 
     private void repairCancel(RegistryScan.Ref ref, Instant now, boolean force) {
