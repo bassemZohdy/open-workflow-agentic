@@ -311,6 +311,10 @@ memory and resets on restart; it is not a durable failover guarantee. Stale star
 use independent cursors with the same limitation, so a held lock or a missing engine confirmation does not keep
 later stale rows out of every batch.
 
+Before starting a restored instance, the reconciler also checks its own stored wait deadline and effective maximum
+lifetime after authority and checkpoint preparation. An expired instance is cancelled or failed even if the bounded
+deadline scan has not reached it. This check is not an atomic fence around the engine start or a multi-replica lease.
+
 ### 9.6 Entry points for 105d
 
 Java methods on `Reconciler`, to be exposed by the operations API with its own authorization:

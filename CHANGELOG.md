@@ -1,5 +1,7 @@
 # Changelog
 
+- Recheck each restored instance's wait and lifetime deadlines after recovery preparation, even when bounded expiry scans have not reached it.
+
 - Recheck event-producer authority after policy/audit, inside the receipt transaction and before returning its result; expiry before the final transaction check rolls the receipt back.
 
 - Share the process-local coordination budget between workflow starts and lifecycle repairs, so competing advisory locks do not consume every small-pool connection.
