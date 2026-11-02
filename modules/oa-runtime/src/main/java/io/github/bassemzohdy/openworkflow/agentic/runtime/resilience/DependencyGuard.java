@@ -20,7 +20,8 @@ import java.util.function.Supplier;
  *   <li><b>Circuit breaker.</b> After {@code failureThreshold} consecutive failures the circuit opens and every call is
  *       rejected with {@link Rejection#CIRCUIT_OPEN} without touching the dependency, for {@code openFor}. Then exactly
  *       one probe is let through (half-open): its success closes the circuit, its failure reopens it for another
- *       {@code openFor}. A rejected call is neither a success nor a failure.</li>
+ *       {@code openFor}. Results of calls admitted before opening do not affect a later circuit generation. A rejected
+ *       call is neither a success nor a failure.</li>
  *   <li><b>Retry budget.</b> {@link #callWithRetry} retries only while the budget of {@code retryBudget} retries per
  *       {@code retryWindow} lasts, so a failing dependency cannot be multiplied by retries. Rejections are never
  *       retried. Each retry passes the bulkhead and breaker again.</li>
@@ -94,6 +95,7 @@ public final class DependencyGuard {
     // guarded by lock
     private State state = State.CLOSED;
     private int consecutiveFailures;
+    private long generation;
     private Instant openedAt;
     private boolean probeInFlight;
     private Instant windowStart;
@@ -123,38 +125,50 @@ public final class DependencyGuard {
                 retriesDenied.get());
     }
 
-    /** Calls the dependency once through the bulkhead and the breaker. */
+    /** Calls the dependency once through the bulkhead and the breaker; every failure counts against the dependency. */
     public <T> T call(Supplier<T> operation) {
+        return call(operation, failure -> true);
+    }
+
+    /**
+     * Calls the dependency once. A failure for which {@code countsAsFailure} is false (a cancellation, a caller's own
+     * bad input) is rethrown but is neither a success nor a failure for the breaker, and a half-open probe that ends this
+     * way leaves the circuit half-open for the next call.
+     */
+    public <T> T call(Supplier<T> operation, Predicate<Throwable> countsAsFailure) {
         Objects.requireNonNull(operation, "operation");
+        Objects.requireNonNull(countsAsFailure, "countsAsFailure");
         if (!permits.tryAcquire()) {
             rejectedOverload.incrementAndGet();
             throw new RejectedException(settings.name(), Rejection.OVERLOADED);
         }
-        boolean probe;
         try {
-            probe = admit();
-        } catch (RejectedException rejected) {
+            Admission admission = admit();
+            try {
+                T result = operation.get();
+                recordSuccess(admission);
+                return result;
+            } catch (Throwable failure) {
+                boolean counts;
+                try {
+                    counts = countsAsFailure.test(failure);
+                } catch (Throwable classifierFailure) {
+                    recordNeutral(admission);
+                    throw classifierFailure;
+                }
+                if (counts) recordFailure(admission); else recordNeutral(admission);
+                throw failure;
+            }
+        } finally {
             permits.release();
-            throw rejected;
         }
-        T result;
-        try {
-            result = operation.get();
-        } catch (Throwable failure) {
-            recordFailure(probe);
-            permits.release();
-            throw failure;
-        }
-        recordSuccess(probe);
-        permits.release();
-        return result;
     }
 
     /**
      * Calls the dependency, retrying a failure that {@code retriable} accepts while attempts and the retry budget last,
      * pausing {@code retryBackoff} between attempts. A rejection is thrown at once and never retried. The last failure is
-     * thrown unchanged when retrying stops; an interrupt while pausing stops retrying, keeps the interrupt flag and
-     * throws the last failure.
+     * thrown unchanged when retrying stops; an interrupt after a failed attempt or while pausing stops retrying,
+     * keeps the interrupt flag and throws the last failure.
      */
     public <T> T callWithRetry(int maxAttempts, Predicate<Throwable> retriable, Supplier<T> operation) {
         if (maxAttempts < 1 || maxAttempts > 10) throw new IllegalArgumentException("maxAttempts must be 1..10");
@@ -166,7 +180,8 @@ public final class DependencyGuard {
             } catch (RejectedException rejected) {
                 throw rejected;
             } catch (Throwable failure) {
-                if (attempt >= maxAttempts || !retriable.test(failure)) throw failure;
+                if (attempt >= maxAttempts || Thread.currentThread().isInterrupted() || !retriable.test(failure)
+                        || Thread.currentThread().isInterrupted()) throw failure;
                 if (!consumeRetry()) {
                     retriesDenied.incrementAndGet();
                     throw failure;
@@ -180,6 +195,7 @@ public final class DependencyGuard {
                         throw failure;
                     }
                 }
+                if (Thread.currentThread().isInterrupted()) throw failure;
             }
         }
     }
@@ -191,27 +207,29 @@ public final class DependencyGuard {
         return state;
     }
 
-    /** @return true when this call is the half-open probe */
-    private boolean admit() {
+    private record Admission(boolean probe, long generation) { }
+
+    private Admission admit() {
         synchronized (lock) {
             Instant now = clock.instant();
             State current = effectiveState(now);
-            if (current == State.CLOSED) return false;
+            if (current == State.CLOSED) return new Admission(false, generation);
             if (current == State.HALF_OPEN && !probeInFlight) {
                 state = State.HALF_OPEN;
                 probeInFlight = true;
-                return true;
+                return new Admission(true, generation);
             }
             rejectedCircuit.incrementAndGet();
             throw new RejectedException(settings.name(), Rejection.CIRCUIT_OPEN);
         }
     }
 
-    private void recordSuccess(boolean probe) {
+    private void recordSuccess(Admission admission) {
         successes.incrementAndGet();
         synchronized (lock) {
+            if (admission.generation() != generation) return;
             consecutiveFailures = 0;
-            if (probe) {
+            if (admission.probe()) {
                 probeInFlight = false;
                 state = State.CLOSED;
                 openedAt = null;
@@ -219,10 +237,17 @@ public final class DependencyGuard {
         }
     }
 
-    private void recordFailure(boolean probe) {
+    private void recordNeutral(Admission admission) {
+        synchronized (lock) {
+            if (admission.probe() && admission.generation() == generation) probeInFlight = false;
+        }
+    }
+
+    private void recordFailure(Admission admission) {
         failures.incrementAndGet();
         synchronized (lock) {
-            if (probe) {
+            if (admission.generation() != generation) return;
+            if (admission.probe()) {
                 probeInFlight = false;
                 open();
             } else if (state == State.CLOSED && ++consecutiveFailures >= settings.failureThreshold()) {
@@ -232,6 +257,7 @@ public final class DependencyGuard {
     }
 
     private void open() {
+        generation++;
         state = State.OPEN;
         openedAt = clock.instant();
         consecutiveFailures = 0;
