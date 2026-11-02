@@ -52,6 +52,7 @@ public class JdbcInboxDispatch {
                 try (var r = s.executeQuery()) {
                     if (r.next()) {
                         if (!r.getString(1).equals(wait.digest())) throw new IllegalStateException("wait identity changed");
+                        WaitProfiles.retain(c,wait);
                         return r.getTimestamp(2).toInstant();
                     }
                 }
@@ -74,9 +75,21 @@ public class JdbcInboxDispatch {
                 route(s, wait);
                 try (var r = s.executeQuery()) {
                     if (!r.next() || !r.getString(1).equals(wait.digest())) throw new IllegalStateException("wait identity changed");
+                    WaitProfiles.retain(c,wait);
                     return r.getTimestamp(2).toInstant();
                 }
             }
+        });
+    }
+
+    /** Reconstructs retained identity only; the caller must recheck current authority and acquire the task lease. */
+    public Optional<InboxWait> findProfile(String tenant,io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid instance,String waitKey) {
+        io.github.bassemzohdy.openworkflow.agentic.contracts.common.Checks.requireText("tenant",tenant,256);
+        Objects.requireNonNull(instance);io.github.bassemzohdy.openworkflow.agentic.contracts.common.Checks.requireText("wait key",waitKey,256);
+        return Transactions.inTransaction(dataSource,c->{
+            var found=WaitProfiles.load(c,tenant,instance,waitKey);
+            if(found.isPresent())instance(c,found.get());
+            return found;
         });
     }
 

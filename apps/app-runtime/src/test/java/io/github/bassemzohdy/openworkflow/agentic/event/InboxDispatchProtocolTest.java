@@ -88,6 +88,102 @@ class InboxDispatchProtocolTest {
         try(var held=one.claim(wait).orElseThrow()) { assertTrue(two.claim(wait).isEmpty()); }
         try(var acquired=two.claim(wait).orElseThrow()) { assertNotNull(acquired); }
     }
+    @Test void retainedWaitProfileRoundTripsExactIdentityAndIsTenantScoped() {
+        var row=instance();var base=occurrence(row);
+        var wait=new InboxWait(base.tenant(),base.instanceId(),base.applicationId(),base.engineInstanceId(),base.namespace(),base.definition(),
+                base.version(),"/do/0/é😀",2,base.route(),base.eventType(),base.filterDigest(),Duration.ofSeconds(42,123456789));
+        var store=dispatch();store.register(wait);store.register(wait);
+        assertEquals(Optional.of(wait),store.findProfile(wait.tenant(),wait.instanceId(),wait.key()));
+        assertTrue(store.findProfile("wrong-tenant",wait.instanceId(),wait.key()).isEmpty());
+        assertTrue(store.findProfile(wait.tenant(),wait.instanceId(),"other~"+"0".repeat(64)).isEmpty());
+    }
+    @Test void legacyDigestOnlyRegistrationIsNotGuessedButCanBeRehydratedByExactRegistration() throws Exception {
+        var wait=occurrence(instance());
+        Instant original=now().plusSeconds(45);
+        try(var c=dataSource.getConnection();var q=c.prepareStatement("insert into inbox.delivery "
+                +"(tenant,instance_id,wait_key,identity_digest,state,registered_at,deadline) values (?,?,?,?,'REGISTERED',?,?)")) {
+            route(q,wait);q.setString(4,wait.digest());q.setTimestamp(5,Timestamp.from(now()));q.setTimestamp(6,Timestamp.from(original));q.executeUpdate();
+        }
+        var store=dispatch();assertTrue(store.findProfile(wait.tenant(),wait.instanceId(),wait.key()).isEmpty());
+        assertEquals(original,store.register(wait));assertEquals(Optional.of(wait),store.findProfile(wait.tenant(),wait.instanceId(),wait.key()));
+    }
+    @Test void corruptWaitProfileIsRejectedAndRetainedProfileCannotBeChanged() throws Exception {
+        var wait=occurrence(instance());var store=dispatch();store.register(wait);
+        try(var c=dataSource.getConnection();var q=c.prepareStatement("update inbox.wait_profile set event_type='forged' where tenant=? and instance_id=? and wait_key=?")) {
+            route(q,wait);assertThrows(SQLException.class,q::executeUpdate);
+        }
+        try(var c=dataSource.getConnection();var s=c.createStatement()) {
+            s.execute("alter table inbox.wait_profile disable trigger wait_profile_immutable");
+            try(var q=c.prepareStatement("update inbox.wait_profile set event_type='forged' where tenant=? and instance_id=? and wait_key=?")) {
+                route(q,wait);assertEquals(1,q.executeUpdate());
+            } finally {s.execute("alter table inbox.wait_profile enable trigger wait_profile_immutable");}
+        }
+        assertThrows(IllegalStateException.class,()->store.findProfile(wait.tenant(),wait.instanceId(),wait.key()));
+        assertThrows(IllegalStateException.class,()->store.register(wait));
+    }
+    @Test void failureToRetainTheProfileRollsBackTheWaitRegistration() throws Exception {
+        var base=occurrence(instance());
+        var wait=new InboxWait(base.tenant(),base.instanceId(),base.applicationId(),base.engineInstanceId(),base.namespace(),base.definition(),
+                base.version(),"/do/0/profile-refusal",base.iteration(),base.route(),base.eventType(),base.filterDigest(),base.maxWait());
+        try(var c=dataSource.getConnection();var s=c.createStatement()) {
+            s.execute("create function inbox.test_reject_profile() returns trigger language plpgsql as $$ begin "
+                    +"if new.task_position='/do/0/profile-refusal' then raise exception 'test refusal'; end if; return new; end $$");
+            s.execute("create trigger test_reject_profile before insert on inbox.wait_profile for each row execute function inbox.test_reject_profile()");
+        }
+        try {
+            assertThrows(StoreUnavailableException.class,()->dispatch().register(wait));
+            try(var c=dataSource.getConnection();var q=c.prepareStatement("select count(*) from inbox.delivery where tenant=? and instance_id=? and wait_key=?")) {
+                route(q,wait);try(var r=q.executeQuery()){assertTrue(r.next());assertEquals(0,r.getInt(1));}
+            }
+        } finally {
+            try(var c=dataSource.getConnection();var s=c.createStatement()) {
+                s.execute("drop trigger test_reject_profile on inbox.wait_profile");s.execute("drop function inbox.test_reject_profile()");
+            }
+        }
+    }
+    @Test void restrictedRolesCanUseOnlyTheDocumentedWaitProfileGrants() throws Exception {
+        var wait=occurrence(instance());String suffix=UUID.randomUUID().toString().replace("-","");
+        String writer="wait_writer_"+suffix,reader="wait_reader_"+suffix,password="local-wait-test";
+        boolean writerCreated=false,readerCreated=false;
+        try {
+            try(var c=dataSource.getConnection();var s=c.createStatement()) {
+                s.execute("create role "+writer+" login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls password '"+password+"'");writerCreated=true;
+                s.execute("create role "+reader+" login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls password '"+password+"'");readerCreated=true;
+                s.execute("grant usage on schema task,inbox to "+writer);
+                s.execute("grant select,update on task.instance to "+writer);
+                s.execute("grant select,insert,update on inbox.delivery to "+writer);
+            }
+            String url;try(var c=dataSource.getConnection()){url=c.getMetaData().getURL();}
+            var writerDs=new org.postgresql.ds.PGSimpleDataSource();writerDs.setURL(url);writerDs.setUser(writer);writerDs.setPassword(password);
+            var readerDs=new org.postgresql.ds.PGSimpleDataSource();readerDs.setURL(url);readerDs.setUser(reader);readerDs.setPassword(password);
+            var store=new JdbcInboxDispatch(writerDs,e->{});
+            assertThrows(StoreUnavailableException.class,()->store.register(wait));
+            try(var c=dataSource.getConnection();var q=c.prepareStatement("select count(*) from inbox.delivery where tenant=? and instance_id=? and wait_key=?")) {
+                route(q,wait);try(var r=q.executeQuery()){assertTrue(r.next());assertEquals(0,r.getInt(1));}
+            }
+            var root=java.nio.file.Path.of("").toAbsolutePath();
+            while(root!=null&&!java.nio.file.Files.isRegularFile(root.resolve("deploy/sql/wait-profile-grants.sql")))root=root.getParent();
+            assertNotNull(root,"wait profile grant template not found");
+            var sql=java.nio.file.Files.readString(root.resolve("deploy/sql/wait-profile-grants.sql"))
+                    .replace("__WAIT_PROFILE_WRITER__",writer).replace("__WAIT_PROFILE_READER__",reader);
+            try(var c=dataSource.getConnection();var s=c.createStatement()){s.execute(sql);}
+            store.register(wait);assertEquals(Optional.of(wait),store.findProfile(wait.tenant(),wait.instanceId(),wait.key()));
+            try(var c=readerDs.getConnection();var s=c.createStatement();var r=s.executeQuery("select count(*) from inbox.wait_profile")){assertTrue(r.next());assertTrue(r.getLong(1)>0);}
+            for(var ds:List.of(writerDs,readerDs))try(var c=ds.getConnection();var s=c.createStatement()) {
+                for(String command:List.of("update inbox.wait_profile set route=route","delete from inbox.wait_profile","truncate inbox.wait_profile")) {
+                    var error=assertThrows(SQLException.class,()->s.execute(command));assertEquals("42501",error.getSQLState());
+                }
+            }
+            try(var c=readerDs.getConnection();var s=c.createStatement()) {
+                var error=assertThrows(SQLException.class,()->s.execute("insert into inbox.wait_profile select * from inbox.wait_profile limit 1"));assertEquals("42501",error.getSQLState());
+            }
+        } finally {
+            try(var c=dataSource.getConnection();var s=c.createStatement()) {
+                if(readerCreated){s.execute("drop owned by "+reader);s.execute("drop role "+reader);}
+                if(writerCreated){s.execute("drop owned by "+writer);s.execute("drop role "+writer);}
+            }
+        }
+    }
 
     @Test void anotherPinnedVersionOrEngineInstanceCannotRegister() {
         var row=instance(); var wait=occurrence(row); var dispatch=dispatch();

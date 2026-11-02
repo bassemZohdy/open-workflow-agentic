@@ -285,7 +285,6 @@ class HumanWakeCheckpointTest {
     }
     private static void saveManifest(java.nio.file.Path path,InstanceRecord row,String application,InboxWait wait,HumanDecision decision) throws Exception {
         var saved=new Properties();saved.setProperty("instance",row.id().value());saved.setProperty("application",application);
-        saved.setProperty("position",wait.taskPosition());saved.setProperty("iteration",Integer.toString(wait.iteration()));
         saved.setProperty("task",decision.taskId().value());saved.setProperty("decision",decision.id().value());
         try(var out=java.nio.file.Files.newOutputStream(path)){saved.store(out,"isolated checkpoint process fixture");}
     }

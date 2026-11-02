@@ -1,5 +1,7 @@
 # Changelog
 
+- Retain and verify complete wait profiles for recovery without extending existing deadlines.
+
 - Capture and revoke targeted human-wake SDK listeners for explicitly composed recovery.
 
 - Verify human-wake recovery after the reservation owner exits before the callback.
