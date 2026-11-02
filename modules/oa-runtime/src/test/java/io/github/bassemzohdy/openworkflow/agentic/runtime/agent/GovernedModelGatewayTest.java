@@ -93,6 +93,29 @@ class GovernedModelGatewayTest {
         assertFalse(result.reason().contains("private model output"));
     }
 
+    @Test void unavailableApprovalSourceReportsWhetherTheProviderWasCalled() {
+        var first = APPROVED.current().orElseThrow();
+        for (int failureAt : new int[] {1, 2, 3, 4}) {
+            var reads = new java.util.concurrent.atomic.AtomicInteger();
+            var calls = new java.util.concurrent.atomic.AtomicInteger();
+            ApprovedModelContext context = () -> {
+                if (reads.incrementAndGet() == failureAt) throw new IllegalStateException("private detail");
+                return Optional.of(first);
+            };
+            LlmClient counting = (system, user) -> { calls.incrementAndGet(); return "private output"; };
+            var result = gateway(context, COST, counting).complete(CALL);
+            if (failureAt < 4) {
+                var refused = assertInstanceOf(ModelResult.Rejected.class, result);
+                assertFalse(refused.decision().reason().contains("private detail"));
+                assertEquals(0, calls.get());
+            } else {
+                var failed = assertInstanceOf(ModelResult.Failed.class, result);
+                assertFalse(failed.reason().contains("private output"));
+                assertEquals(1, calls.get());
+            }
+        }
+    }
+
     @Test void aPolicyDenyIsRejectedCarryingTheRefusingDecision() {
         var denying = new Engine(DecisionOutcome.DENY);
         var gateway = new GovernedModelGateway(new GovernedLlmClient(provider, pep(denying, audit), APPROVED), APPROVED,

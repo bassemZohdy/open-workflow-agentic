@@ -52,7 +52,12 @@ public final class GovernedModelGateway implements ModelGateway {
 
     @Override public ModelResult complete(ModelCall call) {
         Objects.requireNonNull(call, "call");
-        var approved = context.current().orElse(null);
+        final ApprovedModelContext.Approved approved;
+        try {
+            approved = context.current().orElse(null);
+        } catch (RuntimeException unavailable) {
+            return reject("the approved model context is unavailable");
+        }
         if (approved == null) return reject("no approved context for this model call");
         if (!approved.task().id().equals(call.taskId())) return reject("the call is for a task other than the approved one");
         if (!approved.modelId().equals(call.modelId())) return reject("the call names a model other than the approved one");

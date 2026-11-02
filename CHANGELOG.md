@@ -1,5 +1,7 @@
 # Changelog
 
+- Fail closed when the model approval source is unavailable, preserving whether a model call was actually made and avoiding disclosure of source errors.
+
 - Withhold a model gateway response if its approved context disappears or changes while the provider is running. The already-started call can still incur cost; durable accounting remains open.
 
 - Bind a model gateway call to the exact approval it checked and recheck that approval after policy and audit before reaching the provider. Durable budget and execution authority remain separate.
