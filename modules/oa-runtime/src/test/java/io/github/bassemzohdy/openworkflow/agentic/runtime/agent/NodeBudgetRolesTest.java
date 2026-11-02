@@ -43,9 +43,13 @@ class NodeBudgetRolesTest {
             denied(run, "update task.agent_tool_budget set max_calls=3");
             denied(run, "delete from task.agent_tool_budget");
             denied(run, "truncate task.agent_tool_budget");
+            denied(run, "update task.agent_tool_profile set profile_version='forged'");
+            denied(run, "delete from task.agent_tool_profile");
+            denied(run, "truncate task.agent_tool_profile");
             assertEquals("23514", sqlFailure(run,"update task.agent_tool_budget set calls=0").getSQLState());
             denied(allocate, "update task.agent_tool_budget set calls=calls+1");
             denied(unprivileged, "select * from task.agent_tool_budget");
+            denied(unprivileged, "select * from task.agent_tool_profile");
             toolBudget.admit(approved);
             assertThrows(NodeRefused.class, () -> toolBudget.admit(approved));
             var budget = new JdbcNodeBudget(run).openExisting("role-test-thread", AGENT, task);

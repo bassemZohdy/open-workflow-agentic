@@ -1,12 +1,14 @@
 # Agent node budget permissions
 
-Apply migrations V77.3 and V77.4 as the migration owner. Provision two distinct, fresh non-owner
+Apply migrations V77.3, V77.4 and V77.5 as the migration owner. Provision two distinct, fresh non-owner
 roles with no elevated attributes, inherited permissions or role memberships. The
 allocator is trusted to insert a budget only in the same transaction as a genuinely
 new approved resource-task allocation. The executor reads the existing budget and
 updates only its step or tool-call count. Neither role may own the tables or assume the other role.
 The opt-in proposed V78 allocation adapter can insert the tool budget in the same transaction as a fresh task and node
 budget. Its caller must supply the approved tool-call ceiling; this is not an approval source or production activation.
+The profiled variant also retains immutable tool profile data; the caller is responsible for obtaining real approval,
+and the local gateway does not yet enforce the retained profile.
 The separate preparation method must only be used when the caller has independently established that the task is new.
 Never backfill based on a missing row.
 

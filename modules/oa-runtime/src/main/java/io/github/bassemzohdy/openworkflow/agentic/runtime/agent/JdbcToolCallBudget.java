@@ -2,6 +2,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.agent;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ApprovedToolProfile;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Transactions;
 import jakarta.transaction.TransactionManager;
@@ -83,6 +84,53 @@ public final class JdbcToolCallBudget {
 
     private static void validateCeiling(int maxCalls) {
         if (maxCalls < 1 || maxCalls > 100_000) throw new IllegalArgumentException("invalid tool-call ceiling");
+    }
+
+    /** Retains profile data only in the transaction creating its fresh allocation and budget. */
+    public static void insertProfileForFreshAllocation(Connection connection, AllocatedResourceTask allocated,
+                                                        ApprovedToolProfile profile) throws SQLException {
+        Objects.requireNonNull(connection); Objects.requireNonNull(allocated); Objects.requireNonNull(profile);
+        if (connection.getAutoCommit()) throw new IllegalArgumentException("fresh allocation requires an owned transaction");
+        profile.requireWithin(allocated.allocation().contract(), allocated.allocation().modelProfile().agent());
+        try (var q = connection.prepareStatement("""
+                insert into task.agent_tool_profile(task_id,profile_id,profile_version,configuration_fingerprint,
+                    agent_id,tools,max_calls,max_call_nanos,fingerprint)
+                select task_id,?,?,?,?,cast(? as jsonb),?,?,? from task.agent_tool_budget
+                where task_id=? and max_calls=?
+                """)) {
+            q.setString(1, profile.id()); q.setString(2, profile.version());
+            q.setString(3, profile.configurationFingerprint()); q.setString(4, profile.agent().id());
+            q.setString(5, profileTools(profile)); q.setInt(6, profile.maxCalls());
+            q.setLong(7, profile.maxCallTime().toNanos()); q.setString(8, profile.fingerprint());
+            q.setString(9, allocated.allocation().contract().id().value()); q.setInt(10, profile.maxCalls());
+            if (q.executeUpdate() != 1) throw new IllegalStateException("fresh tool profile budget mismatch");
+        }
+    }
+
+    /** Verifies all retained profile fields on an exact historical retry; this does not grant execution permission. */
+    public static void requireProfileForAllocation(Connection connection, AllocatedResourceTask allocated,
+                                                    ApprovedToolProfile profile) throws SQLException {
+        Objects.requireNonNull(connection); Objects.requireNonNull(allocated); Objects.requireNonNull(profile);
+        profile.requireWithin(allocated.allocation().contract(), allocated.allocation().modelProfile().agent());
+        requireForAllocation(connection, allocated, profile.maxCalls());
+        try (var q = connection.prepareStatement("""
+                select 1 from task.agent_tool_profile where task_id=? and profile_id=? and profile_version=?
+                    and configuration_fingerprint=? and agent_id=? and tools=cast(? as jsonb)
+                    and max_calls=? and max_call_nanos=? and fingerprint=?
+                """)) {
+            q.setString(1, allocated.allocation().contract().id().value()); q.setString(2, profile.id());
+            q.setString(3, profile.version()); q.setString(4, profile.configurationFingerprint());
+            q.setString(5, profile.agent().id()); q.setString(6, profileTools(profile));
+            q.setInt(7, profile.maxCalls()); q.setLong(8, profile.maxCallTime().toNanos()); q.setString(9, profile.fingerprint());
+            try (var rows = q.executeQuery()) {
+                if (!rows.next()) throw new IllegalStateException("allocation tool profile is missing or mismatched");
+            }
+        }
+    }
+
+    private static String profileTools(ApprovedToolProfile profile) {
+        try { return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(profile.tools().stream().sorted().toList()); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException impossible) { throw new IllegalArgumentException("invalid tool profile", impossible); }
     }
 
     /** Missing or differently bound rows refuse; they are never created by execution. */
