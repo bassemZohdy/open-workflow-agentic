@@ -339,6 +339,11 @@ persisted instance. It preserved original builder identities when linking tasks;
 transitions. However, the SDK evaluates a workflow input filter before the executor boundary: a failing input filter
 prevents the cancellation guard from running. This experiment is not wired into recovery and is not a general fix.
 
+A second test-only experiment wraps the jq filter as well as the executor. It stops the tested input filter before
+evaluation, preserves one ordinary filtered workflow, and cancels restored JPA instances with and without a filter
+in same-process tests. This does not prove compatibility with Quarkus's jq scope or other expression providers,
+durable cancellation under process loss, concurrent starts, or multi-replica ownership. It is not wired into recovery.
+
 ### 9.6 Entry points for 105d
 
 Java methods on `Reconciler`, to be exposed by the operations API with its own authorization:
