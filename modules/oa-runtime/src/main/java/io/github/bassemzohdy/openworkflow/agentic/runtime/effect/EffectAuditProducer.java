@@ -196,7 +196,7 @@ public final class EffectAuditProducer {
         if(!expected.equals(resourceCall(c,expected.key())))throw inconsistent();
         return new Origin(scope,null,expected.key());
     }
-    private static ResourceCallScope resourceCall(Connection c,String key) throws SQLException {
+    static ResourceCallScope resourceCall(Connection c,String key) throws SQLException {
         try(var q=c.prepareStatement("select r.*,o.occurrence_key from task.resource_call r "
                 + "join task.resource_occurrence o on o.call_key=r.call_key where r.call_key=?")) {
             q.setString(1,key);try(var r=q.executeQuery()) {

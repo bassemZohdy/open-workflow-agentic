@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify and deliver retained audit history for governed resource effects.
+
 - Preserve governed tool effect keys while binding their retained audit provenance to the resource call.
 
 - Bound concurrent manual-effect authorization checks even when a dependency ignores cancellation.

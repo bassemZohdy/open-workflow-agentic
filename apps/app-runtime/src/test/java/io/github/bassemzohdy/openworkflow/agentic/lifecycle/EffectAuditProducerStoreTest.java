@@ -114,6 +114,22 @@ class EffectAuditProducerStoreTest {
         assertThrows(IllegalStateException.class,()->ledger.prepareResourceScoped(changed,command,Duration.ZERO,now()));
         var other=EffectCommand.of(f.scope().threadId(),"tool:charge",call.key(),"approved-charge","private request");
         assertThrows(IllegalArgumentException.class,()->ledger.prepareResourceScoped(call,other,Duration.ZERO,now()));
+        var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(owned);
+        var auditCalls=new java.util.concurrent.atomic.AtomicInteger();
+        var delivery=new EffectAuditDelivery(owned,manager,producer,(source,draft)->{
+            auditCalls.incrementAndGet();return central.appendOnce(source,draft);
+        });
+        var history=new EffectAuditHistory(owned,manager,producer,delivery);
+        assertThrows(IllegalStateException.class,()->history.observedResourceHistory(changed,command.key(),128));
+        assertThrows(IllegalArgumentException.class,()->history.observedResourceHistory(call,other.key(),128));
+        assertThrows(IllegalStateException.class,()->history.observedResourceHistory(call,command.key(),2));
+        assertEquals(0,auditCalls.get(),"invalid scope and incomplete history must refuse before central append");
+        var receipts=history.observedResourceHistory(call,command.key(),128);
+        assertEquals(3,receipts.size());assertEquals(receipts,history.observedResourceHistory(call,command.key(),128));
+        assertEquals(6,auditCalls.get(),"recovery rereads each original source");
+        try(var c=owned.getConnection();var q=c.prepareStatement("select count(*) from audit.event where event_type like 'effect.%'")) {
+            try(var r=q.executeQuery()){assertTrue(r.next());assertEquals(3,r.getInt(1));}
+        }
         // A direct writer cannot attach another workflow's retained resource call to a fresh legacy intent.
         var foreign=fixture();ledger.prepare(foreign.command(),Duration.ZERO,now());
         try(var c=owned.getConnection();var q=c.prepareStatement("""

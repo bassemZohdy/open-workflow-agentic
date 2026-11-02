@@ -2,6 +2,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.effect;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import jakarta.transaction.Transaction;
 import jakarta.transaction.TransactionManager;
@@ -41,10 +42,20 @@ public final class EffectAuditHistory {
      */
     public List<AuditReceipt> observedHistory(EffectScope scope, EffectKey key, int limit) {
         Objects.requireNonNull(scope); Objects.requireNonNull(key); scope.requireKey(key);
+        return observed(scope,null,key,limit);
+    }
+
+    /** Resource-scoped history is retained evidence only, not current authority or permission to dispatch. */
+    public List<AuditReceipt> observedResourceHistory(ResourceCallScope call,EffectKey key,int limit) {
+        Objects.requireNonNull(call);Objects.requireNonNull(key);
+        if(!call.threadId().equals(key.threadId()))throw new IllegalArgumentException("effect key belongs to another resource call");
+        return observed(new EffectScope(call.tenant(),call.instanceId(),call.owner()),call,key,limit);
+    }
+    private List<AuditReceipt> observed(EffectScope scope,ResourceCallScope call,EffectKey key,int limit) {
         if(limit<1 || limit>128)throw new IllegalArgumentException("history limit must be between 1 and 128");
         cancelled();
         return isolated(()->{
-            var before=snapshot(scope,key,limit);
+            var before=snapshot(scope,call,key,limit);
             var receipts=new LinkedHashMap<String,AuditReceipt>();
             for(var entry:before.entries()) {
                 cancelled();
@@ -53,7 +64,7 @@ public final class EffectAuditHistory {
                 receipts.put(entry.fact().source().key(),receipt);
                 cancelled();
             }
-            var after=snapshot(scope,key,limit);
+            var after=snapshot(scope,call,key,limit);
             if(!before.entries().stream().map(Entry::fact).toList().equals(after.entries().stream().map(Entry::fact).toList()))
                 throw inconsistent();
             for(int i=0;i<after.entries().size();i++) {
@@ -68,7 +79,7 @@ public final class EffectAuditHistory {
         });
     }
 
-    private Snapshot snapshot(EffectScope scope,EffectKey key,int limit) {
+    private Snapshot snapshot(EffectScope scope,ResourceCallScope call,EffectKey key,int limit) {
         return Transactions.inTransaction(data,c->{
             // Preserve SERIALIZABLE; otherwise use a repeatable read snapshot without leaking pool settings.
             Transactions.beginReadOnlySnapshot(c,5);
@@ -77,7 +88,8 @@ public final class EffectAuditHistory {
                 bind(q,1,key);try(var r=q.executeQuery()){if(!r.next())throw inconsistent();ledgerState=r.getString(1);purpose=r.getString(2);}
             }
             var bound=producer.bound(c,key).orElseThrow(EffectAuditHistory::inconsistent);
-            if(!bound.scope().equals(scope))throw inconsistent();
+            if(!bound.scope().equals(scope) || !Objects.equals(bound.resourceCallKey(),call==null?null:call.key()))throw inconsistent();
+            if(call!=null && !call.equals(EffectAuditProducer.resourceCall(c,call.key())))throw inconsistent();
             var initial=producer.find(c,bound.initialId()).orElseThrow(EffectAuditHistory::inconsistent);
             if(initial.source().transition()!=AuditSource.Transition.INTENT)throw inconsistent();
             List<Long> events;
