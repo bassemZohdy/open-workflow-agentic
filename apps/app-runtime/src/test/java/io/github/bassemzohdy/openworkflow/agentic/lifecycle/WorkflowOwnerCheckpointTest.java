@@ -15,6 +15,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.serverlessworkflow.api.*;
 import io.serverlessworkflow.impl.*;
 import io.serverlessworkflow.impl.events.*;
+import io.serverlessworkflow.impl.executors.DefaultTaskExecutorFactory;
 import io.serverlessworkflow.impl.persistence.*;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -52,6 +53,7 @@ class WorkflowOwnerCheckpointTest {
     @Inject JpaInstanceOperations operations;
     @Inject EntityManager entities;
     @Inject WorkflowOwnerJpaFence fence;
+    @Inject WorkflowOwnerExecutionFence executionFence;
     @Inject CancellationAwareJpaOperations guardedOperations;
     @Inject WorkflowOwnerContextBindings bindings;
     @Inject OwnerFencedJpaWriter fencedWriter;
@@ -168,6 +170,7 @@ class WorkflowOwnerCheckpointTest {
                     catch (InvocationTargetException e) { throw e.getCause(); }
                 });
         try (broker; var app = WorkflowApplication.builder().withId(appId).withEventConsumer(broker)
+                .withTaskExecutorFactory(new OwnerFencedTaskExecutorFactory(DefaultTaskExecutorFactory.get(), executionFence::requireCurrent))
                 .disableLifeCycleCEPublishing().disableStatusChangePublishing()
                 .withListener(new WorkflowPersistenceListener(composed)).build()) {
             var workflow = WorkflowReader.readWorkflowFromString(DOCUMENT, WorkflowFormat.YAML);

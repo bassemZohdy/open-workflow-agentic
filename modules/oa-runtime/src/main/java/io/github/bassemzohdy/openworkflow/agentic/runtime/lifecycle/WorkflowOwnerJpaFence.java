@@ -30,8 +30,8 @@ public class WorkflowOwnerJpaFence {
         this.checkpointOperations = Objects.requireNonNull(checkpointOperations);
     }
 
-    @Transactional(Transactional.TxType.MANDATORY)
-    public void requireCurrent(WorkflowContextData context, JdbcWorkflowOwnerLease.Claim claim) {
+    /** Validates immutable SDK identity; this check alone is not proof of a live lease. */
+    static void requireMatchingContext(WorkflowContextData context, JdbcWorkflowOwnerLease.Claim claim) {
         Objects.requireNonNull(context, "context"); Objects.requireNonNull(claim, "claim");
         var binding = claim.binding();
         var definition = context.definition().id();
@@ -40,6 +40,11 @@ public class WorkflowOwnerJpaFence {
                 || !binding.definition().definitionId().equals(definition.namespace() + "/" + definition.name())
                 || !binding.definition().version().equals(definition.version()))
             throw new IllegalStateException("workflow owner claim does not identify this SDK context");
+    }
+
+    @Transactional(Transactional.TxType.MANDATORY)
+    public void requireCurrent(WorkflowContextData context, JdbcWorkflowOwnerLease.Claim claim) {
+        requireMatchingContext(context, claim);
         try {
             if (transactions.getStatus() != Status.STATUS_ACTIVE)
                 throw new IllegalStateException("active SDK writer transaction required");

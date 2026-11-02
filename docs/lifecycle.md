@@ -345,9 +345,13 @@ listener futures, so a rejected checkpoint alone does not stop subsequent execut
 writer now binds an immutable owner generation to the exact SDK context and fences the real JPA writer transaction;
 component tests cover completed-task checkpoints and rejection of stale task, status and removal writes. A test also
 confirms that the SDK can continue to the next task after an unbound writer rejects its initial checkpoint. The
-candidate is not the normal application writer; owner acquisition and renewal, input-filter and execution fencing,
-cancellation cleanup, and external-effect fencing remain open. These primitives cannot stop an in-flight external
-effect or establish split-brain safety.
+candidate is not the normal application writer. Separate opt-in wrappers check the current database lease before a
+selected workflow-level filter and before task execution. Tests cover the selected jq filter, transitions including
+nested and named jumps, restore lookup, takeover between tasks, and use with the candidate JPA writer. Filter-provider
+selection and compatibility across the full SDK remain unproven. The check does not hold a lease across task execution:
+a lease can expire immediately after the check. Owner acquisition and renewal, production composition, cancellation
+cleanup and external-effect fencing remain open. These primitives cannot stop an in-flight external effect or establish
+split-brain safety.
 
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`
