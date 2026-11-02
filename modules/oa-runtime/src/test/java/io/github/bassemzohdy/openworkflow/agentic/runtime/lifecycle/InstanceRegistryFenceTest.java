@@ -81,6 +81,25 @@ class InstanceRegistryFenceTest {
         assertRefused("not found");
     }
 
+    @Test void aLookupReturningADifferentTenantRefuses() {
+        var original = running();
+        row = Optional.of(new InstanceRecord(original.id(), "other-tenant", original.owner(), original.idempotencyKey(),
+                original.requestFingerprint(), original.definition(), original.input(), original.status(),
+                original.engineInstanceId(), original.startAttempts(), original.lastError(), original.waitDeadline(),
+                original.retriedFrom(), original.version(), original.createdAt(), original.updatedAt()));
+        assertRefused("tenant differs");
+    }
+
+    @Test void aLookupReturningADifferentInstanceRefuses() {
+        var original = running();
+        row = Optional.of(new InstanceRecord(UlidGenerator.shared().next(), original.tenant(), original.owner(),
+                original.idempotencyKey(), original.requestFingerprint(), original.definition(), original.input(),
+                original.status(), original.engineInstanceId(), original.startAttempts(), original.lastError(),
+                original.waitDeadline(), original.retriedFrom(), original.version(), original.createdAt(),
+                original.updatedAt()));
+        assertRefused("instance differs");
+    }
+
     @Test void aDifferentOwnerEvenWithTheSameIdRefuses() {
         row = Optional.of(record(InstanceStatus.RUNNING, new Subject(SubjectKind.USER, "mallory"), "engine-1",
                 new DefinitionRef("ns/wf", "1")));
