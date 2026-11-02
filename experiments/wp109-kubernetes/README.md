@@ -30,7 +30,9 @@ workflow after warmup, and completed it after a test event. A graceful deletion
 also cleared its member lease. The database still held the scheduled
 `audit-chain-verification` and `identity-grant-expiry` jobs in this run. This
 local test does not prove node failure, network partitions, mixed versions,
-duplicate-effect prevention or T12.
+duplicate-effect prevention or T12. `verify_failover.py` automates the same
+scoped scenario against a prebuilt bridge-enabled image, using a unique cluster
+and private kubeconfig and removing that cluster afterward.
 
 The Maven profile `wp109-kube-experiment` adds the Kubernetes extension only to
 an explicitly selected experimental build. Build the app with that profile and
@@ -59,9 +61,11 @@ kubectl --kubeconfig "$PWD/target/wp109-kubeconfig" apply -f experiments/wp109-k
 kubectl --kubeconfig "$PWD/target/wp109-kubeconfig" -n owa-wp109 get pods,leases
 ```
 
-After collecting evidence, remove only the dedicated experiment with
-`kind delete cluster --name owa-wp109-failover`. Do not reuse its namespace or
-credentials in a shared environment.
+For the automated scenario, build and tag the bridge-enabled image as above,
+then run `python experiments/wp109-kubernetes/verify_failover.py`; it creates and
+cleans up a uniquely named kind cluster. For the manual setup, remove only the
+dedicated experiment with `kind delete cluster --name owa-wp109-failover`. Do
+not reuse its namespace or credentials in a shared environment.
 
 The cluster resources, test profile and embedded credentials are intentionally
 isolated and are not a production-ready Kubernetes configuration. The bridge is not enabled in the default build. Production rollout, compatibility
