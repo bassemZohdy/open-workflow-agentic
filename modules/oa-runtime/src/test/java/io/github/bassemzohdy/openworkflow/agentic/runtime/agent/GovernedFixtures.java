@@ -20,6 +20,10 @@ final class GovernedFixtures {
                         GovernedLlmClientTest.NOW),
                 event -> { },
                 java.time.Duration.ofSeconds(5), GovernedLlmClientTest.CLOCK);
-        return new GovernedLlmClient(provider, pep, GovernedLlmClientTest.APPROVED);
+        LlmClient bound = new LlmClient() {
+            @Override public String configuredModelId() { return "gpt-test"; }
+            @Override public String complete(String system, String user) { return provider.complete(system, user); }
+        };
+        return new GovernedLlmClient(bound, pep, GovernedLlmClientTest.APPROVED);
     }
 }

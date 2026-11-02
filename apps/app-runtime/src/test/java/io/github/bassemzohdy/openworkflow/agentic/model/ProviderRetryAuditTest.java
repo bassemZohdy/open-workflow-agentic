@@ -5,6 +5,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.sun.net.httpserver.HttpServer;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.LangChain4jLlmClient;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedLlmClient;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ApprovedModelContext;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ModelCallRefused;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.*;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.Set;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -67,6 +79,24 @@ class ProviderRetryAuditTest {
 
     @Inject
     LangChain4jLlmClient provider;
+
+    @Test
+    void anApprovedDifferentModelMakesNoHttpRequest() {
+        synchronized (System.class) { System.setProperty(COUNT, "0"); }
+        var user = new Subject(SubjectKind.USER, "provider-model-test");
+        var agent = new Subject(SubjectKind.AGENT, "provider-model-agent");
+        var task = new AgentTaskContract(UlidGenerator.shared().next(), "model identity test", Set.of(), Set.of(),
+                RiskTier.LOW, new ExecutionLimits(2, Duration.ofMinutes(1), 1000), user, UlidGenerator.shared().next());
+        String actual = provider.configuredModelId();
+        org.junit.jupiter.api.Assertions.assertNotNull(actual);
+        ApprovedModelContext approved = () -> Optional.of(new ApprovedModelContext.Approved(agent,task,actual + "-different",1000));
+        var clock = Clock.systemUTC();
+        var pep = new Pep(request -> new Decision("provider-test",DecisionOutcome.ALLOW,"allow",
+                new PolicyRef("provider.test","1"),clock.instant()), event -> {}, Duration.ofSeconds(5),clock);
+
+        assertThrows(ModelCallRefused.class, () -> new GovernedLlmClient(provider,pep,approved).complete("system","hello"));
+        assertEquals(0,count(),"a mismatched provider must not receive the prompt");
+    }
 
     @Test
     void oneFailingChatMakesExactlyOnePhysicalRequest() {

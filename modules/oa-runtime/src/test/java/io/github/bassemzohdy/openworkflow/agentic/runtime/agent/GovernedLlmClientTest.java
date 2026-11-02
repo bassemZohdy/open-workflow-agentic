@@ -1,6 +1,7 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.agent;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -69,6 +70,8 @@ class GovernedLlmClientTest {
         CountingProvider(Function<Integer, String> answer) {
             this.answer = answer;
         }
+
+        @Override public String configuredModelId() { return "gpt-test"; }
 
         @Override
         public String complete(String system, String user) {
@@ -165,6 +168,24 @@ class GovernedLlmClientTest {
 
         assertThrows(GovernedLlmClient.ApprovalLostAfterCall.class, () -> client.complete("sys", "usr"));
         assertEquals(1, provider.calls.get());
+    }
+
+    @Test
+    void aDifferentOrUnknownProviderModelCannotReceiveAnApprovedCall() {
+        for (String configured : new String[]{null, "other-model", "unavailable"}) {
+            var calls = new AtomicInteger();
+            LlmClient provider = new LlmClient() {
+                @Override public String configuredModelId() {
+                    if ("unavailable".equals(configured)) throw new IllegalStateException("private provider detail");
+                    return configured;
+                }
+                @Override public String complete(String system, String user) { calls.incrementAndGet(); return OK; }
+            };
+            var client = new GovernedLlmClient(provider, pep(new Engine(DecisionOutcome.ALLOW), new Audit()), APPROVED);
+            var refusal = assertThrows(ModelCallRefused.class, () -> client.complete("sys", "usr"));
+            assertFalse(refusal.getMessage().contains("private"));
+            assertEquals(0, calls.get());
+        }
     }
 
     // ------------------------------------------------------------------ every refusal: zero provider calls

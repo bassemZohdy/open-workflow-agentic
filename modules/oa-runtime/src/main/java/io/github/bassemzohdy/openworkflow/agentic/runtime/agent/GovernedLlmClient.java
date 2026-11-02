@@ -69,6 +69,7 @@ public class GovernedLlmClient {
         }
         var decision = pep.modelCall(expected.agent(), expected.task(), expected.modelId(), expected.budgetRemainingMicros());
         return Pep.guard(decision, () -> {
+            requireProviderModel(expected.modelId());
             requireSameApproval(expected);
             final String output;
             try {
@@ -90,6 +91,13 @@ public class GovernedLlmClient {
     static final class ApprovalLostAfterCall extends RuntimeException { }
     /** Sanitized failure after entering the provider, irrespective of the provider's exception type. */
     static final class ProviderCallFailed extends RuntimeException { }
+
+    private void requireProviderModel(String approvedModel) {
+        final String actual;
+        try { actual = provider.configuredModelId(); }
+        catch (RuntimeException unavailable) { throw new ModelCallRefused("provider model identity is unavailable"); }
+        if (!approvedModel.equals(actual)) throw new ModelCallRefused("provider model differs from approval");
+    }
 
     private void requireSameApproval(ApprovedModelContext.Approved expected) {
         final boolean matches;
@@ -140,6 +148,8 @@ public class GovernedLlmClient {
         var decision = pep.modelCall(approved.agent(), approved.task(), approved.modelId(),
                 approved.budgetRemainingMicros()); // may block in policy and audit; recheck on ALLOW below
         return Pep.guard(decision, () -> {
+            control.requireCurrent(expected);
+            requireProviderModel(approved.modelId());
             control.requireCurrent(expected);
             String output = provider.complete(system, user);
             control.requireCurrent(expected); // private output is withheld if permission was lost meanwhile

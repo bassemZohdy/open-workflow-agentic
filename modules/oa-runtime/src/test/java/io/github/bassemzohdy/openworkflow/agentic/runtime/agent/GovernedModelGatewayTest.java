@@ -22,7 +22,11 @@ class GovernedModelGatewayTest {
 
     private GovernedModelGateway gateway(ApprovedModelContext context, ToLongBiFunction<ModelCall, String> cost,
                                          LlmClient llm) {
-        return new GovernedModelGateway(new GovernedLlmClient(llm, pep(engine, audit), context), context, cost, CLOCK);
+        LlmClient bound = new LlmClient() {
+            @Override public String configuredModelId() { return "gpt-test"; }
+            @Override public String complete(String system, String user) { return llm.complete(system, user); }
+        };
+        return new GovernedModelGateway(new GovernedLlmClient(bound, pep(engine, audit), context), context, cost, CLOCK);
     }
 
     private GovernedModelGateway gateway(ApprovedModelContext context) { return gateway(context, COST, provider); }

@@ -21,6 +21,8 @@ public class StubLlm implements LlmClient {
     /** Calls that reached this "provider"; a refused model call must leave it unchanged. */
     public static final java.util.concurrent.atomic.AtomicInteger CALLS = new java.util.concurrent.atomic.AtomicInteger();
 
+    @Override public String configuredModelId() { return "stub"; }
+
     @Override
     public String complete(String system, String user) {
         CALLS.incrementAndGet();
