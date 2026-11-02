@@ -3,15 +3,17 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.human;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.HumanDecision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.HumanDecisionAudit;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import java.util.Set;
 
 /**
- * Transaction primitive against an isolated proposed schema. Not wired to production: a committed row is neither
- * an audit receipt nor permission to wake a workflow. The caller owns the transaction and must roll back on any
+ * Transaction primitive against an isolated proposed schema. Not wired to production: a committed audit event is
+ * not permission to wake a workflow. The caller owns the transaction and must roll back on any
  * exception. This primitive does not authenticate the actor, evaluate policy, verify the live workflow lease or
  * recheck caller authority at commit. Those are mandatory before an actual service may invoke it.
  */
@@ -62,9 +64,13 @@ final class HumanDecisionJournal {
             q.setString(1, decision.tenant()); q.setString(2, decision.taskId().value()); q.setLong(3, decision.expectedVersion());
             if (q.executeUpdate() != 1) throw new Conflict();
         }
+        var occurredAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
+        HumanDecisionAudit.append(connection, decision, instanceId, occurredAt);
         try (var q = connection.prepareStatement("insert into human_proposal.pending "
-                + "(tenant,decision_id,audit_state,wake_state) values (?,?,'PENDING','BLOCKED')")) {
-            q.setString(1, decision.tenant()); q.setString(2, decision.id().value()); q.executeUpdate();
+                + "(tenant,decision_id,audit_event_id,audit_occurred_at,audit_state,wake_state) "
+                + "values (?,?,?,?,'RECORDED','BLOCKED')")) {
+            q.setString(1, decision.tenant()); q.setString(2, decision.id().value()); q.setString(3, decision.id().value());
+            q.setTimestamp(4, java.sql.Timestamp.from(occurredAt)); q.executeUpdate();
         }
         return Result.RECORDED;
     }
@@ -73,7 +79,7 @@ final class HumanDecisionJournal {
             throws SQLException {
         try (var q = connection.prepareStatement("select d.fingerprint,d.instance_id,d.wait_key,d.task_id,"
                 + "d.expected_version,d.actor_id,d.outcome,d.content,t.status,t.version,p.audit_state,p.wake_state,"
-                + "t.instance_id,t.wait_key,t.assignee_id "
+                + "t.instance_id,t.wait_key,t.assignee_id,p.audit_event_id,p.audit_occurred_at "
                 + "from human_proposal.decision d left join human_proposal.task t on t.tenant=d.tenant and t.task_id=d.task_id "
                 + "left join human_proposal.pending p on p.tenant=d.tenant and p.decision_id=d.decision_id "
                 + "where d.tenant=? and d.decision_id=?")) {
@@ -85,9 +91,13 @@ final class HumanDecisionJournal {
                         || decision.expectedVersion() != r.getLong(5) || !decision.actor().id().equals(r.getString(6))
                         || !decision.outcome().name().equals(r.getString(7)) || !Objects.equals(decision.content(), r.getString(8))
                         || !"COMPLETED".equals(r.getString(9)) || r.getLong(10) != decision.expectedVersion() + 1
-                        || !"PENDING".equals(r.getString(11)) || !"BLOCKED".equals(r.getString(12))
+                        || !"RECORDED".equals(r.getString(11)) || !"BLOCKED".equals(r.getString(12))
                         || !instanceId.value().equals(r.getString(13)) || !waitKey.equals(r.getString(14))
-                        || !decision.actor().id().equals(r.getString(15))) throw new Conflict();
+                        || !decision.actor().id().equals(r.getString(15)) || !decision.id().value().equals(r.getString(16))
+                        || r.getTimestamp(17) == null
+                        || !HumanDecisionAudit.matches(connection, decision, instanceId, r.getTimestamp(17).toInstant())) {
+                    throw new Conflict();
+                }
                 return true;
             }
         }

@@ -41,6 +41,7 @@ class HumanDecisionJournalTest {
         assertTrue(database.matches("owa_human_[0-9a-f]{32}"));
         try (var c = admin.getConnection(); var s = c.createStatement()) { s.execute("create database " + database); created = true; }
         owned = source(database);
+        org.flywaydb.core.Flyway.configure().dataSource(owned).locations("classpath:db/migration").load().migrate();
         try (var in = getClass().getResourceAsStream("/human/proposed-human-decision.sql")) {
             assertNotNull(in);
             String sql = new String(in.readAllBytes(), StandardCharsets.UTF_8);
@@ -91,10 +92,17 @@ class HumanDecisionJournalTest {
         assertThrows(HumanDecisionJournal.Conflict.class, () -> record(f, changed, "wait"));
         assertThrows(HumanDecisionJournal.Conflict.class, () -> record(f, f.decision(), "other-wait"));
         assertEquals(1, count("decision", f)); assertEquals(1, count("pending", f));
+        try (var c = owned.getConnection(); var q = c.prepareStatement("select event_type,attributes::text from audit.event where event_id=?")) {
+            q.setString(1, f.decision().id().value());
+            try (var r = q.executeQuery()) {
+                assertTrue(r.next()); assertEquals("human.decision.recorded", r.getString(1));
+                assertFalse(r.getString(2).contains("private"), "private decision content is not written to audit attributes");
+            }
+        }
         try (var c = owned.getConnection(); var q = c.prepareStatement("select audit_state,wake_state from human_proposal.pending "
                 + "where tenant=? and decision_id=?")) {
             q.setString(1, "tenant"); q.setString(2, f.decision().id().value());
-            try (var r = q.executeQuery()) { assertTrue(r.next()); assertEquals("PENDING", r.getString(1)); assertEquals("BLOCKED", r.getString(2)); }
+            try (var r = q.executeQuery()) { assertTrue(r.next()); assertEquals("RECORDED", r.getString(1)); assertEquals("BLOCKED", r.getString(2)); }
         }
     }
 
@@ -102,7 +110,30 @@ class HumanDecisionJournalTest {
         var f = fixture("bob", "NONE");
         try (var c = owned.getConnection()) { c.setAutoCommit(false); journal.record(c, f.decision(), f.instance(), "wait"); c.rollback(); }
         assertEquals(0, count("decision", f)); assertEquals(0, count("pending", f));
+        assertEquals(0, auditCount(f));
         assertEquals(HumanDecisionJournal.Result.RECORDED, record(f, f.decision(), "wait"));
+        assertEquals(1, auditCount(f));
+    }
+
+    @Test void failedAuditAppendRollsBackDecisionAndTaskTransition() throws Exception {
+        var f = fixture("bob", "NONE");
+        try (var c = owned.getConnection(); var s = c.createStatement()) {
+            s.execute("create function human_proposal.refuse_audit() returns trigger language plpgsql as $$ "
+                    + "begin raise exception 'injected audit failure'; end $$");
+            s.execute("create trigger human_test_refuse before insert on audit.event "
+                    + "for each row execute function human_proposal.refuse_audit()");
+        }
+        try {
+            assertThrows(SQLException.class, () -> record(f, f.decision(), "wait"));
+            assertEquals(0, count("decision", f)); assertEquals(0, count("pending", f)); assertEquals(0, auditCount(f));
+        } finally {
+            try (var c = owned.getConnection(); var s = c.createStatement()) {
+                s.execute("drop trigger human_test_refuse on audit.event");
+                s.execute("drop function human_proposal.refuse_audit()");
+            }
+        }
+        assertEquals(HumanDecisionJournal.Result.RECORDED, record(f, f.decision(), "wait"));
+        assertEquals(1, auditCount(f));
     }
 
     @Test void forbiddenInitiatorCannotWrite() throws Exception {
@@ -133,6 +164,7 @@ class HumanDecisionJournalTest {
             assertEquals(Set.of(HumanDecisionJournal.Result.RECORDED, HumanDecisionJournal.Result.REPLAYED),
                     Set.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)));
             assertEquals(1, count("decision", f)); assertEquals(1, count("pending", f));
+            assertEquals(1, auditCount(f));
         } finally { pool.shutdownNow(); }
     }
 
@@ -174,5 +206,12 @@ class HumanDecisionJournalTest {
             q.setString(1, "tenant"); q.setString(2, f.task().value()); q.executeUpdate();
         }
         assertThrows(HumanDecisionJournal.Conflict.class, () -> record(f, f.decision(), "wait"));
+    }
+
+    private long auditCount(Fixture f) throws SQLException {
+        try (var c = owned.getConnection(); var q = c.prepareStatement("select count(*) from audit.event where event_id=?")) {
+            q.setString(1, f.decision().id().value());
+            try (var r = q.executeQuery()) { r.next(); return r.getLong(1); }
+        }
     }
 }
