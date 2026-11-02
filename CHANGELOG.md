@@ -1,5 +1,7 @@
 # Changelog
 
+- Prove same-decision recovery after a simulated lost commit reply in the isolated human journal; changed retained audit metadata fails closed. Actual process restart and workflow delivery remain open.
+
 - Extend the isolated human-decision journal proposal to append its non-sensitive audit event in the same database transaction and keep workflow wakeup blocked. Audit failure rolls back the decision; production authority, schema and delivery remain open.
 
 - Add an isolated, unactivated human-decision storage proposal with concurrent retry, conflict, rollback and blocked-wakeup tests. Production schema, audit receipts, authority/lease checks and delivery remain open.
