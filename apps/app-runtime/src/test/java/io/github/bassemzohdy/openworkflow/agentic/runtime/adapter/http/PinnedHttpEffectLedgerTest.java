@@ -4,6 +4,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.sun.net.httpserver.HttpServer;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Credential;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken;
+import java.time.Instant;
+import java.util.List;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.JdbcEffectLedger;
 import io.quarkus.test.junit.QuarkusTest;
@@ -33,8 +38,11 @@ class PinnedHttpEffectLedgerTest {
         });server.start();
         try {
             var endpoint=URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/orders");
+            var grant=UlidGenerator.shared().next();
+            var expected=new PinnedHttpEffectTarget.CredentialExpectation("issuer",grant,Set.of("orders:write"));
             var target=new PinnedHttpEffectTarget("tool:orders",endpoint,"orders","correlation","{\"amount\":10}",
-                    Duration.ofMillis(500),Set.of(200),audience->"token",true);
+                    Duration.ofMillis(500),Set.of(200),expected,audience->new IssuedToken(Credential.of("token"),audience,
+                    Set.of("orders:write"),Instant.now().plusSeconds(60),"issuer","jti",List.of("actor"),grant),issued->{},true);
             var thread=ThreadId.derive("http-effect-test","alice",UUID.randomUUID().toString());
             var command=EffectCommand.of(thread,"send","occurrence-1","tool:orders","{\"amount\":10}");
             assertEquals(EffectState.INTENDED,effects.execute(command,target).state());

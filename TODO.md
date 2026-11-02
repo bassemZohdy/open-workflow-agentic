@@ -745,7 +745,7 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-08. Shared pat
 
 Implemented scope:
 
-- An explicitly composed pinned HTTPS JSON effect transport sends the ledger key and correlation, refuses redirects, returns UNKNOWN for nonconfirmed responses and timeouts, and provides no automatic ledger replay. Unresolved calls permanently reserve a shared classloader slot. Loopback and PostgreSQL ledger tests exercise the candidate; no OpenAPI parsing, approved endpoint, current credential verification or production wiring is provided.
+- An explicitly composed pinned HTTPS JSON effect transport sends the ledger key and correlation, refuses redirects, returns UNKNOWN for nonconfirmed responses and timeouts, and provides no automatic ledger replay. Its classloader-wide slots now cover credential acquisition; after acquisition it compares issued-token audience, issuer, grant, exact scopes and expiry with pinned expectations and invokes a supplied current-authority fence. Dispatched unresolved calls permanently reserve a slot. These metadata and supplied callbacks are not verification or proof of current authority. Loopback and PostgreSQL ledger tests exercise the candidate; no OpenAPI parsing, approved endpoint, verified exchanger integration or production wiring is provided.
 
 Additional closure/integration tasks:
 
