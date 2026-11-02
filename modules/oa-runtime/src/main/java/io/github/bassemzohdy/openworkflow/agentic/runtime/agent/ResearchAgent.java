@@ -42,12 +42,15 @@ public class ResearchAgent {
 
     /**
      * Where the approved task, and so the run's limits and acting agent, come from. With this and {@link #audit} both
-     * present, every run gets its own {@link NodeInterceptor} (step and wall-clock limits, started/completed records).
+     * present, every run gets a {@link NodeInterceptor} backed by its task's durable node budget.
      * Left unset, the graph runs unwrapped exactly as before. With the default context (none) a run is refused at its
      * first model call regardless.
      */
     @Inject
     ApprovedModelContext approvedContext;
+
+    @Inject
+    JdbcNodeBudget nodeBudget;
 
     /** Set by {@link #useAuditTrail}; tests may set a recording sink directly. */
     AuditSink audit;
@@ -132,25 +135,28 @@ public class ResearchAgent {
         // before any node (and so any provider call): the store may have drifted since the graph was built
         verifyStore();
         var config = RunnableConfig.builder().threadId(threadId).build();
+        // Validate checkpoint compatibility before requesting an already-registered task budget.
+        graph.lastStateOf(config).ifPresent(snapshot -> ResearchStateVersion.requireContinuable(snapshot.state().data()));
         var runGraph = runGraph(threadId);
-        // a stored run of a state shape this build cannot continue is refused before any node or provider call
-        runGraph.lastStateOf(config).ifPresent(snapshot -> ResearchStateVersion.requireContinuable(snapshot.state().data()));
         return runGraph.invoke(Map.of(ResearchState.TOPIC, topic,
                         ResearchStateVersion.KEY, ResearchStateVersion.CURRENT), config)
                 .orElseThrow(() -> new IllegalStateException("Agent graph produced no state"));
     }
 
     /**
-     * The graph for one run. With an approved context and an audit sink, a fresh {@link NodeInterceptor} (never shared
-     * between runs, since its step counter and deadline belong to one) wraps every node using the approved task's
-     * limits and the approved agent. Without an approved context the shared unwrapped graph is used and the first
+     * The graph for one run. With an approved context and an audit sink, a fresh {@link NodeInterceptor} wraps each
+     * node, backed by the durable counter and deadline bound to the approved task and thread. Without an approved
+     * context the shared unwrapped graph is used and the first
      * governed model call refuses, as before.
      */
     private CompiledGraph<ResearchState> runGraph(String threadId) {
         if (audit == null || approvedContext == null) return graph;
         var approved = approvedContext.current().orElse(null);
         if (approved == null) return graph;
-        var interceptor = NodeInterceptor.forLimits(approved.agent(), threadId, approved.task().limits(), audit, clock);
+        if (nodeBudget == null) throw new IllegalStateException("durable agent node budget is unavailable");
+        // An absent checkpoint cannot prove this task never ran before an upgrade or crash.
+        var budget = nodeBudget.openExisting(threadId, approved.agent(), approved.task());
+        var interceptor = NodeInterceptor.forLimits(approved.agent(), threadId, approved.task().limits(), audit, clock, budget);
         try {
             return compile(interceptor::wrap);
         } catch (Exception e) {

@@ -1,5 +1,7 @@
 # Changelog
 
+- Enforce pre-registered research-agent node attempts and deadlines in PostgreSQL across retries and concurrent runtimes; unregistered tasks refuse until a trusted start producer is wired. Token, cost, tool-call accounting and exhaustion escalation remain open.
+
 - Withhold agent-node results when their wall-clock limit expires during the node action or its completion audit.
 
 - Add opt-in multi-replica handling for recorded starts and overdue instances whose engine is not local, preserving the unconfirmed start or cancellation until an engine reports its outcome.

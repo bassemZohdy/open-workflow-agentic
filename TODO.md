@@ -777,18 +777,19 @@ Implementation owner: **Claude**; reviewer: **GPT**; backlog: Claude-04. Shared 
 
 Implemented scope:
 
-- The research graph applies approved per-run iteration and wall-clock limits through its existing node interceptor. The interceptor rechecks the deadline after the mandatory started audit, after the action and after the completed audit; a late result is withheld and the admitted attempt remains counted. Already-started actions are not interrupted or undone. Limits remain process-local and restart resets them.
+- For explicitly pre-registered tasks, the research graph enforces node-attempt and wall-clock limits through a PostgreSQL counter and database-clock deadline shared across runtime instances. The binding refuses reuse of a task ID for a different thread or approved contract. Attempts remain consumed after later failure or caller rollback. The interceptor rechecks the deadline after started audit, action and completed audit; a late result is withheld, but an already-started action is not interrupted or undone. An absent budget refuses, even with no checkpoint: there is not yet a trusted task-start producer that can distinguish new work from pre-upgrade attempts.
 
 Additional closure/integration tasks:
 
-- [ ] Implement durable shared token, cost, time, iteration and tool-call accounting across retries and restarts; enforce it at all relevant gateways and graph boundaries.
-- [ ] Add durable exhaustion escalation and prove T06, including concurrent and restart cases.
+- [ ] Implement durable shared token, cost and tool-call accounting across retries and restarts; enforce the full budget at all relevant gateways and graph boundaries.
+- [ ] Wire budget registration atomically to a trusted production task-start producer, establish a safe rolling-upgrade path and deployment grants, and prove process-loss, multi-replica and in-flight deadline behavior.
+- [ ] Add durable exhaustion escalation and prove T06 across all budget dimensions.
 
 Acceptance gates:
 
 - [ ] T06: implement, run in CI and record passing evidence
 
-Evidence: [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptor.java](modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptor.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptorTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptorTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/ResearchAgentNodeLimitsTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/ResearchAgentNodeLimitsTest.java)
+Evidence: [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptor.java](modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptor.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptorTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/NodeInterceptorTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/ResearchAgentNodeLimitsTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/ResearchAgentNodeLimitsTest.java), [modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/JdbcNodeBudget.java](modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/JdbcNodeBudget.java), [modules/oa-runtime/src/main/resources/db/migration/V77_3__agent_node_budget.sql](modules/oa-runtime/src/main/resources/db/migration/V77_3__agent_node_budget.sql), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/JdbcNodeBudgetTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/agent/JdbcNodeBudgetTest.java), [apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/agent/JdbcNodeBudgetTransactionTest.java](apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/agent/JdbcNodeBudgetTransactionTest.java)
 
 ### WP-203 Planning and re-planning — not-started
 
