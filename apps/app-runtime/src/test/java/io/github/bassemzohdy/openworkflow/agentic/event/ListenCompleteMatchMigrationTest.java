@@ -105,6 +105,13 @@ class ListenCompleteMatchMigrationTest {
             var selection=new SdkListenMatchSet(group,snapshot).matches(receipt);
             assertThrows(IllegalStateException.class,()->groups.offer(claim,group,receipt,selection));
             assertEquals(retained,groups.selected(claim,group,0,128));
+            assertTrue(leases.release(claim));
+            var successor=leases.acquire(task,"successor-owner",Duration.ofSeconds(30)).orElseThrow().claim();
+            assertTrue(successor.epoch()>claim.epoch());
+            assertThrows(IllegalStateException.class,()->groups.selected(claim,group,0,128));
+            assertEquals(retained,groups.selected(successor,group,0,128));
+            assertThrows(IllegalStateException.class,()->groups.offer(successor,group,receipt,selection));
+            assertEquals(retained,groups.selected(successor,group,0,128));
         } finally {
             assertTrue(name.matches("oa_match_upgrade_[0-9a-f]{32}"));
             try(var c=db("postgres").getConnection();var s=c.createStatement()) {s.execute("drop database "+name);}

@@ -14,5 +14,7 @@ pre-V81 selection in a disposable PostgreSQL 16 database. The legacy transaction
 with owner, pinning, membership, foreign-key and immutable-history triggers enabled; it does not claim to run
 the historical Java binary. After applying the proposed V81 through Flyway, the current store reads the same
 receipt and membership, refuses replay through the public selector path, and retains the original selection.
-Three migration tests passed locally without skips. This proves the isolated upgrade path, not deployed role
+It then releases the original claim, acquires a later epoch as another owner, verifies the old claim is refused,
+and proves that the new owner can read the unchanged selection but cannot replay it. Three migration tests passed
+locally without skips. This proves the isolated upgrade and storage handover path, not deployed role
 grants, migration activation, SDK callback/Flow recovery, or T13; exact-head CI and independent review remain.
