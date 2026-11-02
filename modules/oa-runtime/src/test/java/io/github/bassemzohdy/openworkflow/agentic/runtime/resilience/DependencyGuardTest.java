@@ -294,6 +294,21 @@ class DependencyGuardTest {
         assertTrue(Thread.currentThread().isInterrupted());
     }
 
+    @Test void anInterruptedOperationDoesNotStartAnotherAttempt() {
+        var guard = guard(4, 100, 10);
+        var calls = new AtomicInteger();
+        var failure = new IllegalStateException("interrupted operation");
+        var thrown = assertThrows(IllegalStateException.class, () -> guard.callWithRetry(5, t -> true, () -> {
+            calls.incrementAndGet();
+            Thread.currentThread().interrupt();
+            throw failure;
+        }));
+        assertSame(failure, thrown);
+        assertEquals(1, calls.get());
+        assertEquals(0, guard.stats().retries());
+        assertTrue(Thread.currentThread().isInterrupted());
+    }
+
     // ---- failures that are not the dependency's fault ---------------------------------------------------------
 
     @Test void aFailureTheCallerDoesNotCountIsNeitherSuccessNorFailureAndNeverOpensTheCircuit() {

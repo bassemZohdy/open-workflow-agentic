@@ -167,8 +167,8 @@ public final class DependencyGuard {
     /**
      * Calls the dependency, retrying a failure that {@code retriable} accepts while attempts and the retry budget last,
      * pausing {@code retryBackoff} between attempts. A rejection is thrown at once and never retried. The last failure is
-     * thrown unchanged when retrying stops; an interrupt while pausing stops retrying, keeps the interrupt flag and
-     * throws the last failure.
+     * thrown unchanged when retrying stops; an interrupt after a failed attempt or while pausing stops retrying,
+     * keeps the interrupt flag and throws the last failure.
      */
     public <T> T callWithRetry(int maxAttempts, Predicate<Throwable> retriable, Supplier<T> operation) {
         if (maxAttempts < 1 || maxAttempts > 10) throw new IllegalArgumentException("maxAttempts must be 1..10");
@@ -180,7 +180,8 @@ public final class DependencyGuard {
             } catch (RejectedException rejected) {
                 throw rejected;
             } catch (Throwable failure) {
-                if (attempt >= maxAttempts || !retriable.test(failure)) throw failure;
+                if (attempt >= maxAttempts || Thread.currentThread().isInterrupted() || !retriable.test(failure)
+                        || Thread.currentThread().isInterrupted()) throw failure;
                 if (!consumeRetry()) {
                     retriesDenied.incrementAndGet();
                     throw failure;
@@ -194,6 +195,7 @@ public final class DependencyGuard {
                         throw failure;
                     }
                 }
+                if (Thread.currentThread().isInterrupted()) throw failure;
             }
         }
     }
