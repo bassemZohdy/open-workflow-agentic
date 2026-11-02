@@ -147,7 +147,7 @@ class InstanceApiPolicyTest {
         DelegationGrant old = grantOf(tenant, "alice");
         String id = started(tenant, old.id().value());
         grants.revoke(old.id(), new Subject(SubjectKind.USER, "alice"), "withdrawn", null);
-        authorityStore.markReauthorizationRequired(Ulid.parse(id), "grant.revoked", Instant.now());
+        authorityStore.markReauthorizationRequired(Ulid.parse(id), old.id(), "grant.revoked", Instant.now());
         return new Waiting(tenant, id, grantOf(tenant, "alice"));
     }
 

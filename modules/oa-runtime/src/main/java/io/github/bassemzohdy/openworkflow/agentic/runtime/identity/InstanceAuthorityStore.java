@@ -99,22 +99,24 @@ public class InstanceAuthorityStore {
     }
 
     /**
-     * Marks the instance as needing re-authorization. Only a row that is AUTHORIZED changes; a row that already waits
-     * keeps its first reason and time.
+     * Marks the instance as needing re-authorization only while it is still bound to the observed grant. A row that
+     * already waits keeps its first reason and time; a replacement grant cannot be held by an old observation.
      *
      * @return true if this call changed the row
      */
-    public boolean markReauthorizationRequired(Ulid instanceId, String reason, Instant at) {
+    public boolean markReauthorizationRequired(Ulid instanceId, Ulid expectedGrant, String reason, Instant at) {
+        java.util.Objects.requireNonNull(expectedGrant, "expectedGrant");
         return Transactions.inTransaction(dataSource, connection -> {
             try (PreparedStatement ps = connection.prepareStatement("""
                     update identity.instance_authority
                        set state = 'REAUTHORIZATION_REQUIRED', state_reason = ?, state_since = ?, updated_at = ?
-                     where instance_id = ? and state = 'AUTHORIZED' and grant_id is not null
+                     where instance_id = ? and state = 'AUTHORIZED' and grant_id = ?
                     """)) {
                 ps.setString(1, reason);
                 ps.setTimestamp(2, Timestamp.from(at));
                 ps.setTimestamp(3, Timestamp.from(at));
                 ps.setString(4, instanceId.value());
+                ps.setString(5, expectedGrant.value());
                 return ps.executeUpdate() == 1;
             }
         });

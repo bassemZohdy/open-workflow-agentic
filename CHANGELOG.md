@@ -1,5 +1,7 @@
 # Changelog
 
+- Prevent a delayed refusal for an old grant from placing a different replacement grant on hold.
+
 - Refuse asynchronous task work or results when its instance authority changes during token exchange or task execution.
 
 - Prevent concurrent adapter starts of the same pending Flow instance and retain uncertain start claims without blocking unrelated starts.

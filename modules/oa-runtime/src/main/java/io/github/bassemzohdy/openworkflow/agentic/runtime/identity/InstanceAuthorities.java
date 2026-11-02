@@ -169,7 +169,7 @@ public class InstanceAuthorities implements ResumeGate {
         attributes.put("reason", reason);
         audit.record(RUNTIME, REQUIRED_EVENT, IdentityAudit.INSTANCE_AUTHORITY, authority.instanceId().value(),
                 authority.tenant(), authority.correlationId(), attributes);
-        store.markReauthorizationRequired(authority.instanceId(), reason, now());
+        store.markReauthorizationRequired(authority.instanceId(), authority.grantId(), reason, now());
     }
 
     // ---- renewal ---------------------------------------------------------------------------------------------------

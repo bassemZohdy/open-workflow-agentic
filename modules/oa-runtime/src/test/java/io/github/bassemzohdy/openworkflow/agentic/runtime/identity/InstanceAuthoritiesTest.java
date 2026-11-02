@@ -90,6 +90,25 @@ class InstanceAuthoritiesTest {
                 row.startAttempts(), row.lastError(), null), row.version(), "test.engine", InstanceService.RUNTIME_ACTOR);
     }
 
+    @Test
+    void anOldGrantRefusalCannotHoldAReplacementGrant() {
+        DelegationGrant old = grantFor(alice, planner, Duration.ofHours(1));
+        DelegationGrant replacement = grantFor(alice, planner, Duration.ofHours(2));
+        InstanceRecord row = start(alice, old.id());
+        InstanceAuthority observed = authorities.find(row.id()).orElseThrow();
+        assertTrue(authorityStore.markReauthorizationRequired(row.id(), old.id(), "grant.revoked", clock.instant()));
+        assertTrue(authorityStore.rebind(row.id(), old.id(), replacement.id(), clock.instant()));
+
+        authorities.require(observed, "grant.inactive");
+
+        InstanceAuthority current = authorities.find(row.id()).orElseThrow();
+        assertEquals(replacement.id(), current.grantId());
+        assertEquals(InstanceAuthority.State.AUTHORIZED, current.state());
+        assertNull(current.stateReason());
+        assertTrue(authorityStore.markReauthorizationRequired(row.id(), replacement.id(), "grant.revoked", clock.instant()));
+        assertEquals(InstanceAuthority.State.REAUTHORIZATION_REQUIRED, authorities.find(row.id()).orElseThrow().state());
+    }
+
     // ---- binding at start --------------------------------------------------------------------------------------------
 
     @Test
