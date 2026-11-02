@@ -28,6 +28,7 @@ public final class PinnedOpenApiEffect {
     private final URI endpoint;
     private final Set<Integer> documentedResponses;
     private final boolean loopbackTest;
+    private final Set<String> oauthScopes;
 
     public PinnedOpenApiEffect(String document, String expectedSha256, String operationId, URI trustedOrigin) {
         this(document, expectedSha256, operationId, trustedOrigin, false);
@@ -73,6 +74,7 @@ public final class PinnedOpenApiEffect {
                 || selectedPath.has("$ref") || selectedPath.has("parameters") || selected.has("parameters")
                 || selectedPath.has("servers") || selected.has("servers"))
             throw new IllegalArgumentException("operation must be unique, fixed-path and parameter-free");
+        this.oauthScopes = securityScopes(root, selected);
         JsonNode request = resolveObject(selected.path("requestBody"), root.path("components").path("requestBodies"), "requestBodies");
         JsonNode input = request.path("content").path("application/json").path("schema");
         if (!request.path("required").isBoolean() || !request.path("required").asBoolean() || !input.isObject())
@@ -102,6 +104,8 @@ public final class PinnedOpenApiEffect {
             Duration timeout, Set<Integer> confirmed, PinnedHttpEffectTarget.CredentialExpectation expectation,
             PinnedHttpEffectTarget.CredentialProvider credentials, PinnedHttpEffectTarget.PreSendFence fence) {
         Objects.requireNonNull(expectation); Set<Integer> statuses = Set.copyOf(confirmed);
+        if (oauthScopes != null && !oauthScopes.equals(expectation.scopes()))
+            throw new IllegalArgumentException("credential scopes differ from the OpenAPI operation");
         if (!documentedResponses.containsAll(statuses)) throw new IllegalArgumentException("confirmation response is not documented");
         var encoder = new CanonicalEncoder("oa.openapi.effect.v1").text(documentDigest).text(operationId)
                 .text(endpoint.toASCIIString()).text(target).text(audience).text(correlation)
@@ -131,6 +135,40 @@ public final class PinnedOpenApiEffect {
         }
         if (!node.isObject()) throw new IllegalArgumentException("missing or invalid component object");
         return node;
+    }
+
+    /** Null means an HTTP bearer scheme, whose in-band requirement carries no OAuth scopes. */
+    private static Set<String> securityScopes(JsonNode root, JsonNode operation) {
+        JsonNode security = operation.has("security") ? operation.get("security") : root.path("security");
+        if (!security.isArray() || security.size() != 1 || !security.get(0).isObject() || security.get(0).size() != 1)
+            throw new IllegalArgumentException("exactly one required bearer or OAuth scheme is supported");
+        var requirement = security.get(0).fields().next();
+        if (!requirement.getKey().matches("[A-Za-z0-9._-]{1,128}") || !requirement.getValue().isArray()
+                || requirement.getValue().size() > 64) throw new IllegalArgumentException("invalid security requirement");
+        var scopes = new java.util.HashSet<String>();
+        for (JsonNode value : requirement.getValue()) {
+            if (!value.isTextual() || value.textValue().isBlank() || value.textValue().length() > 256 || !scopes.add(value.textValue()))
+                throw new IllegalArgumentException("invalid or duplicate security scope");
+        }
+        JsonNode schemes = root.path("components").path("securitySchemes");
+        JsonNode scheme = resolveObject(schemes.path(requirement.getKey()), schemes, "securitySchemes");
+        if ("http".equals(scheme.path("type").asText()) && "bearer".equalsIgnoreCase(scheme.path("scheme").asText())) {
+            if (!scopes.isEmpty()) throw new IllegalArgumentException("bearer roles are unsupported");
+            return null;
+        }
+        if (!"oauth2".equals(scheme.path("type").asText()) || scopes.isEmpty())
+            throw new IllegalArgumentException("unsupported security scheme or empty OAuth scopes");
+        JsonNode flows = scheme.path("flows");
+        boolean declared = false;
+        for (String name : new String[]{"implicit", "password", "clientCredentials", "authorizationCode"}) {
+            JsonNode flow = flows.path(name); JsonNode available = flow.path("scopes");
+            if (!flow.isObject() || !available.isObject()) continue;
+            boolean all = true;
+            for (String scope : scopes) if (!available.path(scope).isTextual()) { all = false; break; }
+            if (all) { declared = true; break; }
+        }
+        if (!declared) throw new IllegalArgumentException("OAuth scopes are not declared in one flow");
+        return Set.copyOf(scopes);
     }
 
     private static void requireSelfContained(JsonNode node) {

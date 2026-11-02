@@ -41,6 +41,16 @@ class PinnedOpenApiEffectTest {
             new PinnedHttpEffectTarget.CredentialExpectation("issuer", Ulid.parse("01ARZ3NDEKTSV4RRFFQ69G5FAV"), Set.of("orders:write"));
 
     private static PinnedOpenApiEffect operation(String doc, String id, URI origin) {
+        return rawOperation(secured(doc), id, origin);
+    }
+    private static String secured(String doc) {
+        String scheme = "\"securitySchemes\":{\"Bearer\":{\"type\":\"http\",\"scheme\":\"bearer\"}}";
+        String withComponents = doc.contains("\"components\":{")
+                ? doc.replace("\"components\":{", "\"components\":{" + scheme + ",")
+                : doc.replace("\"paths\":{", "\"components\":{" + scheme + "},\"paths\":{");
+        return withComponents.replace("\"openapi\":\"3.1.0\"", "\"openapi\":\"3.1.0\",\"security\":[{\"Bearer\":[]}]");
+    }
+    private static PinnedOpenApiEffect rawOperation(String doc, String id, URI origin) {
         return new PinnedOpenApiEffect(doc, CanonicalEncoder.sha256Hex(CanonicalEncoder.strictUtf8(doc)), id, origin);
     }
     private static GovernedToolGateway.Registration registration(PinnedOpenApiEffect operation, Set<Integer> statuses) {
@@ -105,5 +115,26 @@ class PinnedOpenApiEffectTest {
         assertThrows(IllegalArgumentException.class, () -> operation(OBJECT_REFS.replace("\"Done\":{\"description\":\"done\"}", "\"Done\":{\"$ref\":\"#/components/responses/Done\"}"), "createOrder", ORIGIN));
         assertThrows(IllegalArgumentException.class, () -> operation(OBJECT_REFS.replace("\"Done\":{\"description\":\"done\"}", "\"Done\":{}"), "createOrder", ORIGIN));
         assertThrows(IllegalArgumentException.class, () -> operation(OBJECT_REFS.replace("\"$ref\":\"#/components/requestBodies/OrderBody\"", "\"$ref\":\"#/components/requestBodies/OrderBody\",\"required\":true"), "createOrder", ORIGIN));
+    }
+
+    @Test void enforcesDeclaredSecurityAndOAuthScopeBinding() {
+        String secured = secured(DOC);
+        assertThrows(IllegalArgumentException.class, () -> rawOperation(DOC, "createOrder", ORIGIN));
+        String operationOnly = secured.replace(",\"security\":[{\"Bearer\":[]}]", "")
+                .replace("\"operationId\":\"createOrder\"", "\"operationId\":\"createOrder\",\"security\":[{\"Bearer\":[]}]");
+        assertNotNull(registration(rawOperation(operationOnly, "createOrder", ORIGIN), Set.of(200)));
+        assertThrows(IllegalArgumentException.class, () -> rawOperation(secured.replace("\"operationId\":\"createOrder\"", "\"operationId\":\"createOrder\",\"security\":[]"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> rawOperation(secured.replace("[{\"Bearer\":[]}]", "[{\"Bearer\":[]},{}]"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> rawOperation(secured.replace("[{\"Bearer\":[]}]", "[{\"Bearer\":[],\"other\":[]}]"), "createOrder", ORIGIN));
+        assertThrows(IllegalArgumentException.class, () -> rawOperation(secured.replace("[{\"Bearer\":[]}]", "[{\"Bearer\":[\"admin\"]}]"), "createOrder", ORIGIN));
+        String oauth = secured.replace("\"type\":\"http\",\"scheme\":\"bearer\"", "\"type\":\"oauth2\",\"flows\":{\"clientCredentials\":{\"tokenUrl\":\"https://issuer/token\",\"scopes\":{\"orders:write\":\"write\"}}}")
+                .replace("[{\"Bearer\":[]}]", "[{\"Bearer\":[\"orders:write\"]}]");
+        assertNotNull(registration(rawOperation(oauth, "createOrder", ORIGIN), Set.of(200)));
+        String different = oauth.replace("orders:write", "orders:read");
+        assertThrows(IllegalArgumentException.class, () -> registration(rawOperation(different, "createOrder", ORIGIN), Set.of(200)));
+        String undeclared = oauth.replace("\"orders:write\":\"write\"", "\"orders:read\":\"read\"");
+        assertThrows(IllegalArgumentException.class, () -> rawOperation(undeclared, "createOrder", ORIGIN));
+        String duplicate = oauth.replace("[{\"Bearer\":[\"orders:write\"]}]", "[{\"Bearer\":[\"orders:write\",\"orders:write\"]}]");
+        assertThrows(IllegalArgumentException.class, () -> rawOperation(duplicate, "createOrder", ORIGIN));
     }
 }

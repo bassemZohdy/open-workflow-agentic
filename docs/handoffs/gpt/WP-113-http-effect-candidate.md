@@ -31,9 +31,12 @@ fields are refused. Request-body and response objects may likewise reference mat
 missing, cyclic, cross-kind and remote references are refused. Confirmed status codes must be documented with response
 descriptions. The gateway fingerprint covers the exact document digest, selected operation, origin,
 target, timeout, correlation, confirmation codes and token expectations. The gateway validates arguments against the
-selected schema before binding; no credential or network call occurs at registration. This narrow selector is not a
-complete OpenAPI validator, approval workflow or interpretation of OpenAPI security schemes; trusted composition must
-independently enforce those schemes, approved target/occurrence binding, identity, policy, audit and service semantics.
+selected schema before binding; no credential or network call occurs at registration. The selected operation must
+require exactly one supported scheme: HTTP bearer with no declared roles, or OAuth2 with nonempty scopes declared in
+one flow and exactly matching the pinned token scopes. Operation-level security overrides the root declaration;
+anonymous, alternative, combined and unsupported schemes refuse. This narrow selector is not a complete OpenAPI
+validator or approval workflow. It does not validate OAuth endpoints or token signatures; trusted composition must
+independently enforce verified identity, current authority, policy, audit and service semantics.
 The supported subset is intentionally smaller than the [OpenAPI 3.1 specification](https://spec.openapis.org/oas/v3.1.0.html).
 The PostgreSQL controlled-gateway fixture verifies that a schema-invalid request creates no intent and acquires no
 credential, while a valid request reaches a fixture credential refusal and leaves an unresolved intent. The same gateway

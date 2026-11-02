@@ -838,7 +838,7 @@ class GovernedModelRunningControlTest {
         inCallback((running, entry, checks) -> {
             var rig = new ToolEffectRig(entry);
             String document = """
-                    {"openapi":"3.1.0","components":{"schemas":{"Order":
+                    {"openapi":"3.1.0","security":[{"Bearer":[]}],"components":{"securitySchemes":{"Bearer":{"type":"http","scheme":"bearer"}},"schemas":{"Order":
                     {"type":"object","required":["amount"],"properties":{"amount":{"$ref":"#/components/schemas/Amount"}}},
                     "Amount":{"type":"integer","minimum":1}}},
                     "paths":{"/orders":{"post":{"operationId":"createOrder",
@@ -903,7 +903,7 @@ class GovernedModelRunningControlTest {
             inCallback((running, entry, checks) -> {
                 var rig = new ToolEffectRig(entry);
                 String document = """
-                        {"openapi":"3.1.0","components":{"schemas":{"Order":{"type":"object",
+                        {"openapi":"3.1.0","security":[{"Bearer":[]}],"components":{"securitySchemes":{"Bearer":{"type":"http","scheme":"bearer"}},"schemas":{"Order":{"type":"object",
                          "required":["amount"],"properties":{"amount":{"type":"integer","minimum":1}}}},
                          "requestBodies":{"OrderBody":{"required":true,"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Order"}}}}},
                          "responses":{"Done":{"description":"done"}}},
