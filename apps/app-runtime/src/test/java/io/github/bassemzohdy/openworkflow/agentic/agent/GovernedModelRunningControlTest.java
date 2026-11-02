@@ -666,6 +666,8 @@ class GovernedModelRunningControlTest {
         final GovernedToolGateway.Approval approved;
         final GovernedToolGateway.ToolBudget budget;
         final ControlledToolEffects controlled;
+        final GovernedToolGateway gateway;
+        final AtomicInteger bindings = new AtomicInteger();
         volatile Runnable during = () -> { };
         final EffectTarget target = new EffectTarget() {
             @Override public String target() { return "registered:test"; }
@@ -682,7 +684,10 @@ class GovernedModelRunningControlTest {
                     100, Duration.ofSeconds(2), 100);
             var resource = new ResourceTaskAllocation(entry.scope(), null, task, model);
             allocation = new AllocatedResourceTask(resource, NOW, NOW.plusSeconds(120));
-            profile = new ApprovedToolProfile("fixture", "1", "d".repeat(64), AGENT,
+            var registration = GovernedToolGateway.Registration.effectful("{\"type\":\"object\"}", "{\"type\":\"object\"}",
+                    Duration.ofSeconds(2), "d".repeat(64), "registered:test", args -> { bindings.incrementAndGet(); return target; });
+            var registry = Map.of("tool:research", registration);
+            profile = new ApprovedToolProfile("fixture", "1", GovernedToolGateway.configurationFingerprint(registry), AGENT,
                     Set.of("tool:research"), 3, Duration.ofSeconds(2));
             approved = new GovernedToolGateway.Approval(AGENT, task, 1000);
             budget = new GovernedToolGateway.ToolBudget() {
@@ -695,6 +700,7 @@ class GovernedModelRunningControlTest {
             var pep = new Pep(request -> new Decision("fixture", DecisionOutcome.ALLOW, "allow", POLICY, NOW),
                     event -> { }, Duration.ofSeconds(5), CLOCK);
             controlled = new ControlledToolEffects(new DurableEffects(ledger, Clock.systemUTC()), pep, () -> Optional.of(approved));
+            gateway = new GovernedToolGateway(registry, () -> Optional.of(approved), profile, pep, event -> { }, budget, CLOCK);
         }
 
         ToolCall call(String args) { return new ToolCall(allocation.allocation().contract().id(), "tool:research", args); }
@@ -706,6 +712,23 @@ class GovernedModelRunningControlTest {
             return controlled.execute(running, entry, allocation, profile, occurrence(running, entry, call), call,
                     budget, "registered:test", target);
         }
+    }
+
+    @Test void registeredEffectValidatesInputAndRetainsOneDispatch() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry);
+            var invalid = rig.call("[]");
+            assertThrows(ModelCallRefused.class, () -> rig.gateway.invokeEffect(running, entry, rig.allocation,
+                    rig.occurrence(running, entry, invalid), invalid, rig.controlled));
+            assertEquals(0, rig.bindings.get()); assertEquals(0, rig.dispatches.get());
+            var call = rig.call("{\"query\":\"one\"}");
+            var occurrence = rig.occurrence(running, entry, call);
+            var first = rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call, rig.controlled);
+            assertEquals(EffectState.CONFIRMED, first.state());
+            assertEquals(first, rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call, rig.controlled));
+            assertEquals(1, rig.dispatches.get()); assertEquals(1, rig.admissions.get());
+            return null;
+        });
     }
 
     @Test void controlledToolEffectUsesOneDurableOccurrenceAcrossExactRetries() throws Exception {

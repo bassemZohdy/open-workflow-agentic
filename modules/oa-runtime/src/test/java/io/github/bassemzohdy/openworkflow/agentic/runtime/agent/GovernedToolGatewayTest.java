@@ -117,16 +117,16 @@ class GovernedToolGatewayTest {
     @Test void approvalLostDuringAuditRefusesAndAfterToolWithholdsOutput() {
         var before = new Rig(); before.duringAudit = () -> before.approval.set(null);
         assertInstanceOf(ToolResult.Rejected.class, before.gateway().invoke(CALL)); assertEquals(0, before.calls.get());
-        var after = new Rig(); after.mutating = true;
+        var after = new Rig(); after.mutating = false;
         after.tool = args -> { after.calls.incrementAndGet(); after.approval.set(null); return "{\"result\":\"private\"}"; };
         var failure = assertInstanceOf(ToolResult.Failed.class, after.gateway().invoke(CALL));
-        assertTrue(failure.effectMayHaveHappened()); assertFalse(failure.reason().contains("private"));
+        assertFalse(failure.effectMayHaveHappened()); assertFalse(failure.reason().contains("private"));
         assertEquals(1, after.calls.get());
     }
 
-    @Test void invalidOutputAndExceptionsWithholdOutputAndPreserveEffectUncertainty() {
-        var bad = new Rig(); bad.mutating = true; bad.tool = args -> "{\"result\":3}";
-        assertTrue(assertInstanceOf(ToolResult.Failed.class, bad.gateway().invoke(CALL)).effectMayHaveHappened());
+    @Test void invalidOutputAndExceptionsWithholdOutput() {
+        var bad = new Rig(); bad.mutating = false; bad.tool = args -> "{\"result\":3}";
+        assertFalse(assertInstanceOf(ToolResult.Failed.class, bad.gateway().invoke(CALL)).effectMayHaveHappened());
         var broken = new Rig(); broken.tool = args -> { throw new IllegalStateException("secret"); };
         var result = assertInstanceOf(ToolResult.Failed.class, broken.gateway().invoke(CALL));
         assertFalse(result.effectMayHaveHappened()); assertFalse(result.reason().contains("secret"));
@@ -153,13 +153,13 @@ class GovernedToolGatewayTest {
 
     @Test void completionAuditFailureOrApprovalLossWithholdsTheAnswer() {
         for (boolean revoke : new boolean[] {false, true}) {
-            var rig = new Rig(); rig.mutating = true;
+            var rig = new Rig(); rig.mutating = false;
             rig.duringBoundaryAudit = action -> {
                 if (action.equals("agent.tool.completed")) {
                     if (revoke) rig.approval.set(null); else throw new IllegalStateException();
                 }
             };
-            assertTrue(assertInstanceOf(ToolResult.Failed.class, rig.gateway().invoke(CALL)).effectMayHaveHappened());
+            assertFalse(assertInstanceOf(ToolResult.Failed.class, rig.gateway().invoke(CALL)).effectMayHaveHappened());
             assertEquals(1, rig.calls.get());
             assertTrue(rig.boundaryEvents.contains("agent.tool.failed"));
         }
@@ -177,8 +177,8 @@ class GovernedToolGatewayTest {
         assertEquals(0, rig.calls.get());
     }
 
-    @Test void interruptionOfTheCallerIsPreservedAndMutatingOutcomeIsUncertain() throws Exception {
-        var rig = new Rig(); rig.mutating = true;
+    @Test void interruptionOfTheCallerIsPreservedForReadOnlyTools() throws Exception {
+        var rig = new Rig(); rig.mutating = false;
         var started = new java.util.concurrent.CountDownLatch(1);
         rig.tool = args -> { started.countDown(); new java.util.concurrent.CountDownLatch(1).await(); return "{}"; };
         var result = new AtomicReference<ToolResult>();
@@ -191,12 +191,12 @@ class GovernedToolGatewayTest {
         assertTrue(started.await(5, java.util.concurrent.TimeUnit.SECONDS));
         thread.interrupt(); thread.join(5000);
         assertFalse(thread.isAlive());
-        assertTrue(assertInstanceOf(ToolResult.Failed.class, result.get()).effectMayHaveHappened());
+        assertFalse(assertInstanceOf(ToolResult.Failed.class, result.get()).effectMayHaveHappened());
         assertTrue(interrupted.get());
     }
 
     @Test void timeoutWithholdsLateOutputAndDoesNotAssumeTheToolStopped() throws Exception {
-        var rig = new Rig(); rig.mutating = true; rig.timeout = Duration.ofMillis(100);
+        var rig = new Rig(); rig.mutating = false; rig.timeout = Duration.ofMillis(100);
         var release = new java.util.concurrent.CountDownLatch(1);
         var finished = new java.util.concurrent.CountDownLatch(1);
         rig.tool = args -> {
@@ -208,7 +208,7 @@ class GovernedToolGatewayTest {
         };
         try {
             var result = assertInstanceOf(ToolResult.Failed.class, rig.gateway().invoke(CALL));
-            assertTrue(result.effectMayHaveHappened());
+            assertFalse(result.effectMayHaveHappened());
             assertEquals(1, rig.calls.get());
             assertEquals(1, finished.getCount(), "cancellation is not proof that the tool stopped");
             assertFalse(result.reason().contains("private"));
@@ -216,7 +216,7 @@ class GovernedToolGatewayTest {
     }
 
     @Test void stalledTimedOutToolsCannotCreateUnboundedWorkers() throws Exception {
-        var rig = new Rig(); rig.mutating = true; rig.timeout = Duration.ofMillis(100);
+        var rig = new Rig(); rig.mutating = false; rig.timeout = Duration.ofMillis(100);
         var release = new java.util.concurrent.CountDownLatch(1);
         var started = new java.util.concurrent.CountDownLatch(GovernedToolGateway.MAX_IN_FLIGHT);
         var finished = new java.util.concurrent.CountDownLatch(GovernedToolGateway.MAX_IN_FLIGHT);
@@ -260,7 +260,7 @@ class GovernedToolGatewayTest {
         var release = new java.util.concurrent.CountDownLatch(1);
         var lookupFinished = new java.util.concurrent.CountDownLatch(1);
         var invoked = new java.util.concurrent.CountDownLatch(1);
-        var reg = new GovernedToolGateway.Registration(INPUT, OUTPUT, true, Duration.ofMillis(150), IMPLEMENTATION,
+        var reg = new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofMillis(150), IMPLEMENTATION,
                 args -> { invoked.countDown(); return "{\"result\":\"late\"}"; });
         var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
                 event -> { }, Duration.ofSeconds(5), CLOCK);
@@ -273,7 +273,7 @@ class GovernedToolGatewayTest {
             return Optional.of(APPROVAL);
         }, profile(Map.of("search", reg)), pep, event -> { }, TEST_BUDGET, CLOCK);
         try {
-            assertTrue(assertInstanceOf(ToolResult.Failed.class, gateway.invoke(CALL)).effectMayHaveHappened());
+            assertFalse(assertInstanceOf(ToolResult.Failed.class, gateway.invoke(CALL)).effectMayHaveHappened());
             assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS));
         } finally { release.countDown(); }
         assertTrue(lookupFinished.await(5, java.util.concurrent.TimeUnit.SECONDS));
@@ -314,9 +314,9 @@ class GovernedToolGatewayTest {
         var refused = new Rig(); refused.budgetCurrent.set(false);
         assertInstanceOf(ToolResult.Rejected.class, refused.gateway().invoke(CALL));
         assertEquals(0, refused.calls.get());
-        var lost = new Rig(); lost.mutating = true;
+        var lost = new Rig(); lost.mutating = false;
         lost.tool = args -> { lost.calls.incrementAndGet(); lost.budgetCurrent.set(false); return "{\"result\":\"private\"}"; };
-        assertTrue(assertInstanceOf(ToolResult.Failed.class, lost.gateway().invoke(CALL)).effectMayHaveHappened());
+        assertFalse(assertInstanceOf(ToolResult.Failed.class, lost.gateway().invoke(CALL)).effectMayHaveHappened());
         assertEquals(1, lost.admissions.get()); assertEquals(1, lost.calls.get());
     }
 
@@ -366,4 +366,19 @@ class GovernedToolGatewayTest {
         assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(CALL));
         assertEquals(0, rig.calls.get());
     }
+    @Test void mutatingRegistrationCannotBypassControlledEffects() {
+        var rig = new Rig(); rig.mutating = true;
+        assertInstanceOf(ToolResult.Rejected.class, rig.gateway().invoke(CALL));
+        assertEquals(0, rig.calls.get()); assertEquals(0, rig.admissions.get());
+    }
+
+    @Test void effectTargetIsBoundIntoTheApprovedRegistryFingerprint() {
+        var first = GovernedToolGateway.Registration.effectful(INPUT, OUTPUT, Duration.ofSeconds(1), IMPLEMENTATION,
+                "target:first", args -> null);
+        var second = GovernedToolGateway.Registration.effectful(INPUT, OUTPUT, Duration.ofSeconds(1), IMPLEMENTATION,
+                "target:second", args -> null);
+        assertNotEquals(GovernedToolGateway.configurationFingerprint(Map.of("search", first)),
+                GovernedToolGateway.configurationFingerprint(Map.of("search", second)));
+    }
+
 }
