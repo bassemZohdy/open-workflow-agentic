@@ -3,6 +3,8 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.common.ThreadId;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceExecutionFence;
 import jakarta.transaction.TransactionManager;
@@ -11,6 +13,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
 
@@ -81,6 +84,7 @@ public final class ResourceTaskExecutionFence implements ResourceExecutionFence,
                     .orElseThrow(() -> refused("credential missing"));
             if (!binding.equals(retained)) throw refused("credential differs");
             var ancestry = ancestry(c);
+            var parent = parent(c);
             try (var q = c.prepareStatement("select pg_catalog.clock_timestamp()")) {
                 q.setQueryTimeout(5);
                 try (var r = q.executeQuery()) {
@@ -101,10 +105,53 @@ public final class ResourceTaskExecutionFence implements ResourceExecutionFence,
                     var agent = current.allocation().modelProfile().agent();
                     if (!leaf.agentKind().equals(agent.kind().name()) || !leaf.agentId().equals(agent.id()))
                         throw refused("task grant agent differs");
+                    if (parent != null) requireCurrentParent(parent, ancestry, now);
                 }
             }
             return null;
         }, 6_000));
+    }
+
+    private record ParentRow(String instance, String tenant, String ownerKind, String ownerId, String thread,
+                             String status, Instant createdAt, AgentTaskContract contract) { }
+    private ParentRow parent(Connection c) throws SQLException {
+        var parentId = expected.allocation().parentTaskId();
+        if (parentId == null) return null;
+        try (var q = c.prepareStatement("""
+                select instance_id,tenant,owner_kind,owner_id,thread_name,status,created_at,
+                       case when octet_length(contract::text)<=65536 then contract::text end
+                  from task.agent_task where id=?
+                """)) {
+            q.setQueryTimeout(5);
+            q.setString(1, parentId.value());
+            try (var r = q.executeQuery()) {
+                if (!r.next()) throw refused("parent task missing");
+                var value = new ParentRow(r.getString(1), r.getString(2), r.getString(3), r.getString(4),
+                        r.getString(5), r.getString(6), r.getTimestamp(7).toInstant(),
+                        ResourceTaskAllocationCodec.contract(r.getString(8)));
+                if (r.next()) throw refused("parent task is inconsistent");
+                return value;
+            }
+        }
+    }
+
+    private void requireCurrentParent(ParentRow parent, java.util.List<GrantRow> ancestry, Instant now) {
+        var scope = entry.scope();
+        var child = expected.allocation().contract();
+        var contract = parent.contract();
+        if (!scope.instanceId().value().equals(parent.instance()) || !scope.tenant().equals(parent.tenant())
+                || !scope.owner().kind().name().equals(parent.ownerKind()) || !scope.owner().id().equals(parent.ownerId())
+                || !ThreadId.derive(scope.tenant(), scope.owner().id(), scope.instanceId().value()).value().equals(parent.thread())
+                || !expected.allocation().parentTaskId().equals(contract.id())
+                || !scope.owner().equals(contract.requestingSubject())
+                || !Set.of("PENDING", "RUNNING", "WAITING_FOR_HUMAN", "RESUMING").contains(parent.status())
+                || parent.createdAt().isAfter(now) || !now.isBefore(parent.createdAt().plus(contract.limits().maxWallClock()))
+                || expected.deadline().isAfter(parent.createdAt().plus(contract.limits().maxWallClock()))
+                || !contract.permittedTools().containsAll(child.permittedTools())
+                || !contract.permittedDataScopes().containsAll(child.permittedDataScopes())
+                || !child.riskTier().atLeast(contract.riskTier()) || !child.limits().isWithin(contract.limits())
+                || ancestry.stream().noneMatch(g -> g.id().equals(contract.delegationGrantId().value())))
+            throw refused("parent task is closed or differs");
     }
 
     private record GrantRow(String id, String parent, String tenant, String subjectKind, String subjectId,

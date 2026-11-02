@@ -161,6 +161,71 @@ class ResourceTaskAllocationStoreTest {
         }
     }
 
+    private AgentTaskRecord createParentTask() {
+        var t=a.contract();var ids=UlidGenerator.shared();
+        var contract=new AgentTaskContract(ids.next(),"parent",t.permittedTools(),t.permittedDataScopes(),RiskTier.MEDIUM,
+                new ExecutionLimits(10,Duration.ofSeconds(600),10000),t.requestingSubject(),f.binding().issuingGrantId());
+        var parent=new AgentTaskRecord(contract.id(),a.scope().tenant(),a.scope().owner(),a.scope().instanceId().value(),
+                ThreadId.derive(a.scope().tenant(),a.scope().owner().id(),a.scope().instanceId().value()),
+                contract,AgentTaskStatus.PENDING,0);
+        return new JdbcTaskStore(data).insert(parent);
+    }
+
+    private AllocatedResourceTask allocateChildOf(AgentTaskRecord parent) {
+        return store.allocate(new ResourceTaskAllocation(a.scope(),parent.taskId(),a.contract(),a.modelProfile()));
+    }
+
+    private void cancelParent(AgentTaskRecord parent) {
+        var cancelled=new AgentTaskRecord(parent.taskId(),parent.tenant(),parent.owner(),parent.workflowInstance(),
+                parent.threadId(),parent.contract(),AgentTaskStatus.CANCELLED,parent.version()+1);
+        new JdbcTaskStore(data).replace(cancelled,parent.version());
+    }
+
+    @Test void taskFenceRefusesParentCancelledDuringApproval() {
+        var parent=createParentTask();var allocated=allocateChildOf(parent);var approved=new AtomicBoolean();
+        try(var fence=new ResourceTaskExecutionFence(data,manager,f.entry(1),allocated,f.binding(),(entry,task)->{
+            approved.set(true);cancelParent(parent);
+        })) {
+            assertThrows(IllegalStateException.class,()->fence.requireCurrent(f.entry(1)));
+            assertTrue(approved.get(),"the parent was current before approval");
+            assertEquals(AgentTaskStatus.CANCELLED,new JdbcTaskStore(data).find(parent.taskId()).orElseThrow().status());
+        }
+    }
+
+    @Test void parentCancelledDuringAuditStopsCommittedEntryBeforeCallback() {
+        var parent=createParentTask();var allocated=allocateChildOf(parent);var entry=f.entry(1);
+        var audits=new AtomicInteger();var callbacks=new AtomicInteger();
+        try(var taskFence=new ResourceTaskExecutionFence(data,manager,entry,allocated,f.binding(),(e,t)->{});
+            var gate=new JdbcResourceExecutionGate(data,manager,1)) {
+            var builder=CompositeExecutionFence.builder();
+            for(var check:CompositeExecutionFence.Check.values()) {
+                if(check==CompositeExecutionFence.Check.TASK_AND_TARGET)builder.with(check,taskFence);
+                else if(check==CompositeExecutionFence.Check.AUDIT)builder.with(check,ignored->{
+                    if(audits.incrementAndGet()==2)cancelParent(parent);
+                });
+                else builder.with(check,ignored->{});
+            }
+            // Approval, identity, policy, owner and audit are controlled fixtures.
+            var paired=JdbcResourceExecutionGate.CredentialFence.pair(f.binding(),builder.build());
+            var attempt=gate.openGoverned(f.binding(),entry,UUID.randomUUID(),paired);
+            assertThrows(IllegalStateException.class,()->attempt.executeGoverned(r->{callbacks.incrementAndGet();return "private";}));
+            assertEquals(0,callbacks.get(),"a cancelled parent must prevent callback entry");
+            assertTrue(gate.find(a.scope()).isPresent(),"a post-commit refusal retains the entry");
+        }
+    }
+
+    @Test void taskFenceRefusesParentContractThatNoLongerCoversChild() throws Exception {
+        var parent=createParentTask();var allocated=allocateChildOf(parent);var approvals=new AtomicInteger();
+        try(var fence=new ResourceTaskExecutionFence(data,manager,f.entry(1),allocated,f.binding(),
+                (entry,task)->approvals.incrementAndGet())) {
+            assertDoesNotThrow(()->fence.requireCurrent(f.entry(1)));
+            corrupt("update task.agent_task set contract=jsonb_set(contract,'{permittedTools}','[]'::jsonb) where id='"
+                    +parent.taskId().value()+"'");
+            assertThrows(IllegalStateException.class,()->fence.requireCurrent(f.entry(1)));
+            assertEquals(1,approvals.get(),"invalid parent data must refuse before approval");
+        }
+    }
+
     @Test void identityPolicyAndTaskMustPairTheSameCredentialAndEntry() throws Exception {
         f=fixture(support.db,"a".repeat(64),Pep.AGENT_RESEARCH_RUN);a=support.candidate(f);
         var allocated=store.allocate(a);var entry=f.entry(1);var binding=f.binding();

@@ -389,8 +389,11 @@ a required current-approval check; the composite repeats task/target after audit
 cover withdrawal during audit and deadline expiry during a blocking approval lookup. The fence also checks that the exact canonical credential belongs to the live task-grant ancestry and that its
 leaf grant matches the allocated agent; identity pairing binds the identity, policy and task checks to the same
 credential and entry. Same-process database tests cover a refreshed credential, unrelated grant and revocation
-during approval. The approval callback is a fixture and no approved-target catalog is supplied. V78 and this fence
-are not installed in production, and the checks cannot stop an external effect already in flight.
+during approval. For a child allocation, the check also re-reads its parent task and requires matching ownership,
+a usable status, and contract, grant and lifetime coverage. Database tests cover cancellation during approval or
+audit and a parent contract that no longer covers the child. The approval callback is a fixture and no approved-target
+catalog is supplied. V78 and this fence are not installed in production, and the checks cannot stop an external effect
+already in flight.
 
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`
