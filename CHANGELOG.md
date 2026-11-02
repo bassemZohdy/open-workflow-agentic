@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify process-loss recovery of resource-scoped audited effects.
+
 - Exercise the audited governed effect path against a pinned OpenAPI HTTP target.
 
 - Enable explicit audited effect composition through the governed tool gateway.
