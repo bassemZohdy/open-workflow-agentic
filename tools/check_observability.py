@@ -16,6 +16,7 @@ METRICS = {'agentic_outbox_unpublished', 'agentic_outbox_failed',
 METHODS = {'failedFirstObservationIsUnknownAndFailureAttemptsAreCachedAcrossAllGauges',
            'successfulSampleIsRetainedButMarkedUnhealthyAndAgesUntilRecovery',
            'aBlockedObservationDoesNotStartASecondDatabaseReadOnConcurrentScrapes',
+           'asynchronousScrapesReturnImmediatelyWhileSingleDatabaseReadIsBlocked',
            'realPrometheusRegistryExportsUnknownFailureAndRecoveryWithExactNamesAndNoPrivateLabels'}
 
 
@@ -86,8 +87,8 @@ def main():
         raise ValueError('Missing or ambiguous actual OutboxMetricsTest XML')
     suite = ET.parse(reports[0]).getroot()
     cases = suite.findall('testcase')
-    if suite.get('tests') != '4' or len(cases) != 4 or {c.get('name') for c in cases} != METHODS:
-        raise ValueError('Require four exact nonzero metric test cases')
+    if suite.get('tests') != str(len(METHODS)) or len(cases) != len(METHODS) or {c.get('name') for c in cases} != METHODS:
+        raise ValueError('Require all exact nonzero metric test cases')
     if any(suite.get(k) != '0' for k in ('failures', 'errors', 'skipped')) or any(
             c.find(k) is not None for c in cases for k in ('failure', 'error', 'skipped')):
         raise ValueError('Failed/skipped metric cases do not prove the monitoring contract')
@@ -113,7 +114,7 @@ def main():
     output = target / 'observability' / 'evidence.json'
     output.parent.mkdir(exist_ok=True)
     output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
-    print('PASS: actual metric4, rule scenarios8 (all five alerts each), dashboard queries6; scoped preparation only')
+    print(f'PASS: actual metric{len(METHODS)}, rule scenarios8 (all five alerts each), dashboard queries6; scoped preparation only')
 
 
 if __name__ == '__main__':

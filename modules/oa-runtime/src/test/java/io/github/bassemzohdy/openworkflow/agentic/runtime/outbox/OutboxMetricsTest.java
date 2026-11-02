@@ -75,6 +75,34 @@ class OutboxMetricsTest {
         } finally {registry.close();}
     }
 
+    @Test void asynchronousScrapesReturnImmediatelyWhileSingleDatabaseReadIsBlocked() throws Exception {
+        var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
+        var calls = new AtomicInteger(); var registry = new SimpleMeterRegistry();
+        var worker = Executors.newSingleThreadExecutor();
+        var metrics = new OutboxMetrics(() -> {
+            calls.incrementAndGet(); entered.countDown();
+            try { if (!release.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("test barrier expired"); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+            return new OutboxAdmin.Lag(4, 0, 2);
+        }, registry, System::nanoTime, worker);
+        metrics.onStart(null);
+        try {
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(1), () ->
+                    assertTrue(Double.isNaN(value(registry, OutboxMetrics.UNPUBLISHED))));
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(1), () -> {
+                assertEquals(0, value(registry, OutboxMetrics.HEALTHY));
+                assertTrue(Double.isNaN(value(registry, OutboxMetrics.UNPUBLISHED)));
+            });
+            assertEquals(1, calls.get());
+            release.countDown();
+            assertTimeoutPreemptively(java.time.Duration.ofSeconds(5), () -> {
+                while (value(registry, OutboxMetrics.HEALTHY) != 1) Thread.sleep(10);
+            });
+            assertEquals(4, value(registry, OutboxMetrics.UNPUBLISHED));
+        } finally { release.countDown(); metrics.stop(); registry.close(); }
+    }
+
     @Test void realPrometheusRegistryExportsUnknownFailureAndRecoveryWithExactNamesAndNoPrivateLabels() throws Exception {
         var calls=new AtomicInteger();var now=new AtomicLong();
         var registry=new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);

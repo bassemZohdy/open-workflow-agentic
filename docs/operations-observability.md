@@ -30,15 +30,17 @@ These are custom Micrometer names/version1, not new OpenTelemetry semantic
 convention attributes; existing effect span schema1 and its tracing defaults are
 unchanged. Private queue contents are never exported here.
 
-The one-second cache bounds completed read-attempt frequency, including failures.
-Concurrent gauges do not start duplicate reads; they may see the prior immutable
-observation while one read is in flight. The scrape query requests JDBC cancellation after two seconds; a PostgreSQL lock
-test exercises that timeout and subsequent recovery. Connection acquisition,
-network failure detection and driver cancellation response are governed separately
-and can still delay a scrape. The observations do not make a whole scrape an
-atomic database snapshot or certify current business delivery. Exporter/up and
-stale signals address different failures; deployment connection timeouts and
-load budgets still need evidence.
+Scrapes return the last completed observation without waiting for the database.
+The first scrape can therefore show unknown values even when the database is
+healthy. One background worker performs at most one observation at a time; a
+stuck read holds that worker rather than blocking the scrape or spawning more
+reads. The one-second cache bounds completed read-attempt frequency, including
+failures. A stale success remains marked healthy until a failure completes, so
+consumers must also check observation age. The query requests JDBC cancellation
+after two seconds; a PostgreSQL lock test exercises timeout and recovery.
+Connection acquisition and network failure can still hold the worker. Observations
+do not make a whole scrape an atomic snapshot or certify business delivery.
+Deployment connection timeouts and load budgets still need evidence.
 
 ## Collection and dashboard proposal
 
@@ -117,7 +119,7 @@ historical count warning in favor of observation failure; it does not clear rows
 
 ## Verification and remaining gates
 
-Run the four actual OutboxMetricsTest methods, then:
+Run the five actual OutboxMetricsTest methods, then:
 
 ```text
 python tools/check_observability.py --promtool <verified-promtool3.15.0>
