@@ -250,6 +250,52 @@ class DependencyGuardTest {
         assertTrue(Thread.currentThread().isInterrupted());
     }
 
+    // ---- failures that are not the dependency's fault ---------------------------------------------------------
+
+    @Test void aFailureTheCallerDoesNotCountIsNeitherSuccessNorFailureAndNeverOpensTheCircuit() {
+        var guard = guard(4, 2, 0);
+        for (int i = 0; i < 10; i++) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> guard.call(() -> { throw new IllegalArgumentException("cancelled"); },
+                            failure -> !(failure instanceof IllegalArgumentException)));
+        }
+        assertEquals(State.CLOSED, guard.state());
+        assertEquals(0, guard.stats().failures());
+        assertEquals(0, guard.stats().successes());
+    }
+
+    @Test void aNeutralFailureDoesNotResetTheConsecutiveFailureCount() {
+        var guard = guard(4, 2, 0);
+        fail(guard, 1);
+        assertThrows(IllegalArgumentException.class,
+                () -> guard.call(() -> { throw new IllegalArgumentException("x"); }, f -> false));
+        fail(guard, 1);
+        assertEquals(State.OPEN, guard.state(), "failure, neutral, failure is still two failures in a row");
+    }
+
+    @Test void aProbeThatEndsNeutrallyLeavesTheCircuitHalfOpenForTheNextCall() {
+        var guard = guard(4, 2, 0);
+        fail(guard, 2);
+        clock.advance(Duration.ofSeconds(30));
+        assertThrows(IllegalArgumentException.class,
+                () -> guard.call(() -> { throw new IllegalArgumentException("cancelled"); }, f -> false));
+        assertEquals(State.HALF_OPEN, guard.state());
+        assertEquals("probe", guard.call(() -> "probe"));
+        assertEquals(State.CLOSED, guard.state());
+    }
+
+    @Test void aBrokenFailureClassifierReleasesThePermitAndHalfOpenProbe() {
+        var guard = guard(1, 2, 0);
+        fail(guard, 2);
+        clock.advance(Duration.ofSeconds(30));
+        assertThrows(IllegalStateException.class, () -> guard.call(
+                () -> { throw new IllegalArgumentException("dependency"); },
+                failure -> { throw new IllegalStateException("classifier"); }));
+        assertEquals(State.HALF_OPEN, guard.state());
+        assertEquals("recovered", guard.call(() -> "recovered"));
+        assertEquals(State.CLOSED, guard.state());
+    }
+
     // ---- counters and validation -------------------------------------------------------------------------
 
     @Test void countersTellSuccessesFailuresAndRejectionsApart() {

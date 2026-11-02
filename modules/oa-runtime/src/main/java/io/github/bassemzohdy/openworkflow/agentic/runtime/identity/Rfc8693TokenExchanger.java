@@ -75,10 +75,25 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
     private final Clock clock;
     private final Duration timeout;
     private final HttpClient http;
+    private final io.github.bassemzohdy.openworkflow.agentic.runtime.resilience.DependencyGuard guard;
 
+    /** Without a dependency guard: every request reaches the authorization server. */
     public Rfc8693TokenExchanger(String tokenEndpoint, String clientId, String clientSecretName, SecretProvider secrets,
                                  DelegationGrants grants, IssuedTokenBindings bindings, TokenVerifier verifier,
                                  IdentityAudit audit, Clock clock, Duration timeout) {
+        this(tokenEndpoint, clientId, clientSecretName, secrets, grants, bindings, verifier, audit, clock, timeout, null);
+    }
+
+    /**
+     * @param guard protects the call to the authorization server (load shedding and a circuit breaker; never retries,
+     *              as a repeat would mint a second token), or null for none. Only an unreachable server, a timeout or
+     *              an answer other than 200/400/401/403 counts against it; a refusal is the server working.
+     */
+    public Rfc8693TokenExchanger(String tokenEndpoint, String clientId, String clientSecretName, SecretProvider secrets,
+                                 DelegationGrants grants, IssuedTokenBindings bindings, TokenVerifier verifier,
+                                 IdentityAudit audit, Clock clock, Duration timeout,
+                                 io.github.bassemzohdy.openworkflow.agentic.runtime.resilience.DependencyGuard guard) {
+        this.guard = guard;
         this.endpoint = checkedEndpoint(tokenEndpoint);
         this.clientId = requireText(clientId, "clientId");
         this.clientSecretName = requireText(clientSecretName, "clientSecretName");
@@ -311,14 +326,14 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         int status;
         byte[] body;
         try {
-            HttpResponse<InputStream> response = this.http.send(req, HttpResponse.BodyHandlers.ofInputStream());
-            status = response.statusCode();
-            try (InputStream in = response.body()) {
-                body = in.readNBytes(MAX_RESPONSE_BYTES + 1);
-            }
+            Answer answer = guard == null ? send(req) : guardedSend(req);
+            status = answer.status();
+            body = answer.body();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new ExchangeException(ExchangeException.Code.UNAVAILABLE, "the token request was interrupted", e);
+        } catch (ExchangeException e) {
+            throw e;
         } catch (IOException | RuntimeException e) {
             throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
                     "the authorization server could not be reached", e);
@@ -335,6 +350,62 @@ public final class Rfc8693TokenExchanger implements TokenExchanger {
         }
         throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
                 "the authorization server answered HTTP " + status);
+    }
+
+    private record Answer(int status, byte[] body) { }
+
+    private Answer send(HttpRequest req) throws IOException, InterruptedException {
+        HttpResponse<InputStream> response = this.http.send(req, HttpResponse.BodyHandlers.ofInputStream());
+        try (InputStream in = response.body()) {
+            return new Answer(response.statusCode(), in.readNBytes(MAX_RESPONSE_BYTES + 1));
+        }
+    }
+
+    /** The server answered, but not with an answer the exchange protocol defines: it is unwell, not saying no. */
+    private static boolean outage(int status) {
+        return status != 200 && status != 400 && status != 401 && status != 403;
+    }
+
+    private static final class Outage extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        private final transient Answer answer;
+        Outage(Answer answer) { super("HTTP " + answer.status()); this.answer = answer; }
+        Outage(IOException cause) { super(cause); this.answer = null; }
+    }
+
+    private static final class Interrupted extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        Interrupted(InterruptedException cause) { super(cause); }
+    }
+
+    /**
+     * The same exchange through the dependency guard. An unreachable server, a timeout and an undefined answer count
+     * against the dependency; a defined answer (including 400/401/403) is a success, and an interrupt is neither. An
+     * undefined answer is handed back to the unchanged classification below, so callers see the same typed errors.
+     */
+    private Answer guardedSend(HttpRequest req) throws IOException, InterruptedException {
+        try {
+            return guard.call(() -> {
+                try {
+                    Answer answer = send(req);
+                    if (outage(answer.status())) throw new Outage(answer);
+                    return answer;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new Interrupted(e);
+                } catch (IOException e) {
+                    throw new Outage(e);
+                }
+            }, failure -> !(failure instanceof Interrupted));
+        } catch (Outage outage) {
+            if (outage.answer != null) return outage.answer;
+            throw (IOException) outage.getCause();
+        } catch (Interrupted interrupted) {
+            throw (InterruptedException) interrupted.getCause();
+        } catch (io.github.bassemzohdy.openworkflow.agentic.runtime.resilience.DependencyGuard.RejectedException rejected) {
+            throw new ExchangeException(ExchangeException.Code.UNAVAILABLE,
+                    "the authorization server is not accepting requests now (" + rejected.reason() + ")", rejected);
+        }
     }
 
     private static JsonNode parse(byte[] body) {

@@ -123,31 +123,43 @@ public final class DependencyGuard {
                 retriesDenied.get());
     }
 
-    /** Calls the dependency once through the bulkhead and the breaker. */
+    /** Calls the dependency once through the bulkhead and the breaker; every failure counts against the dependency. */
     public <T> T call(Supplier<T> operation) {
+        return call(operation, failure -> true);
+    }
+
+    /**
+     * Calls the dependency once. A failure for which {@code countsAsFailure} is false (a cancellation, a caller's own
+     * bad input) is rethrown but is neither a success nor a failure for the breaker, and a half-open probe that ends this
+     * way leaves the circuit half-open for the next call.
+     */
+    public <T> T call(Supplier<T> operation, Predicate<Throwable> countsAsFailure) {
         Objects.requireNonNull(operation, "operation");
+        Objects.requireNonNull(countsAsFailure, "countsAsFailure");
         if (!permits.tryAcquire()) {
             rejectedOverload.incrementAndGet();
             throw new RejectedException(settings.name(), Rejection.OVERLOADED);
         }
-        boolean probe;
         try {
-            probe = admit();
-        } catch (RejectedException rejected) {
+            boolean probe = admit();
+            try {
+                T result = operation.get();
+                recordSuccess(probe);
+                return result;
+            } catch (Throwable failure) {
+                boolean counts;
+                try {
+                    counts = countsAsFailure.test(failure);
+                } catch (Throwable classifierFailure) {
+                    recordNeutral(probe);
+                    throw classifierFailure;
+                }
+                if (counts) recordFailure(probe); else recordNeutral(probe);
+                throw failure;
+            }
+        } finally {
             permits.release();
-            throw rejected;
         }
-        T result;
-        try {
-            result = operation.get();
-        } catch (Throwable failure) {
-            recordFailure(probe);
-            permits.release();
-            throw failure;
-        }
-        recordSuccess(probe);
-        permits.release();
-        return result;
     }
 
     /**
@@ -216,6 +228,12 @@ public final class DependencyGuard {
                 state = State.CLOSED;
                 openedAt = null;
             }
+        }
+    }
+
+    private void recordNeutral(boolean probe) {
+        synchronized (lock) {
+            if (probe) probeInFlight = false; // stays half-open: the next call is the probe
         }
     }
 
