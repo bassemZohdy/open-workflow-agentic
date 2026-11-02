@@ -21,12 +21,14 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.LifecycleSet
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.RegistryScan;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.RepairStore;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Reconciler;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.ResumeGate;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StartRequest;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
@@ -34,6 +36,7 @@ import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
@@ -289,6 +292,68 @@ class ReconcilerRepairTest {
         assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
         sync.observe(engineId, EngineStatus.CANCELLED, "observed");
         assertEquals(InstanceStatus.CANCELLED, reload(tenant, row).status());
+    }
+
+    @Test
+    void restoredWaitsBeyondTheDeadlineBatchAreNotResumed() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String firstId = "deadline-batch-first-" + RUN, secondId = "deadline-batch-second-" + RUN;
+        engine.report(firstId, EngineStatus.PENDING); engine.report(secondId, EngineStatus.PENDING);
+        var first = move(newRow(tenant), InstanceStatus.RUNNING, firstId, null);
+        first = move(first, InstanceStatus.WAITING, firstId, Instant.now().minusSeconds(120));
+        var second = move(newRow(tenant), InstanceStatus.RUNNING, secondId, null);
+        second = move(second, InstanceStatus.WAITING, secondId, Instant.now().minusSeconds(60));
+        var bounded = new LifecycleSettings(true, Duration.ofSeconds(30), Duration.ofSeconds(120), TINY, 3,
+                TINY, TINY, Duration.ofHours(24), 1, Optional.empty());
+
+        new Reconciler(store, engine, sync, scan, repairs, bounded, dataSource, Clock.systemUTC(), tenant::equals)
+                .reconcileOnce();
+
+        assertEquals(0, engine.restarts.get(), "a row outside the deadline batch must not restart");
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, first).status());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, second).status());
+    }
+
+    @Test
+    void restoredInstancesBeyondTheLifetimeBatchAreNotResumed() {
+        String tenant = newTenant();
+        FakeEngine engine = new FakeEngine();
+        String firstId = "lifetime-batch-first-" + RUN, secondId = "lifetime-batch-second-" + RUN;
+        engine.report(firstId, EngineStatus.PENDING); engine.report(secondId, EngineStatus.PENDING);
+        var first = move(newRow(tenant), InstanceStatus.RUNNING, firstId, null);
+        var second = move(newRow(tenant), InstanceStatus.RUNNING, secondId, null);
+        var bounded = new LifecycleSettings(true, Duration.ofSeconds(30), Duration.ofSeconds(120), TINY, 3,
+                TINY, TINY, Duration.ofHours(24), 1, Optional.empty(), Optional.of(Duration.ofMinutes(10)));
+
+        new Reconciler(store, engine, sync, scan, repairs, bounded, dataSource,
+                Clock.offset(Clock.systemUTC(), Duration.ofMinutes(11)), tenant::equals).reconcileOnce();
+
+        assertEquals(0, engine.restarts.get(), "a row outside the lifetime batch must not restart");
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, first).status());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, second).status());
+    }
+
+    @Test
+    void waitExpiringDuringCheckpointRepairIsNotResumed() {
+        String tenant = newTenant(), engineId = "deadline-during-checkpoint-" + RUN;
+        FakeEngine engine = new FakeEngine();
+        engine.report(engineId, EngineStatus.PENDING);
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        Instant before = Instant.now();
+        row = move(row, InstanceStatus.WAITING, engineId, before.plusSeconds(30));
+        var now = new AtomicReference<>(before);
+        Clock clock = new Clock() {
+            @Override public ZoneId getZone() { return ZoneId.of("UTC"); }
+            @Override public Clock withZone(ZoneId zone) { return this; }
+            @Override public Instant instant() { return now.get(); }
+        };
+
+        new Reconciler(store, engine, sync, scan, repairs, settings(3), dataSource, clock, tenant::equals,
+                ResumeGate.ALLOW, ignored -> { now.set(before.plusSeconds(31)); return true; }).reconcileOnce();
+
+        assertEquals(0, engine.restarts.get());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
     }
 
     @Test

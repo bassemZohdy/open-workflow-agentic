@@ -611,6 +611,11 @@ public class Reconciler {
             if(!resumable(row,current)) return false;
             decision=gateDecision(current); // The receipt audit/storage work may have outlasted the prior grant check.
             if(!decision.proceeds()) { holdResume(current,decision,clock.instant());return false; }
+            // Deadline scans are bounded and may not have reached this row. Enforce its own deadlines after the
+            // potentially blocking authority and checkpoint work, before starting the restored engine instance.
+            var ref = new RegistryScan.Ref(row.id().value(), row.tenant());
+            repairDeadline(ref, clock.instant());
+            repairLifetime(ref, clock.instant());
             return resumable(row,store.find(row.tenant(),row.id()).orElseThrow()); // Cancellation may race the authority read too.
         } catch(RuntimeException failed) {
             LOG.warnf("receipt restore gate failed for instance %s (%s); the instance is not resumed",row.id(),simpleName(failed));
