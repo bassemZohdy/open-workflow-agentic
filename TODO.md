@@ -446,7 +446,8 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-03. Shared pat
 
 Implemented scope:
 
-- Human-action facts and policy rules exist; an immutable decision identity distinguishes exact retries from changed actor, task, version, outcome or content. A non-wired preflight checks verified non-delegated caller authority and task facts before and after policy evaluation. Neither is a durable decision or commit-time authorization.
+- Human-action facts and policy rules exist; an immutable decision identity distinguishes exact retries from changed actor, task, version, outcome or content. A non-wired preflight checks verified non-delegated caller authority and task facts before and after policy evaluation.
+- An isolated, unactivated PostgreSQL proposal tests transactional task decision and blocked pending wakeup, exact retries, concurrent conflicting decisions and rollback. It does not implement central audit receipts, live lease/current-authority checks, production schema or delivery.
 
 Additional closure/integration tasks:
 
@@ -457,7 +458,7 @@ Acceptance gates:
 
 - [ ] T02: implement, run in CI and record passing evidence
 
-Evidence: [modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java](modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/HumanDecisionAdmissionTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/HumanDecisionAdmissionTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java)
+Evidence: [modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java](modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/HumanDecisionAdmissionTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/HumanDecisionAdmissionTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/human/HumanDecisionJournalTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/human/HumanDecisionJournalTest.java), [modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java](modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java)
 
 ### WP-107 Event correlation and idempotent inbox — partial
 

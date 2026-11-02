@@ -1,5 +1,7 @@
 # Changelog
 
+- Add an isolated, unactivated human-decision storage proposal with concurrent retry, conflict, rollback and blocked-wakeup tests. Production schema, audit receipts, authority/lease checks and delivery remain open.
+
 - Add an unwired human-decision preflight that checks verified non-delegated caller authority, task facts, policy and post-policy expiry. Storage, commit-time rechecks, audit delivery and workflow wakeup remain open.
 
 - Start WP-106 decision identity: exact retries have a stable fingerprint and changed decision facts conflict. The contract is data only; durable tasks, authorization, audit, wakeup and T02 remain open.
