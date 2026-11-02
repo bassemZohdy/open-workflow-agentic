@@ -96,6 +96,7 @@ class KeycloakStandardIT {
                 () -> h.exchanger.exchange(h.request(user, TOOL, READ, grant)));
         assertEquals(Code.BAD_RESPONSE, e.code());
         assertTrue(e.getMessage().contains("actor"), e.getMessage());
+        assertTrue(h.exchangeGuard.stats().successes() > 0, "the real server response passed through the guard");
 
         // and it is the product refusing: the very same request is answered 200 with a token that has no act and no
         // refresh token. Nothing in the exchange requires Keycloak to say no.

@@ -18,6 +18,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.ResourceToken
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.Rfc8693TokenExchanger;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.SecretProvider;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.TokenVerifier;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.resilience.DependencyGuard;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -46,6 +47,7 @@ final class KeycloakHarness implements AutoCloseable {
     final io.github.bassemzohdy.openworkflow.agentic.runtime.identity.JdbcIssuedTokenBindings bindings =
             new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.JdbcIssuedTokenBindings(KeycloakSupport.dataSource());
     final IdentityAudit audit;
+    final DependencyGuard exchangeGuard;
     final Rfc8693TokenExchanger exchanger;
     final JwtTokenVerifier verifier;
 
@@ -66,7 +68,8 @@ final class KeycloakHarness implements AutoCloseable {
         grants = new DelegationGrants(new DelegationGrantStore(KeycloakSupport.dataSource()), audit, clock,
                 UlidGenerator.shared(), Duration.ofDays(30));
         verifier = verifier(clock);
-        exchanger = exchanger(clock, UnaryOperator.identity());
+        exchangeGuard = newGuard(clock);
+        exchanger = exchanger(clock, UnaryOperator.identity(), exchangeGuard);
     }
 
     JwtTokenVerifier verifier(Clock clock) {
@@ -76,9 +79,18 @@ final class KeycloakHarness implements AutoCloseable {
 
     /** An exchanger for the agent runtime's client, with its own clock and optionally a wrapped verifier. */
     Rfc8693TokenExchanger exchanger(Clock clock, UnaryOperator<TokenVerifier> wrap) {
+        return exchanger(clock, wrap, newGuard(clock));
+    }
+
+    private static DependencyGuard newGuard(Clock clock) {
+        return new DependencyGuard(new DependencyGuard.Settings("token-endpoint", 16, 5, Duration.ofSeconds(30),
+                0, Duration.ofMinutes(1), Duration.ZERO), clock);
+    }
+
+    private Rfc8693TokenExchanger exchanger(Clock clock, UnaryOperator<TokenVerifier> wrap, DependencyGuard guard) {
         SecretProvider secrets = name -> Credential.of(KeycloakRealm.AGENT_SECRET);
         return new Rfc8693TokenExchanger(realm.tokenEndpoint(), KeycloakRealm.AGENT, "exchange-client-secret", secrets,
-                grants, bindings, wrap.apply(verifier(clock)), audit, clock, Duration.ofSeconds(10));
+                grants, bindings, wrap.apply(verifier(clock)), audit, clock, Duration.ofSeconds(10), guard, 16);
     }
 
     /** A resource server for {@code audience}: one use per token, grants checked. */
@@ -116,6 +128,7 @@ final class KeycloakHarness implements AutoCloseable {
 
     @Override
     public void close() {
+        exchanger.close();
         realm.close();
     }
 }

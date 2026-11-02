@@ -523,7 +523,7 @@
         ],
         "remaining_tasks": [
           "Complete the ORIGINAL asynchronous live-Flow dispatch and identity/correlation propagation deliverable, including fresh delegated credentials after waits and no bearer persistence/passthrough. TokenExchanger is currently only an implementation/producer; AuthorityScope wrappers and the development/resume path are not the missing governed production consumer. GPT owns dispatch/lifecycle wiring; Claude supplies identity/PEP/audit hooks. Prove actual live tasks and restart with current effective user/acting workload/tenant/grant/correlation and denial after revocation/expiry during blocking work.",
-          "Run and reciprocally review the complete asynchronous consumer evidence before closing WP-102/M11. The merged native26.8.1 preview profile and strict standard26.2.5 actorless rejection are evidenced producer interfaces, available now; no whole-WP-102 closure dependency is imposed on those consumers.",
+          "Run and retain complete asynchronous consumer evidence for WP-102/M11; include it in the deferred project review. The merged native26.8.1 preview profile and strict standard26.2.5 actorless rejection are evidenced producer interfaces, available now; no whole-WP-102 closure dependency is imposed on those consumers.",
           "If a future decision selects Vault, implement and run its required integration/renewal/rotation tests. Mounted static secrets remain the selected implemented path; no Vault execution is claimed."
         ],
         "evidence": [
@@ -767,11 +767,22 @@
       ],
       "notes": "",
       "progress": {
-        "status": "not-started",
-        "implemented": [],
+        "status": "partial",
+        "implemented": [
+          "Human-action facts and policy rules exist; an immutable decision identity distinguishes exact retries from changed actor, task, version, outcome or content. A non-wired preflight checks verified non-delegated caller authority and task facts before and after policy evaluation.",
+          "An isolated, unactivated PostgreSQL proposal tests transactional task decision, a non-sensitive audit event and blocked wakeup, including exact retries, concurrent conflicts, rollback and audit failure. It does not implement production schema, live lease/current-authority checks, wakeup delivery or whole-chain verification."
+        ],
         "completed_deliverables": [],
-        "remaining_tasks": [],
-        "evidence": []
+        "remaining_tasks": [
+          "Implement durable tenant-scoped task lifecycle, current-facts authorization and atomic decision/audit/wakeup persistence.",
+          "Implement assignment, delegation, reassignment, escalation and authorized decision APIs, plus restart-safe delivery and T02 end-to-end proof."
+        ],
+        "evidence": [
+          "modules/oa-contracts/src/test/java/io/github/bassemzohdy/openworkflow/agentic/contracts/governance/HumanDecisionTest.java",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/HumanDecisionAdmissionTest.java",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/human/HumanDecisionJournalTest.java",
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/policy/PepHumanActionFactsTest.java"
+        ]
       }
     },
     {
@@ -867,7 +878,7 @@
           "Complete durable Flow event-consumer/group membership, overlapping all-filter fan-out, stable duplicate ordinals and durable any-winner fencing; preserve ordered output and serial FIFO foreach/until behavior in actual-engine conformance cases.",
           "Implement bounded delivery coordination, renewal and new-owner whole-task reconstruction without idle JDBC connections; enforce pinned bindings/predicates/correlation and prove receipt-before-registration plus stable loop/parallel occurrence and original-reader restore behavior.",
           "Extend current short-transaction callback/checkpoint and post-ACK checks to every later continuation, governed effect and cleanup; prove live old-owner/lease loss, actual process death and partition windows, including committed cancellation before engine invocation.",
-          "Complete event-triggered starts through reviewed lifecycle APIs, idempotent start recovery, retention/tombstones and terminal audit/metrics/tracing. Manual changes require verified oa.recover OPERATION policy.",
+          "Complete event-triggered starts through integrated and tested lifecycle APIs, idempotent start recovery, retention/tombstones and terminal audit/metrics/tracing. Manual changes require verified oa.recover OPERATION policy.",
           "Automate complete T13 including late/duplicate events, cancellation races and failed compensation. Actual SDK receipt/ACK/component restart evidence does not replace full group/distributed recovery acceptance."
         ],
         "evidence": [
@@ -1113,7 +1124,8 @@
       "progress": {
         "status": "partial",
         "implemented": [
-          "Policy calls have timeout and concurrency bounds; unintended Flow HTTP-client retries are disabled."
+          "Policy calls have timeout and concurrency bounds; unintended Flow HTTP-client retries are disabled.",
+          "The runtime token exchanger bounds HTTP response-body time and physical concurrency, and its production producer configures a circuit breaker without automatic token-request retries. Focused local tests cover stalled bodies, retained worker capacity and producer wiring; the latest integration branch CI is pending."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -3230,19 +3242,19 @@
       "WP-105"
     ],
     "rules": [
-      "Each unfinished work package has exactly one implementation owner and the other agent as reviewer. Completed packages are historical evidence, outside both backlogs; regression fixes go through their path owner.",
-      "The numbered rows are priority queues, not a promise of equal effort or simultaneous delivery. Each agent works on one implementation PR at a time and picks the first unblocked row; review the other agent promptly before starting another PR.",
-      "An After gate means the needed API, implementation and failure tests have merged and been reviewed, not merely proposed. Original start dependencies remain visible in the detailed checklist. WP-105 is the only explicitly accepted partial baseline for starting dependent work; its remaining recovery gate closes after WP-108/WP-107/WP-109. WP-102 gates are interface-specific, not whole-package closure: WP-103/WP-106/WP-404 need merged verified-caller and tenant/authority mapping with denial tests; WP-205/WP-206 need merged scoped caller and delegation-grant verification; WP-207 needs the merged exchanged-credential/target/TTL/replay contract and interoperability evidence for its selected provider; WP-604 needs merged verified user-delegation and caller guards. Real-Keycloak evidence is a separate WP-102 closure gate and does not block consumers of already evidenced interfaces. If Keycloak rejects actor_token/act semantics, Claude requests a GPT-owned ADR/contract handoff before any affected provider-dependent consumer proceeds.",
+      "The owner labels below identify domain responsibilities, not a requirement to wait for a particular agent. The active delivery agent may implement across those areas; preserve the stated security, identity, audit and integration boundaries.",
+      "Work through the remaining project in dependency order, prioritizing the first unblocked package. Complete and push each coherent task with its appropriate checks; do not wait for an independent review before continuing implementation.",
+      "An After gate means the needed API and implementation are integrated and their failure tests pass, not merely proposed; independent review is deferred until the project implementation is complete. Original start dependencies remain visible in the detailed checklist. WP-105 is the only explicitly accepted partial baseline for starting dependent work; its remaining recovery gate closes after WP-108/WP-107/WP-109. WP-102 gates are interface-specific, not whole-package closure: WP-103/WP-106/WP-404 need integrated verified-caller and tenant/authority mapping with denial tests; WP-205/WP-206 need integrated scoped caller and delegation-grant verification; WP-207 needs the integrated exchanged-credential/target/TTL/replay contract and interoperability evidence for its selected provider; WP-604 needs integrated verified user-delegation and caller guards. Real-Keycloak evidence is a separate WP-102 closure gate and does not block consumers of already evidenced interfaces. If Keycloak rejects actor_token/act semantics, record and resolve the affected provider contract before proceeding.",
       "WP-103 and WP-303 may merge useful increments while their consumer/freshness/evaluation closure gates remain partial. A merged prerequisite is usable only for its evidenced interface; no package becomes completed until every existing deliverable and acceptance gate passes.",
-      "Use separate branches from current main: gpt/<WP-id>-<scope> and claude/<WP-id>-<scope>. Do not edit the other agent branch, shared checkout, or write areas. Rebase after every prerequisite merge and rerun affected checks.",
-      "For a cross-area change, write docs/handoffs/<agent>/<WP-id>.md with producer/consumer, exact affected paths, port/schema/config proposal, acceptance/failure cases and evidence. The registered writer implements and merges that small handoff before the consumer depends on it. It is a subtask of the requesting package, never a second owner of the same work package.",
-      "Shared-file writes are serialized by GPT integration ownership. Claude must request contract, migration, build, configuration, lifecycle, acceptance-status and tracking changes; GPT requests Claude-owned policy/caller/audit/agent edits the same way. No simultaneous edits to a shared file, including generated documents.",
-      "Before each implementation PR merges, the other agent reviews the exact current head SHA for behavior, boundary bypasses and failure/recovery cases, verifies relevant tests independently, and records findings plus a pass/request-changes verdict. Any later code change requires another review of the new head; unresolved material findings block merge.",
-      "If both agents use the same GitHub identity, record reviewer=GPT or reviewer=Claude, head SHA, commands/results and verdict explicitly in the PR review/comment; do not claim a distinct GitHub approval or self-review. GPT updates execution status after each review, implementation start and merge; record outstanding findings and the reviewed SHA without claiming a later head was approved.",
-      "GPT collects Claude evidence and updates plan/status JSON, CHANGELOG and generated TODO in a serialized integration commit on main or the current integration PR. A package is not closed before that update, reciprocal review and green CI. Planning this work does not change current implementation or acceptance status.",
-      "Claude reviews this ownership/dependency plan and GPT addresses recorded findings. WP-108 starts on the merged WP-105 core independently of WP-102 design/real-IdP evidence; GPT and Claude may implement their owned first packages concurrently. Cross-area consumers still wait for their required merged interface handoffs. Claude review of the exact implementation head, no unresolved material findings, and passing CI remain mandatory before GPT merges. Preserve outcome-only research documentation and do not restore spike implementations.",
-      "Reserve additive Flyway72.1 (V72_1) for #55 N1/N2 completeness candidate, ordered after V72 and before reserved V73/V74; do not rewrite applied migrations or renumber the existing preparation. Candidate remains separate until exact peer/current required CI permits fast-forward of the single #55 PR.",
-      "Reserve additive Flyway75.1 (V75_1) for the GPT-owned checkpoint-profile migration after V75 and before reserved V76-V80. Preserve all applied migrations and existing proposal numbering; runtime DDL removal and current-authority adoption require their owned reviewed handoff."
+      "Use separate branches from current main for coherent work packages. Preserve existing work in other branches and checkouts; integrate prerequisites and rerun affected checks when the baseline changes.",
+      "For a cross-area change, record producer/consumer, exact affected paths, port/schema/config proposal, acceptance/failure cases and evidence in a handoff. Implement and test the needed interface before a consumer depends on it; the active delivery agent may cover both sides.",
+      "Serialize shared-file writes, including contracts, migrations, build, configuration, lifecycle, acceptance-status and generated tracking. Area ownership labels remain useful for tracing responsibilities, not a reason to defer work to an unavailable agent.",
+      "At the user's request, defer independent project review until all remaining implementation tasks and their required tests are complete. Do not describe author checks as independent review; retain exact commits, test evidence and unresolved findings for that final review.",
+      "When the final review occurs, independently assess the completed project's exact current state for behavior, security boundaries and failure/recovery cases; record the reviewer, revision, commands, results and findings. Resolve material findings and reverify affected work before claiming the overall goal complete.",
+      "Update plan/status JSON, CHANGELOG and generated TODO in serialized changes. A package may be recorded as implementation-complete only after its deliverables and acceptance checks pass; the overall project remains unfinished until the deferred review and any resulting fixes are complete.",
+      "WP-108 starts on the merged WP-105 core independently of whole-package WP-102 completion. Implement and test required cross-area interfaces before their consumers; preserve fail-closed identity, policy and audit behavior. Do not treat a deferred review as permission to skip tests or activate unsafe prerequisites.",
+      "Preserve additive Flyway72.1 (V72_1) and the ordering of V72 through V74; do not rewrite applied migrations or renumber historical preparation.",
+      "Preserve additive Flyway75.1 (V75_1), all applied migrations and existing proposal numbering; runtime DDL removal and current-authority adoption require their implemented and tested interfaces."
     ],
     "write_areas": [
       {

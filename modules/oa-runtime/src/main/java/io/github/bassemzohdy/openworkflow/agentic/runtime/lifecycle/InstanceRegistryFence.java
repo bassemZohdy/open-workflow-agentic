@@ -46,6 +46,8 @@ public final class InstanceRegistryFence implements ResourceExecutionFence {
             throw refused;
         }
         if (row == null) throw refuse("instance not found");
+        if (!row.tenant().equals(scope.tenant())) throw refuse("tenant differs");
+        if (!row.id().equals(scope.instanceId())) throw refuse("instance differs");
         if (row.status() != InstanceStatus.RUNNING) throw refuse("instance is not running");
         if (!row.owner().equals(scope.owner())) throw refuse("owner differs");
         if (row.engineInstanceId() == null || !row.engineInstanceId().equals(scope.engineInstanceId()))

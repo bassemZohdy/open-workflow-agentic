@@ -1,5 +1,15 @@
 # Changelog
 
+- Extend the isolated human-decision journal proposal to append its non-sensitive audit event in the same database transaction and keep workflow wakeup blocked. Audit failure rolls back the decision; production authority, schema and delivery remain open.
+
+- Add an isolated, unactivated human-decision storage proposal with concurrent retry, conflict, rollback and blocked-wakeup tests. Production schema, audit receipts, authority/lease checks and delivery remain open.
+
+- Add an unwired human-decision preflight that checks verified non-delegated caller authority, task facts, policy and post-policy expiry. Storage, commit-time rechecks, audit delivery and workflow wakeup remain open.
+
+- Start WP-106 decision identity: exact retries have a stable fingerprint and changed decision facts conflict. The contract is data only; durable tasks, authorization, audit, wakeup and T02 remain open.
+
+- Update delivery sequencing at the user's request: complete and test remaining implementation first, then conduct independent project review and resolve its findings. Existing security, dependency and acceptance gates remain; package and acceptance counts do not change.
+
 - Merge WP-107 literal data-schema matching PR125 as b2a84c8 after Claude PASS, 23 local focused tests and PR CI40816443429. General matching and T13 remain open.
 - Merge WP-107 legacy replay proof PR123 as 328297e after Claude PASS, 19 PostgreSQL cases, PR CI40814049581 and post-merge CI40815224198. Production upgrade and T13 remain open.
 - Merge WP-107 literal content-type matching PR121 as 7e21193 after Claude PASS, 20 focused runtime cases, PR CI40811603653 and post-merge CI40812450304. General matching and T13 remain open.

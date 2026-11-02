@@ -178,6 +178,50 @@ class DependencyGuardTest {
         assertEquals("ok", guard.call(() -> "ok"), "the circuit recovered through the first probe");
     }
 
+    @Test void oldFailureDoesNotOpenARecoveredCircuit() throws Exception {
+        var guard = guard(2, 1, 0);
+        var started = new CountDownLatch(1);
+        var finish = new CountDownLatch(1);
+        Future<?> old = pool.submit(() -> assertThrows(IllegalStateException.class, () -> guard.call(() -> {
+            started.countDown();
+            try { assertTrue(finish.await(5, TimeUnit.SECONDS)); }
+            catch (InterruptedException e) { throw new AssertionError(e); }
+            return boom("old failure");
+        })));
+        try {
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            fail(guard, 1);
+            clock.advance(Duration.ofSeconds(30));
+            assertEquals("probe", guard.call(() -> "probe"));
+            finish.countDown();
+            old.get(5, TimeUnit.SECONDS);
+            assertEquals(State.CLOSED, guard.state());
+        } finally { finish.countDown(); }
+    }
+
+    @Test void oldSuccessDoesNotResetFailuresAfterRecovery() throws Exception {
+        var guard = guard(2, 2, 0);
+        var started = new CountDownLatch(1);
+        var finish = new CountDownLatch(1);
+        Future<String> old = pool.submit(() -> guard.call(() -> {
+            started.countDown();
+            try { assertTrue(finish.await(5, TimeUnit.SECONDS)); }
+            catch (InterruptedException e) { throw new AssertionError(e); }
+            return "old success";
+        }));
+        try {
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            fail(guard, 2);
+            clock.advance(Duration.ofSeconds(30));
+            assertEquals("probe", guard.call(() -> "probe"));
+            fail(guard, 1);
+            finish.countDown();
+            assertEquals("old success", old.get(5, TimeUnit.SECONDS));
+            fail(guard, 1);
+            assertEquals(State.OPEN, guard.state());
+        } finally { finish.countDown(); }
+    }
+
     // ---- retry budget ------------------------------------------------------------------------------------
 
     @Test void aRetriableFailureIsRetriedUpToTheAttemptsWithABackoffBetween() {
@@ -248,6 +292,67 @@ class DependencyGuardTest {
         assertEquals("down", e.getMessage());
         assertEquals(1, calls.get());
         assertTrue(Thread.currentThread().isInterrupted());
+    }
+
+    @Test void anInterruptedOperationDoesNotStartAnotherAttempt() {
+        var guard = guard(4, 100, 10);
+        var calls = new AtomicInteger();
+        var failure = new IllegalStateException("interrupted operation");
+        var thrown = assertThrows(IllegalStateException.class, () -> guard.callWithRetry(5, t -> true, () -> {
+            calls.incrementAndGet();
+            Thread.currentThread().interrupt();
+            throw failure;
+        }));
+        assertSame(failure, thrown);
+        assertEquals(1, calls.get());
+        assertEquals(0, guard.stats().retries());
+        assertTrue(Thread.currentThread().isInterrupted());
+    }
+
+    // ---- failures that are not the dependency's fault ---------------------------------------------------------
+
+    @Test void aFailureTheCallerDoesNotCountIsNeitherSuccessNorFailureAndNeverOpensTheCircuit() {
+        var guard = guard(4, 2, 0);
+        for (int i = 0; i < 10; i++) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> guard.call(() -> { throw new IllegalArgumentException("cancelled"); },
+                            failure -> !(failure instanceof IllegalArgumentException)));
+        }
+        assertEquals(State.CLOSED, guard.state());
+        assertEquals(0, guard.stats().failures());
+        assertEquals(0, guard.stats().successes());
+    }
+
+    @Test void aNeutralFailureDoesNotResetTheConsecutiveFailureCount() {
+        var guard = guard(4, 2, 0);
+        fail(guard, 1);
+        assertThrows(IllegalArgumentException.class,
+                () -> guard.call(() -> { throw new IllegalArgumentException("x"); }, f -> false));
+        fail(guard, 1);
+        assertEquals(State.OPEN, guard.state(), "failure, neutral, failure is still two failures in a row");
+    }
+
+    @Test void aProbeThatEndsNeutrallyLeavesTheCircuitHalfOpenForTheNextCall() {
+        var guard = guard(4, 2, 0);
+        fail(guard, 2);
+        clock.advance(Duration.ofSeconds(30));
+        assertThrows(IllegalArgumentException.class,
+                () -> guard.call(() -> { throw new IllegalArgumentException("cancelled"); }, f -> false));
+        assertEquals(State.HALF_OPEN, guard.state());
+        assertEquals("probe", guard.call(() -> "probe"));
+        assertEquals(State.CLOSED, guard.state());
+    }
+
+    @Test void aBrokenFailureClassifierReleasesThePermitAndHalfOpenProbe() {
+        var guard = guard(1, 2, 0);
+        fail(guard, 2);
+        clock.advance(Duration.ofSeconds(30));
+        assertThrows(IllegalStateException.class, () -> guard.call(
+                () -> { throw new IllegalArgumentException("dependency"); },
+                failure -> { throw new IllegalStateException("classifier"); }));
+        assertEquals(State.HALF_OPEN, guard.state());
+        assertEquals("recovered", guard.call(() -> "recovered"));
+        assertEquals(State.CLOSED, guard.state());
     }
 
     // ---- counters and validation -------------------------------------------------------------------------

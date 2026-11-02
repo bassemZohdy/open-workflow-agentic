@@ -153,11 +153,21 @@ public class IdentityProducers {
                     "agentic.identity.token-endpoint is set but agentic.identity.issuer is not");
         }
         IdentitySettings.Exchange exchange = settings.exchange();
+        var guard = exchange.circuitEnabled()
+                ? new io.github.bassemzohdy.openworkflow.agentic.runtime.resilience.DependencyGuard(
+                        new io.github.bassemzohdy.openworkflow.agentic.runtime.resilience.DependencyGuard.Settings(
+                                "token-endpoint", exchange.maxConcurrent(), exchange.circuitFailureThreshold(),
+                                exchange.circuitOpenFor(), 0, java.time.Duration.ofMinutes(1), java.time.Duration.ZERO),
+                        Clock.systemUTC())
+                : null;
         return new Rfc8693TokenExchanger(settings.tokenEndpoint().get(),
                 exchange.clientId().orElseThrow(() -> new IllegalStateException(
                         "agentic.identity.exchange.client-id is required with a token endpoint")),
                 exchange.clientSecretName().orElseThrow(() -> new IllegalStateException(
                         "agentic.identity.exchange.client-secret-name is required with a token endpoint")),
-                secrets, grants, bindings, verifier, audit, Clock.systemUTC(), exchange.timeout());
+                secrets, grants, bindings, verifier, audit, Clock.systemUTC(), exchange.timeout(), guard, exchange.maxConcurrent());
+    }
+    public void disposeTokenExchanger(@jakarta.enterprise.inject.Disposes TokenExchanger exchanger) {
+        if (exchanger instanceof Rfc8693TokenExchanger client) client.close();
     }
 }
