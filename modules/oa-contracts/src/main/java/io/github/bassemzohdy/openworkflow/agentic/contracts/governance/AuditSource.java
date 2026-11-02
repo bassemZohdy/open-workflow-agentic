@@ -6,8 +6,8 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Immutable identity/content of one retained effect-journal projection. Data, never permission or an audit append.
- * Sequence is the committed source journal id (positive, possibly gapped), not central chain sequence or global order.
+ * Immutable identity/content of one retained producer fact. Data, never permission or an audit append.
+ * Sequence is producer-defined (effect journal id or one for a resource entry), not central chain or global order.
  * The producer retains the original source, draft id/time and content before delivery; retry never creates another id.
  */
 public record AuditSource(int schemaVersion, String scopeFingerprint, String keyFingerprint, Transition transition,
@@ -15,7 +15,7 @@ public record AuditSource(int schemaVersion, String scopeFingerprint, String key
     private static final Pattern SHA256=Pattern.compile("[0-9a-f]{64}");
 
     /** Finite v1 producer facts. A state transition is not inferred from successful callback return. */
-    public enum Transition { INTENT, DISPATCH, UNKNOWN, OUTCOME, MANUAL, COMPENSATION }
+    public enum Transition { INTENT, DISPATCH, UNKNOWN, OUTCOME, MANUAL, COMPENSATION, RESOURCE_ENTRY }
 
     public AuditSource {
         if(schemaVersion!=1) throw new IllegalArgumentException("unsupported audit source schema");

@@ -10,6 +10,8 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecut
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceExecutionFence;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.IdempotentAuditSink;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditReceipt;
 import jakarta.transaction.Transaction;
 import jakarta.transaction.TransactionManager;
 import java.sql.*;
@@ -114,6 +116,8 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
     private final TransactionManager transactions;
     private final int limit;
     private final IoBounds io;
+    private final ResourceEntryAuditSource entryAudit;
+    private final IdempotentAuditSink entryAuditSink;
     private final Semaphore workerSlots;
     private final ThreadFactory workerFactory;
     private final Set<Attempt> active = new HashSet<>();
@@ -126,8 +130,21 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
     }
     public JdbcResourceExecutionGate(DataSource data, int maxInFlight, IoBounds io) { this(data, null, maxInFlight, io); }
     public JdbcResourceExecutionGate(DataSource data, TransactionManager transactions, int maxInFlight, IoBounds io) {
+        this(data, transactions, maxInFlight, io, null);
+    }
+    /** Explicitly retain entry audit drafts atomically; delivery and authorization are separate responsibilities. */
+    public JdbcResourceExecutionGate(DataSource data, TransactionManager transactions, int maxInFlight, IoBounds io,
+                                     ResourceEntryAuditSource entryAudit) {
+        this(data, transactions, maxInFlight, io, entryAudit, null);
+    }
+    /** Explicit co-located audit delivery before callback; sink and central tables must share this database. */
+    public JdbcResourceExecutionGate(DataSource data, TransactionManager transactions, int maxInFlight, IoBounds io,
+                                     ResourceEntryAuditSource entryAudit, IdempotentAuditSink entryAuditSink) {
         this.data = Objects.requireNonNull(data); this.transactions = transactions;
         this.io = Objects.requireNonNull(io);
+        this.entryAudit = entryAudit;
+        if (entryAuditSink != null && entryAudit == null) throw new IllegalArgumentException("audit producer is required");
+        this.entryAuditSink = entryAuditSink;
         if (maxInFlight < 1 || maxInFlight > 1024) throw new IllegalArgumentException("entry bound must be 1..1024");
         limit = maxInFlight;
         workerSlots = new Semaphore(maxInFlight);
@@ -310,6 +327,10 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
                 Write write = isolated(true, c -> append(c, binding, entry, executor));
                 check(); // only after commit, connection cleanup AND ambient resume, never under the registry lock.
                 if (!write.fresh()) return new Result<>(Kind.RETAINED, write.fact(), null);
+                if (entryAuditSink != null) {
+                    deliverEntryAudit(entry.scope());
+                    check(); // central audit may block; authority must still be current before callback.
+                }
                 T value = callback.apply(running);
                 if (value instanceof Future<?> || value instanceof CompletionStage<?> || value instanceof Flow.Publisher<?>) {
                     quarantine = true;
@@ -336,6 +357,44 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         Objects.requireNonNull(scope);
         return isolated(false, c -> read(c, scope));
     }
+    /** Reads and validates original retained data only; it neither appends centrally nor authorizes a callback. */
+    public Optional<ResourceEntryAuditSource.Retained> findEntryAudit(ResourceCallScope scope) {
+        Objects.requireNonNull(scope);
+        if (entryAudit == null) throw new IllegalStateException("entry audit producer is not configured");
+        return isolated(false, c -> {
+            var fact = read(c, scope);
+            return fact.isEmpty() ? Optional.empty() : entryAudit.read(c, fact.get());
+        });
+    }
+    /** Deliver the original source and verify the co-located central binding; a receipt alone is not authority. */
+    public AuditReceipt deliverEntryAudit(ResourceCallScope scope) {
+        Objects.requireNonNull(scope);
+        if (entryAuditSink == null) throw new IllegalStateException("entry audit delivery is not configured");
+        java.util.function.Supplier<AuditReceipt> delivery = () -> {
+            var retained = findEntryAudit(scope).orElseThrow(() -> new IllegalStateException("entry audit source missing"));
+            var receipt = Objects.requireNonNull(entryAuditSink.appendOnce(retained.source(), retained.draft()), "audit receipt");
+            receipt.requireMatches(retained.source(), retained.draft());
+            isolated(false, c -> {
+                var fact = read(c, scope).orElseThrow(() -> new IllegalStateException("entry missing"));
+                if (!retained.equals(entryAudit.read(c, fact).orElseThrow()))
+                    throw new IllegalStateException("entry audit source changed");
+                try (var q = c.prepareStatement("""
+                        select 1 from audit.source_binding where source_key=? and event_id=? and chain_id=?
+                          and chain_sequence=? and hash=? and content_fingerprint=?
+                        """)) {
+                    q.setString(1, receipt.source().key()); q.setString(2, receipt.eventId().value());
+                    q.setString(3, receipt.chainId()); q.setLong(4, receipt.chainSequence());
+                    q.setString(5, receipt.hash()); q.setString(6, receipt.contentFingerprint());
+                    try (var r = q.executeQuery()) {
+                        if (!r.next()) throw new IllegalStateException("central entry audit binding missing");
+                    }
+                }
+                return null;
+            });
+            return receipt;
+        };
+        return transactions == null ? delivery.get() : Transactions.inSuspendedTransaction(transactions, delivery);
+    }
     private Write append(Connection c, ResourceCallBinding binding, ResourceExecutionEntry entry, UUID executor)
             throws SQLException {
         var retainedBinding = JdbcResourceCallBindings.read(c, binding.issuer(), binding.tokenId());
@@ -353,6 +412,7 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         }
         var fact = read(c, entry.scope()).orElseThrow(() -> new RefusedException("entry not retained"));
         if (!fact.entry().equals(entry)) throw new RefusedException("retained epoch differs");
+        if (inserted == 1 && entryAudit != null) entryAudit.captureFresh(c, fact);
         return new Write(fact, inserted == 1);
     }
     private static Write retained(EntryFact fact, ResourceExecutionEntry entry) {
