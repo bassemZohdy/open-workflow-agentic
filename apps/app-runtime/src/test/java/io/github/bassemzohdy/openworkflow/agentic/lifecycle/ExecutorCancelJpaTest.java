@@ -119,7 +119,15 @@ class ExecutorCancelJpaTest {
         cancelRestored(true);
     }
 
+    @Test void cancellingWithoutStartingTheRestoredInstanceRemovesThePersistedInstance() throws Exception {
+        cancelRestored(true, true);
+    }
+
     private void cancelRestored(boolean filtered) throws Exception {
+        cancelRestored(filtered, false);
+    }
+
+    private void cancelRestored(boolean filtered, boolean withoutStart) throws Exception {
         String appId = "pending-cancel-" + UUID.randomUUID();
         var listening = new CountDownLatch(1);
         var broker = new InMemoryEvents() {
@@ -168,10 +176,28 @@ class ExecutorCancelJpaTest {
                 var definition = restoredApp.workflowDefinition(workflow);
                 var restored = reader.find(definition, original.id()).orElseThrow();
                 assertEquals(WorkflowStatus.PENDING, restored.status());
-                factory.cancelled.add(restored.id());
-                var completion = restored.start();
-                assertThrows(ExecutionException.class, () -> completion.get(10, TimeUnit.SECONDS));
+                if (withoutStart) {
+                    // Characterization only: this emits a RUNNING status event despite no execution.
+                    assertTrue(((WorkflowMutableInstance) restored).status(WorkflowStatus.RUNNING).get(10, TimeUnit.SECONDS));
+                    assertTrue(restored.cancelFuture().get(10, TimeUnit.SECONDS));
+                } else {
+                    factory.cancelled.add(restored.id());
+                    var completion = restored.start();
+                    assertThrows(ExecutionException.class, () -> completion.get(10, TimeUnit.SECONDS));
+                }
                 aborted.get(10, TimeUnit.SECONDS);
+                if (withoutStart) {
+                    try (var connection = dataSource.getConnection(); var query = connection.prepareStatement(
+                            "select count(*) from workflowinstanceentity where applicationid=? and instanceid=?")) {
+                        query.setString(1, appId); query.setString(2, original.id());
+                        try (var rows = query.executeQuery()) { rows.next(); assertEquals(0, rows.getInt(1)); }
+                    }
+                    assertTrue(definition.activeInstance(restored.id()).isPresent(),
+                            "direct cancellation leaves the unstarted instance registered");
+                    // A stale holder can still call start. Arm the test filter to stop before business work.
+                    factory.cancelled.add(restored.id());
+                    assertThrows(ExecutionException.class, () -> restored.start().get(10, TimeUnit.SECONDS));
+                }
                 assertEquals(filtered ? 1 : 0, expressions.entries.get());
                 assertEquals(filtered ? 0 : 1, factory.entries.get());
                 assertEquals(0, starts.get(), "the task-start callback must not be reached");
