@@ -1,5 +1,7 @@
 # Changelog
 
+- Cap start admission below the configured Agroal pool maximum, keeping a slot available for registry work when only starts use the pool; reject a one-connection pool.
+
 - Bound concurrent workflow starts per process; when full, reject new keys before insertion with a retryable response while preserving idempotent repeats.
 
 - Rotate stale-start and cancellation scans independently, so held locks or unconfirmed cancellations do not block later recovery work.

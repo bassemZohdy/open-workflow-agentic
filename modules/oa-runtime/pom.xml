@@ -25,6 +25,7 @@
     <dependency><groupId>io.quarkiverse.flow</groupId><artifactId>quarkus-flow-jpa</artifactId></dependency>
 
     <!-- Persistence -->
+    <dependency><groupId>io.agroal</groupId><artifactId>agroal-api</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-jdbc-postgresql</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-hibernate-orm</artifactId></dependency>
     <dependency><groupId>io.quarkus</groupId><artifactId>quarkus-flyway</artifactId></dependency>
