@@ -40,7 +40,9 @@ begin
          new.risk_tier,new.policy_id,new.policy_version,new.separation)
        is distinct from row(old.tenant,old.task_id,old.instance_id,old.wait_key,old.initiator_kind,old.initiator_id,
                             old.risk_tier,old.policy_id,old.policy_version,old.separation)
-     or new.version <> old.version + 1 or old.status <> 'IN_PROGRESS' then
+     or new.version <> old.version + 1 or old.status <> 'IN_PROGRESS'
+     or (new.status <> 'IN_PROGRESS' and row(new.assignee_id,new.due_at)
+         is distinct from row(old.assignee_id,old.due_at)) then
     raise exception 'invalid human task mutation' using errcode='check_violation';
   end if;
   return new;

@@ -1,5 +1,7 @@
 # Changelog
 
+- Harden the isolated human-task proposal against changing assignment or deadline while closing a task; separately versioned in-progress changes remain supported.
+
 - Prove an abruptly stopped writer leaves its staged human wake recoverable by a new owner without a duplicate receipt. Workflow-checkpoint process crash remains open.
 
 - Reconstruct a workflow component from its real human-wake checkpoint and verify the completed listen is not registered again. An operating-system process restart remains unproved.
