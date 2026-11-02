@@ -39,6 +39,10 @@ import org.junit.jupiter.api.Test;
 @QuarkusTestResource(value = HumanSchemaResource.class, restrictToAnnotatedClass = true)
 class HumanWakeCheckpointTest {
     @Inject JpaInstanceWriter writer;
+    @Inject JpaInstanceReader reader;
+    @Inject RegistryScan scan;
+    @Inject RepairStore repairs;
+    @Inject EngineStatusSync sync;
     @Inject JdbcInboxCheckpointProof proof;
     @Inject JdbcInboxDispatch dispatch;
     @Inject JdbcEventInbox inbox;
@@ -72,9 +76,10 @@ class HumanWakeCheckpointTest {
     private InstanceRecord move(InstanceRecord row, InstanceStatus status, String engine) {
         return registry.replace(row.successor(now(), status, engine, row.startAttempts(), null, null), row.version(), "test.human", row.owner());
     }
-    @Test void stagedWakeCommitsRealSdkCheckpointAndReceiptTogether() throws Exception { execute(false); }
-    @Test void stagedWakeWithLostOwnerCannotCommitRealSdkCheckpoint() throws Exception { execute(true); }
-    private void execute(boolean loseOwner) throws Exception {
+    @Test void stagedWakeCommitsRealSdkCheckpointAndReceiptTogether() throws Exception { execute(false, false); }
+    @Test void stagedWakeWithLostOwnerCannotCommitRealSdkCheckpoint() throws Exception { execute(true, false); }
+    @Test void stagedWakeRecoversFromPersistedWorkflowWithoutRedelivery() throws Exception { execute(false, true); }
+    private void execute(boolean loseOwner, boolean restore) throws Exception {
         try (var gate = new PersistenceCommitGate(Duration.ofSeconds(15), Clock.systemUTC()); var broker = new Broker()) {
             var next = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();
             var guarded = new CheckpointingWriter(borrowed(), gate, (op,id) -> {});
@@ -140,6 +145,11 @@ class HumanWakeCheckpointTest {
                     assertFalse(completion.isDone());
                     assertTrue(QuarkusTransaction.requiringNew().call(() -> em.find(CompletedTaskEntity.class, key) != null));
                     assertTrue(proof.consumed(wait, message));
+                    if (restore) {
+                        gate.close(); // Stop the old workflow component before reconstructing it from JPA.
+                        restoreCheckpoint(row, app.id(), wait, message);
+                        return;
+                    }
                     // Simulate a fresh recovery component seeing the committed checkpoint before acknowledgement.
                     var auditCalls = new java.util.concurrent.atomic.AtomicInteger();
                     var recovery = new JdbcInboxCheckpointRecovery(dataSource, recorded -> {
@@ -156,4 +166,37 @@ class HumanWakeCheckpointTest {
             }
         }
     }
+    private void restoreCheckpoint(InstanceRecord row, String appId, InboxWait wait, InboxMessage message) throws Exception {
+        var resumed = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();
+        var cleaned = new CompletableFuture<Void>(); var restoredBroker = new Broker();
+        var recovery = new JdbcInboxCheckpointRecovery(dataSource, audit, Clock.systemUTC());
+        try (var freshGate = new PersistenceCommitGate(Duration.ofSeconds(15), Clock.systemUTC());
+             var finalizer = new InboxCheckpointFinalizer(owned, leases);
+             var app = WorkflowApplication.builder().withId(appId).withEventConsumer(restoredBroker)
+                     .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                     .withListener(new WorkflowPersistenceListener(new CheckpointingWriter(borrowed(), freshGate, (op,id) -> {
+                         if (op == PersistenceCommitGate.Operation.COMPLETED) cleaned.complete(null);
+                     }, finalizer)))
+                     .withListener(new WorkflowExecutionCompletableListener() {
+                         @Override public CompletableFuture<?> onTaskStarted(TaskStartedEvent event) {
+                             if (event.taskContext().taskName().equals("afterDecision")) { resumed.complete(null); return release; }
+                             return CompletableFuture.completedFuture(null);
+                         }
+                     }).build()) {
+            var definition = app.workflowDefinition(WorkflowReader.readWorkflowFromClasspath("human/decision-checkpoint.yaml"));
+            var restored = reader.find(definition, row.engineInstanceId()).orElseThrow();
+            assertEquals(WorkflowStatus.PENDING, restored.status());
+            var settings = new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120), Duration.ofMillis(1), 3,
+                    Duration.ofMillis(1), Duration.ofMillis(1), Duration.ofHours(24), 100, Optional.empty());
+            var reconciler = new Reconciler(registry, new FlowWorkflowEngine(app), sync, scan, repairs, settings, dataSource,
+                    Clock.systemUTC(), row.tenant()::equals, ResumeGate.ALLOW, new InboxRestoreCheckpointGate(recovery, app, freshGate));
+            reconciler.recover(row.tenant(), row.id().value());
+            resumed.get(10, TimeUnit.SECONDS);
+            assertFalse(restoredBroker.registration.isDone(), "restored completed listen must not register or redeliver");
+            assertTrue(proof.consumed(wait, message));
+            release.complete(null); cleaned.get(10, TimeUnit.SECONDS);
+            assertTrue(freshGate.status().healthy());
+        } finally { release.complete(null); }
+    }
+
 }
