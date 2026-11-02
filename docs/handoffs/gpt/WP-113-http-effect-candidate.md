@@ -11,8 +11,11 @@ the provider returns its actual result. It compares token audience, issuer, gran
 server-pinned expectations, then passes the same token to a caller-supplied current-authority fence and rechecks expiry
 and the remaining operation budget before dispatch. These metadata checks and supplied fence do not prove signature
 verification or current authorization: production composition must supply the verified exchanger and real identity,
-policy, task and owner checks. If authority is lost after a target confirmation, this composition withholds the result;
-the ledger conservatively leaves the effect unresolved rather than pretending the target was undone.
+policy, task and owner checks. If authority is lost after a terminal target confirmation, the adapter carries only the
+non-secret observed outcome to the ledger. The ledger commits that fact and then propagates the authority refusal;
+it does not release the result. An unknown target response remains unresolved. If the outcome commit fails, its
+commit status can be uncertain and must be read back; the intent may remain unresolved, and a physical effect is not
+rolled back.
 
 A trusted service contract must explicitly choose terminal confirmation status codes from 200, 201 and 204, and must
 prove those statuses mean the effect is complete. A 202, redirect, unselected status, timeout, I/O failure or missing
@@ -34,10 +37,12 @@ Local loopback tests cover request/key/correlation/credential binding, terminal 
 timeout uncertainty, invalid or expired tokens, authority refusal after acquisition, shared slot exhaustion and
 blocked credential acquisition. Scoped-dispatch tests exercise revocation before and after the target call and reject
 escaped or repeated callbacks, using a fixture exchanger and policy. A PostgreSQL case combines the actual grant store,
-identity dispatcher and ledger with a fixture exchanger and local service: revocation during the call withholds the
-result and leaves the effect INTENDED for manual resolution. Another ledger case checks that a lost acknowledgement
-remains INTENDED and is not resent by the ledger. The latest Linux/PostgreSQL run passed 44 focused cases, including both ledger cases; the scoped identity and transport
-cases also passed on Windows. These are controlled integrations, not real provider interoperability. The first Windows run exposed the process
+identity dispatcher and ledger with a fixture exchanger and local service: revocation during a confirmed call retains
+the CONFIRMED fact while withholding the result. Separate cases cover withheld authoritative lookup and compensation;
+a later authorized compensation retry reuses the retained confirmation. Another ledger case checks that a genuinely
+lost acknowledgement remains INTENDED and is not resent by the ledger. The scoped identity and transport cases also passed on Windows. The prior ledger implementation failed the
+revocation regression by returning an unresolved result without propagating the refusal. These are controlled
+integrations, not real provider interoperability. The first Windows run exposed the process
 classpath length limit; the saturation probe now uses a Java argument file. The loopback seam and credentials are
 fixtures, not provider interoperability or network isolation evidence.
 

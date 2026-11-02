@@ -56,7 +56,9 @@ class GovernedHttpCredentialsTest {
             assertThrows(AuthorityLostException.class,()->target.execute("key-2"));
             assertEquals(1,calls.get(),"revocation during exchange must precede the target call");
             revoked.set(false);revokeDuringExchange.set(false);revokeOnSend.set(true);
-            assertThrows(AuthorityLostException.class,()->target.execute("key-3"));
+            var withheld=assertThrows(EffectTarget.ObservedOutcomeException.class,()->target.execute("key-3"));
+            assertEquals(EffectTarget.Outcome.CONFIRMED,withheld.observed().outcome());
+            assertInstanceOf(AuthorityLostException.class,withheld.refusal());
             assertEquals(2,calls.get(),"a completed external call is not undone by later revocation");
             assertTrue(AuthorityScope.current().isEmpty());
         } finally {server.stop(0);}

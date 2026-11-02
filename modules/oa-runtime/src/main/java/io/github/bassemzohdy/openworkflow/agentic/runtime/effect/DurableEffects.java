@@ -75,17 +75,21 @@ public class DurableEffects {
         Effect intent = prepared.effect();
         if (intent.state().isResolved()) return intent;
         Reply result;
+        RuntimeException withheld = null;
         if (!prepared.attempted()) {
             ledger.markAttempted(command.key()); // This commit MUST succeed before dispatch.
-            result = dispatch(target, command.key(), null);
+            var attempt = dispatch(target, command.key(), null);
+            result = attempt.reply(); withheld = attempt.withheld();
         } else {
-            result = lookup(target, command.key());
+            var lookup = lookup(target, command.key());
+            result = lookup.reply(); withheld = lookup.withheld();
             Instant now = clock.instant();
             if (result.outcome() == EffectTarget.Outcome.UNKNOWN) requireNotInterrupted();
             if (result.outcome() == EffectTarget.Outcome.UNKNOWN && prepared.replayUntil() != null
                     && now.isBefore(prepared.replayUntil()) && !window.isZero()
                     && now.isBefore(prepared.createdAt().plus(window))) {
-                result = dispatch(target, command.key(), prepared);
+                var attempt = dispatch(target, command.key(), prepared);
+                result = attempt.reply(); withheld = attempt.withheld();
             }
         }
         if (result.outcome() == EffectTarget.Outcome.UNKNOWN) {
@@ -102,6 +106,7 @@ public class DurableEffects {
         Effect resultEffect = ledger.recordOutcome(command.key(), result.outcome() == EffectTarget.Outcome.CONFIRMED
                 ? EffectState.CONFIRMED : EffectState.FAILED, result.detail());
         count(resultEffect.state() == EffectState.CONFIRMED ? "confirmed" : "failed");
+        if (withheld != null) throw withheld; // Retain history, but do not release the outcome to an unauthorized caller.
         requireNotInterrupted();
         return resultEffect;
     }
@@ -168,8 +173,11 @@ public class DurableEffects {
         if(Thread.currentThread().isInterrupted()) throw new CancellationException("effect caller interrupted");
     }
 
-    private Reply dispatch(EffectTarget target, EffectKey key, JdbcEffectLedger.Prepared replay) {
-        return telemetry.target(EffectTelemetry.Operation.DISPATCH,()->{
+    private record DispatchAttempt(Reply reply, RuntimeException withheld) { }
+
+    private DispatchAttempt dispatch(EffectTarget target, EffectKey key, JdbcEffectLedger.Prepared replay) {
+        var withheld = new java.util.concurrent.atomic.AtomicReference<RuntimeException>();
+        Reply reply = telemetry.target(EffectTelemetry.Operation.DISPATCH,()->{
             requireNotInterrupted(); // After blocking intent/attempt writes and telemetry setup, immediately before target I/O.
             if (replay != null) {
                 // Setup may block and an adapter may withdraw or shorten its guarantee after the earlier lookup.
@@ -184,19 +192,26 @@ public class DurableEffects {
                 requireNotInterrupted();
             }
             try { return Objects.requireNonNull(target.execute(key.idempotencyKey()), "target reply"); }
-            catch (InterruptedException e) {
+            catch (EffectTarget.ObservedOutcomeException observed) {
+                withheld.set(observed.refusal());return observed.observed();
+            } catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
             } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }
         });
+        return new DispatchAttempt(reply,withheld.get());
     }
 
-    private Reply lookup(EffectTarget target, EffectKey key) {
-        return telemetry.target(EffectTelemetry.Operation.LOOKUP,()->{
+    private DispatchAttempt lookup(EffectTarget target, EffectKey key) {
+        var withheld = new java.util.concurrent.atomic.AtomicReference<RuntimeException>();
+        Reply reply=telemetry.target(EffectTelemetry.Operation.LOOKUP,()->{
             requireNotInterrupted();
             try { return Objects.requireNonNull(target.lookup(key.idempotencyKey()), "lookup reply"); }
-            catch (InterruptedException e) {
+            catch (EffectTarget.ObservedOutcomeException observed) {
+                withheld.set(observed.refusal());return observed.observed();
+            } catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
             } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }
         });
+        return new DispatchAttempt(reply,withheld.get());
     }
 }

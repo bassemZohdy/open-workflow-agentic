@@ -22,6 +22,24 @@ public interface EffectTarget {
         }
     }
 
+    /**
+     * A trusted adapter observed a definitive outcome but may not release a result, for example because authority
+     * expired after the target replied. The ledger must retain the non-secret fact before propagating the refusal.
+     * This is not an authorization, payload, or proof that arbitrary adapter claims are true.
+     */
+    final class ObservedOutcomeException extends RuntimeException {
+        private final Reply observed;
+        private final RuntimeException refusal;
+        public ObservedOutcomeException(Reply observed, RuntimeException refusal) {
+            super("effect outcome observed but result withheld",Objects.requireNonNull(refusal,"refusal"));
+            this.observed=Objects.requireNonNull(observed,"observed");
+            if(observed.outcome()==Outcome.UNKNOWN)throw new IllegalArgumentException("unknown is not a definitive outcome");
+            this.refusal=refusal;
+        }
+        public Reply observed() {return observed;}
+        public RuntimeException refusal() {return refusal;}
+    }
+
     String target();
 
     /**

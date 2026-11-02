@@ -11,6 +11,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.common.Checks;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IssuedToken;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
 import java.io.IOException;
 import java.net.*;
 import java.net.http.*;
@@ -135,6 +136,10 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
             if(state.phase.get()!=2 || result==null || result!=state.observed)
                 throw new IllegalStateException("credential provider did not return the scoped operation result");
             return result;
+        } catch(AuthorityLostException lost) {
+            if(state.observed!=null && state.observed.outcome()!=Outcome.UNKNOWN)
+                throw new EffectTarget.ObservedOutcomeException(state.observed,lost);
+            throw lost;
         } catch(InterruptedException interrupted) {
             Thread.currentThread().interrupt();throw interrupted;
         } catch(IOException failure) {

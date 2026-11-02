@@ -11,6 +11,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.DelegationGra
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InstanceAuthorities;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.InstanceAuthority;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.GovernedAsyncDispatch;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
@@ -42,7 +43,7 @@ class PinnedHttpEffectLedgerTest {
     @Inject InstanceAuthorities authorities;
     @Inject DelegationGrants grants;
 
-    @Test void revocationDuringCallWithRealGrantLeavesTheEffectUnresolved() throws Exception {
+    @Test void revocationDuringCallRetainsConfirmedFactWithoutReleasingIt() throws Exception {
         String tenant="http-"+UUID.randomUUID();var user=new Subject(SubjectKind.USER,"alice");
         var agent=new Subject(SubjectKind.AGENT,"worker");
         var grant=grants.grant(tenant,user,user,agent,Set.of("orders:write"),Instant.now().plusSeconds(600),null);
@@ -75,8 +76,9 @@ class PinnedHttpEffectLedgerTest {
                     issued->dispatch.requireCurrentAuthority(engineId),true);
             var thread=ThreadId.derive("http-revocation-test","alice",UUID.randomUUID().toString());
             var command=EffectCommand.of(thread,"send","occurrence-1","tool:orders","{}");
-            assertEquals(EffectState.INTENDED,effects.execute(command,target).state());
-            assertNull(failure.get());assertEquals(1,calls.get());assertEquals(1,ledger.manualQueue(thread,10).size());
+            assertThrows(AuthorityLostException.class,()->effects.execute(command,target));
+            assertEquals(EffectState.CONFIRMED,ledger.find(command.key()).orElseThrow().state());
+            assertNull(failure.get());assertEquals(1,calls.get());assertTrue(ledger.manualQueue(thread,10).isEmpty());
             assertEquals(InstanceAuthority.State.REAUTHORIZATION_REQUIRED,authorities.find(row.id()).orElseThrow().state());
         } finally {server.stop(0);}
     }

@@ -236,6 +236,61 @@ class DurableEffectsTest {
     }
 
     @Test
+    void failedWriteOfWithheldOutcomeLeavesIntentUnresolvedAndDoesNotResend() {
+        var command=JdbcEffectLedgerTest.command("withheld-write-failure");var calls=new AtomicInteger();
+        EffectTarget target=new EffectTarget() {
+            public String target(){return command.target();}
+            public Reply execute(String key){calls.incrementAndGet();throw new EffectTarget.ObservedOutcomeException(
+                    new Reply(Outcome.CONFIRMED,"target confirmed"),new IllegalStateException("authority lost"));}
+        };
+        var failing=new JdbcEffectLedger(dataSource) {
+            @Override public Effect recordOutcome(EffectKey key,EffectState state,String detail) {
+                throw new StoreUnavailableException("outcome write failed",new SQLException());
+            }
+        };
+        assertThrows(StoreUnavailableException.class,()->new DurableEffects(failing).execute(command,target));
+        assertEquals(EffectState.INTENDED,ledger.find(command.key()).orElseThrow().state());
+        assertEquals(EffectState.INTENDED,effects.execute(command,target).state());
+        assertEquals(1,calls.get(),"unknown retained intent must not be resent without a replay guarantee");
+        assertEquals(1,ledger.manualQueue(command.key().threadId(),10).size());
+    }
+
+    @Test
+    void withheldAuthoritativeLookupIsRetainedBeforeRefusal() {
+        EffectCommand command=JdbcEffectLedgerTest.command("withheld-lookup");
+        ledger.prepare(command,Duration.ZERO,Instant.now());ledger.markAttempted(command.key());
+        var refusal=new IllegalStateException("authority lost");var sent=new AtomicInteger();
+        EffectTarget target=new EffectTarget() {
+            public String target(){return command.target();}
+            public Reply execute(String key){sent.incrementAndGet();return new Reply(Outcome.CONFIRMED,"unexpected");}
+            public Reply lookup(String key){throw new EffectTarget.ObservedOutcomeException(new Reply(Outcome.CONFIRMED,"target confirmed"),refusal);}
+        };
+        assertSame(refusal,assertThrows(IllegalStateException.class,()->effects.execute(command,target)));
+        assertEquals(EffectState.CONFIRMED,ledger.find(command.key()).orElseThrow().state());
+        assertEquals(0,sent.get());
+    }
+
+    @Test
+    void withheldConfirmedCompensationIsRetainedBeforeRefusalAndNeverResent() {
+        EffectCommand original=JdbcEffectLedgerTest.command("withheld-original");var originalTarget=new Target();
+        assertEquals(EffectState.CONFIRMED,effects.execute(original,originalTarget).state());
+        EffectCommand undo=EffectCommand.of(original.key().threadId(),"refund","withheld",originalTarget.target(),"refund=10");
+        var sent=new AtomicInteger();var refusal=new IllegalStateException("authority lost");
+        EffectTarget target=new EffectTarget() {
+            public String target(){return originalTarget.target();}
+            public Reply execute(String key) {
+                sent.incrementAndGet();
+                throw new EffectTarget.ObservedOutcomeException(new Reply(Outcome.CONFIRMED,"target confirmed"),refusal);
+            }
+        };
+        assertSame(refusal,assertThrows(IllegalStateException.class,()->effects.compensate(original.key(),undo,target)));
+        assertEquals(EffectState.CONFIRMED,ledger.find(undo.key()).orElseThrow().state());
+        assertEquals(EffectState.CONFIRMED,ledger.find(original.key()).orElseThrow().state());
+        assertEquals(EffectState.COMPENSATED,effects.compensate(original.key(),undo,target).state());
+        assertEquals(1,sent.get(),"confirmed compensation must never be sent twice");
+    }
+
+    @Test
     void compensationUsesSeparateIntentAndFailedCompensationStaysVisible() {
         EffectCommand original = JdbcEffectLedgerTest.command("pay"); Target target = new Target();
         effects.execute(original, target);
