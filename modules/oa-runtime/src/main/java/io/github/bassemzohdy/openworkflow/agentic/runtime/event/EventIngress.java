@@ -3,6 +3,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.event;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.Checks;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.InboxMessage;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.event.HumanDecisionWake;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.ActionKind;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuthorizationRequest;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
@@ -82,6 +83,9 @@ public class EventIngress {
             Checks.requireText("producer tenant", p.tenant(), 256); Objects.requireNonNull(p.kind());
             Checks.requireText("producer subject", p.subject(), 256); Checks.requireText("producer source", p.source(), 1024);
             java.net.URI.create(p.source());
+            if (HumanDecisionWake.SOURCE.equals(p.source())) {
+                throw new IllegalArgumentException("human decision event source is reserved for internal use");
+            }
             for (var values : List.of(p.types(), p.definitions(), p.correlations())) {
                 if (values.isEmpty() || values.size() > 64) throw new IllegalArgumentException("producer route list must contain 1..64 entries");
                 for (String value : values) Checks.requireText("producer route", value, 256);
@@ -110,6 +114,9 @@ public class EventIngress {
     public JdbcEventInbox.Received receive(CallerContext caller, Ulid instance, String correlation, StructuredEvent event) {
         if (caller == null || caller.provenance() == CallerContext.Provenance.UNVERIFIED || caller.subject() == null) {
             throw new ProblemException(403, "verified event caller required");
+        }
+        if (event != null && HumanDecisionWake.SOURCE.equals(event.source())) {
+            throw new ProblemException(403, "event source is reserved for internal use");
         }
         InboxMessage message;
         try { message = new InboxMessage(caller.tenant(), event.source(), event.id(), event.type(), instance,

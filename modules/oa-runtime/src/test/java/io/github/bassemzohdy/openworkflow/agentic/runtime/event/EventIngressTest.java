@@ -2,6 +2,7 @@ package io.github.bassemzohdy.openworkflow.agentic.runtime.event;
 
 import static org.junit.jupiter.api.Assertions.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.event.InboxMessage;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.event.HumanDecisionWake;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
@@ -72,6 +73,33 @@ class EventIngressTest {
                     () -> new EventPolicyProducer().validateBindings(null, empty));
             else new EventPolicyProducer().validateBindings(null, empty);
         }
+    }
+
+    @Test
+    void internalHumanDecisionSourceCannotBeConfiguredOrReceivedExternally() {
+        var original = settings().producers().get("orders");
+        EventIngressSettings reserved = new EventIngressSettings() {
+            public Duration retention() { return Duration.ofHours(1); }
+            public String policyFolder() { return "policy/events"; }
+            public Map<String, Producer> producers() { return Map.of("reserved", new Producer() {
+                public String tenant() { return original.tenant(); }
+                public SubjectKind kind() { return original.kind(); }
+                public String subject() { return original.subject(); }
+                public String source() { return HumanDecisionWake.SOURCE; }
+                public Set<String> types() { return original.types(); }
+                public Set<String> definitions() { return original.definitions(); }
+                public Set<String> correlations() { return original.correlations(); }
+            }); }
+        };
+        assertThrows(IllegalArgumentException.class, () -> EventIngress.validateSettings(reserved));
+        Inbox inbox = new Inbox();
+        var ingress = ingress(inbox, DecisionOutcome.ALLOW, audit::add);
+        var forged = StructuredEventTest.parse("{" + StructuredEventTest.PREFIX.replace("urn:test:orders", HumanDecisionWake.SOURCE) + ",\"data\":{\"ok\":true}}");
+        assertEquals(403, assertThrows(ProblemException.class,
+                () -> ingress.receive(caller(), row.id(), "wait-1", forged)).getResponse().getStatus());
+        assertEquals(0, inbox.calls);
+        assertEquals(0, targetReads.get());
+        assertTrue(decisions.isEmpty());
     }
 
     @Test

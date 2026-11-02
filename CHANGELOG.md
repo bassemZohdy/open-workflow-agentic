@@ -1,5 +1,7 @@
 # Changelog
 
+- Reserve the internal human-decision event source against external ingress configuration and receipt. Internal producer authority and dispatch remain open.
+
 - Test unactivated atomic staging of a human decision wake with its inbox receipt and exact wait binding under a live task owner. Production dispatch, authorized replay and checkpoint proof remain open.
 
 - Add an internal transaction seam for task-owned inbox matching, retaining the live-owner checks before and after matching. Callback reservation and checkpoint proof remain separate.
