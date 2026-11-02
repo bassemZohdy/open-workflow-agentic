@@ -277,6 +277,38 @@ class ReconcilerRepairTest {
     }
 
     @Test
+    void aPolledFaultDuringCancellationWaitsForTheCancellationReport() {
+        String tenant = newTenant(), engineId = "cancel-fault-" + RUN;
+        FakeEngine engine = new FakeEngine();
+        engine.report(engineId, EngineStatus.FAULTED);
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.CANCEL_REQUESTED, engineId, null);
+
+        reconciler(engine, tenant, 3).reconcileOnce();
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+        assertEquals(EngineStatusSync.Result.UNCHANGED, sync.observe(engineId, EngineStatus.FAULTED, "polled"));
+        sync.observe(engineId, EngineStatus.CANCELLED, "observed");
+        assertEquals(InstanceStatus.CANCELLED, reload(tenant, row).status());
+    }
+
+    @Test
+    void anObservedGenuineFaultStillFailsARequestedCancellation() {
+        String tenant = newTenant(), engineId = "cancel-real-fault-" + RUN;
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.CANCEL_REQUESTED, engineId, null);
+        sync.observe(engineId, EngineStatus.FAULTED, "observed");
+        assertEquals(InstanceStatus.FAILED, reload(tenant, row).status());
+    }
+
+    @Test
+    void aPolledFaultStillFailsAWorkflowWithoutACancellationRequest() {
+        String tenant = newTenant(), engineId = "uncancelled-fault-" + RUN;
+        InstanceRecord row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        sync.observe(engineId, EngineStatus.FAULTED, "polled");
+        assertEquals(InstanceStatus.FAILED, reload(tenant, row).status());
+    }
+
+    @Test
     void aWaitPastItsDeadlineIsCancelledAndTheRequestIsRecordedFirst() {
         String tenant = newTenant();
         FakeEngine engine = new FakeEngine();

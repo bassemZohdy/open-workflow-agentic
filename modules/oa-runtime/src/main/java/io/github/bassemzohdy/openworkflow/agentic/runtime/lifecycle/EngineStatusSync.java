@@ -14,7 +14,8 @@ import org.jboss.logging.Logger;
 /**
  * Carries what the engine reports into the registry (WP-105c, scope item 3; ADR 0019, Cancel and Resume). The Flow
  * observer calls it when the engine emits a status change; the reconciler calls it when it polls an engine instance.
- * Both paths give the same result, so a missed event is repaired by the next poll.
+ * A poll normally repairs a missed event, except that a cause-free FAULTED poll cannot resolve a pending cancellation:
+ * the pinned SDK can expose a cancellation-induced timeout as FAULTED before its cancellation event arrives.
  *
  * <p><b>Rules.</b> The registry moves only along {@link InstanceStateMachine}. A terminal row never changes. The
  * registry records CANCELLED only when the engine reports it (ADR 0019). A STARTING row is moved to RUNNING by an
@@ -97,6 +98,12 @@ public class EngineStatusSync {
             InstanceRecord row = store.find(ref.get().tenant(), Ulid.parse(ref.get().id()))
                     .orElseThrow(() -> new IllegalStateException("registry row vanished for engine instance "
                             + engineInstanceId));
+            // The SDK can expose FAULTED after cancellation of a timed task before its cancellation report arrives.
+            // A status poll has no cause, so do not convert a pending cancellation into an irreversible failure.
+            if ("polled".equals(source) && status == EngineStatus.FAULTED
+                    && row.status() == InstanceStatus.CANCEL_REQUESTED) {
+                return attempt == 0 ? Result.UNCHANGED : Result.CHANGED;
+            }
             List<InstanceStatus> steps = steps(row.status(), status);
             if (steps.isEmpty()) {
                 return attempt == 0 ? Result.UNCHANGED : Result.CHANGED;

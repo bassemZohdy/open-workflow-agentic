@@ -1,5 +1,7 @@
 # Changelog
 
+- Keep a cancellation request pending when a cause-free engine status poll reports a fault; a later cancellation or observed genuine fault can still resolve it.
+
 - Track a database-maintained authority revision to reject stale holds and renewals even after same-grant rebinding.
 
 - Refuse a changed or disappearing delegated authority even when ungoverned workflows are allowed.
