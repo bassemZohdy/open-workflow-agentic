@@ -44,6 +44,14 @@ class PinnedHttpEffectLedgerTest {
     @Inject DelegationGrants grants;
 
     @Test void revocationDuringCallRetainsConfirmedFactWithoutReleasingIt() throws Exception {
+        revokeDuringCall(200, EffectState.CONFIRMED);
+    }
+
+    @Test void revocationDuringUnconfirmedCallWithholdsAndQueuesTheUnknown() throws Exception {
+        revokeDuringCall(202, EffectState.INTENDED);
+    }
+
+    private void revokeDuringCall(int status, EffectState expectedState) throws Exception {
         String tenant="http-"+UUID.randomUUID();var user=new Subject(SubjectKind.USER,"alice");
         var agent=new Subject(SubjectKind.AGENT,"worker");
         var grant=grants.grant(tenant,user,user,agent,Set.of("orders:write"),Instant.now().plusSeconds(600),null);
@@ -64,7 +72,7 @@ class PinnedHttpEffectLedgerTest {
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
         server.createContext("/orders",exchange->{
             try {calls.incrementAndGet();exchange.getRequestBody().readAllBytes();grants.revoke(grant.id(),user,"withdrawn during call",null);
-                exchange.sendResponseHeaders(200,-1);
+                exchange.sendResponseHeaders(status,-1);
             } catch(Throwable e) {failure.set(e);try{exchange.sendResponseHeaders(500,-1);}catch(java.io.IOException ignored){}}
             finally {exchange.close();}
         });server.start();
@@ -77,8 +85,9 @@ class PinnedHttpEffectLedgerTest {
             var thread=ThreadId.derive("http-revocation-test","alice",UUID.randomUUID().toString());
             var command=EffectCommand.of(thread,"send","occurrence-1","tool:orders","{}");
             assertThrows(AuthorityLostException.class,()->effects.execute(command,target));
-            assertEquals(EffectState.CONFIRMED,ledger.find(command.key()).orElseThrow().state());
-            assertNull(failure.get());assertEquals(1,calls.get());assertTrue(ledger.manualQueue(thread,10).isEmpty());
+            assertEquals(expectedState,ledger.find(command.key()).orElseThrow().state());
+            assertNull(failure.get());assertEquals(1,calls.get());
+            assertEquals(expectedState == EffectState.INTENDED ? 1 : 0,ledger.manualQueue(thread,10).size());
             assertEquals(InstanceAuthority.State.REAUTHORIZATION_REQUIRED,authorities.find(row.id()).orElseThrow().state());
         } finally {server.stop(0);}
     }

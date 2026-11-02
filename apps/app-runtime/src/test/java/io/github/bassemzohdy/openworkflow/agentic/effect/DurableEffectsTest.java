@@ -6,6 +6,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectTelemetry;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.JdbcEffectLedger;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -73,6 +74,34 @@ class DurableEffectsTest {
         assertEquals(EffectState.CONFIRMED, restarted.execute(command, target).state());
         assertEquals(2, target.calls.get(), "confirmed effects never call the target again");
         assertTrue(ledger.manualQueue(command.key().threadId(), 10).isEmpty());
+    }
+
+    @Test
+    void lostAuthorityDuringUnknownDispatchWithholdsResultAndQueuesReconciliation() {
+        var command = JdbcEffectLedgerTest.command("authority-lost-dispatch");
+        var refusal = new AuthorityLostException(AuthorityLostException.Reason.REVOKED);
+        var target = new Target() {
+            @Override public Reply execute(String key) { calls.incrementAndGet(); throw refusal; }
+        };
+        assertSame(refusal, assertThrows(AuthorityLostException.class, () -> effects.execute(command, target)));
+        assertEquals(EffectState.INTENDED, ledger.find(command.key()).orElseThrow().state());
+        assertEquals(1, ledger.manualQueue(command.key().threadId(), 10).size());
+        assertEquals(1, target.calls.get());
+    }
+
+    @Test
+    void lostAuthorityDuringLookupCannotTriggerReplayEvenWithinRetentionWindow() {
+        var command = JdbcEffectLedgerTest.command("authority-lost-lookup");
+        var refusal = new AuthorityLostException(AuthorityLostException.Reason.REVOKED);
+        var target = new Target() {
+            @Override public Reply lookup(String key) { throw refusal; }
+        };
+        ledger.prepare(command, target.replayWindow(), Instant.now());
+        ledger.markAttempted(command.key());
+        assertSame(refusal, assertThrows(AuthorityLostException.class, () -> effects.execute(command, target)));
+        assertEquals(EffectState.INTENDED, ledger.find(command.key()).orElseThrow().state());
+        assertEquals(1, ledger.manualQueue(command.key().threadId(), 10).size());
+        assertEquals(0, target.calls.get());
     }
 
     @Test

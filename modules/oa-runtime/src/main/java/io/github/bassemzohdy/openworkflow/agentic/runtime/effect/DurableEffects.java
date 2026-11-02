@@ -6,6 +6,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectKey
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectState;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget.Reply;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -85,7 +86,7 @@ public class DurableEffects {
             result = lookup.reply(); withheld = lookup.withheld();
             Instant now = clock.instant();
             if (result.outcome() == EffectTarget.Outcome.UNKNOWN) requireNotInterrupted();
-            if (result.outcome() == EffectTarget.Outcome.UNKNOWN && prepared.replayUntil() != null
+            if (withheld == null && result.outcome() == EffectTarget.Outcome.UNKNOWN && prepared.replayUntil() != null
                     && now.isBefore(prepared.replayUntil()) && !window.isZero()
                     && now.isBefore(prepared.createdAt().plus(window))) {
                 var attempt = dispatch(target, command.key(), prepared);
@@ -97,6 +98,7 @@ public class DurableEffects {
             ledger.requireManualResolution(command.key(), "effect.outcome.unknown");
             count("unknown");
             LOG.warnf("Effect awaits reconciliation: thread=%s node=%s", command.key().threadId(), command.key().nodeId());
+            if (withheld != null) throw withheld;
             requireNotInterrupted();
             Effect pending=ledger.find(command.key()).orElseThrow();
             requireNotInterrupted();
@@ -194,6 +196,8 @@ public class DurableEffects {
             try { return Objects.requireNonNull(target.execute(key.idempotencyKey()), "target reply"); }
             catch (EffectTarget.ObservedOutcomeException observed) {
                 withheld.set(observed.refusal());return observed.observed();
+            } catch (AuthorityLostException lost) {
+                withheld.set(lost); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
             } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }
@@ -208,6 +212,8 @@ public class DurableEffects {
             try { return Objects.requireNonNull(target.lookup(key.idempotencyKey()), "lookup reply"); }
             catch (EffectTarget.ObservedOutcomeException observed) {
                 withheld.set(observed.refusal());return observed.observed();
+            } catch (AuthorityLostException lost) {
+                withheld.set(lost); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt(); return new Reply(EffectTarget.Outcome.UNKNOWN, null);
             } catch (Exception e) { return new Reply(EffectTarget.Outcome.UNKNOWN, null); }

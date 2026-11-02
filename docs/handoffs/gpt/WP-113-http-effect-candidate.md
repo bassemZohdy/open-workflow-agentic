@@ -17,6 +17,10 @@ it does not release the result. An unknown target response remains unresolved. I
 commit status can be uncertain and must be read back; the intent may remain unresolved, and a physical effect is not
 rolled back.
 
+If the scoped identity boundary reports lost authority without a definitive outcome, the ledger queues the unknown
+for reconciliation and propagates the refusal. A refused lookup cannot trigger a replay, even within a replay window.
+This does not imply that an already dispatched network operation was cancelled or that a queue write always succeeds.
+
 A trusted service contract must explicitly choose terminal confirmation status codes from 200, 201 and 204, and must
 prove those statuses mean the effect is complete. A 202, redirect, unselected status, timeout, I/O failure or missing
 lookup is UNKNOWN, never proof of failure. Response bodies are not retained. Replay window is zero, so the ledger does
@@ -38,9 +42,13 @@ timeout uncertainty, invalid or expired tokens, authority refusal after acquisit
 blocked credential acquisition. Scoped-dispatch tests exercise revocation before and after the target call and reject
 escaped or repeated callbacks, using a fixture exchanger and policy. A PostgreSQL case combines the actual grant store,
 identity dispatcher and ledger with a fixture exchanger and local service: revocation during a confirmed call retains
-the CONFIRMED fact while withholding the result. Separate cases cover withheld authoritative lookup and compensation;
+the CONFIRMED fact while withholding the result; a non-confirming response under the same revocation remains INTENDED
+and enters reconciliation without returning an outcome. Separate cases cover withheld authoritative lookup and compensation;
 a later authorized compensation retry reuses the retained confirmation. Another ledger case checks that a genuinely
-lost acknowledgement remains INTENDED and is not resent by the ledger. The scoped identity and transport cases also passed on Windows. The prior ledger implementation failed the
+lost acknowledgement remains INTENDED and is not resent by the ledger. A separate PostgreSQL gateway fixture checks
+that an observed-outcome refusal propagates through the registered tool path, the ledger retains its confirmation,
+and an authorized retry does not dispatch twice. It uses a fixture target and does not establish the end-to-end HTTP
+or production approval composition. The scoped identity and transport cases also passed on Windows. The prior ledger implementation failed the
 revocation regression by returning an unresolved result without propagating the refusal. These are controlled
 integrations, not real provider interoperability. The first Windows run exposed the process
 classpath length limit; the saturation probe now uses a Java argument file. The loopback seam and credentials are

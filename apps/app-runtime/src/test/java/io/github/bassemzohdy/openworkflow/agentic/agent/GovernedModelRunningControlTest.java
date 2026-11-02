@@ -46,6 +46,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectState;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectKey;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.DelegationGrantStore;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.DelegationGrants;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.IdentityAudit;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.JdbcIssuedTokenBindings;
@@ -829,6 +830,27 @@ class GovernedModelRunningControlTest {
             assertEquals(EffectState.CONFIRMED, first.state());
             assertEquals(first, rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call));
             assertEquals(1, rig.dispatches.get()); assertEquals(1, rig.admissions.get());
+            return null;
+        });
+    }
+
+    @Test void registeredEffectRetainsConfirmedFactWhenTargetWithholdsAfterAuthorityLoss() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{}");
+            var occurrence = rig.occurrence(running, entry, call);
+            var refusal = new AuthorityLostException(AuthorityLostException.Reason.REVOKED);
+            rig.during = () -> { throw new EffectTarget.ObservedOutcomeException(
+                    new EffectTarget.Reply(EffectTarget.Outcome.CONFIRMED, "confirmed"), refusal); };
+            assertEquals(refusal, assertThrows(AuthorityLostException.class, () ->
+                    rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call)));
+            assertEquals(EffectState.CONFIRMED,
+                    rig.ledger.find(occurrence.effectCommand("registered:test").key()).orElseThrow().state());
+            rig.during = () -> { };
+            assertEquals(EffectState.CONFIRMED,
+                    rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call).state());
+            assertEquals(1, rig.dispatches.get()); assertEquals(1, rig.admissions.get());
+            assertEquals(java.util.List.of("agent.tool.started", "agent.tool.failed", "agent.tool.started",
+                    "agent.tool.effect.retained"), rig.auditEvents);
             return null;
         });
     }

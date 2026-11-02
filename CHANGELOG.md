@@ -1,5 +1,7 @@
 # Changelog
 
+- Preserve unknown effect outcomes for reconciliation and propagate lost-authority refusals without replaying a refused lookup.
+
 - Refuse governed model calls when the provider cannot prove it is configured for the approved model; model aliases require a trusted mapping.
 
 - Withhold model gateway output if the approved context changes or becomes unavailable while cost is calculated.
