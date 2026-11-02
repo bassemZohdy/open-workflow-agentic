@@ -171,7 +171,7 @@ class ResourceTaskAllocationStoreTest {
     @Test void profileCorruptedDuringToolExecutionWithholdsTheOutput() throws Exception {
         var calls = new AtomicInteger();
         var entry = new GovernedToolGateway.Registration("{\"type\":\"object\"}", "{\"type\":\"object\"}",
-                true, Duration.ofSeconds(3), "a".repeat(64), args -> {
+                false, Duration.ofSeconds(3), "a".repeat(64), args -> {
                     calls.incrementAndGet(); corrupt("update task.agent_tool_profile set profile_version='forged'"); return "{}";
                 });
         var registry = Map.of("tool:research", entry);
@@ -187,7 +187,7 @@ class ResourceTaskAllocationStoreTest {
         var gateway = new GovernedToolGateway(registry, () -> Optional.of(approved), profile, pep, event -> { }, budget, Clock.systemUTC());
         var call = new io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall(a.contract().id(), "tool:research", "{}");
         var result = assertInstanceOf(io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult.Failed.class, gateway.invoke(call));
-        assertTrue(result.effectMayHaveHappened()); assertEquals(1, calls.get());
+        assertFalse(result.effectMayHaveHappened()); assertEquals(1, calls.get());
     }
 
     @Test void aLegacyToolBudgetIsNotSilentlyGivenAProfile() throws Exception {

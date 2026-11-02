@@ -18,7 +18,7 @@ import java.util.function.Supplier;
 /**
  * Explicit synchronous composition of a canonical tool occurrence with the durable effect ledger and a live run.
  * The registered target must bind the validated request and enforce its own finite transport deadlines and identity.
- * This is not a tool registry, schema validator, occurrence producer, production approval source or gateway wiring.
+ * This is not an occurrence producer, production approval source or production gateway wiring.
  * The supplied occurrence, allocation, profile, budget and target must come from trusted composition, not a request.
  * The call is synchronous: it never returns while a target invocation it started is still running.
  */

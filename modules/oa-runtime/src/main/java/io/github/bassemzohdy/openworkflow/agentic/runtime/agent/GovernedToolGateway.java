@@ -9,6 +9,12 @@ import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SchemaRegistryConfig;
 import com.networknt.schema.SpecificationVersion;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceToolCall;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Effect;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate.Running;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ApprovedToolProfile;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.common.Checks;
@@ -39,7 +45,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * Explicitly composed local tool boundary. Registration and approval are trusted inputs, never request fields.
  * A composed budget must be durable in production. This class is not a CDI producer, MCP client, task-start
- * authority, or effect-ledger integration.
+ * authority, or production effect-ledger wiring.
  * Approval lookups must work on the caller and worker threads; a missing worker context refuses before the tool.
  * A caller must not treat this partial boundary as production tool execution until those controls are supplied.
  */
@@ -68,6 +74,9 @@ public final class GovernedToolGateway implements ToolGateway {
     /** Runs on a bounded worker; credentials and context must be explicitly bound, not read from caller thread locals. */
     @FunctionalInterface public interface Tool { String invoke(String argumentsJson) throws Exception; }
 
+    /** Trusted local binding only: no I/O or side effects; the target enforces finite transport deadlines. */
+    @FunctionalInterface public interface EffectTargetFactory { EffectTarget bind(String validatedArgumentsJson); }
+
     /** A trusted durable budget must commit each admission and recheck its deadline independently. */
     public interface ToolBudget {
         void admit(Approval approval);
@@ -88,6 +97,8 @@ public final class GovernedToolGateway implements ToolGateway {
         private final String inputSource;
         private final String outputSource;
         private final String implementationFingerprint;
+        private String effectTarget;
+        private EffectTargetFactory effectFactory;
 
         public Registration(String inputSchema, String outputSchema, boolean mutating, Duration timeout,
                             String implementationFingerprint, Tool tool) {
@@ -99,6 +110,16 @@ public final class GovernedToolGateway implements ToolGateway {
             this.timeout = Objects.requireNonNull(timeout);
             if (timeout.compareTo(Duration.ofMillis(1)) < 0 || timeout.compareTo(Duration.ofMinutes(1)) > 0)
                 throw new IllegalArgumentException("tool timeout must be between 1 ms and 1 minute");
+        }
+
+        /** Binds an effect target chosen by trusted composition, never by a tool request. */
+        public static Registration effectful(String inputSchema, String outputSchema, Duration timeout,
+                                             String implementationFingerprint, String target, EffectTargetFactory factory) {
+            var registration = new Registration(inputSchema, outputSchema, true, timeout, implementationFingerprint,
+                    args -> { throw new IllegalStateException("effect tools require controlled execution"); });
+            registration.effectTarget = Checks.requireMatching("effect target", target, AgentTaskContract.TOKEN);
+            registration.effectFactory = Objects.requireNonNull(factory);
+            return registration;
         }
     }
 
@@ -121,16 +142,19 @@ public final class GovernedToolGateway implements ToolGateway {
         this.budget = Objects.requireNonNull(budget); this.clock = Objects.requireNonNull(clock);
     }
 
-    /** Fingerprints exact schemas, timeouts, declared side effects and composition-supplied implementation digests. */
+    /** Fingerprints exact schemas, timeouts, declared side effects, target IDs and composition-supplied digests.
+     * Version 2 changes every fingerprint; existing profiles must be reapproved, not silently migrated.
+     */
     public static String configurationFingerprint(Map<String, Registration> registry) {
         var entries = Map.copyOf(registry);
         if (entries.size() > AgentTaskContract.MAX_ALLOW_LIST_SIZE) throw new IllegalArgumentException("too many registered tools");
-        var encoder = new CanonicalEncoder("oa.tool.registry.v1").number(entries.size());
+        var encoder = new CanonicalEncoder("oa.tool.registry.v2").number(entries.size());
         entries.keySet().stream().sorted().forEach(name -> {
             Checks.requireMatching("tool name", name, AgentTaskContract.TOKEN);
             var entry = entries.get(name);
             encoder.text(name).text(entry.inputSource).text(entry.outputSource).text(entry.implementationFingerprint)
-                    .number(entry.mutating ? 1 : 0).number(entry.timeout.getSeconds()).number(entry.timeout.getNano());
+                    .number(entry.mutating ? 1 : 0).number(entry.timeout.getSeconds()).number(entry.timeout.getNano())
+                    .text(entry.effectTarget == null ? "" : entry.effectTarget);
         });
         return CanonicalEncoder.sha256Hex(encoder.toBytes());
     }
@@ -147,6 +171,7 @@ public final class GovernedToolGateway implements ToolGateway {
         if (!profile.tools().contains(call.toolName())) return reject(call, approved, attempt, "tool is not permitted by the profile");
         Registration entry = registry.get(call.toolName());
         if (entry == null) return reject(call, approved, attempt, "tool is not registered");
+        if (entry.mutating) return reject(call, approved, attempt, "effect tool requires controlled execution");
         if (entry.timeout.compareTo(profile.maxCallTime()) > 0) return reject(call, approved, attempt, "tool timeout exceeds profile");
         JsonNode arguments = parse(call.argumentsJson());
         if (arguments == null || !arguments.isObject() || !valid(entry.input, arguments))
@@ -211,6 +236,42 @@ public final class GovernedToolGateway implements ToolGateway {
                 || !budgetCurrent(approved) || !same(approved))
             return failed(call, approved, attempt, entry);
         return new ToolResult.Completed(answer);
+    }
+
+    /**
+     * Synchronous effect path; returns the retained ledger outcome, not a validated tool output. Trusted factories
+     * must bind locally without I/O and targets must enforce transport deadlines and their identity. The timeout
+     * is an approval ceiling, not a timer around this synchronous call. This is opt-in, not production wiring.
+     */
+    public Effect invokeEffect(Running control, ResourceExecutionEntry execution, AllocatedResourceTask allocation,
+                               ResourceToolCall occurrence, ToolCall call, ControlledToolEffects effects) {
+        Objects.requireNonNull(control); Objects.requireNonNull(execution); Objects.requireNonNull(allocation);
+        Objects.requireNonNull(occurrence); Objects.requireNonNull(call); Objects.requireNonNull(effects);
+        control.requireCurrent(execution, occurrence.executor());
+        Approval approved = current();
+        if (approved == null || !approved.task().id().equals(call.taskId()) || approved.budgetRemainingMicros() == 0)
+            throw new ModelCallRefused("no matching tool approval");
+        try { profile.requireWithin(approved.task(), approved.agent()); }
+        catch (IllegalArgumentException mismatch) { throw new ModelCallRefused("tool profile differs from task"); }
+        if (!approved.task().permitsTool(call.toolName()) || !profile.tools().contains(call.toolName()))
+            throw new ModelCallRefused("tool is not permitted");
+        Registration registration = registry.get(call.toolName());
+        if (registration == null || registration.effectFactory == null || registration.timeout.compareTo(profile.maxCallTime()) > 0)
+            throw new ModelCallRefused("controlled tool is not registered");
+        JsonNode arguments = parse(call.argumentsJson());
+        if (arguments == null || !arguments.isObject() || !valid(registration.input, arguments))
+            throw new ModelCallRefused("tool arguments are invalid");
+        var expected = ResourceToolCall.of(allocation, profile, execution, occurrence.executor(), occurrence.nodeOccurrence(), call);
+        if (!expected.equals(occurrence) || !approved.task().equals(allocation.allocation().contract()))
+            throw new ModelCallRefused("tool occurrence does not match the request");
+        if (!same(approved) || !budgetCurrent(approved) || !same(approved))
+            throw new ModelCallRefused("tool approval or profile is unavailable");
+        control.requireCurrent(execution, occurrence.executor());
+        EffectTarget target = Objects.requireNonNull(registration.effectFactory.bind(call.argumentsJson()));
+        control.requireCurrent(execution, occurrence.executor());
+        if (!same(approved) || !budgetCurrent(approved) || !same(approved))
+            throw new ModelCallRefused("tool approval or profile changed");
+        return effects.execute(control, execution, allocation, profile, occurrence, call, budget, registration.effectTarget, target);
     }
 
     private Approval current() {
