@@ -45,6 +45,36 @@ class PinnedHttpEffectLedgerTest {
     @Inject DelegationGrants grants;
     @Inject InstanceAuthorityStore authorityStore;
 
+    @Test void realLedgerDispatchCarriesItsClientSpanToTheService() throws Exception {
+        var exporter=io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter.create();
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        var received=new AtomicReference<String>();
+        server.createContext("/orders",exchange->{try {
+            received.set(exchange.getRequestHeaders().getFirst("traceparent"));
+            exchange.sendResponseHeaders(200,-1);
+        } finally {exchange.close();}});server.start();
+        try (var sdk=io.opentelemetry.sdk.trace.SdkTracerProvider.builder()
+                .addSpanProcessor(io.opentelemetry.sdk.trace.export.SimpleSpanProcessor.create(exporter)).build()) {
+            var service=new DurableEffects(ledger,Clock.systemUTC(),
+                    new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectTelemetry(sdk.get("effects")));
+            var grant=UlidGenerator.shared().next();
+            var expected=new PinnedHttpEffectTarget.CredentialExpectation("issuer",grant,Set.of("orders:write"));
+            var target=new PinnedHttpEffectTarget("tool:orders",URI.create("http://127.0.0.1:"+server.getAddress().getPort()+"/orders"),
+                    "orders","corr","{}",Duration.ofSeconds(5),Set.of(200),expected,
+                    (a,action)->action.run(new IssuedToken(Credential.of("issued"),a,Set.of("orders:write"),
+                            Instant.now().plusSeconds(60),"issuer","jti",List.of("worker"),grant)),issued->{},true);
+            var command=EffectCommand.of(ThreadId.derive("trace", "alice", UUID.randomUUID().toString()),
+                    "send","one","tool:orders","{}");
+            var parent=sdk.get("caller").spanBuilder("caller").startSpan();
+            try(var scope=parent.makeCurrent()) {assertEquals(EffectState.CONFIRMED,service.execute(command,target).state());}
+            finally {parent.end();}
+            var dispatch=exporter.getFinishedSpanItems().stream().filter(span->span.getName().equals("oa.effect.dispatch")).findFirst().orElseThrow();
+            assertEquals("00-"+dispatch.getTraceId()+"-"+dispatch.getSpanId()+"-"+
+                    dispatch.getSpanContext().getTraceFlags().asHex(),received.get());
+            assertEquals(parent.getSpanContext().getTraceId(),dispatch.getTraceId());
+        } finally {server.stop(0);}
+    }
+
     @Test void rebindDuringExchangeDoesNotRunOldGrantWork() {
         rebindDuringDispatch(true);
     }

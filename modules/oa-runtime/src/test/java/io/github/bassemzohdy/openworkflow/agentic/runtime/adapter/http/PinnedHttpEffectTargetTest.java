@@ -51,6 +51,50 @@ class PinnedHttpEffectTargetTest {
             assertEquals(Outcome.UNKNOWN,target.lookup("stable-key").outcome());
         } finally {server.stop(0);}
     }
+    @Test void propagatesOnlyTraceparentOnDispatchAndLookup() throws Exception {
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        var parents=new java.util.concurrent.CopyOnWriteArrayList<String>();
+        var sensitive=new java.util.concurrent.CopyOnWriteArrayList<String>();
+        server.createContext("/",exchange->{
+            try {
+                parents.add(java.util.Objects.toString(exchange.getRequestHeaders().getFirst("traceparent"),""));
+                sensitive.add(java.util.Objects.toString(exchange.getRequestHeaders().getFirst("baggage"),"")
+                        +java.util.Objects.toString(exchange.getRequestHeaders().getFirst("tracestate"),""));
+                exchange.sendResponseHeaders(200,-1);
+            } finally {exchange.close();}
+        });server.start();
+        try {
+            var lookup=new PinnedHttpEffectTarget.Lookup(uri(server,"/lookup"),Set.of(200));
+            var target=new PinnedHttpEffectTarget("tool:orders",uri(server,"/orders"),"audience:orders","trace-1","{}",TIMEOUT,
+                    Set.of(200),Set.of(),EXPECTED,(a,action)->action.run(token(a)),issued->{},true,false,lookup);
+            var span=io.opentelemetry.api.trace.Span.wrap(io.opentelemetry.api.trace.SpanContext.create(
+                    "0123456789abcdef0123456789abcdef","0123456789abcdef",io.opentelemetry.api.trace.TraceFlags.getSampled(),
+                    io.opentelemetry.api.trace.TraceState.builder().put("tenant","private-value").build()));
+            var baggage=io.opentelemetry.api.baggage.Baggage.builder().put("secret","private-value").build();
+            try(var scope=io.opentelemetry.context.Context.current().with(span).with(baggage).makeCurrent()) {
+                assertEquals(Outcome.CONFIRMED,target.execute("key").outcome());
+                assertEquals(Outcome.CONFIRMED,target.lookup("key").outcome());
+            }
+            assertEquals(Outcome.CONFIRMED,target.execute("no-trace").outcome());
+            assertEquals(java.util.List.of("00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+                    "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",""),parents);
+            assertEquals(java.util.List.of("","",""),sensitive);
+        } finally {server.stop(0);}
+    }
+    @Test void authorityLostDuringRequestPreparationRefusesBeforeNetworkIo() throws Exception {
+        var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);var calls=new AtomicInteger();
+        server.createContext("/orders",exchange->{calls.incrementAndGet();exchange.sendResponseHeaders(200,-1);exchange.close();});server.start();
+        try {
+            var checks=new AtomicInteger();
+            var target=new PinnedHttpEffectTarget("tool:orders",uri(server,"/orders"),"audience:orders","trace-1","{}",TIMEOUT,
+                    Set.of(200),EXPECTED,(a,action)->action.run(token(a)),issued->{
+                        if(checks.incrementAndGet()==2)throw new io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException(
+                                io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException.Reason.REVOKED);
+                    },true);
+            assertThrows(io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException.class,()->target.execute("key"));
+            assertEquals(2,checks.get());assertEquals(0,calls.get());
+        } finally {server.stop(0);}
+    }
     @Test void redirectIsNotFollowedAndUnrecognizedResponseIsUnknown() throws Exception {
         var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);var redirected=new AtomicInteger();
         server.createContext("/start",exchange->{exchange.getResponseHeaders().add("Location","/other");exchange.sendResponseHeaders(302,-1);exchange.close();});

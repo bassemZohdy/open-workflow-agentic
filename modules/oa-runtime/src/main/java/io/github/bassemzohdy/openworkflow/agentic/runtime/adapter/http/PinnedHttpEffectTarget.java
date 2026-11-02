@@ -236,6 +236,13 @@ public final class PinnedHttpEffectTarget implements EffectTarget {
                 .header("X-Correlation-ID",correlation);
         if(lookupCall)builder.GET();
         else builder.header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body,StandardCharsets.UTF_8));
+        try {
+            // Only W3C traceparent crosses this trust boundary: do not forward baggage or vendor tracestate.
+            io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator.getInstance().inject(
+                    io.opentelemetry.context.Context.current(), builder,
+                    (carrier,key,value)->{if(carrier!=null && "traceparent".equals(key))carrier.setHeader(key,value);});
+        } catch(RuntimeException ignored) { /* Optional tracing must not prevent the governed call. */ }
+        fence.requireCurrent(issued); // Trace-context access may block; recheck authority before network I/O.
         if(Thread.currentThread().isInterrupted())throw new InterruptedException("transport interrupted");
         elapsed=System.nanoTime()-started;
         if(elapsed<0 || elapsed>=timeout.toNanos() || !issued.usableAt(Instant.now()))

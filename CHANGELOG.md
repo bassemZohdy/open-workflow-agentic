@@ -1,5 +1,7 @@
 # Changelog
 
+- Propagate W3C traceparent on governed HTTP effects and lookups without forwarding tracing baggage or vendor state.
+
 - Trace governed model-call attempts with bounded, non-sensitive outcome attributes, preserving approval checks and research-graph trace context across node execution.
 
 - Allow the experimental workflow-owner coordinator to renew independent owners concurrently with a bounded worker pool.

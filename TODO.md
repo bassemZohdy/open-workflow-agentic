@@ -736,13 +736,14 @@ Implemented scope:
 - Effect trace producte2dc636 executed in39376019493 SUCCESS both Linux lanes: ledger/CDI3 and SDK/fault5 zero skips, plus existing service/guard/provider regressions. This proves only component emission/privacy/failure semantics; production collector/deployment, complete Flow/agent/tool/model and async/restart/outbound correlation, runbook/dashboard/alert/SLO gates remain open.
 - Operational outbox signals landed (PR 129): five bounded gauges re-registered per application lifecycle, Prometheus rules and dashboard as code, promtool/preview validation tooling and the observability workflow, with an endpoint test scraping the real application. This does not complete end-to-end Flow/agent/tool/model tracing, collector deployment or SLO evidence.
 - Governed model-call attempts emit an optional OpenTelemetry span with fixed schema and outcome only; no prompt, response, identity, model name or exception details are added by this instrumentation. Approval and execution fences run after span setup and again before releasing results. Research graph nodes explicitly carry the current OpenTelemetry context across the graph executor; this is not identity propagation. Complete Flow/graph/tool/model tracing, restart propagation and production collection remain open.
+- The explicit pinned HTTP effect target propagates W3C traceparent on dispatch and lookup while excluding baggage and tracestate, and rechecks authority before network I/O after building tracing headers. Trace identity is distinct from X-Correlation-ID. Full Flow/agent/tool/model linkage, actual production wiring and restart propagation remain open.
 
 Additional closure/integration tasks:
 
 - [ ] Add OpenTelemetry across workflow, graph, tool and model spans under one correlation ID.
 - [ ] Finish structured operational logs and dashboards as code; document collection and alerting.
 
-Evidence: [README.md](README.md), [docs/lifecycle.md](docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](docs/handoffs/gpt/WP-108-tracing.md), [docs/operations-observability.md](docs/operations-observability.md), [deploy/observability/outbox-rules.json](deploy/observability/outbox-rules.json), [docs/handoffs/gpt/WP-112-model-tracing.md](docs/handoffs/gpt/WP-112-model-tracing.md)
+Evidence: [README.md](README.md), [docs/lifecycle.md](docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](docs/handoffs/gpt/WP-108-tracing.md), [docs/operations-observability.md](docs/operations-observability.md), [deploy/observability/outbox-rules.json](deploy/observability/outbox-rules.json), [docs/handoffs/gpt/WP-112-model-tracing.md](docs/handoffs/gpt/WP-112-model-tracing.md), [docs/handoffs/gpt/WP-112-http-trace-context.md](docs/handoffs/gpt/WP-112-http-trace-context.md)
 
 ### WP-113 Enterprise service adapters — partial
 
