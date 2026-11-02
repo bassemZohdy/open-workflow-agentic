@@ -83,11 +83,11 @@ public class RegistryScan {
         }, rs -> new StaleRef(rs.getString("id"), rs.getString("tenant"), rs.getTimestamp("updated_at").toInstant()));
     }
 
-    /** Waiting rows whose wait deadline has passed at {@code now} (ADR 0019, Deadlines). */
+    /** Waiting rows whose wait deadline has been reached at {@code now} (ADR 0019, Deadlines). */
     public List<Ref> waitsPastDeadline(Instant now, int limit) {
         return query("""
                 select id, tenant from task.instance
-                 where status = 'WAITING' and wait_deadline is not null and wait_deadline < ?
+                 where status = 'WAITING' and wait_deadline is not null and wait_deadline <= ?
                  order by wait_deadline limit ?
                 """, statement -> {
             statement.setTimestamp(1, Timestamp.from(now));
@@ -100,7 +100,7 @@ public class RegistryScan {
         String upper = through == null ? "" : " and (wait_deadline, id) <= (?, ?)";
         return query("""
                 select id, tenant, wait_deadline from task.instance
-                 where status = 'WAITING' and wait_deadline is not null and wait_deadline < ?
+                 where status = 'WAITING' and wait_deadline is not null and wait_deadline <= ?
                 """ + lower + upper + " order by wait_deadline, id limit ?", statement -> {
             int i = 1; statement.setTimestamp(i++, Timestamp.from(now));
             if (after != null) { statement.setTimestamp(i++, Timestamp.from(after.deadline())); statement.setString(i++, after.id()); }
@@ -125,7 +125,7 @@ public class RegistryScan {
             return query("""
                     select i.id, i.tenant from task.instance_lifetime p
                       join task.instance i on i.id = p.instance_id
-                     where p.deadline < ? and i.status in ('STARTING', 'RUNNING', 'WAITING')
+                     where p.deadline <= ? and i.status in ('STARTING', 'RUNNING', 'WAITING')
                        and (? or i.status <> 'STARTING')
                      order by p.deadline, i.id limit ? offset ?
                     """, statement -> {
@@ -139,7 +139,7 @@ public class RegistryScan {
                   left join task.instance_lifetime p on p.instance_id = i.id
                  where i.status in ('STARTING', 'RUNNING', 'WAITING')
                    and (? or i.status <> 'STARTING')
-                   and (p.deadline < ? or (cast(? as timestamptz) is not null and i.created_at < ?))
+                   and (p.deadline <= ? or (cast(? as timestamptz) is not null and i.created_at <= ?))
                  order by least(p.deadline, i.created_at + (cast(? as timestamptz) - cast(? as timestamptz))), i.id
                  limit ? offset ?
                 """, statement -> {
@@ -158,7 +158,7 @@ public class RegistryScan {
             return query("""
                     select i.id, i.tenant, p.deadline from task.instance_lifetime p
                       join task.instance i on i.id = p.instance_id
-                     where p.deadline < ? and i.status in ('STARTING', 'RUNNING', 'WAITING')
+                     where p.deadline <= ? and i.status in ('STARTING', 'RUNNING', 'WAITING')
                        and (? or i.status <> 'STARTING')
                     """ + (after == null ? "" : " and (p.deadline, i.id) > (?, ?)")
                     + (through == null ? "" : " and (p.deadline, i.id) <= (?, ?)")
@@ -176,7 +176,7 @@ public class RegistryScan {
                          (cast(? as timestamptz) - cast(? as timestamptz))) as deadline
                     from task.instance i left join task.instance_lifetime p on p.instance_id = i.id
                    where i.status in ('STARTING', 'RUNNING', 'WAITING') and (? or i.status <> 'STARTING')
-                     and (p.deadline < ? or i.created_at < ?)
+                     and (p.deadline <= ? or i.created_at <= ?)
                 ) eligible where true
                 """ + cursor + upper + " order by deadline, id limit ?", statement -> {
             int i = 1; statement.setTimestamp(i++, Timestamp.from(now)); statement.setTimestamp(i++, cutoff);

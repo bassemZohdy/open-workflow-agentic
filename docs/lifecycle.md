@@ -319,8 +319,9 @@ use independent cursors with the same limitation, so a held lock or a missing en
 later stale rows out of every batch.
 
 Before starting a restored instance, the reconciler also checks its own stored wait deadline and effective maximum
-lifetime after authority and checkpoint preparation. An expired instance is cancelled or failed even if the bounded
-deadline scan has not reached it. This check is not an atomic fence around the engine start or a multi-replica lease.
+lifetime after authority and checkpoint preparation. A deadline is expired when the current time reaches it, including
+the exact deadline instant. The reconciler requests cancellation or marks the instance failed even if the bounded
+deadline scan has not reached it; a cancellation request is not proof that the engine stopped. This check is not an atomic fence around the engine start or a multi-replica lease.
 
 **Open recovery defect:** the pinned Flow SDK refuses cancellation of a restored `PENDING` instance. A process-level
 test found that a deadline expiring while the application is down can leave the registry `CANCEL_REQUESTED` after

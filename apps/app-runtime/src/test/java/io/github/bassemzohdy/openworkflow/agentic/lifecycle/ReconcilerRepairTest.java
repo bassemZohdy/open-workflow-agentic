@@ -295,6 +295,62 @@ class ReconcilerRepairTest {
     }
 
     @Test
+    void aRestoredWaitAtItsDeadlineIsNotResumed() {
+        String tenant = newTenant(), engineId = "deadline-equality-" + RUN;
+        FakeEngine engine = new FakeEngine();
+        engine.report(engineId, EngineStatus.PENDING);
+        Instant deadline = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(30);
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.WAITING, engineId, deadline);
+
+        new Reconciler(store, engine, sync, scan, repairs, settings(3), dataSource,
+                Clock.fixed(deadline, ZoneId.of("UTC")), tenant::equals).reconcileOnce();
+
+        assertEquals(0, engine.restarts.get());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+    }
+
+    @Test
+    void aRestoredInstanceAtItsCurrentLifetimeLimitIsNotResumed() {
+        String tenant = newTenant(), engineId = "lifetime-equality-" + RUN;
+        FakeEngine engine = new FakeEngine();
+        engine.report(engineId, EngineStatus.PENDING);
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        Duration lifetime = Duration.ofMinutes(10);
+        var bounded = new LifecycleSettings(true, Duration.ofSeconds(30), Duration.ofSeconds(120), TINY, 3,
+                TINY, TINY, Duration.ofHours(24), 100, Optional.empty(), Optional.of(lifetime));
+
+        new Reconciler(store, engine, sync, scan, repairs, bounded, dataSource,
+                Clock.fixed(row.createdAt().plus(lifetime), ZoneId.of("UTC")), tenant::equals).reconcileOnce();
+
+        assertEquals(0, engine.restarts.get());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+    }
+
+    @Test
+    void aRestoredInstanceAtItsPinnedLifetimeLimitIsNotResumed() throws Exception {
+        String tenant = newTenant(), engineId = "pinned-lifetime-equality-" + RUN;
+        FakeEngine engine = new FakeEngine();
+        engine.report(engineId, EngineStatus.PENDING);
+        var row = newRow(tenant);
+        Instant deadline = row.createdAt().plus(Duration.ofMinutes(10));
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement(
+                     "insert into task.instance_lifetime(instance_id, deadline) values (?, ?)")) {
+            statement.setString(1, row.id().value());
+            statement.setTimestamp(2, java.sql.Timestamp.from(deadline));
+            statement.executeUpdate();
+        }
+        row = move(row, InstanceStatus.RUNNING, engineId, null);
+
+        new Reconciler(store, engine, sync, scan, repairs, settings(3), dataSource,
+                Clock.fixed(deadline, ZoneId.of("UTC")), tenant::equals).reconcileOnce();
+
+        assertEquals(0, engine.restarts.get());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+    }
+
+    @Test
     void restoredWaitsBeyondTheDeadlineBatchAreNotResumed() {
         String tenant = newTenant();
         FakeEngine engine = new FakeEngine();
@@ -340,7 +396,7 @@ class ReconcilerRepairTest {
         FakeEngine engine = new FakeEngine();
         engine.report(engineId, EngineStatus.PENDING);
         var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
-        Instant before = Instant.now();
+        Instant before = Instant.now().truncatedTo(ChronoUnit.MICROS);
         row = move(row, InstanceStatus.WAITING, engineId, before.plusSeconds(30));
         var now = new AtomicReference<>(before);
         Clock clock = new Clock() {
@@ -350,7 +406,7 @@ class ReconcilerRepairTest {
         };
 
         new Reconciler(store, engine, sync, scan, repairs, settings(3), dataSource, clock, tenant::equals,
-                ResumeGate.ALLOW, ignored -> { now.set(before.plusSeconds(31)); return true; }).reconcileOnce();
+                ResumeGate.ALLOW, ignored -> { now.set(before.plusSeconds(30)); return true; }).reconcileOnce();
 
         assertEquals(0, engine.restarts.get());
         assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
