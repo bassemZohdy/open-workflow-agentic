@@ -4,6 +4,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Effect;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectCommand;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectKey;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.EffectState;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallScope;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget.Reply;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
@@ -48,28 +49,43 @@ public class DurableEffects {
     }
 
     public Effect execute(EffectCommand command, EffectTarget target) {
-        Effect result=telemetry.effect(EffectTelemetry.Operation.EXECUTE,()->executeCommand(command,target));
+        Effect result=telemetry.effect(EffectTelemetry.Operation.EXECUTE,()->executeCommand(command,target,null,null));
         requireNotInterrupted(); // Claim release and optional tracing cleanup can block after the inner outcome check.
         return result;
     }
 
-    private Effect executeCommand(EffectCommand command,EffectTarget target) {
+    /** Explicit audited resource composition; scope/history are trusted internal data, not dispatch authority. */
+    public Effect executeResourceScoped(ResourceCallScope scope,EffectCommand command,EffectTarget target,EffectAuditHistory history) {
+        Objects.requireNonNull(scope);Objects.requireNonNull(history);
+        Effect result=telemetry.effect(EffectTelemetry.Operation.EXECUTE,()->executeCommand(command,target,scope,history));
+        requireNotInterrupted();
+        return result;
+    }
+
+    private Effect executeCommand(EffectCommand command,EffectTarget target,ResourceCallScope scope,EffectAuditHistory history) {
         requireNotInterrupted();
         requireTarget(command, target);
         requireNotInterrupted();
         if (!slots.tryAcquire()) throw new JdbcEffectLedger.EffectBusyException();
-        try { return ledger.exclusively(command.key(), () -> {requireNotInterrupted();return executeLocked(command, target);}); }
+        try { return ledger.exclusively(command.key(), () -> {requireNotInterrupted();return executeLocked(command, target,scope,history);}); }
         finally { slots.release(); }
     }
 
-    private Effect executeLocked(EffectCommand command, EffectTarget target) {
+    private Effect executeLocked(EffectCommand command, EffectTarget target,ResourceCallScope scope,EffectAuditHistory history) {
         Duration window = Objects.requireNonNull(target.replayWindow(), "replayWindow");
         requireNotInterrupted();
-        JdbcEffectLedger.Prepared prepared = ledger.prepare(command, window, clock.instant());
-        return executePrepared(command, target, prepared);
+        JdbcEffectLedger.Prepared prepared = scope==null ? ledger.prepare(command, window, clock.instant())
+                : ledger.prepareResourceScoped(scope,command,window,clock.instant());
+        Runnable audit=scope==null ? () -> { } : () -> { history.observedResourceHistory(scope,command.key(),128); };
+        return executePrepared(command, target, prepared,audit);
     }
 
     private Effect executePrepared(EffectCommand command, EffectTarget target, JdbcEffectLedger.Prepared prepared) {
+        return executePrepared(command,target,prepared,() -> { });
+    }
+    private Effect executePrepared(EffectCommand command, EffectTarget target, JdbcEffectLedger.Prepared prepared,Runnable audit) {
+        requireNotInterrupted();
+        audit.run();
         requireNotInterrupted();
         Duration window = Objects.requireNonNull(target.replayWindow(), "replayWindow");
         requireNotInterrupted();
@@ -79,6 +95,8 @@ public class DurableEffects {
         RuntimeException withheld = null;
         if (!prepared.attempted()) {
             ledger.markAttempted(command.key()); // This commit MUST succeed before dispatch.
+            audit.run(); // The exact intent and dispatch facts must be centrally observed before target entry.
+            requireNotInterrupted();
             var attempt = dispatch(target, command.key(), null);
             result = attempt.reply(); withheld = attempt.withheld();
         } else {
@@ -100,6 +118,8 @@ public class DurableEffects {
             LOG.warnf("Effect awaits reconciliation: thread=%s node=%s", command.key().threadId(), command.key().nodeId());
             if (withheld != null) throw withheld;
             requireNotInterrupted();
+            audit.run();
+            requireNotInterrupted();
             Effect pending=ledger.find(command.key()).orElseThrow();
             requireNotInterrupted();
             return pending;
@@ -109,6 +129,8 @@ public class DurableEffects {
                 ? EffectState.CONFIRMED : EffectState.FAILED, result.detail());
         count(resultEffect.state() == EffectState.CONFIRMED ? "confirmed" : "failed");
         if (withheld != null) throw withheld; // Retain history, but do not release the outcome to an unauthorized caller.
+        requireNotInterrupted();
+        audit.run();
         requireNotInterrupted();
         return resultEffect;
     }

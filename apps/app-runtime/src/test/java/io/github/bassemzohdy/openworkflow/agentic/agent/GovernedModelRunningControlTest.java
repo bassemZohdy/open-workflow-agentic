@@ -1122,6 +1122,87 @@ class GovernedModelRunningControlTest {
         });
     }
 
+    private ControlledToolEffects auditedTool(ToolEffectRig rig,io.github.bassemzohdy.openworkflow.agentic.contracts.port.IdempotentAuditSink sink) {
+        var manager=(jakarta.transaction.TransactionManager)java.lang.reflect.Proxy.newProxyInstance(
+                jakarta.transaction.TransactionManager.class.getClassLoader(),new Class<?>[]{jakarta.transaction.TransactionManager.class},
+                (proxy,method,args)->{if(method.getName().equals("suspend"))return null;throw new UnsupportedOperationException(method.getName());});
+        var producer=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditProducer();
+        var ledger=new JdbcEffectLedger(db.owner,manager,producer);
+        var delivery=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditDelivery(db.owner,manager,producer,sink);
+        var history=new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditHistory(db.owner,manager,producer,delivery);
+        var pep=new Pep(request->new Decision("fixture",rig.outcome.get(),"fixture",POLICY,NOW),event->{},Duration.ofSeconds(5),CLOCK);
+        return new ControlledToolEffects(new DurableEffects(ledger,Clock.systemUTC()),pep,()->Optional.of(rig.approved),history);
+    }
+    @Test void scopedToolRequiresCentralAuditBeforeDispatchAndReusesItsOutcome() throws Exception {
+        inCallback((running,entry,checks)->{
+            var rig=new ToolEffectRig(entry);var call=rig.call("{}");var occurrence=rig.occurrence(running,entry,call);
+            var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(db.owner);
+            var transitions=new ArrayList<String>();
+            var control=auditedTool(rig,(source,draft)->{transitions.add(source.transition().name());return central.appendOnce(source,draft);});
+            var first=control.execute(running,entry,rig.allocation,rig.profile,occurrence,call,rig.budget,"registered:test",rig.target);
+            assertEquals(EffectState.CONFIRMED,first.state());assertEquals(1,rig.dispatches.get());
+            assertEquals(first,control.execute(running,entry,rig.allocation,rig.profile,occurrence,call,rig.budget,"registered:test",rig.target));
+            assertEquals(1,rig.dispatches.get());assertTrue(transitions.containsAll(List.of("INTENT","DISPATCH","OUTCOME")));
+            try(var c=db.owner.getConnection();var q=c.prepareStatement("select count(*) from audit.event where attributes->>'oa.instance'=? and event_type like 'effect.%'")) {
+                q.setString(1,entry.scope().instanceId().value());try(var r=q.executeQuery()){assertTrue(r.next());assertEquals(3,r.getInt(1));}
+            }
+            return null;
+        });
+    }
+    @Test void scopedToolWithholdsTargetAndOutcomeWhenCentralAuditFails() throws Exception {
+        inCallback((running,entry,checks)->{
+            var rig=new ToolEffectRig(entry);var call=rig.call("{}");var occurrence=rig.occurrence(running,entry,call);
+            var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(db.owner);
+            var failIntent=new java.util.concurrent.atomic.AtomicBoolean(true);
+            var control=auditedTool(rig,(source,draft)->{
+                if(source.transition().name().equals("INTENT") && failIntent.getAndSet(false))throw new IllegalStateException("central unavailable");
+                return central.appendOnce(source,draft);
+            });
+            assertThrows(IllegalStateException.class,()->control.execute(running,entry,rig.allocation,rig.profile,occurrence,call,rig.budget,"registered:test",rig.target));
+            assertEquals(0,rig.dispatches.get());
+            assertEquals(EffectState.CONFIRMED,control.execute(running,entry,rig.allocation,rig.profile,occurrence,call,rig.budget,"registered:test",rig.target).state());
+            assertEquals(1,rig.dispatches.get());
+            return null;
+        });
+        inCallback((running,entry,checks)->{
+            var rig=new ToolEffectRig(entry);var call=rig.call("{}");var occurrence=rig.occurrence(running,entry,call);
+            var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(db.owner);
+            var failDispatch=new java.util.concurrent.atomic.AtomicBoolean(true);
+            var control=auditedTool(rig,(source,draft)->{
+                if(source.transition().name().equals("DISPATCH") && failDispatch.getAndSet(false))throw new IllegalStateException("central unavailable");
+                return central.appendOnce(source,draft);
+            });
+            assertThrows(IllegalStateException.class,()->control.execute(running,entry,rig.allocation,rig.profile,occurrence,call,rig.budget,"registered:test",rig.target));
+            assertEquals(0,rig.dispatches.get());
+            assertEquals(EffectState.INTENDED,control.execute(running,entry,rig.allocation,rig.profile,occurrence,call,rig.budget,"registered:test",rig.target).state());
+            assertEquals(0,rig.dispatches.get(),"an uncertain attempted effect must not become a fresh dispatch");
+            return null;
+        });
+        inCallback((running,entry,checks)->{
+            var rig=new ToolEffectRig(entry);var call=rig.call("{}");var occurrence=rig.occurrence(running,entry,call);
+            var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(db.owner);
+            var failOutcome=new java.util.concurrent.atomic.AtomicBoolean(true);
+            var control=auditedTool(rig,(source,draft)->{
+                if(source.transition().name().equals("OUTCOME") && failOutcome.getAndSet(false))throw new IllegalStateException("central unavailable");
+                return central.appendOnce(source,draft);
+            });
+            assertThrows(IllegalStateException.class,()->control.execute(running,entry,rig.allocation,rig.profile,occurrence,call,rig.budget,"registered:test",rig.target));
+            assertEquals(1,rig.dispatches.get());
+            assertEquals(EffectState.CONFIRMED,control.execute(running,entry,rig.allocation,rig.profile,occurrence,call,rig.budget,"registered:test",rig.target).state());
+            assertEquals(1,rig.dispatches.get());
+            return null;
+        });
+    }
+    @Test void scopedToolRechecksControlAfterBlockingAudit() {
+        inClosingCallback((running,entry,checks)->{
+            var rig=new ToolEffectRig(entry);var call=rig.call("{}");var occurrence=rig.occurrence(running,entry,call);
+            var central=new io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditAppendOnce(db.owner);
+            var control=auditedTool(rig,(source,draft)->{var receipt=central.appendOnce(source,draft);running.close();return receipt;});
+            assertThrows(RefusedException.class,()->control.execute(running,entry,rig.allocation,rig.profile,occurrence,call,rig.budget,"registered:test",rig.target));
+            assertEquals(0,rig.dispatches.get());return null;
+        });
+    }
+
     @Test void aClosedOrMismatchedControlCannotDispatchAToolEffect() {
         inClosingCallback((running, entry, checks) -> {
             var rig = new ToolEffectRig(entry); var call = rig.call("{}");

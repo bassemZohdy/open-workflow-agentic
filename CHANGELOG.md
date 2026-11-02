@@ -1,5 +1,7 @@
 # Changelog
 
+- Add explicit resource-scoped central-audit gating to controlled tool effects.
+
 - Verify and deliver retained audit history for governed resource effects.
 
 - Preserve governed tool effect keys while binding their retained audit provenance to the resource call.

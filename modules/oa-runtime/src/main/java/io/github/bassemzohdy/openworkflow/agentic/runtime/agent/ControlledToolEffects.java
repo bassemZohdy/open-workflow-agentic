@@ -8,6 +8,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Effect;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.EffectTarget;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectAuditHistory;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate.Running;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import java.time.Duration;
@@ -26,11 +27,19 @@ public final class ControlledToolEffects {
     private final DurableEffects effects;
     private final Pep policy;
     private final Supplier<Optional<GovernedToolGateway.Approval>> approvals;
+    private final EffectAuditHistory history;
 
     public ControlledToolEffects(DurableEffects effects, Pep policy,
                                  Supplier<Optional<GovernedToolGateway.Approval>> approvals) {
+        this.effects=Objects.requireNonNull(effects);this.policy=Objects.requireNonNull(policy);
+        this.approvals=Objects.requireNonNull(approvals);this.history=null;
+    }
+
+    /** Explicitly opts into resource-scoped retained audit and central receipt verification. */
+    public ControlledToolEffects(DurableEffects effects, Pep policy,
+                                 Supplier<Optional<GovernedToolGateway.Approval>> approvals,EffectAuditHistory history) {
         this.effects = Objects.requireNonNull(effects); this.policy = Objects.requireNonNull(policy);
-        this.approvals = Objects.requireNonNull(approvals);
+        this.approvals = Objects.requireNonNull(approvals);this.history=Objects.requireNonNull(history);
     }
 
     /** Returns a retained outcome, including unresolved INTENDED; callers must not interpret it as tool output. */
@@ -77,7 +86,8 @@ public final class ControlledToolEffects {
                 authorize.run(); targetMatches(); current.run(); return target.lookup(key);
             }
         };
-        Effect result = effects.execute(command, fenced);
+        Effect result = history==null ? effects.execute(command, fenced)
+                : effects.executeResourceScoped(entry.scope(),command,fenced,history);
         current.run();
         return result;
     }
