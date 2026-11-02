@@ -140,6 +140,15 @@ class HumanWakeCheckpointTest {
                     assertFalse(completion.isDone());
                     assertTrue(QuarkusTransaction.requiringNew().call(() -> em.find(CompletedTaskEntity.class, key) != null));
                     assertTrue(proof.consumed(wait, message));
+                    // Simulate a fresh recovery component seeing the committed checkpoint before acknowledgement.
+                    var auditCalls = new java.util.concurrent.atomic.AtomicInteger();
+                    var recovery = new JdbcInboxCheckpointRecovery(dataSource, recorded -> {
+                        auditCalls.incrementAndGet(); audit.record(recorded);
+                    }, clock);
+                    assertTrue(recovery.repairBatch(row, app.id(), 16));
+                    assertTrue(recovery.repairBatch(row, app.id(), 16));
+                    assertEquals(1, auditCalls.get(), "repeat repair must not repeat the acknowledgement audit");
+                    assertTrue(owned.reserve(claim, wait).isEmpty(), "a checkpointed wake cannot be redelivered");
                     assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED, owned.acknowledge(wait));
                     release.complete(null); completion.get(15, TimeUnit.SECONDS);
                     assertTrue(proof.consumed(wait, message));

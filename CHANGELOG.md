@@ -1,5 +1,7 @@
 # Changelog
 
+- Test repeat-safe component recovery of a checkpointed human wake before acknowledgement, without duplicate acknowledgement audit or redelivery. Process restart remains unproved.
+
 - Test staged human wake delivery against the actual SDK and JPA checkpoint writer, including lost-owner rollback. The targeted callback is test-only; production dispatch and restart recovery remain open.
 
 - Reserve the internal human-decision event source against external ingress configuration and receipt. Internal producer authority and dispatch remain open.
