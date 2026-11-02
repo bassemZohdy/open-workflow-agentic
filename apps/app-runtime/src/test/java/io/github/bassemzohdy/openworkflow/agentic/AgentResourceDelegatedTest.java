@@ -6,6 +6,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.AgentResource;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcNodeBudget;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
@@ -56,6 +57,9 @@ class AgentResourceDelegatedTest {
 
     @Inject
     DataSource dataSource;
+
+    @Inject
+    JdbcNodeBudget budgets;
 
     @Inject
     ResourceCallBindings calls;
@@ -134,6 +138,7 @@ class AgentResourceDelegatedTest {
     void aBoundDelegatedTokenRunsOnceOnAFreshGovernedThreadOfTheUser() throws Exception {
         String tenant = newTenant();
         Issued issued = valid(tenant, "alice");
+        TestModelGovernance.prepare(budgets, issued.scope().threadId().value());
         run(issued.token(), null).statusCode(200).body("plan", containsString("[stub]"))
                 .body("threadId", equalTo(issued.scope().key()));
         String name = issued.scope().threadId().value();
@@ -154,7 +159,9 @@ class AgentResourceDelegatedTest {
         // two invocations never share a thread, and neither is in the direct namespace of the same visible id
         Issued one = valid(tenant, "alice");
         Issued two = valid(tenant, "alice");
+        TestModelGovernance.prepare(budgets, one.scope().threadId().value());
         run(one.token(), null).statusCode(200);
+        TestModelGovernance.prepare(budgets, two.scope().threadId().value());
         run(two.token(), null).statusCode(200);
         assertEquals(false, one.scope().threadId().equals(two.scope().threadId()));
         Subject alice = new Subject(SubjectKind.USER, "alice");
@@ -173,6 +180,7 @@ class AgentResourceDelegatedTest {
         bindings.bind(FakeIdpResource.idp().issuer(), refreshed.jti(),
                 new IssuedTokenBindings.Binding(grant.id(), tenant, refreshed.expires()));
         bindCall(refreshed, tenant, grant, first.scope()); // same invocation, new credential
+        TestModelGovernance.prepare(budgets, first.scope().threadId().value());
         run(first.token(), null).statusCode(200).body("threadId", equalTo(first.scope().key()));
         run(refreshed.token(), null).statusCode(200).body("threadId", equalTo(first.scope().key()));
         // one row per run on the one invocation thread (as for a direct owner's repeat), and no other thread appeared
@@ -187,7 +195,9 @@ class AgentResourceDelegatedTest {
         String tenant = newTenant();
         Issued alice = valid(tenant, "alice");
         Issued bob = valid(tenant, "bob");
+        TestModelGovernance.prepare(budgets, alice.scope().threadId().value());
         run(alice.token(), null).statusCode(200);
+        TestModelGovernance.prepare(budgets, bob.scope().threadId().value());
         run(bob.token(), null).statusCode(200);
         assertEquals(1, scalar("select count(*) from lg4jthread where thread_name = '"
                 + alice.scope().threadId().value() + "'"));
@@ -288,6 +298,8 @@ class AgentResourceDelegatedTest {
         Map<String, Object> claims = idp.baseClaims("alice", FakeIdpResource.AUDIENCE, Duration.ofMinutes(5));
         claims.put("tenant", tenant);
         claims.put("scope", RUN);
+        TestModelGovernance.prepare(budgets, AgentResource.threadOf(tenant,
+                new Subject(SubjectKind.USER, "alice"), "direct:" + thread).value());
         run(idp.signClaims(claims), thread).statusCode(200);
         claims = idp.baseClaims("alice", FakeIdpResource.AUDIENCE, Duration.ofMinutes(5));
         claims.put("tenant", tenant);

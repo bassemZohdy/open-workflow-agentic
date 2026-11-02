@@ -7,10 +7,12 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ApprovedModelContext;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ModelPolicy;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcNodeBudget;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import jakarta.annotation.Priority;
@@ -22,7 +24,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Test-only seam for boot tests that are not about the model boundary: an approved context and a model PEP that
@@ -33,6 +37,20 @@ public final class TestModelGovernance {
 
     /** When false the context has nothing approved, as in production. */
     public static final AtomicBoolean APPROVED = new AtomicBoolean(true);
+    private static final ConcurrentHashMap<String, ApprovedModelContext.Approved> TASKS = new ConcurrentHashMap<>();
+    private static final AtomicReference<ApprovedModelContext.Approved> CURRENT = new AtomicReference<>();
+
+    /** Register the approved test task for the same canonical thread that the request will use. */
+    public static void prepare(JdbcNodeBudget budgets, String thread) {
+        CURRENT.set(TASKS.computeIfAbsent(thread, ignored -> {
+            var task = new AgentTaskContract(UlidGenerator.shared().next(), "boot test", Set.of(),
+                    Set.of("cases:read"), RiskTier.LOW, new ExecutionLimits(20, Duration.ofMinutes(10), 1_000_000L),
+                    new Subject(SubjectKind.USER, "boot-test"), Ulid.parse("01CP2ZZKBKACTAV9WEVGEMMVRZ"));
+            var agent = new Subject(SubjectKind.AGENT, "research-agent");
+            budgets.registerNew(thread, agent, task);
+            return new ApprovedModelContext.Approved(agent, task, "stub", 1_000_000L);
+        }));
+    }
 
     private TestModelGovernance() {
     }
@@ -46,10 +64,7 @@ public final class TestModelGovernance {
             if (!APPROVED.get()) {
                 return Optional.empty();
             }
-            var task = new AgentTaskContract(Ulid.parse("01ARZ3NDEKTSV4RRFFQ69G5FAV"), "boot test", Set.of(),
-                    Set.of("cases:read"), RiskTier.LOW, new ExecutionLimits(20, Duration.ofMinutes(10), 1_000_000L),
-                    new Subject(SubjectKind.USER, "boot-test"), Ulid.parse("01CP2ZZKBKACTAV9WEVGEMMVRZ"));
-            return Optional.of(new Approved(new Subject(SubjectKind.AGENT, "research-agent"), task, "stub", 1_000_000L));
+            return Optional.ofNullable(CURRENT.get());
         }
     }
 
