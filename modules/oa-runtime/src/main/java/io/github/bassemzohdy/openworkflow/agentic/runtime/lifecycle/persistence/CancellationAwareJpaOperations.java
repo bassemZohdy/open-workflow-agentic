@@ -61,6 +61,29 @@ public class CancellationAwareJpaOperations extends JpaInstanceOperations {
         lock(workflow, true);
         var definition = workflow.definition().id();
         String definitionId = definition.namespace() + "/" + definition.name();
+        // A previous attempt may have committed even if its caller observed an I/O failure. Only accept the
+        // exact durable fact, still bound to this cancellation request, with the SDK checkpoint absent.
+        try (var c = checkpointDataSource.getConnection();
+             var q = c.prepareStatement("""
+                     select 1 from task.pending_cancellation_receipt r
+                     join task.instance i on i.id = r.instance_id
+                     where r.application_id = ? and r.engine_instance_id = ?
+                       and r.definition_id = ? and r.definition_version = ?
+                       and i.status = 'CANCEL_REQUESTED' and i.engine_instance_id = r.engine_instance_id
+                       and i.definition_id = r.definition_id and i.definition_version = r.definition_version
+                       and not exists (select 1 from public.workflowinstanceentity w
+                                       where w.applicationid = r.application_id and w.instanceid = r.engine_instance_id)
+                     for update of i
+                     """)) {
+            q.setQueryTimeout(5);
+            q.setString(1, workflow.definition().application().id());
+            q.setString(2, workflow.instanceData().id());
+            q.setString(3, definitionId);
+            q.setString(4, definition.version());
+            try (var result = q.executeQuery()) { if (result.next()) return; }
+        } catch (SQLException unavailable) {
+            throw new StoreUnavailableException("pending cancellation receipt unavailable", unavailable);
+        }
         try (var c = checkpointDataSource.getConnection();
              var q = c.prepareStatement("""
                      insert into task.pending_cancellation_receipt

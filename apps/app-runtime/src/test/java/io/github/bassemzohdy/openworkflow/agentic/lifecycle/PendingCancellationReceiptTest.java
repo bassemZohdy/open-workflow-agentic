@@ -64,6 +64,9 @@ class PendingCancellationReceiptTest {
     interface Scenario { void run(WorkflowInstance instance, InstanceRecord row, String appId,
                                    PersistenceCommitGate gate) throws Exception; }
     void withRestored(Scenario scenario) throws Exception {
+        withRestored(java.util.function.UnaryOperator.identity(), scenario);
+    }
+    void withRestored(java.util.function.UnaryOperator<PersistenceInstanceWriter> wrap, Scenario scenario) throws Exception {
         String appId = "receipt-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
         var listening = new CountDownLatch(1);
         var broker = new InMemoryEvents() {
@@ -92,11 +95,50 @@ class PendingCancellationReceiptTest {
                     .disableLifeCycleCEPublishing().disableStatusChangePublishing().build()) {
                 var definition = restored.workflowDefinition(workflow);
                 var guardedWriter = new CheckpointingWriter(borrowed(receiptWriter), cancelGate, (op,id)->{});
-                var reader = new CancellablePersistenceReader(operations, guardedWriter);
+                var reader = new CancellablePersistenceReader(operations, wrap.apply(guardedWriter));
                 var instance = reader.find(definition, original.id()).orElseThrow();
                 scenario.run(instance, row, appId, cancelGate);
             }
         }
+    }
+    @Test void retryAfterLostCommitAcknowledgementReusesExactReceipt() throws Exception {
+        var first = new java.util.concurrent.atomic.AtomicBoolean(true);
+        withRestored(real -> (PersistenceInstanceWriter) Proxy.newProxyInstance(PersistenceInstanceWriter.class.getClassLoader(),
+                new Class<?>[]{PersistenceInstanceWriter.class}, (proxy, method, args) -> {
+                    try {
+                        Object result = method.invoke(real, args);
+                        if (method.getName().equals("aborted") && first.getAndSet(false)) {
+                            @SuppressWarnings("unchecked") var committed = (CompletableFuture<Void>) result;
+                            return committed.thenCompose(ignored -> CompletableFuture.failedFuture(new IllegalStateException("lost acknowledgement")));
+                        }
+                        return result;
+                    } catch (InvocationTargetException e) { throw e.getCause(); }
+                }), (instance, row, appId, gate) -> {
+            assertThrows(ExecutionException.class, () -> instance.cancelFuture().get(10, TimeUnit.SECONDS));
+            assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+            assertEquals(0, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+            assertThrows(CancellationException.class, () -> instance.start().join());
+            assertTrue(instance.cancelFuture().get(10, TimeUnit.SECONDS));
+            assertEquals(WorkflowStatus.CANCELLED, instance.status());
+            assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+        });
+    }
+    @Test void retryAfterPreCommitFailureKeepsTheStartGuard() throws Exception {
+        var first = new java.util.concurrent.atomic.AtomicBoolean(true);
+        withRestored(real -> (PersistenceInstanceWriter) Proxy.newProxyInstance(PersistenceInstanceWriter.class.getClassLoader(),
+                new Class<?>[]{PersistenceInstanceWriter.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("aborted") && first.getAndSet(false))
+                        return CompletableFuture.failedFuture(new IllegalStateException("temporary failure"));
+                    try { return method.invoke(real, args); } catch (InvocationTargetException e) { throw e.getCause(); }
+                }), (instance, row, appId, gate) -> {
+            assertThrows(ExecutionException.class, () -> instance.cancelFuture().get(10, TimeUnit.SECONDS));
+            assertEquals(0, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+            assertEquals(1, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+            assertThrows(CancellationException.class, () -> instance.start().join());
+            assertTrue(instance.cancelFuture().get(10, TimeUnit.SECONDS));
+            assertEquals(WorkflowStatus.CANCELLED, instance.status());
+            assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+        });
     }
     long count(String sql, String value) throws Exception {
         try (var c = data.getConnection(); var q = c.prepareStatement(sql)) {
