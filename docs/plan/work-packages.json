@@ -821,6 +821,7 @@
       "progress": {
         "status": "partial",
         "implemented": [
+          "An internal transaction seam lets an inbox receipt and its exact wait binding share a caller-owned PostgreSQL transaction; rollback, duplicate and concurrent-receipt tests pass. It is not a producer, dispatch permission or T13 completion.",
           "JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.",
           "Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied.",
           "Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.",
@@ -889,6 +890,7 @@
           "Automate complete T13 including late/duplicate events, cancellation races and failed compensation. Actual SDK receipt/ACK/component restart evidence does not replace full group/distributed recovery acceptance."
         ],
         "evidence": [
+          "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/JdbcEventInboxTransactionTest.java",
           "docs/handoffs/gpt/WP-107.md",
           "docs/lifecycle.md",
           "docs/handoffs/gpt/INTEGRATION-2026-10-20.md",
