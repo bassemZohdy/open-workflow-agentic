@@ -115,6 +115,20 @@ class HumanDecisionJournalTest {
         assertEquals(1, auditCount(f));
     }
 
+    @Test void aSimulatedLostCommitReplyIsRecoveredByTheSameDecision() throws Exception {
+        var f = fixture("bob", "NONE");
+        try (var c = owned.getConnection()) {
+            c.setAutoCommit(false);
+            assertEquals(HumanDecisionJournal.Result.RECORDED, journal.record(c, f.decision(), f.instance(), "wait"));
+            assertThrows(SQLException.class, () -> {
+                c.commit();
+                throw new SQLException("simulated reply loss after commit");
+            });
+        }
+        assertEquals(HumanDecisionJournal.Result.REPLAYED, record(f, f.decision(), "wait"));
+        assertEquals(1, count("decision", f)); assertEquals(1, count("pending", f)); assertEquals(1, auditCount(f));
+    }
+
     @Test void failedAuditAppendRollsBackDecisionAndTaskTransition() throws Exception {
         var f = fixture("bob", "NONE");
         try (var c = owned.getConnection(); var s = c.createStatement()) {
@@ -204,6 +218,16 @@ class HumanDecisionJournalTest {
         try (var c = owned.getConnection(); var q = c.prepareStatement("update human_proposal.task set wait_key='other' "
                 + "where tenant=? and task_id=?")) {
             q.setString(1, "tenant"); q.setString(2, f.task().value()); q.executeUpdate();
+        }
+        assertThrows(HumanDecisionJournal.Conflict.class, () -> record(f, f.decision(), "wait"));
+    }
+
+    @Test void changedRetainedAuditTimeCannotReplayTheOldDecision() throws Exception {
+        var f = fixture("bob", "NONE");
+        record(f, f.decision(), "wait");
+        try (var c = owned.getConnection(); var q = c.prepareStatement("update human_proposal.pending "
+                + "set audit_occurred_at=audit_occurred_at + interval '1 second' where tenant=? and decision_id=?")) {
+            q.setString(1, "tenant"); q.setString(2, f.decision().id().value()); q.executeUpdate();
         }
         assertThrows(HumanDecisionJournal.Conflict.class, () -> record(f, f.decision(), "wait"));
     }
