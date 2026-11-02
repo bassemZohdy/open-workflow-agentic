@@ -1,5 +1,7 @@
 # Changelog
 
+- Document and test restricted checkpoint-audit database grants.
+
 - Retain one audit identity across concurrent owned checkpoint acknowledgements, crashes and recovery.
 
 - Avoid repeating acknowledgement audits when an owned checkpoint receipt was already acknowledged.

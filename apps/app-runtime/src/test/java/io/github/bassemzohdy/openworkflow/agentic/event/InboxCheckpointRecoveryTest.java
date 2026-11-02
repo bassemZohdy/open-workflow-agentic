@@ -247,6 +247,49 @@ class InboxCheckpointRecoveryTest {
             }
         }
     }
+    @Test void restrictedRuntimeRoleNeedsOnlyTheDocumentedCheckpointAuditGrants() throws Exception {
+        try(var f=new Fixture(2)) {
+            String role="checkpoint_role_"+UUID.randomUUID().toString().replace("-","");
+            String password="local-checkpoint-test";
+            boolean created=false;
+            try {
+                try(var c=dataSource.getConnection();var s=c.createStatement()) {
+                    s.execute("create role "+role+" login noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls password '"+password+"'");
+                    created=true;
+                    s.execute("grant usage on schema task,inbox to "+role);
+                    // Existing owned-dispatch prerequisites, deliberately separate from the new additive template.
+                    s.execute("grant select,update on task.instance,inbox.delivery to "+role);
+                    s.execute("grant select on inbox.signal,inbox.message,inbox.checkpoint_receipt to "+role);
+                }
+                String url;try(var c=dataSource.getConnection()){url=c.getMetaData().getURL();}
+                var restricted=new org.postgresql.ds.PGSimpleDataSource();restricted.setURL(url);restricted.setUser(role);restricted.setPassword(password);
+                var roleAudit=new AuditTrail(restricted);var clock=Clock.systemUTC();
+                var roleInbox=new JdbcEventInbox(restricted);var roleLeases=new JdbcInboxTaskLease(restricted,roleAudit,clock);
+                var service=new JdbcOwnedInbox(restricted,roleLeases,roleInbox,new JdbcInboxCheckpointProof(restricted),roleAudit,clock);
+                assertThrows(StoreUnavailableException.class,()->service.acknowledge(f.waits.getFirst()));
+                assertEquals(0,acknowledged(f.row));assertEquals(0,recoveryAudits(f.row));
+                var root=java.nio.file.Path.of("").toAbsolutePath();
+                while(root!=null && !java.nio.file.Files.isRegularFile(root.resolve("deploy/sql/checkpoint-audit-grants.sql")))root=root.getParent();
+                assertNotNull(root,"checkpoint grant template not found");
+                String sql=java.nio.file.Files.readString(root.resolve("deploy/sql/checkpoint-audit-grants.sql"))
+                        .replace("__CHECKPOINT_AUDIT_ROLE__",role);
+                try(var c=dataSource.getConnection();var s=c.createStatement()){s.execute(sql);}
+                assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,service.acknowledge(f.waits.getFirst()));
+                assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,service.acknowledge(f.waits.getFirst()));
+                assertEquals(1,acknowledged(f.row));assertEquals(1,recoveryAudits(f.row));
+                try(var c=restricted.getConnection();var s=c.createStatement()) {
+                    for(String command:List.of("update inbox.checkpoint_audit_source set event_id=event_id",
+                            "delete from inbox.checkpoint_audit_source", "truncate inbox.checkpoint_audit_source")) {
+                        var failure=assertThrows(java.sql.SQLException.class,()->s.execute(command));assertEquals("42501",failure.getSQLState());
+                    }
+                }
+            } finally {
+                if(created)try(var c=dataSource.getConnection();var s=c.createStatement()) {
+                    s.execute("drop owned by "+role);s.execute("drop role if exists "+role);
+                }
+            }
+        }
+    }
     @Test void mismatchedApplicationTenantAndFullOwnerFailBeforeAuditOrAcknowledgement() throws Exception {
         try(var f=new Fixture(2)) {
             var calls=new AtomicInteger();var service=new JdbcInboxCheckpointRecovery(dataSource,(c,e)->calls.incrementAndGet(),Clock.systemUTC());
