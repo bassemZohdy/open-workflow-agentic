@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test a waiting workflow after loss of its kind worker node (disposable cluster only)."""
+import argparse
 import json
 import re
 import subprocess
@@ -11,6 +12,9 @@ from verify_failover import EXPERIMENT, IMAGE, NAMESPACE, ROOT, api, eventually,
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--deadline", action="store_true", help="test expiry with the proposed schema and test-only reader")
+    args = parser.parse_args()
     run("docker", "image", "inspect", IMAGE)
     cluster = "owa-node-" + uuid.uuid4().hex[:10]
     control, workers = cluster + "-control-plane", [cluster + "-worker", cluster + "-worker2"]
@@ -58,6 +62,13 @@ def main():
       - { key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 5 }
 """
             deployment = deployment.replace(before, before + scheduling)
+            if args.deadline:
+                before = "        - { name: AGENTIC_RECONCILER_INTERVAL, value: PT2S }\n"
+                if deployment.count(before) != 1:
+                    raise RuntimeError("unexpected reconciler configuration")
+                deployment = deployment.replace(before, before +
+                    "        - { name: AGENTIC_RECONCILER_WAIT_DEADLINE, value: PT20S }\n"
+                    "        - { name: AGENTIC_TEST_PENDING_CANCELLATION_READER, value: 'true' }\n")
             run("kubectl", "--kubeconfig", kubeconfig, "apply", "-f", "-", stdin=deployment)
             run(*kubectl, "rollout", "status", "deployment/workflow", "--timeout=180s", timeout=200)
 
@@ -67,7 +78,12 @@ def main():
             initial = pods()
             if len(initial) != 2 or {p["spec"]["nodeName"] for p in initial} != set(workers):
                 raise RuntimeError("the two ready replicas were not placed on separate workers")
+            if args.deadline:
+                proposal = ROOT / "modules/oa-runtime/src/main/resources/db/proposed/V81__pending_cancellation_receipt.sql"
+                run(*kubectl, "exec", "-i", "db", "--", "psql", "-U", "postgres", "-d", "agentic",
+                    "-v", "ON_ERROR_STOP=1", stdin=proposal.read_text(encoding="utf-8"))
             original = initial[0]["metadata"]["name"]
+            survivor = initial[1]["metadata"]["name"]
             lost_node = initial[0]["spec"]["nodeName"]
             remaining_node = next(node for node in workers if node != lost_node)
 
@@ -106,14 +122,41 @@ def main():
 
             if sql(f"select applicationid from workflowinstanceentity where instanceid='{engine_id}'") != lease:
                 raise RuntimeError("checkpoint is not bound to the original lease")
+            deadline_millis = None
+            if args.deadline:
+                deadline_millis = sql(f"select (extract(epoch from wait_deadline)*1000)::bigint from task.instance "
+                                      f"where id='{instance_id}' and wait_deadline > clock_timestamp() + interval '3 seconds'")
+                if not re.fullmatch(r"[0-9]+", deadline_millis):
+                    raise RuntimeError("deadline is missing or too close to stop the worker")
             print("Stopping the workflow owner's worker node", flush=True)
             run("docker", "kill", lost_node, timeout=30)
             forwarder.terminate(); forwarder.wait(timeout=10); forwarder = None
+            if args.deadline:
+                eventually("original deadline to pass", lambda: sql(f"select (clock_timestamp() >= "
+                           f"to_timestamp({deadline_millis}/1000.0))::text") == "true")
+                run(*kubectl, "wait", "--for=condition=Ready", "pod/" + survivor, "--timeout=10s", timeout=15)
+                if sql(f"select resume_epoch from task.instance where id='{instance_id}'") != "0":
+                    raise RuntimeError("expired workflow resumed before the deadline check")
             replacement = eventually("replacement on the surviving worker", lambda: next(
                 (p["metadata"]["name"] for p in pods() if p["metadata"]["name"] != original
                  and p["spec"].get("nodeName") == remaining_node and lease_for(p["metadata"]["name"]) == lease), None),
                 timeout=300)
             port = forward(replacement)
+            if args.deadline:
+                def cancelled():
+                    status = api(port, "/instances/" + instance_id)["status"]
+                    if status in {"FAILED", "COMPLETED"}:
+                        raise RuntimeError("expired workflow reached unexpected terminal status " + status)
+                    return status == "CANCELLED"
+                eventually("expired workflow cancellation after node loss", cancelled, timeout=180)
+                if sql(f"select resume_epoch from task.instance where id='{instance_id}'") != "0":
+                    raise RuntimeError("expired workflow resumed after node loss")
+                if sql(f"select count(*) from task.pending_cancellation_receipt where instance_id='{instance_id}'") != "1":
+                    raise RuntimeError("committed cancellation receipt is missing")
+                if "probe-effect received instance=" + engine_id in run(*kubectl, "logs", replacement):
+                    raise RuntimeError("expired workflow invoked its effect after node loss")
+                print("PASS: deadline expired during worker loss and was cancelled without resume", flush=True)
+                return
             eventually("workflow restored on the surviving worker", lambda:
                        sql(f"select resume_epoch from task.instance where id='{instance_id}'") == "1"
                        and api(port, "/instances/" + instance_id)["status"] == "WAITING", timeout=180)
