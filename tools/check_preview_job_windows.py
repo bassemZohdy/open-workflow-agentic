@@ -40,7 +40,11 @@ try:
                     "';[Console]::WriteLine($p.Id);" + ('exit 0' if exits else 'Wait-Process -Id $p.Id'))
                 arguments = [str(native), '-NoProfile', '-NonInteractive', '-Command', script]
             parent = job.start(arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            descendant = int(executor.submit(parent.stdout.readline).result(timeout=10).strip())
+            try:
+                line = executor.submit(parent.stdout.readline).result(timeout=30)
+            except concurrent.futures.TimeoutError as failure:
+                raise TimeoutError(f'{kind} parent did not report its descendant within 30 seconds') from failure
+            descendant = int(line.strip())
             if exits:
                 assert parent.wait(timeout=10) == 0
             members = job.members(); assert descendant in members and sentinel.pid not in members

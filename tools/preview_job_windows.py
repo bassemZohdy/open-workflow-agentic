@@ -157,7 +157,16 @@ class NativeProcess:
 
     def terminate(self):
         import _winapi
-        if self.poll() is None:_winapi.TerminateProcess(self._handle, 1)
+        if self.poll() is not None:
+            return
+        try:
+            _winapi.TerminateProcess(self._handle, 1)
+        except PermissionError:
+            # A job termination can win between poll and TerminateProcess. Ignore access denied only if
+            # the same process handle becomes signalled; a still-running process remains an error.
+            if _winapi.WaitForSingleObject(self._handle, 1000) != _winapi.WAIT_OBJECT_0:
+                raise
+            self.returncode = _winapi.GetExitCodeProcess(self._handle)
 
     kill = terminate
 
