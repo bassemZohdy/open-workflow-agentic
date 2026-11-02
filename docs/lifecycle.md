@@ -337,8 +337,8 @@ primitive uses the database clock, retains increasing owner generations, and loc
 checking database work. PostgreSQL tests cover competing owners, expiry, stale generations, cancellation and
 rollback after expiry, including a successor waiting for the earlier transaction. A post-work check can still precede
 commit by enough time for a lease to expire; the locks prevent a successor from taking over until that transaction
-ends. The proposed schema and primitive are not deployed or connected to start, restore, checkpointing or external
-calls. An explicit JTA fence has also been tested around the SDK's actual JPA workflow-status operation: it takes the
+ends. The proposed schema and primitive are not deployed or connected to normal application startup, restore,
+checkpointing or external calls. An explicit JTA fence has also been tested around the SDK's actual JPA workflow-status operation: it takes the
 existing checkpoint advisory lock before the registry and owner locks, and an expired owner's flushed write rolls
 back before the successor commits. This is not installed in the normal writer. The pinned SDK can suppress failed
 listener futures, so a rejected checkpoint alone does not stop subsequent execution. A separately composed candidate
@@ -352,16 +352,19 @@ same-process SDK/JPA restore test, a current owner completes a persisted wait, w
 wait checkpoint or start the next task. The test explicitly binds the claim and keeps the original engine in the same
 process; it is not a crash or partition test. Filter-provider selection and compatibility across the full SDK remain
 unproven. The check does not hold a lease across task execution:
-a lease can expire immediately after the check. Owner acquisition and renewal, production composition, cancellation
-cleanup and external-effect fencing remain open. These primitives cannot stop an in-flight external effect or establish
+a lease can expire immediately after the check. Production composition, cancellation cleanup and external-effect fencing remain open. These primitives cannot stop an in-flight external effect or establish
 split-brain safety.
 
 A separately composed, bounded process-local coordinator can acquire and renew one generation for a context supplied
 by a trusted caller. A failed or uncertain renewal or shutdown revokes that exact context locally and leaves the
 database lease to expire; it does not stop work already in flight. Tests cover renewal, failure while the database
 lease remains live, a writer and an execution check blocked during revocation, and shutdown during a blocked
-acquisition. The coordinator is not installed in application startup or restore. Trusted context provenance, pool
-and scheduler capacity, cross-process failure and production rollout remain open.
+acquisition. An explicitly composed candidate restore reader can acquire a session for its own SDK context before starting.
+Same-process database tests cover competing restores, takeover after expiry, concurrent starts and cancellation while
+acquisition is blocked. A required caller-supplied post-acquisition check must revalidate authority, deadlines and
+checkpoint preparation; the test fixture permits the start and is not a production policy. A context retired after
+acquisition cannot be retried in place. This composition is not installed in application startup. Trusted context
+provenance, pool and scheduler capacity, cross-process failure and production rollout remain open.
 
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`

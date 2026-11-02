@@ -1,6 +1,8 @@
 package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence;
 
 import io.serverlessworkflow.impl.WorkflowDefinition;
+import io.serverlessworkflow.impl.WorkflowContextData;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.WorkflowOwnerCoordinator;
 import io.serverlessworkflow.impl.WorkflowInstance;
 import io.serverlessworkflow.impl.persistence.PersistenceInstanceOperations;
 import io.serverlessworkflow.impl.persistence.PersistenceInstanceReader;
@@ -24,18 +26,33 @@ public final class CancellablePersistenceReader implements PersistenceInstanceRe
     private final PersistenceInstanceOperations operations;
     private final PersistenceInstanceWriter writer;
     private final Map<WorkflowDefinition, Set<String>> prohibited = new IdentityHashMap<>();
+    @FunctionalInterface public interface OwnerStarter {
+        Optional<WorkflowOwnerCoordinator.Session> acquire(WorkflowContextData context);
+    }
+    /** The context was bound and retired; a fresh restored instance is required for another attempt. */
+    public static final class RetiredOwnerContextException extends IllegalStateException {
+        public RetiredOwnerContextException(String message, Throwable cause) { super(message, cause); }
+    }
     private final int maxTombstones;
+    private final OwnerStarter ownerStarter;
     private int tombstones;
     private boolean closed;
 
     public CancellablePersistenceReader(PersistenceInstanceOperations operations, PersistenceInstanceWriter writer) {
-        this(operations, writer, 100_000);
+        this(operations, writer, 100_000, null);
     }
 
     public CancellablePersistenceReader(PersistenceInstanceOperations operations, PersistenceInstanceWriter writer,
                                         int maxTombstones) {
+        this(operations, writer, maxTombstones, null);
+    }
+
+    /** Explicit test composition; the application must also install execution and persistence fences. */
+    public CancellablePersistenceReader(PersistenceInstanceOperations operations, PersistenceInstanceWriter writer,
+                                        int maxTombstones, OwnerStarter ownerStarter) {
         this.operations = Objects.requireNonNull(operations, "operations");
         this.writer = Objects.requireNonNull(writer, "writer");
+        this.ownerStarter = ownerStarter;
         if (maxTombstones < 1) throw new IllegalArgumentException("invalid cancellation tombstone limit");
         this.maxTombstones = maxTombstones;
     }
@@ -54,7 +71,7 @@ public final class CancellablePersistenceReader implements PersistenceInstanceRe
             io.serverlessworkflow.impl.persistence.PersistenceWorkflowInfo info) {
         if (closed) throw new IllegalStateException("restore reader is closed");
         if (prohibited.getOrDefault(definition, Set.of()).contains(info.id())) return Optional.empty();
-        return Optional.of(CancellableRestoredWorkflowInstance.of(definition, info, writer, this));
+        return Optional.of(CancellableRestoredWorkflowInstance.of(definition, info, writer, this, ownerStarter));
     }
 
     /** Prevents stale reads from reconstructing this occurrence, even when deletion later fails. */

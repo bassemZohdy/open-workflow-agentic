@@ -15,6 +15,7 @@
  */
 package io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence;
 
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.WorkflowOwnerCoordinator;
 import io.serverlessworkflow.impl.persistence.PersistenceWorkflowInfo;
 import io.serverlessworkflow.impl.persistence.PersistenceTaskInfo;
 import io.serverlessworkflow.impl.persistence.CompletedTaskInfo;
@@ -50,6 +51,8 @@ public final class CancellableRestoredWorkflowInstance extends WorkflowMutableIn
   private final Object lifecycle = new Object();
   private final PersistenceInstanceWriter cancellationWriter;
   private final CancellablePersistenceReader reader;
+  private final CancellablePersistenceReader.OwnerStarter ownerStarter;
+  private CompletableFuture<WorkflowModel> guardedStart;
   private boolean started;
   private volatile boolean pendingCancellationRequested;
   private boolean removalAcknowledged;
@@ -59,7 +62,8 @@ public final class CancellableRestoredWorkflowInstance extends WorkflowMutableIn
   private Set<String> userMetaKeys = new HashSet<>();
 
   static WorkflowInstance of(WorkflowDefinition definition, PersistenceWorkflowInfo info,
-                             PersistenceInstanceWriter writer, CancellablePersistenceReader reader) {
+                             PersistenceInstanceWriter writer, CancellablePersistenceReader reader,
+                             CancellablePersistenceReader.OwnerStarter ownerStarter) {
     synchronized (definition) {
       var existing = definition.activeInstance(info.id());
       if (existing.isPresent()) {
@@ -67,15 +71,17 @@ public final class CancellableRestoredWorkflowInstance extends WorkflowMutableIn
           throw new IllegalStateException("existing restored instance belongs to another reader");
         return guarded;
       }
-      return new CancellableRestoredWorkflowInstance(definition, info, writer, reader);
+      return new CancellableRestoredWorkflowInstance(definition, info, writer, reader, ownerStarter);
     }
   }
 
   private CancellableRestoredWorkflowInstance(WorkflowDefinition definition, PersistenceWorkflowInfo info,
-                                               PersistenceInstanceWriter writer, CancellablePersistenceReader reader) {
+                                               PersistenceInstanceWriter writer, CancellablePersistenceReader reader,
+                                               CancellablePersistenceReader.OwnerStarter ownerStarter) {
     super(definition, info.id(), info.input());
     this.cancellationWriter = Objects.requireNonNull(writer, "writer");
     this.reader = Objects.requireNonNull(reader, "reader");
+    this.ownerStarter = ownerStarter;
     this.info = info;
     info.tasks()
         .forEach(
@@ -90,21 +96,72 @@ public final class CancellableRestoredWorkflowInstance extends WorkflowMutableIn
 
   @Override
   public CompletableFuture<WorkflowModel> start() {
+    if (ownerStarter == null) {
+      synchronized (lifecycle) {
+        if (pendingCancellationRequested)
+          return CompletableFuture.failedFuture(new CancellationException("restored instance was cancelled"));
+        started = true;
+        return startRestoredExecution();
+      }
+    }
+    CompletableFuture<WorkflowModel> attempt;
     synchronized (lifecycle) {
       if (pendingCancellationRequested)
         return CompletableFuture.failedFuture(new CancellationException("restored instance was cancelled"));
-      started = true;
-      return startExecution(
-          () -> {
-            if (info.status() == WorkflowStatus.SUSPENDED) {
-              setSuspended();
-              setStatus(WorkflowStatus.SUSPENDED);
-            } else {
-              setStatus(WorkflowStatus.RUNNING);
-            }
-            return CompletableFuture.completedFuture(null);
-          });
+      if (guardedStart != null) return guardedStart;
+      guardedStart = new CompletableFuture<>();
+      attempt = guardedStart;
     }
+    WorkflowOwnerCoordinator.Session session = null;
+    try {
+      // Acquisition can block: never hold the lifecycle monitor while cancellation is trying to prevent a start.
+      var acquired = Objects.requireNonNull(ownerStarter.acquire(workflowContext), "owner acquisition");
+      if (acquired.isEmpty()) {
+        synchronized (lifecycle) { if (guardedStart == attempt) guardedStart = null; }
+        attempt.completeExceptionally(new IllegalStateException("restored workflow has no current owner"));
+        return attempt;
+      }
+      session = acquired.get();
+      CompletableFuture<WorkflowModel> execution;
+      synchronized (lifecycle) {
+        if (pendingCancellationRequested) {
+          session.close();
+          attempt.completeExceptionally(new CancellationException("restored instance was cancelled during acquisition"));
+          return attempt;
+        }
+        started = true;
+        execution = startRestoredExecution();
+      }
+      var active = session;
+      execution.whenComplete((value, failure) -> {
+        active.close();
+        if (failure == null) attempt.complete(value); else attempt.completeExceptionally(failure);
+      });
+      return attempt;
+    } catch (RuntimeException | Error failure) {
+      if (session != null) session.close();
+      // Once a context has been bound, it must never be rebound to another owner generation.
+      synchronized (lifecycle) {
+        if (session == null && !(failure instanceof CancellablePersistenceReader.RetiredOwnerContextException)
+            && guardedStart == attempt) guardedStart = null;
+      }
+      attempt.completeExceptionally(failure);
+      if (failure instanceof Error fatal) throw fatal;
+      return attempt;
+    }
+  }
+
+  private CompletableFuture<WorkflowModel> startRestoredExecution() {
+    return startExecution(
+        () -> {
+          if (info.status() == WorkflowStatus.SUSPENDED) {
+            setSuspended();
+            setStatus(WorkflowStatus.SUSPENDED);
+          } else {
+            setStatus(WorkflowStatus.RUNNING);
+          }
+          return CompletableFuture.completedFuture(null);
+        });
   }
 
   @Override

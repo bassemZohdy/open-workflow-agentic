@@ -5,6 +5,10 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.OwnerFencedJpaWriter;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.CancellablePersistenceReader;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.persistence.PendingCancellationReceiptWriter;
+import io.quarkiverse.flow.persistence.jpa.JpaInstanceOperations;
+import jakarta.transaction.TransactionManager;
 import io.quarkiverse.flow.persistence.jpa.JpaInstanceReader;
 import io.quarkiverse.flow.persistence.jpa.JpaInstanceWriter;
 import io.cloudevents.CloudEvent;
@@ -53,12 +57,18 @@ class WorkflowOwnerExecutionBoundaryTest {
     @Inject JpaInstanceReader reader;
     @Inject JpaInstanceWriter writer;
     @Inject OwnerFencedJpaWriter fencedWriter;
+    @Inject PendingCancellationReceiptWriter pendingWriter;
+    @Inject JpaInstanceOperations operations;
+    @Inject RegistryScan scan;
+    @Inject TransactionManager transactions;
 
     @BeforeAll void installProposal() throws Exception {
-        try (var in = getClass().getClassLoader().getResourceAsStream("db/proposed/V82__workflow_owner_lease.sql")) {
-            assertNotNull(in);
-            try (var c = data.getConnection(); var s = c.createStatement()) {
-                s.execute(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+        try (var c = data.getConnection(); var statement = c.createStatement()) {
+            for (String schema : List.of("db/proposed/V81__pending_cancellation_receipt.sql",
+                                         "db/proposed/V82__workflow_owner_lease.sql")) {
+                try (var in = getClass().getClassLoader().getResourceAsStream(schema)) {
+                    assertNotNull(in); statement.execute(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+                }
             }
         }
     }
@@ -81,6 +91,198 @@ class WorkflowOwnerExecutionBoundaryTest {
         var row = store.insertIfAbsent(InstanceRecord.starting(UlidGenerator.shared().next(), request, now), "test.insert").record();
         row = store.replace(row.successor(now, InstanceStatus.RUNNING, instance.id(), 0, null, null), row.version(), "test.running", actor);
         return new JdbcWorkflowOwnerLease.Binding(tenant, row.id(), appId, instance.id(), definition);
+    }
+
+    @Test void failedPostAcquisitionCheckRetiresContext() throws Exception {
+        String appId = "owner-denied-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
+        String document = """
+                document: { dsl: '1.0.3', namespace: agentic-test, name: owner-boundary, version: '1.0.0' }
+                do:
+                  - wait:
+                      listen:
+                        to:
+                          one:
+                            with: { type: io.openworkflow.owner.resume }
+                """;
+        var waiting = new CountDownLatch(1);
+        var calls = new AtomicInteger();
+        try (var originalBroker = broker(waiting);
+             var coordinator = new WorkflowOwnerCoordinator(data, transactions, bindings, 4);
+             var originalApp = WorkflowApplication.builder().withId(appId).withEventConsumer(originalBroker)
+                     .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                     .withListener(new WorkflowPersistenceListener(borrowed(writer, null))).build();
+             var restoredApp = WorkflowApplication.builder().withId(appId)
+                     .disableLifeCycleCEPublishing().disableStatusChangePublishing().build()) {
+            var workflow = WorkflowReader.readWorkflowFromString(document, WorkflowFormat.YAML);
+            var original = originalApp.workflowDefinition(workflow).instance(Map.of()); original.start();
+            assertTrue(waiting.await(10, TimeUnit.SECONDS));
+            register(appId, tenant, original);
+            var starter = new RestoredWorkflowOwnerStarter(scan, store, coordinator, ownerFence,
+                    Duration.ofSeconds(10), row -> { calls.incrementAndGet(); return false; });
+            try (var candidate = new CancellablePersistenceReader(operations, borrowed(writer, null), 1000, starter)) {
+                var restored = candidate.find(restoredApp.workflowDefinition(workflow), original.id()).orElseThrow();
+                var first = restored.start();
+                assertThrows(CompletionException.class, first::join);
+                assertSame(first, restored.start());
+                assertEquals(1, calls.get(), "a retired context must not acquire again");
+                assertEquals(WorkflowStatus.PENDING, restored.status());
+            }
+        }
+    }
+
+    @Test void cancellationWinsWhileRestoredOwnerAcquisitionIsBlocked() throws Exception {
+        String appId = "owner-cancel-race-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
+        String document = """
+                document: { dsl: '1.0.3', namespace: agentic-test, name: owner-boundary, version: '1.0.0' }
+                do:
+                  - wait:
+                      listen:
+                        to:
+                          one:
+                            with: { type: io.openworkflow.owner.resume }
+                """;
+        var originalWaiting = new CountDownLatch(1); var acquired = new CountDownLatch(1); var proceed = new CountDownLatch(1);
+        var originalBroker = broker(originalWaiting); var restoredBroker = new InMemoryEvents();
+        var session = new AtomicReference<WorkflowOwnerCoordinator.Session>();
+        var entered = new AtomicInteger(); var worker = Executors.newSingleThreadExecutor();
+        try (originalBroker; restoredBroker;
+             var coordinator = new WorkflowOwnerCoordinator(data, transactions, bindings, 4);
+             var originalApp = WorkflowApplication.builder().withId(appId).withEventConsumer(originalBroker)
+                     .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                     .withListener(new WorkflowPersistenceListener(borrowed(writer, null))).build()) {
+            var workflow = WorkflowReader.readWorkflowFromString(document, WorkflowFormat.YAML);
+            var original = originalApp.workflowDefinition(workflow).instance(Map.of()); original.start();
+            assertTrue(originalWaiting.await(10, TimeUnit.SECONDS));
+            var binding = register(appId, tenant, original);
+            var starter = new RestoredWorkflowOwnerStarter(scan, store, coordinator, ownerFence,
+                    Duration.ofSeconds(10), row -> true);
+            CancellablePersistenceReader.OwnerStarter delayed = context -> {
+                var owned = starter.acquire(context); owned.ifPresent(session::set); acquired.countDown();
+                try { if (!proceed.await(8, TimeUnit.SECONDS)) throw new IllegalStateException("test did not release acquisition"); }
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new IllegalStateException(e); }
+                return owned;
+            };
+            try (var restoredApp = WorkflowApplication.builder().withId(appId).withEventConsumer(restoredBroker)
+                    .withTaskExecutorFactory(new OwnerFencedTaskExecutorFactory(DefaultTaskExecutorFactory.get(), ownerFence::requireCurrent))
+                    .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                    .withListener(new WorkflowPersistenceListener(borrowed(fencedWriter, null)))
+                    .withListener(new WorkflowExecutionListener() {
+                        @Override public void onTaskStarted(TaskStartedEvent event) { entered.incrementAndGet(); }
+                    }).build();
+                 var reader = new CancellablePersistenceReader(operations, borrowed(pendingWriter, null), 1000, delayed)) {
+                var restored = reader.find(restoredApp.workflowDefinition(workflow), original.id()).orElseThrow();
+                Future<CompletableFuture<WorkflowModel>> starting = worker.submit((Callable<CompletableFuture<WorkflowModel>>) restored::start);
+                assertTrue(acquired.await(8, TimeUnit.SECONDS)); assertNotNull(session.get());
+                var concurrentStart = restored.start();
+                var current = store.find(tenant, binding.instanceId()).orElseThrow();
+                store.replace(current.successor(Instant.now().truncatedTo(ChronoUnit.MICROS), InstanceStatus.CANCEL_REQUESTED,
+                        current.engineInstanceId(), current.startAttempts(), null, null), current.version(), "test.cancel", current.owner());
+                assertTrue(restored.cancelFuture().get(5, TimeUnit.SECONDS), "pending cancellation must not wait for acquisition");
+                proceed.countDown();
+                var completion = starting.get(5, TimeUnit.SECONDS);
+                assertSame(concurrentStart, completion);
+                assertThrows(Exception.class, () -> completion.get(5, TimeUnit.SECONDS));
+                assertEquals(0, entered.get());
+                assertEquals(WorkflowOwnerCoordinator.State.CLOSED, session.get().state());
+                assertEquals(1, countReceipt(binding.instanceId().value()));
+            }
+        } finally { proceed.countDown(); worker.shutdownNow(); }
+    }
+
+    private long countReceipt(String id) throws Exception {
+        try (var c = data.getConnection(); var q = c.prepareStatement("select count(*) from task.pending_cancellation_receipt where instance_id=?")) {
+            q.setString(1, id); try (var r = q.executeQuery()) { r.next(); return r.getLong(1); }
+        }
+    }
+
+    @Test void competingRestoresAcquireAndRenewTheirOwnContextBeforeStarting() throws Exception {
+        String appId = "owner-auto-restore-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
+        String document = """
+                document: { dsl: '1.0.3', namespace: agentic-test, name: owner-boundary, version: '1.0.0' }
+                do:
+                  - prepare:
+                      set: { prepared: true }
+                  - wait:
+                      listen:
+                        to:
+                          one:
+                            with: { type: io.openworkflow.owner.resume }
+                  - effect:
+                      set: { effect: true }
+                """;
+        var initialWaiting = new CountDownLatch(1); var waitingA = new CountDownLatch(1); var waitingB = new CountDownLatch(1);
+        var initialBroker = broker(initialWaiting); var brokerA = broker(waitingA); var brokerB = broker(waitingB);
+        var sessionA = new AtomicReference<WorkflowOwnerCoordinator.Session>();
+        var effectA = new AtomicBoolean(); var effectB = new AtomicBoolean();
+        try (initialBroker; brokerA; brokerB;
+             var coordinatorA = new WorkflowOwnerCoordinator(data, transactions, bindings, 8);
+             var coordinatorB = new WorkflowOwnerCoordinator(data, transactions, bindings, 8);
+             var originalApp = WorkflowApplication.builder().withId(appId).withEventConsumer(initialBroker)
+                     .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                     .withListener(new WorkflowPersistenceListener(borrowed(writer, null))).build()) {
+            var workflow = WorkflowReader.readWorkflowFromString(document, WorkflowFormat.YAML);
+            var original = originalApp.workflowDefinition(workflow).instance(Map.of()); original.start();
+            assertTrue(initialWaiting.await(10, TimeUnit.SECONDS));
+            assertEquals(1, taskCount(appId, original.id(), "do/0/prepare"));
+            var binding = register(appId, tenant, original); var leases = new JdbcWorkflowOwnerLease(data);
+            var starterA = new RestoredWorkflowOwnerStarter(scan, store, coordinatorA, ownerFence,
+                    Duration.ofMillis(1200), row -> true); // Only this isolated test has no delegated authority/deadline gate.
+            var starterB = new RestoredWorkflowOwnerStarter(scan, store, coordinatorB, ownerFence,
+                    Duration.ofSeconds(10), row -> true);
+            CancellablePersistenceReader.OwnerStarter captureA = context -> {
+                var session = starterA.acquire(context); session.ifPresent(sessionA::set); return session;
+            };
+            try (var appA = restoredOwnerApp(appId, brokerA, effectA);
+                 var appB = restoredOwnerApp(appId, brokerB, effectB);
+                 var readerA = new CancellablePersistenceReader(operations, borrowed(writer, null), 1000, captureA);
+                 var readerB = new CancellablePersistenceReader(operations, borrowed(writer, null), 1000, starterB)) {
+                var a = readerA.find(appA.workflowDefinition(workflow), original.id()).orElseThrow();
+                var b = readerB.find(appB.workflowDefinition(workflow), original.id()).orElseThrow();
+                var firstCompletion = a.start();
+                assertTrue(waitingA.await(10, TimeUnit.SECONDS)); assertNotNull(sessionA.get());
+                assertThrows(Exception.class, () -> b.start().get(10, TimeUnit.SECONDS), "live owner excludes competing restore");
+                assertEquals(1, waitingB.getCount());
+                var firstClaim = sessionA.get().claim();
+                sessionA.get().close();
+                awaitLeaseExpiry(binding.instanceId().value(), Duration.ofSeconds(8));
+                var secondCompletion = b.start();
+                assertTrue(waitingB.await(10, TimeUnit.SECONDS));
+                assertFalse(leases.release(firstClaim), "stale owner cannot release the successor");
+                brokerA.publish(CloudEventBuilder.v1().withId(UUID.randomUUID().toString())
+                        .withSource(URI.create("urn:owner:auto-a")).withType("io.openworkflow.owner.resume").build()).get(10, TimeUnit.SECONDS);
+                assertThrows(Exception.class, () -> firstCompletion.get(10, TimeUnit.SECONDS));
+                assertFalse(effectA.get());
+                brokerB.publish(CloudEventBuilder.v1().withId(UUID.randomUUID().toString())
+                        .withSource(URI.create("urn:owner:auto-b")).withType("io.openworkflow.owner.resume").build()).get(10, TimeUnit.SECONDS);
+                secondCompletion.get(10, TimeUnit.SECONDS);
+                assertTrue(effectB.get());
+                assertEquals(0, taskCount(appId, original.id(), "do/0/prepare"), "successful completion cleans checkpoints");
+            }
+        }
+    }
+
+    private WorkflowApplication restoredOwnerApp(String appId, InMemoryEvents broker, AtomicBoolean effectStarted) {
+        return WorkflowApplication.builder().withId(appId).withEventConsumer(broker)
+                .withTaskExecutorFactory(new OwnerFencedTaskExecutorFactory(DefaultTaskExecutorFactory.get(), ownerFence::requireCurrent))
+                .disableLifeCycleCEPublishing().disableStatusChangePublishing()
+                .withListener(new WorkflowPersistenceListener(borrowed(fencedWriter, null)))
+                .withListener(new WorkflowExecutionListener() {
+                    @Override public void onTaskStarted(TaskStartedEvent event) {
+                        if (event.taskContext().taskName().equals("effect")) effectStarted.set(true);
+                    }
+                }).build();
+    }
+
+    private void awaitLeaseExpiry(String id, Duration timeout) throws Exception {
+        long until = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < until) {
+            try (var c = data.getConnection(); var q = c.prepareStatement("select expires_at <= clock_timestamp() "
+                    + "from task.workflow_owner_lease where instance_id=?")) {
+                q.setString(1, id); try (var r = q.executeQuery()) { if (r.next() && r.getBoolean(1)) return; }
+            }
+            Thread.sleep(50);
+        }
+        fail("the previous owner lease did not expire");
     }
 
     @Test void restoredWaitDoesNotAdvanceAfterAnotherOwnerTakesOver() throws Exception { runRestoredWait(true); }
