@@ -242,7 +242,7 @@ Not observable with Flow 1.2.0: whether a side effect inside a task completed wh
 | `STARTING`, no engine id, unchanged for `start-stale-after` | Prepare, record the engine id, start, record RUNNING | `ReconcilerRepairTest.aStartingRowWithNoEngineIdIsPreparedAndStarted`; process scenario B (kill after the insert) |
 | `STARTING`, engine start threw | Count the attempt, keep the engine id, retry after backoff (doubling, capped at 10 minutes); the engine's instance is adopted if it exists | `ReconcilerRepairTest.aStartThatFailedOnceIsRetriedAndThenAccepted` |
 | `STARTING`, engine holds the instance PENDING | Start it (no epoch change: the first start) | `ReconcilerRepairTest.aStartingRowTheEngineHoldsAsPendingIsStartedWithoutAnEpochChange` |
-| `STARTING`, engine holds nothing for the engine id | Count the attempt; at `start-max-attempts` the row is `FAILED` with `start.exhausted`. Never prepared again. | `ReconcilerRepairTest.aStartingRowTheEngineNeverHeardOfIsFailedAfterTheLimit` |
+| `STARTING`, engine holds nothing for the engine id | By default count the attempt and eventually fail; in multi-replica mode leave the recorded start unconfirmed without consuming attempts. Never prepare a second engine id. | `ReconcilerRepairTest.aStartingRowTheEngineNeverHeardOfIsFailedAfterTheLimit`, `remotePreparedStartIsNotFailedByNonOwningReplicaAndOwnerCanAdoptIt` |
 | `RUNNING` or `WAITING`, engine instance PENDING (restored) | Increment `resume_epoch` (history row written), then `startRestored`. The task runs again with the new epoch. | `ReconcilerRepairTest.aPendingRestoredInstanceIsStartedAndItsEpochGoesUp`; process scenario A |
 | `RUNNING` or `WAITING`, engine holds the instance in another state | Record the engine's status (poll; catches a missed report) | `ReconcilerRepairTest.theEngineStatusIsWrittenToTheRowThroughTheObserverPath` |
 | `RUNNING` or `WAITING`, engine holds nothing | Audit `instance.absent` once an hour; status unchanged | Not covered by a test |
@@ -252,7 +252,7 @@ Not observable with Flow 1.2.0: whether a side effect inside a task completed wh
 | `CANCEL_REQUESTED` with no engine id (rows written before amendment 4 only) | Audit `cancel.unconfirmed`; not finished automatically. No new row can reach this state (issue #24) | Not covered by a test |
 | `STARTING`, no engine id, row changed while the reconciler prepared the engine instance | The prepared instance is not started, and the engine is asked to discard it; refusal or failure is logged. Audit `start` `superseded`; the row keeps the operator's state | `ReconcilerRepairTest.aRowCancelledWhileThePreparedInstanceIsBeingMadeIsNeverStarted`, `InstanceLifetimePinTest.cancelledDuringRecoveryPreparationDiscardsTheUnregisteredEngineInstance` |
 | `WAITING` with `wait_deadline` in the past, engine holds it | Record `CANCEL_REQUESTED` first (so the engine's CANCELLED report finds it), then ask the engine to cancel | `ReconcilerRepairTest.aWaitPastItsDeadlineIsCancelledAndTheRequestIsRecordedFirst` |
-| `WAITING` past its deadline, engine holds nothing | `FAILED` with `deadline.no-engine-instance` | `ReconcilerRepairTest.aWaitPastItsDeadlineWithNoEngineInstanceFailsTheRow` |
+| `WAITING` past its deadline, engine holds nothing | By default `FAILED` with `deadline.no-engine-instance`; in multi-replica mode a recorded engine id remains `CANCEL_REQUESTED`. | `ReconcilerRepairTest.aWaitPastItsDeadlineWithNoEngineInstanceFailsTheRow`, `remoteOwnerReceivesAnOverdueWaitCancellationInsteadOfAFalseFailure` |
 | Agent run `RUNNING` or `RESUMING`, lease missing or expired | `AgentRunPolicy`: bridge A or B left to the workflow; bridge C would be restarted, but no restarter is registered in 105c (WP-201); unknown bridge reported; live lease untouched. Audited as `agent.run`. | `AgentRunPolicyTest` (the rule). Not run against `agent_task` rows: there is no insert path yet. |
 
 Every repair writes a row in `task.repair_event` (actor `agentic-runtime`). Conditions that repeat without change are audited once per hour per subject, not on every pass.
@@ -281,8 +281,9 @@ No sleep. The reconciler's startup pass is started by Flow's `WorkflowApplicatio
 | `agentic.reconciler.start-backoff` | `PT5S` | Wait after the first failed attempt; doubles per attempt |
 | `agentic.reconciler.cancel-reissue-after` | `PT30S` | A `CANCEL_REQUESTED` row is sent to the engine again after this time |
 | `agentic.reconciler.wait-deadline` | `PT24H` | Wait given to a `WAITING` instance when the observer records it |
-| `agentic.reconciler.max-lifetime` | unset (no limit) | Maximum age from creation for `RUNNING` or `WAITING` instances; minimum one microsecond. New instances started with a limit retain an immutable absolute deadline, rounded down to database precision. A later tighter setting applies too, but a larger or removed setting cannot extend that original deadline. After the effective deadline, the reconciler requests cancellation or marks a missing engine instance `FAILED` (repair kind `lifetime`). |
+| `agentic.reconciler.max-lifetime` | unset (no limit) | Maximum age from creation for `RUNNING` or `WAITING` instances; minimum one microsecond. New instances started with a limit retain an immutable absolute deadline, rounded down to database precision. A later tighter setting applies too, but a larger or removed setting cannot extend that original deadline. After the effective deadline, the reconciler requests cancellation or applies the missing-engine rule below (repair kind `lifetime`). |
 | `agentic.reconciler.starting-lifetime-enabled` | `false` | Enable lifetime expiry for `STARTING` only after every start writer is upgraded to use the same instance advisory lock. An expired start with no engine id is cancelled; with an engine id, cancellation is requested even if this replica cannot see it. |
+| `agentic.reconciler.multi-replica` | `false` | When `true`, an overdue instance with an engine id absent locally remains `CANCEL_REQUESTED` until its owning or restored engine reports an outcome. A `STARTING` instance with a recorded id absent locally also remains unconfirmed without consuming attempts. The default keeps the existing single-replica failure rules. |
 | `agentic.reconciler.batch-size` | `100` | Rows per page of the scans |
 | `agentic.lifecycle.max-concurrent-starts` | `4` | Shared per-process limit for start admissions and reconciler repairs; must be positive. For a recognized Agroal datasource the effective limit is at most its maximum pool size minus one; a one-connection pool is rejected. When full, a new start key is rejected with 503 before insertion and a repair reports busy; a matching existing key remains readable. |
 | `agentic.dev.fault.crash-at` | unset | Dev only: halt the process (`137`) at `after-insert`, `after-prepare` or `before-accept` |
@@ -304,6 +305,12 @@ An in-flight start can pass its deadline while holding the lock: expiry waits un
 does not interrupt engine work. A request with an unconfirmed engine id can remain `CANCEL_REQUESTED` until the
 engine confirms cancellation; absence from one replica's engine is not proof of termination. Enforcement depends on
 reconciliation running. Escalation and two-replica failover evidence remain outside this limit's current scope.
+
+For coordinated multi-replica use, upgrade all reconcilers and enable `multi-replica` consistently before allowing
+them to repair shared instances; an older or differently configured reconciler can still mark a remotely owned
+instance `FAILED`. Stop reconciliation during a mixed-version rollout. This setting prevents a missing local view
+from being treated as a confirmed global failure, including during start; it does not implement a distributed owner lease, guarantee that
+an owner will return, or establish two-replica failover. An unavailable owner may leave cancellation pending.
 
 Lifetime and overdue-wait scans rotate through a stable deadline and instance-id ordering across passes, so locked older rows do not
 permanently consume the whole batch while the reconciler continues running. The cursor is held in each reconciler's
@@ -338,7 +345,7 @@ Each returns counts. The operator's identity is not recorded by these methods; 1
 1. **Two nodes may restore one live instance.** A node that restarts restores every instance in the Flow tables, including one another node is still running. The reconciler's locks do not prevent this. The fix is a lease held by the running node, which is WP-109 (failover). Single-node resume is the only case verified.
 2. **Unregistered engine instances are reported, not cancelled.** An engine instance carries no tenant or idempotency key, so cancelling it by its input could cancel another tenant's identical request.
 3. **Completion and cancellation of an instance the engine no longer holds are not decided.** The registry keeps the row and audits it. Only the engine's report decides, and Flow does not keep that report after the row is deleted.
-4. **Deadlines use the platform default.** `agentic.reconciler.wait-deadline` is recorded when the observer sees WAITING. The definition's own timeout is not read; Flow's timeout remains a second guard. A deadline with no engine instance is set `FAILED`, which assumes the instance did not complete unobserved.
+4. **Deadlines use the platform default.** `agentic.reconciler.wait-deadline` is recorded when the observer sees WAITING. The definition's own timeout is not read; Flow's timeout remains a second guard. The default missing-engine rule sets the row `FAILED`, which assumes the instance did not complete unobserved; multi-replica mode preserves an unconfirmed cancellation instead.
 5. **Agent runs are decided, not restarted.** `AgentRunPolicy` is the rule. There is no `agent_task` insert path, no lease writer and no restarter yet (WP-201). The rule is not exercised against rows.
 6. **The window between the engine id and `start()` cannot be repaired by re-preparing.** The engine id is fixed once recorded, and the prepared object is in memory only. The row fails after the attempt limit.
 7. **The unregistered-instance report can name an instance that was just prepared** and is not yet recorded. It is an audit row, not an action.
@@ -364,7 +371,7 @@ Results on the committed tree (`mvn -B verify` exit 0, `BUILD SUCCESS`):
 These are for the owner. The ADRs were not edited.
 
 - ADR 0019, Cancel: "a reconciler moves rows stuck in `CANCEL_REQUESTED`". This is incomplete. When the engine holds no instance and sends no report, CANCELLED and COMPLETED cannot be told apart, and the ADR needs a rule for that outcome. Amendment 4 (2026-10-19) gives the rule for a row with no engine id (`CANCELLED` directly, issue #24). The rule for a `CANCEL_REQUESTED` row whose engine holds nothing is still open.
-- ADR 0019, Deadlines: says the reconciler enforces the deadline without saying how. Implemented: record the request, then cancel the engine instance; `FAILED` when the engine holds nothing.
+- ADR 0019, Deadlines: record the request before cancelling the engine; the default rule marks an instance `FAILED` when the engine holds nothing. Multi-replica mode preserves an unconfirmed cancellation for a recorded engine id.
 - ADR 0019, Start: records RUNNING after `start()` returns. The engine's report can arrive first, so the registry follows the engine's report when both happen. The ADR should say so.
 - The resume epoch remains diagnostic. WP-108 keys use a persisted logical operation occurrence and remain unchanged across restart (section 9.7).
 - ADR 0019, Retries: states the rule for the OWS retry. It does not say that the Flow default also repeats a 500 response (9.8).

@@ -369,6 +369,77 @@ class ReconcilerRepairTest {
         assertEquals(0, engine.cancels.get());
     }
 
+    private Reconciler multiReplicaReconciler(FakeEngine engine, String tenant, Optional<Duration> lifetime, Clock clock) {
+        var config = new LifecycleSettings(true, Duration.ofSeconds(30), Duration.ofSeconds(120), TINY, 3,
+                TINY, TINY, Duration.ofHours(24), 100, Optional.empty(), lifetime, false, true);
+        return new Reconciler(store, engine, sync, scan, repairs, config, dataSource, clock, tenant::equals);
+    }
+
+    @Test
+    void remotePreparedStartIsNotFailedByNonOwningReplicaAndOwnerCanAdoptIt() {
+        String tenant = newTenant(), engineId = "remote-start-" + RUN;
+        FakeEngine nonOwner = new FakeEngine(), owner = new FakeEngine();
+        owner.report(engineId, EngineStatus.PENDING);
+        var row = move(newRow(tenant), InstanceStatus.STARTING, engineId, null);
+        var remote = multiReplicaReconciler(nonOwner, tenant, Optional.empty(), Clock.systemUTC());
+
+        for (int i = 0; i < 5; i++) remote.reconcileOnce();
+        var held = reload(tenant, row);
+        assertEquals(InstanceStatus.STARTING, held.status());
+        assertEquals(0, held.startAttempts());
+        assertEquals(0, nonOwner.starts.get());
+        multiReplicaReconciler(owner, tenant, Optional.empty(), Clock.systemUTC()).retry(tenant, row.id().value());
+        assertEquals(1, owner.restarts.get());
+        assertEquals(InstanceStatus.RUNNING, reload(tenant, row).status());
+    }
+
+    @Test
+    void remoteOwnerReceivesAnOverdueWaitCancellationInsteadOfAFalseFailure() {
+        String tenant = newTenant(), engineId = "remote-deadline-" + RUN;
+        FakeEngine nonOwner = new FakeEngine(), owner = new FakeEngine();
+        owner.report(engineId, EngineStatus.WAITING);
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.WAITING, engineId, Instant.now().minusSeconds(60));
+
+        multiReplicaReconciler(nonOwner, tenant, Optional.empty(), Clock.systemUTC()).reconcileOnce();
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+        assertEquals(0, nonOwner.cancels.get());
+        multiReplicaReconciler(owner, tenant, Optional.empty(), Clock.systemUTC()).recover(tenant, row.id().value());
+        assertEquals(1, owner.cancels.get());
+        sync.observe(engineId, EngineStatus.CANCELLED, "observed");
+        assertEquals(InstanceStatus.CANCELLED, reload(tenant, row).status());
+    }
+
+    @Test
+    void remoteOwnerReceivesAnExpiredLifetimeCancellationInsteadOfAFalseFailure() {
+        String tenant = newTenant(), engineId = "remote-lifetime-" + RUN;
+        FakeEngine nonOwner = new FakeEngine(), owner = new FakeEngine();
+        owner.report(engineId, EngineStatus.RUNNING);
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        var clock = Clock.offset(Clock.systemUTC(), Duration.ofMinutes(11));
+        var lifetime = Optional.of(Duration.ofMinutes(10));
+
+        multiReplicaReconciler(nonOwner, tenant, lifetime, clock).reconcileOnce();
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+        multiReplicaReconciler(owner, tenant, lifetime, clock).recover(tenant, row.id().value());
+        assertEquals(1, owner.cancels.get());
+        sync.observe(engineId, EngineStatus.CANCELLED, "observed");
+        assertEquals(InstanceStatus.CANCELLED, reload(tenant, row).status());
+    }
+
+    @Test
+    void remoteCompletionCanWinAnUnconfirmedDeadlineCancellation() {
+        String tenant = newTenant(), engineId = "remote-complete-" + RUN;
+        FakeEngine nonOwner = new FakeEngine();
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.WAITING, engineId, Instant.now().minusSeconds(60));
+
+        multiReplicaReconciler(nonOwner, tenant, Optional.empty(), Clock.systemUTC()).reconcileOnce();
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+        sync.observe(engineId, EngineStatus.COMPLETED, "observed");
+        assertEquals(InstanceStatus.COMPLETED, reload(tenant, row).status());
+    }
+
     /** A reconciler whose clock runs {@code ahead} of the real one and whose maximum lifetime is {@code lifetime}. */
     private Reconciler lifetimeReconciler(FakeEngine engine, String tenant, Duration lifetime, Duration ahead) {
         var withLifetime = new LifecycleSettings(true, Duration.ofSeconds(30), Duration.ofSeconds(120), TINY, 3,
