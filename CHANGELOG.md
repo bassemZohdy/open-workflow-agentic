@@ -1,5 +1,7 @@
 # Changelog
 
+- Avoid repeating acknowledgement audits when an owned checkpoint receipt was already acknowledged.
+
 - Verify human-wake checkpoint recovery after an abrupt application-process exit.
 
 - Commit checkpoint-recovery audits and acknowledgements atomically, including after a recovery-process crash.

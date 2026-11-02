@@ -157,6 +157,18 @@ class InboxCheckpointRecoveryTest {
             assertTrue(service.repairBatch(f.row,f.appId,1));assertEquals(2,calls.get());
         }
     }
+    @Test void ownedRetryAfterRecoveryDoesNotRepeatTheAcknowledgementAudit() throws Exception {
+        try(var f=new Fixture(2)) {
+            assertTrue(recovery.repairBatch(f.row,f.appId,64));
+            assertEquals(2,recoveryAudits(f.row));
+            for(int i=0;i<f.waits.size();i++) {
+                assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,owned.acknowledge(f.waits.get(i)));
+                assertEquals(JdbcInboxDispatch.Acknowledgement.ACKNOWLEDGED,owned.acknowledge(f.waits.get(i)));
+                assertTrue(owned.reserve(f.claims.get(i),f.waits.get(i)).isEmpty());
+            }
+            assertEquals(2,recoveryAudits(f.row),"rechecking a committed acknowledgement must not append another audit");
+        }
+    }
     @Test void mismatchedApplicationTenantAndFullOwnerFailBeforeAuditOrAcknowledgement() throws Exception {
         try(var f=new Fixture(2)) {
             var calls=new AtomicInteger();var service=new JdbcInboxCheckpointRecovery(dataSource,(c,e)->calls.incrementAndGet(),Clock.systemUTC());

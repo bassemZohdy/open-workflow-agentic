@@ -26,6 +26,7 @@ public class JdbcOwnedInbox {
     private final AuditSink audit;
     private final Clock clock;
     private record Row(String state,int attempts,Instant deadline,String task,String owner,Long epoch) { }
+    private record Consumed(Reserved reservation,boolean acknowledged) { }
 
     @Inject public JdbcOwnedInbox(DataSource dataSource,JdbcInboxTaskLease leases,JdbcEventInbox inbox,
                                  JdbcInboxCheckpointProof proof,AuditTrail audit) {
@@ -104,16 +105,17 @@ public class JdbcOwnedInbox {
     /** Historical consumption is authoritative even after completion/lease loss. ACK alone never grants advancement. */
     public Acknowledgement acknowledge(InboxWait wait) {
         Objects.requireNonNull(wait);
-        Optional<Reserved> consumed=Transactions.inTransaction(dataSource,c-> {
+        Optional<Consumed> consumed=Transactions.inTransaction(dataSource,c-> {
             instance(c,wait); Row row=row(c,wait);
             if(row==null || !(row.state.equals("DISPATCHED") || row.state.equals("ACKNOWLEDGED"))) return Optional.empty();
             return signal(c,wait).filter(m-> {
                 try { return proof.consumed(c,wait,m); }
                 catch(SQLException unavailable) { throw new io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavailableException("owned proof read failed",unavailable); }
-            }).map(m->new Reserved(wait,m,row.attempts,row.deadline));
+            }).map(m->new Consumed(new Reserved(wait,m,row.attempts,row.deadline),row.state.equals("ACKNOWLEDGED")));
         });
         if(consumed.isEmpty()) return Acknowledgement.NO_PROOF;
-        record(consumed.get(),null,"event.checkpoint.observed");
+        if(consumed.get().acknowledged()) return Acknowledgement.ACKNOWLEDGED;
+        record(consumed.get().reservation(),null,"event.checkpoint.observed");
         return Transactions.inTransaction(dataSource,c-> {
             instance(c,wait); Row row=row(c,wait);
             if(row==null || !(row.state.equals("DISPATCHED") || row.state.equals("ACKNOWLEDGED"))) return Acknowledgement.NO_RESERVATION;
