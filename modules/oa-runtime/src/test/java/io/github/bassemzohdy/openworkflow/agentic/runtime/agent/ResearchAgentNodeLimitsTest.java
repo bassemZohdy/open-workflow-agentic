@@ -11,11 +11,15 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionO
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchRunInspector.Kind;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import java.time.Duration;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
@@ -88,6 +92,30 @@ class ResearchAgentNodeLimitsTest {
         agent.run("node-limits-b-" + UUID.randomUUID(), "topic"); // a shared counter would refuse this at its first node
 
         assertEquals(6, provider.calls.get());
+    }
+
+    @Test void aLateFinalModelResponseCannotCompleteTheGraph() throws Exception {
+        DataSource ds = AgentTestDatabase.dataSource();
+        var time = new AtomicReference<>(NOW);
+        Clock clock = new Clock() {
+            @Override public ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+            @Override public Clock withZone(ZoneId zone) { return this; }
+            @Override public Instant instant() { return time.get(); }
+        };
+        var provider = new CountingProvider(n -> {
+            if (n == 3) time.set(NOW.plus(Duration.ofMinutes(10)));
+            return OK;
+        });
+        var nodeAudit = new NodeAudit();
+        var agent = agent(ds, provider, contextWith(10), nodeAudit);
+        agent.clock = clock;
+        String thread = "node-limits-late-final-" + UUID.randomUUID();
+
+        assertThrows(Exception.class, () -> agent.run(thread, "topic"));
+
+        assertEquals(3, provider.calls.get(), "the final model call completed, but its late result is withheld");
+        assertNotSame(Kind.COMPLETE, new ResearchRunInspector(ds).inspect(thread).kind());
+        assertEquals("agent.node.refused", nodeAudit.actions().getLast());
     }
 
     @Test void withoutAnApprovedContextTheGraphStaysUnwrappedAndTheModelCallStillRefuses() throws Exception {

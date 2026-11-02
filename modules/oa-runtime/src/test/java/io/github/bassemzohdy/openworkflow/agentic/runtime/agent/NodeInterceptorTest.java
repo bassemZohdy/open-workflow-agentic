@@ -229,7 +229,7 @@ class NodeInterceptorTest {
     }
 
     @Test
-    void aNodeThatOutlastsTheDeadlineCompletesButTheNextOneIsRefused() throws Exception {
+    void aNodeThatOutlastsTheDeadlineCannotReleaseItsResult() {
         var clock = new MovingClock();
         var audit = new Audit();
         var slow = new NodeAction<AgentState>() {
@@ -239,10 +239,28 @@ class NodeInterceptorTest {
             }
         };
         var interceptor = new NodeInterceptor(GovernedLlmClientTest.AGENT, "run-1", 10, Duration.ofMinutes(5), audit, clock);
-        assertEquals(Map.of("out", "late"), interceptor.wrap("slow", slow).apply(STATE));
+        assertThrows(NodeRefused.class, () -> interceptor.wrap("slow", slow).apply(STATE));
+        assertEquals(1, interceptor.stepsCounted());
+        assertEquals(List.of("agent.node.started", "agent.node.refused"), audit.actions());
         var next = new Counting();
         assertThrows(NodeRefused.class, () -> interceptor.wrap("next", next).apply(STATE));
         assertEquals(0, next.runs.get());
+    }
+
+    @Test
+    void deadlineReachedDuringCompletedAuditAlsoWithholdsTheResult() {
+        var clock = new MovingClock();
+        var audit = new Audit();
+        AuditSink delayed = event -> {
+            audit.record(event);
+            if (event.action().equals("agent.node.completed")) clock.now = clock.now.plusSeconds(5);
+        };
+        var node = new Counting();
+        var interceptor = new NodeInterceptor(GovernedLlmClientTest.AGENT, "run-1", 2, Duration.ofSeconds(5), delayed, clock);
+        assertThrows(NodeRefused.class, () -> interceptor.wrap("plan", node).apply(STATE));
+        assertEquals(1, node.runs.get());
+        assertEquals(1, interceptor.stepsCounted());
+        assertEquals(List.of("agent.node.started", "agent.node.completed", "agent.node.refused"), audit.actions());
     }
 
     @Test
