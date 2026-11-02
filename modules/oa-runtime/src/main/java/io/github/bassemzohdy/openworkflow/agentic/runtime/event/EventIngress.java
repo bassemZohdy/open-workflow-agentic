@@ -11,7 +11,9 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyCon
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.Ulid;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerContext;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.problem.ProblemException;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.AuthorityLostException;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditDraft;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditKeys;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
@@ -22,6 +24,9 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StoreUnavail
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.Response;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -111,10 +116,13 @@ public class EventIngress {
         }
     }
 
-    public JdbcEventInbox.Received receive(CallerContext caller, Ulid instance, String correlation, StructuredEvent event) {
-        if (caller == null || caller.provenance() == CallerContext.Provenance.UNVERIFIED || caller.subject() == null) {
+    public JdbcEventInbox.Received receive(CallerAuthority authority, Ulid instance, String correlation, StructuredEvent event) {
+        CallerContext caller = authority == null ? null : authority.caller();
+        if (caller == null || (!caller.verified() && !authority.trustedDevelopment()) || caller.subject() == null) {
             throw new ProblemException(403, "verified event caller required");
         }
+        if (authority.delegated()) throw new ProblemException(403, "delegated event callers are not supported");
+        current(authority, Set.of(), "nothing was received");
         if (event != null && HumanDecisionWake.SOURCE.equals(event.source())) {
             throw new ProblemException(403, "event source is reserved for internal use");
         }
@@ -129,6 +137,7 @@ public class EventIngress {
         catch (IllegalArgumentException invalid) { throw new ProblemException(403, "event caller scopes are not acceptable"); }
         var decision = pep.decide(new AuthorizationRequest(caller.subject(), ActionKind.DATA_ACCESS,
                 "event:receive:" + route, instance, context));
+        current(authority, Set.of(), "nothing was received");
         if (!decision.allows()) {
             count(decision.outcome() == DecisionOutcome.ERROR ? "unavailable" : "denied");
             throw new ProblemException(decision.outcome() == DecisionOutcome.ERROR ? 503 : 403, "event ingress is not authorized");
@@ -139,27 +148,56 @@ public class EventIngress {
                 && p.correlations().contains(correlation)).toList();
         if (routes.isEmpty()) {
             record(caller, message, "event.receive.denied", route);
+            current(authority, Set.of(), "nothing was received");
             count("denied");
             throw new ProblemException(403, "event producer is not bound to this source and target route");
         }
         // Unbound producers learn nothing about instance existence. Definition-denied targets look absent too.
-        InstanceRecord target;
-        try { target = instances.find(caller.tenant(), instance).orElseThrow(() -> new ProblemException(404, "no such instance")); }
+        java.util.Optional<InstanceRecord> found;
+        try { found = instances.find(caller.tenant(), instance); }
         catch (StoreUnavailableException unavailable) { throw new ProblemException(503, "event target lookup is unavailable"); }
+        current(authority, Set.of(), "nothing was received");
+        InstanceRecord target = found.orElseThrow(() -> new ProblemException(404, "no such instance"));
         if (routes.stream().noneMatch(p -> p.definitions().contains(target.definition().definitionId()))) {
             record(caller, message, "event.receive.denied", route); count("denied");
+            current(authority, Set.of(), "nothing was received");
             throw new ProblemException(404, "no such instance");
         }
         record(caller, message, "event.receive.attempt", route); // Audit failure refuses before persistence.
         JdbcEventInbox.Received received;
-        try { received = inbox.receive(message, clock.instant().plus(retention)); }
-        catch (NoSuchElementException missing) { throw new ProblemException(404, "no such instance"); }
+        try {
+            current(authority, Set.of("oa.events.receive"), "nothing was received");
+            received = inbox.receive(message, clock.instant().plus(retention),
+                    () -> current(authority, Set.of("oa.events.receive"), "nothing was received"));
+        }
+        catch (NoSuchElementException missing) {
+            current(authority, Set.of(), "nothing was received");
+            throw new ProblemException(404, "no such instance");
+        }
         catch (StoreUnavailableException unavailable) { throw new ProblemException(503, "event receipt is unavailable; retry the same event id"); }
-        catch (IllegalStateException conflict) { throw new ProblemException(409, "event source/id is bound to different content or routing"); }
+        catch (IllegalStateException conflict) {
+            current(authority, Set.of(), "nothing was received");
+            throw new ProblemException(409, "event source/id is bound to different content or routing");
+        }
         // A failed result audit returns 503. The committed receipt remains idempotently retryable.
         record(caller, message, received.created() ? "event.received" : "event.receive.duplicate", route);
+        current(authority, Set.of("oa.events.receive"), "the receipt may already have been committed");
         count(received.created() ? "received" : "duplicate");
         return received;
+    }
+
+    private static void current(CallerAuthority authority, Set<String> scopes, String consequence) {
+        if (authority.trustedDevelopment()) return;
+        try { authority.requireCurrent(scopes); }
+        catch (AuthorityLostException gone) {
+            if (gone.reason() == AuthorityLostException.Reason.UNAVAILABLE)
+                throw new ProblemException(503, "event authority is unavailable; " + consequence);
+            if (gone.reason() == AuthorityLostException.Reason.SCOPE)
+                throw new ProblemException(403, "event caller scope is no longer valid; " + consequence);
+            throw new WebApplicationException("event authority is no longer valid; " + consequence,
+                    Response.status(Response.Status.UNAUTHORIZED)
+                            .header(HttpHeaders.WWW_AUTHENTICATE, "Bearer error=\"invalid_token\"").build());
+        }
     }
 
     private void record(CallerContext caller, InboxMessage message, String action, String route) {

@@ -139,7 +139,7 @@ public class CallerContextResolver {
         if (!seamEnabled) {
             throw unauthorized("authentication is required: send a bearer token", false);
         }
-        return CallerAuthority.unverified(fromDevelopmentHeaders(headers), clock);
+        return CallerAuthority.trustedDevelopment(fromDevelopmentHeaders(headers), clock);
     }
 
     // ---- verified path -------------------------------------------------------------------------------------------------

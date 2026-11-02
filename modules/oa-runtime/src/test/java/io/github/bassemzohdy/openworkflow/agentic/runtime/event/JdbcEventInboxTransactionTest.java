@@ -68,6 +68,15 @@ class JdbcEventInboxTransactionTest {
         assertTrue(inbox.receive(message, until).created(), "the rolled-back receipt was not committed");
         assertFalse(inbox.receive(message, until).created());
     }
+    @Test void failedFinalAdmissionRollsBackTheReceipt() throws Exception {
+        var message = fixture(); var until = Instant.now().plus(Duration.ofHours(1));
+        assertThrows(SecurityException.class, () -> inbox.receive(message, until, () -> { throw new SecurityException("expired"); }));
+        try (var c = owned.getConnection(); var q = c.prepareStatement("select count(*) from inbox.message where tenant=? and source=? and event_id=?")) {
+            q.setString(1, message.tenant()); q.setString(2, message.source()); q.setString(3, message.eventId());
+            try (var r = q.executeQuery()) { assertTrue(r.next()); assertEquals(0, r.getLong(1)); }
+        }
+        assertTrue(inbox.receive(message, until).created());
+    }
     @Test void commitKeepsReceiptAndRelatedWorkAndPreservesOriginalRetention() throws Exception {
         var message = fixture(); var until = Instant.now().plus(Duration.ofDays(1)).truncatedTo(ChronoUnit.MICROS);
         try (var c = owned.getConnection()) {

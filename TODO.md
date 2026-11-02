@@ -484,6 +484,7 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-02. Shared pat
 Implemented scope:
 
 - Internal transaction seams let an inbox receipt and its exact task-owned wait binding share a caller-owned PostgreSQL transaction; rollback, duplicate, concurrent-receipt and released-owner tests pass. This is not a producer, callback reservation, checkpoint proof or T13 completion.
+- Event ingress rechecks verified caller authority after blocking checks, inside the receipt transaction and before returning; expiry during commit may still leave a durable receipt.
 - JDBC inbox commits normalized events before matching, rejects conflicting source/id reuse and retains early events.
 - Durable single-event/single-wait signals enforce tenant/target/correlation/type, expiry and cancellation locking; no engine wake is implied.
 - Structured CloudEvents HTTP ingress verifies callers and enforces scoped PEP plus deployment-bound tenant/subject/source/type/definition/correlation routes before durable receipt.
@@ -548,6 +549,7 @@ Additional closure/integration tasks:
 - [ ] Complete durable Flow event-consumer/group membership, overlapping all-filter fan-out, stable duplicate ordinals and durable any-winner fencing; preserve ordered output and serial FIFO foreach/until behavior in actual-engine conformance cases.
 - [ ] Implement bounded delivery coordination, renewal and new-owner whole-task reconstruction without idle JDBC connections; enforce pinned bindings/predicates/correlation and prove receipt-before-registration plus stable loop/parallel occurrence and original-reader restore behavior.
 - [ ] Extend current short-transaction callback/checkpoint and post-ACK checks to every later continuation, governed effect and cleanup; prove live old-owner/lease loss, actual process death and partition windows, including committed cancellation before engine invocation.
+- [ ] Establish commit-time event authority across blocked database commits, beyond the last application-level check.
 - [ ] Complete event-triggered starts through integrated and tested lifecycle APIs, idempotent start recovery, retention/tombstones and terminal audit/metrics/tracing. Manual changes require verified oa.recover OPERATION policy.
 - [ ] Automate complete T13 including late/duplicate events, cancellation races and failed compensation. Actual SDK receipt/ACK/component restart evidence does not replace full group/distributed recovery acceptance.
 

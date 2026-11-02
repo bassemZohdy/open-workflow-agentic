@@ -127,8 +127,18 @@ public class JdbcEventInbox {
 
     /** Duplicate receipt never changes the original payload, route or retention deadline. */
     public Received receive(InboxMessage message, Instant retainUntil) {
+        return receive(message, retainUntil, () -> {});
+    }
+
+    /** Invoke the admission check after receipt locks and before commit; an exception rolls back the receipt. */
+    public Received receive(InboxMessage message, Instant retainUntil, Runnable beforeCommit) {
         validateReceipt(message, retainUntil);
-        return Transactions.inTransaction(dataSource, c -> receiveValidated(c, message, retainUntil));
+        Objects.requireNonNull(beforeCommit, "beforeCommit");
+        return Transactions.inTransaction(dataSource, c -> {
+            Received received = receiveValidated(c, message, retainUntil);
+            beforeCommit.run();
+            return received;
+        });
     }
 
     /**
