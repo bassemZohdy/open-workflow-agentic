@@ -316,14 +316,7 @@ class LifecycleRecoveryIT {
         });
         first.kill();
         // The proposed schema is test-only. Apply it after the first process creates the SDK tables.
-        try (var sql = LifecycleRecoveryIT.class.getClassLoader()
-                .getResourceAsStream("db/proposed/V81__pending_cancellation_receipt.sql")) {
-            assertNotNull(sql);
-            try (var connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
-                 var statement = connection.createStatement()) {
-                statement.execute(new String(sql.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
-            }
-        }
+        applyPendingCancellationSchema();
         await("the original deadline to pass while the process is down", Duration.ofSeconds(60), () -> {
             try {
                 return count("select count(*) from task.instance where id = ? and status = 'WAITING' "
@@ -344,6 +337,49 @@ class LifecycleRecoveryIT {
                 "the expired workflow must not invoke the effect after restart");
         assertEquals(1L, count("select count(*) from task.instance where tenant = ? and idempotency_key = ?",
                 tenant, key));
+    }
+
+    @Test
+    void aResumedWaitIsCancelledWhenItsDeadlineLaterPasses() throws Exception {
+        String tenant = newTenant(), key = "resumed-deadline-" + UUID.randomUUID();
+        int port = ManagedProcess.freePort();
+        ManagedProcess first = app("resumed-deadline-run1", port, true,
+                Map.of("agentic.reconciler.wait-deadline", "PT45S"));
+        String id = startInstance(first, tenant, key, "ok");
+        String engineId = await(first, id, tenant, "WAITING");
+        await("the pre-wait checkpoint to be stored", Duration.ofSeconds(20), () -> {
+            try { return count("select count(*) from public.taskinfoentity where workflowinstanceid = ? "
+                    + "and jsonpointer = 'do/0/effect'", engineId) > 0; }
+            catch (Exception e) { return false; }
+        });
+        first.kill();
+        applyPendingCancellationSchema();
+        ManagedProcess restarted = app("resumed-deadline-run2", port, true,
+                Map.of("agentic.reconciler.wait-deadline", "PT45S", "agentic.test.pending-cancellation-reader", "true"));
+        await("the waiting instance to resume", Duration.ofSeconds(30), () -> {
+            try { return count("select resume_epoch from task.instance where id = ?", id) == 1
+                    && "WAITING".equals(status(restarted, id, tenant)); }
+            catch (Exception e) { return false; }
+        });
+        await(restarted, id, tenant, "CANCELLED");
+        assertEquals(1L, count("select resume_epoch from task.instance where id = ?", id));
+    }
+
+    private static void applyPendingCancellationSchema() throws Exception {
+        try (var connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
+             var statement = connection.createStatement();
+             var exists = statement.executeQuery("select to_regclass('task.pending_cancellation_receipt') is not null")) {
+            exists.next();
+            if (exists.getBoolean(1)) return;
+        }
+        try (var sql = LifecycleRecoveryIT.class.getClassLoader()
+                .getResourceAsStream("db/proposed/V81__pending_cancellation_receipt.sql")) {
+            assertNotNull(sql);
+            try (var connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
+                 var statement = connection.createStatement()) {
+                statement.execute(new String(sql.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+            }
+        }
     }
 
     /** Waits until the registry shows one of the statuses, using the instance's own process. */
