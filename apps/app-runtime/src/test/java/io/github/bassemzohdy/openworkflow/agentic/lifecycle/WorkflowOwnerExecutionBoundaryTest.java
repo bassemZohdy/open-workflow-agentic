@@ -48,6 +48,7 @@ import org.junit.jupiter.api.*;
 @QuarkusTest
 @QuarkusTestResource(value = PendingCancellationDatabase.class, restrictToAnnotatedClass = true)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class WorkflowOwnerExecutionBoundaryTest {
     private static final String DOCUMENT = """
             document: { dsl: '1.0.3', namespace: agentic-test, name: owner-boundary, version: '1.0.0' }
@@ -111,7 +112,8 @@ class WorkflowOwnerExecutionBoundaryTest {
         exerciseOwnedResourceEntry(7);
     }
 
-    @Test void auditedRootCombinesActualOwnerTaskAndEntryReceipt() throws Exception {
+    // The proposed schemas are irreversible in this class's disposable database; legacy-schema cases run first.
+    @Test @Order(Integer.MAX_VALUE) void auditedRootCombinesActualOwnerTaskAndEntryReceipt() throws Exception {
         try (var c = data.getConnection()) {
             c.setAutoCommit(false);
             try { ResourceTaskAllocationMigrationTest.apply(c); c.commit(); }
