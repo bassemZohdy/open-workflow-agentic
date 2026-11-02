@@ -9,6 +9,11 @@ create table task.event_start_binding (
     owner_id text not null,
     initial_grant_id text not null check (initial_grant_id ~ '^[0-9A-Z]{26}$'),
     binding_fingerprint text not null check (binding_fingerprint ~ '^[0-9a-f]{64}$'),
+    producer_kind text not null check (producer_kind in ('USER','AGENT','WORKFLOW','SERVICE')),
+    producer_id text not null check (char_length(producer_id) between 1 and 256),
+    binding_id text not null check (char_length(binding_id) between 1 and 256),
+    binding_version text not null check (char_length(binding_version) between 1 and 128),
+    event_envelope text not null check (octet_length(event_envelope) between 1 and 65536),
     primary key (tenant, start_key)
 );
 create function task.event_start_binding_guard() returns trigger language plpgsql as $$

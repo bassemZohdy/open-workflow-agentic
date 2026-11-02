@@ -52,11 +52,36 @@ class EventStartBindingMigrationTest {
                 assertNotEquals(first.created(),second.created());assertEquals(first.record().id(),second.record().id());
                 try(var c=db.owner.getConnection()) {
                     assertTrue(JdbcEventStartBinding.matches(c,first.record().id(),binding));
+                    var retained=JdbcEventStartBinding.read(c,"tenant",binding.startKey()).orElseThrow();
+                    assertEquals(first.record().id(),retained.instance());
+                    assertEquals(e.canonicalEnvelope(),retained.binding().event().canonicalEnvelope());
+                    assertEquals(PRODUCER,retained.binding().producer());
+                    assertEquals("route",retained.binding().bindingId());
+                    assertEquals("v1",retained.binding().bindingVersion());
+                    assertEquals(grant,retained.binding().originalGrant());
+                    assertEquals("EventStartReceipt[redacted]",retained.toString());
+                    assertTrue(JdbcEventStartBinding.read(c,"other",binding.startKey()).isEmpty());
                     assertFalse(JdbcEventStartBinding.matches(c,first.record().id(),binding(event(2),request,grant)));
                     assertFalse(JdbcEventStartBinding.matches(c,first.record().id(),binding(e,request,UlidGenerator.shared().next())));
                     try(var s=c.createStatement()) {
                         assertThrows(SQLException.class,()->s.executeUpdate("update task.event_start_binding set owner_id='other'"));
                         assertThrows(SQLException.class,()->s.executeUpdate("delete from task.event_start_binding"));
+                        // Simulate privileged corruption in the disposable database; the reader must fail closed.
+                        s.execute("alter table task.event_start_binding disable trigger user");
+                        s.executeUpdate("update task.event_start_binding set event_envelope='{}'");
+                        s.execute("alter table task.event_start_binding enable trigger user");
+                        assertThrows(SQLException.class,()->JdbcEventStartBinding.read(c,"tenant",binding.startKey()));
+                        s.execute("alter table task.event_start_binding disable trigger user");
+                        try(var q=c.prepareStatement("update task.event_start_binding set event_envelope=?")) {
+                            q.setString(1,e.canonicalEnvelope());q.executeUpdate();
+                        }
+                        s.execute("alter table task.event_start_binding enable trigger user");
+                        s.execute("alter table identity.instance_authority disable trigger user");
+                        try(var q=c.prepareStatement("update identity.instance_authority set initial_grant_id=?")) {
+                            q.setString(1,UlidGenerator.shared().next().value());q.executeUpdate();
+                        }
+                        s.execute("alter table identity.instance_authority enable trigger user");
+                        assertThrows(SQLException.class,()->JdbcEventStartBinding.read(c,"tenant",binding.startKey()));
                     }
                 }
             }

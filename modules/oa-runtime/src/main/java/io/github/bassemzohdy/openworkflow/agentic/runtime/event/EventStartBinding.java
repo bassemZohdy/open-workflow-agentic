@@ -14,7 +14,9 @@ import java.util.Objects;
  * trusted admission path; none may be inferred from event extensions. No production path currently consumes it.
  */
 public final class EventStartBinding {
-    private final String tenant, startKey, requestFingerprint, fingerprint;
+    private final String tenant, startKey, requestFingerprint, fingerprint, bindingId, bindingVersion;
+    private final Subject producer;
+    private final StructuredEvent event;
     private final Subject owner;
     private final Ulid originalGrant;
 
@@ -33,15 +35,33 @@ public final class EventStartBinding {
 
     public EventStartBinding(StructuredEvent event, StartRequest request, Subject producer, Ulid originalGrant,
                              String bindingId, String bindingVersion) {
-        Objects.requireNonNull(event); Objects.requireNonNull(request); Objects.requireNonNull(producer);
-        Objects.requireNonNull(originalGrant, "originalGrant");
-        bindingId = Checks.requireText("binding id", bindingId, 256);
-        bindingVersion = Checks.requireText("binding version", bindingVersion, 128);
-        this.tenant = request.tenant(); this.owner = request.owner(); this.originalGrant = originalGrant;
+        this(event, Objects.requireNonNull(request).tenant(), request.idempotencyKey(), request.fingerprint(),
+                request.owner(), producer, originalGrant, bindingId, bindingVersion);
+        if (request.retriedFrom() != null)
+            throw new IllegalArgumentException("event start cannot be a retry of another instance");
+    }
+
+    /** Reconstructs retained data for integrity checking; it does not re-establish current authority. */
+    static EventStartBinding restore(StructuredEvent event, String tenant, String key, String requestFingerprint,
+                                     Subject owner, Subject producer, Ulid originalGrant, String bindingId,
+                                     String bindingVersion) {
+        return new EventStartBinding(event, tenant, key, requestFingerprint, owner, producer, originalGrant,
+                bindingId, bindingVersion);
+    }
+
+    private EventStartBinding(StructuredEvent event, String tenant, String key, String requestFingerprint,
+                              Subject owner, Subject producer, Ulid originalGrant, String bindingId,
+                              String bindingVersion) {
+        this.event = Objects.requireNonNull(event); this.owner = Objects.requireNonNull(owner);
+        this.producer = Objects.requireNonNull(producer); this.originalGrant = Objects.requireNonNull(originalGrant);
+        this.bindingId = Checks.requireText("binding id", bindingId, 256);
+        this.bindingVersion = Checks.requireText("binding version", bindingVersion, 128);
+        this.tenant = Checks.requireText("tenant", tenant, 256);
         this.startKey = startKey(tenant, event.source(), event.id());
-        if (!startKey.equals(request.idempotencyKey()) || request.retriedFrom() != null)
-            throw new IllegalArgumentException("event start requires its own derived key and no retry parent");
-        this.requestFingerprint = request.fingerprint();
+        if (!startKey.equals(key)) throw new IllegalArgumentException("event start key does not match event identity");
+        if (requestFingerprint == null || !requestFingerprint.matches("[0-9a-f]{64}"))
+            throw new IllegalArgumentException("invalid start request fingerprint");
+        this.requestFingerprint = requestFingerprint;
         this.fingerprint = CanonicalEncoder.sha256Hex(new CanonicalEncoder("oa.event.start.binding.v1")
                 .text(tenant).text(startKey).text(event.canonicalEnvelope())
                 .text(bindingId).text(bindingVersion).text(producer.kind().name()).text(producer.id())
@@ -54,6 +74,10 @@ public final class EventStartBinding {
     public String requestFingerprint() { return requestFingerprint; }
     public Subject owner() { return owner; }
     public Ulid originalGrant() { return originalGrant; }
+    public Subject producer() { return producer; }
+    public String bindingId() { return bindingId; }
+    public String bindingVersion() { return bindingVersion; }
+    public StructuredEvent event() { return event; }
     public String fingerprint() { return fingerprint; }
 
     /** Do not include event content, subjects, or original grant in logs. */
