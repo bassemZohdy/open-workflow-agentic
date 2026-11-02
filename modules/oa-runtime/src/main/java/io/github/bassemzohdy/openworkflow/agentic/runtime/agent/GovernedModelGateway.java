@@ -59,6 +59,8 @@ public final class GovernedModelGateway implements ModelGateway {
         String text;
         try {
             text = governed.complete(approved, "", call.prompt());
+        } catch (GovernedLlmClient.ApprovalLostAfterCall e) {
+            return new ModelResult.Failed("model output withheld after approval changed");
         } catch (ModelCallRefused e) {
             return reject(e.getMessage());
         } catch (PolicyDenied e) {

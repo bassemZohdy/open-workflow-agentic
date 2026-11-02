@@ -1,5 +1,7 @@
 # Changelog
 
+- Withhold a model gateway response if its approved context disappears or changes while the provider is running. The already-started call can still incur cost; durable accounting remains open.
+
 - Bind a model gateway call to the exact approval it checked and recheck that approval after policy and audit before reaching the provider. Durable budget and execution authority remain separate.
 
 - Recheck the research graph node deadline after its started audit, preventing a delayed audit from allowing a late node to begin. Cross-restart budgets and exhaustion escalation remain open.

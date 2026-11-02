@@ -61,7 +61,7 @@ public class GovernedLlmClient {
     /**
      * Gateway path bound to the approval the gateway matched to its request. A changing context cannot let a call
      * checked for one task or model borrow another approval. Context lookup and policy/audit can block, so the same
-     * approval is required again immediately before the provider call. This is not a durable reservation or a
+     * approval is required again immediately before and after the provider call. This is not a durable reservation or a
      * replacement for the execution-entry authority fence.
      */
     String complete(ApprovedModelContext.Approved expected, String system, String user) {
@@ -75,9 +75,18 @@ public class GovernedLlmClient {
         var decision = pep.modelCall(expected.agent(), expected.task(), expected.modelId(), expected.budgetRemainingMicros());
         return Pep.guard(decision, () -> {
             requireSameApproval(expected);
-            return provider.complete(system, user);
+            String output = provider.complete(system, user);
+            try {
+                requireSameApproval(expected);
+            } catch (ModelCallRefused lost) {
+                throw new ApprovalLostAfterCall();
+            }
+            return output;
         });
     }
+
+    /** The provider was reached, so callers must not report a pre-call rejection. */
+    static final class ApprovalLostAfterCall extends RuntimeException { }
 
     private void requireSameApproval(ApprovedModelContext.Approved expected) {
         if (!context.current().filter(expected::equals).isPresent()) {
