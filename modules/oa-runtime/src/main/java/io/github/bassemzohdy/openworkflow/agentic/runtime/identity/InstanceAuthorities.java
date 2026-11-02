@@ -82,6 +82,18 @@ public class InstanceAuthorities implements ResumeGate {
                 grantId, correlationId, InstanceAuthority.State.AUTHORIZED, null, now, now));
     }
 
+    /**
+     * Confirms a duplicate start used the original grant. Rows predating capture are unknown and do not match;
+     * a later reauthorization cannot change this initial binding.
+     */
+    public boolean matchesInitialGrant(String tenant, Subject subject, Ulid instanceId, Ulid requestedGrant) {
+        try {
+            return store.matchesInitialGrant(instanceId, tenant, subject, requestedGrant);
+        } catch (RuntimeException failure) {
+            throw new GrantException(GrantException.Code.UNAVAILABLE, "the original start authority could not be checked", failure);
+        }
+    }
+
     private DelegationGrant activeGrantOf(Ulid grantId, String tenant, Subject user) {
         GrantCheck check;
         try {

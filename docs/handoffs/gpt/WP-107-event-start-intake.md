@@ -17,8 +17,9 @@ instance and invokes the hook in the same insert transaction, before launch.
 The hook runs only on a newly created row, not on a duplicate. The registry key
 is unique per tenant; `StartRequest.fingerprint()` covers definition, version
 and canonical input, but not owner or a delegated grant. The lifecycle service now
-separately compares the full owner on the integration branch before returning an idempotent retry. This does
-not bind the original delegated grant or the event-specific retained contract. An
+separately compares the full owner and, at the API boundary, the retained original grant before returning an idempotent
+retry. Legacy original grants remain unknown and conflict. This does not bind the event-specific retained contract or
+provide an event-triggered start endpoint. An
 engine start and a later audit result can fail after the insert commits.
 
 ## Proposed contract for owner review

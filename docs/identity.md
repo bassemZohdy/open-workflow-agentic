@@ -106,6 +106,15 @@ active now, in the caller's tenant, and given by the caller (another user's gran
 The instance then has a row in `identity.instance_authority`, written in the same transaction as the instance row
 (`InstanceStore.insertIfAbsent` with an `InsertHook`): subject, grant id, correlation id, and a state. Identifiers only.
 
+For new starts, the original grant (including an explicit absence of a grant) is retained immutably. An idempotent
+`POST /instances` retry must match that original grant as well as the original owner and request; a later reauthorization
+does not change the original binding. A changed grant or an unknown original binding returns 409 without an instance
+view; a binding-store outage returns 503. Existing records from before this migration are marked unknown rather than
+assigned a guessed original grant, so their start retries return 409 and operators must use the existing authorized
+inspection and recovery paths. Capture also applies to inserts made by older application versions after the migration,
+but every application replica must be updated before the retry check is enforced across a rolling deployment. An
+original grant must still pass the existing current-grant validation on retry; revocation is not bypassed.
+
 Before a restored instance runs again, the reconciler asks the `ResumeGate` (`InstanceAuthorities` implements it):
 
 | Situation | Typed outcome | What happens |

@@ -131,6 +131,22 @@ class InstanceApiTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void legacyStartWithoutRetainedOriginalGrantCannotBeReplayedAsIfKnown() {
+        String tenant = newTenant(); String key = newKey(); var body = standardBody(key);
+        var request = new io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.StartRequest(tenant,
+                new io.github.bassemzohdy.openworkflow.agentic.contracts.identity.Subject(
+                        io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind.USER, "alice"),
+                new io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.DefinitionRef(
+                        LifecycleSupport.DEFINITION_ID, LifecycleSupport.DEFINITION_VERSION),
+                (Map<String, Object>) body.get("input"), key);
+        String id = service.start(request).record().id().value(); // Existing direct/legacy start with no authority record.
+        var conflict = post(tenant, body).statusCode(409).extract().response();
+        assertFalse(conflict.asString().contains(id));
+        assertEquals(1, engine.starts());
+    }
+
+    @Test
     void theSameKeyForADifferentRequestIsAConflictAndChangesNothing() {
         String tenant = newTenant();
         String key = newKey();

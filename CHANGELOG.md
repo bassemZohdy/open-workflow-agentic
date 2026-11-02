@@ -1,5 +1,7 @@
 # Changelog
 
+- Capture the original instance-start grant in additive migration V77.1 and require it for API retries, even after reauthorization. Older rows have unknown provenance and retry with a conflict; rolling replicas must all be upgraded to enforce the check.
+
 - Reject a lifecycle start or retry when a tenant-wide idempotency key belongs to another full owner, including while the checkpoint store is degraded. Event-specific and delegated-grant replay binding remain open.
 
 - Return a failed model call when the provider supplies no answer instead of letting a null response escape the gateway contract.
