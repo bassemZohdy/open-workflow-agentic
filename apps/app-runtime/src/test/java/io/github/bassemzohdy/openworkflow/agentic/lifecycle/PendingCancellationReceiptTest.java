@@ -44,6 +44,9 @@ class PendingCancellationReceiptTest {
     @Inject PendingCancellationReceiptWriter receiptWriter;
     @Inject JpaInstanceOperations operations;
     @Inject JdbcInstanceStore store;
+    @Inject RegistryScan scan;
+    @Inject RepairStore repairs;
+    @Inject EngineStatusSync sync;
 
     @BeforeAll void applyProposal() throws Exception {
         try (var in = getClass().getClassLoader().getResourceAsStream("db/proposed/V81__pending_cancellation_receipt.sql")) {
@@ -67,6 +70,10 @@ class PendingCancellationReceiptTest {
         withRestored(java.util.function.UnaryOperator.identity(), scenario);
     }
     void withRestored(java.util.function.UnaryOperator<PersistenceInstanceWriter> wrap, Scenario scenario) throws Exception {
+        withRestored(wrap, false, scenario);
+    }
+    void withRestored(java.util.function.UnaryOperator<PersistenceInstanceWriter> wrap, boolean observe,
+                      Scenario scenario) throws Exception {
         String appId = "receipt-" + UUID.randomUUID(), tenant = "tenant-" + UUID.randomUUID();
         var listening = new CountDownLatch(1);
         var broker = new InMemoryEvents() {
@@ -91,8 +98,10 @@ class PendingCancellationReceiptTest {
             row = store.replace(row.successor(now, InstanceStatus.RUNNING, original.id(), 0, null, null), row.version(), "test.running", actor);
             row = store.replace(row.successor(now, InstanceStatus.WAITING, original.id(), 0, null, now.plusSeconds(60)), row.version(), "test.waiting", actor);
             row = store.replace(row.successor(now, InstanceStatus.CANCEL_REQUESTED, original.id(), 0, null, null), row.version(), "test.cancel", actor);
-            try (var restored = WorkflowApplication.builder().withId(appId)
-                    .disableLifeCycleCEPublishing().disableStatusChangePublishing().build()) {
+            var builder = WorkflowApplication.builder().withId(appId)
+                    .disableLifeCycleCEPublishing().disableStatusChangePublishing();
+            if (observe) builder.withListener(new FlowEngineObserver(sync));
+            try (var restored = builder.build()) {
                 var definition = restored.workflowDefinition(workflow);
                 var guardedWriter = new CheckpointingWriter(borrowed(receiptWriter), cancelGate, (op,id)->{});
                 var reader = new CancellablePersistenceReader(operations, wrap.apply(guardedWriter));
@@ -157,6 +166,32 @@ class PendingCancellationReceiptTest {
                 while (engine.activeInstance(row.definition(), instance.id()).isPresent()) Thread.sleep(10);
             });
             assertEquals(WorkflowStatus.CANCELLED, instance.status());
+            assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
+            assertEquals(0, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+        });
+    }
+    @Test void reconcilerReissuesFailedCancellationAndObserverConfirmsIt() throws Exception {
+        var first = new java.util.concurrent.atomic.AtomicBoolean(true);
+        withRestored(real -> (PersistenceInstanceWriter) Proxy.newProxyInstance(PersistenceInstanceWriter.class.getClassLoader(),
+                new Class<?>[]{PersistenceInstanceWriter.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("aborted") && first.getAndSet(false))
+                        return CompletableFuture.failedFuture(new IllegalStateException("temporary failure"));
+                    try { return method.invoke(real, args); } catch (InvocationTargetException e) { throw e.getCause(); }
+                }), true, (instance, row, appId, gate, engine) -> {
+            var settings = new LifecycleSettings(false, Duration.ofSeconds(30), Duration.ofSeconds(120),
+                    Duration.ofSeconds(1), 3, Duration.ofSeconds(1), Duration.ofSeconds(1),
+                    Duration.ofHours(24), 100, Optional.empty());
+            var reconciler = new Reconciler(store, engine, sync, scan, repairs, settings, data,
+                    Clock.systemUTC(), row.tenant()::equals);
+            assertEquals(1, reconciler.recover(row.tenant(), row.id().value()).count("recover.examined"));
+            assertEquals(InstanceStatus.CANCEL_REQUESTED, store.find(row.tenant(), row.id()).orElseThrow().status());
+            assertEquals(1, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
+            assertThrows(CancellationException.class, () -> instance.start().join());
+            assertEquals(1, reconciler.recover(row.tenant(), row.id().value()).count("recover.examined"));
+            assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
+                while (store.find(row.tenant(), row.id()).orElseThrow().status() != InstanceStatus.CANCELLED)
+                    Thread.sleep(10);
+            });
             assertEquals(1, count("select count(*) from task.pending_cancellation_receipt where instance_id=?", row.id().value()));
             assertEquals(0, count("select count(*) from workflowinstanceentity where instanceid=?", instance.id()));
         });
