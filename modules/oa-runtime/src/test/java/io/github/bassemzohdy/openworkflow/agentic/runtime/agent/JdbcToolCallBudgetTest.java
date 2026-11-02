@@ -90,21 +90,22 @@ class JdbcToolCallBudgetTest {
         assertThrows(NodeRefused.class, () -> new JdbcToolCallBudget(ds).openExisting(thread, AGENT, task));
     }
 
-    @Test void gatewayDoesNotInvokeAfterDurableAllowanceIsConsumed() {
+    @Test void gatewayRejectsAnUnprofiledDurableBudget() {
         var ds = AgentTestDatabase.dataSource(); var task = task(Duration.ofMinutes(5));
         String thread = "gateway-tool-" + UUID.randomUUID();
         new JdbcNodeBudget(ds).registerNew(thread, AGENT, task);
         var budget = new JdbcToolCallBudget(ds).registerForFreshTask(thread, AGENT, task, 1);
         var calls = new AtomicInteger();
         var registration = new GovernedToolGateway.Registration("{\"type\":\"object\"}", "{\"type\":\"object\"}",
-                false, Duration.ofSeconds(2), args -> { calls.incrementAndGet(); return "{}"; });
+                false, Duration.ofSeconds(2), "a".repeat(64), args -> { calls.incrementAndGet(); return "{}"; });
+        var registry = Map.of("search", registration);
+        var profile = new io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ApprovedToolProfile("p", "1",
+                GovernedToolGateway.configurationFingerprint(registry), AGENT, Set.of("search"), 1, Duration.ofSeconds(2));
         var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
                 event -> { }, Duration.ofSeconds(5), CLOCK);
-        var gateway = new GovernedToolGateway(Map.of("search", registration), () -> Optional.of(approval(task)),
-                pep, event -> { }, budget, CLOCK);
+        var gateway = new GovernedToolGateway(registry, () -> Optional.of(approval(task)), profile, pep, event -> { }, budget, CLOCK);
         var call = new ToolCall(task.id(), "search", "{}");
-        assertInstanceOf(ToolResult.Completed.class, gateway.invoke(call));
         assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(call));
-        assertEquals(1, calls.get());
+        assertEquals(0, calls.get());
     }
 }

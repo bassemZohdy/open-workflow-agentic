@@ -138,6 +138,25 @@ public final class JdbcToolCallBudget {
         return open(thread, actor, task, null);
     }
 
+    /** Opens a budget only when every retained tool-profile field matches the supplied allocation and profile. */
+    public GovernedToolGateway.ToolBudget openProfiled(AllocatedResourceTask allocated, ApprovedToolProfile profile) {
+        Objects.requireNonNull(allocated); Objects.requireNonNull(profile);
+        var allocation = allocated.allocation();
+        var actor = allocation.modelProfile().agent(); var task = allocation.contract();
+        profile.requireWithin(task, actor);
+        var base = openExisting(allocation.scope().threadId().value(), actor, task);
+        transact(c -> { requireProfileForAllocation(c, allocated, profile); return null; });
+        return new GovernedToolGateway.ToolBudget() {
+            @Override public void admit(GovernedToolGateway.Approval approval) { base.admit(approval); }
+            @Override public void requireCurrent(GovernedToolGateway.Approval approval) { base.requireCurrent(approval); }
+            @Override public void requireProfile(GovernedToolGateway.Approval approval, ApprovedToolProfile expected) {
+                if (!actor.equals(approval.agent()) || !task.equals(approval.task()) || !profile.equals(expected))
+                    throw new NodeRefused("tool profile approval mismatch");
+                transact(c -> { requireProfileForAllocation(c, allocated, profile); return null; });
+            }
+        };
+    }
+
     private GovernedToolGateway.ToolBudget open(String thread, Subject actor, AgentTaskContract task, Integer maxCalls) {
         Objects.requireNonNull(thread); Objects.requireNonNull(actor); Objects.requireNonNull(task);
         String binding = JdbcNodeBudget.binding(thread, actor, task);

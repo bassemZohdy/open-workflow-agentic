@@ -4,6 +4,7 @@ import static io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedL
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ApprovedToolProfile;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 class GovernedToolGatewayTest {
     private static final String INPUT = "{\"type\":\"object\",\"required\":[\"query\"],\"properties\":{\"query\":{\"type\":\"string\"}},\"additionalProperties\":false}";
     private static final String OUTPUT = "{\"type\":\"object\",\"required\":[\"result\"],\"properties\":{\"result\":{\"type\":\"string\"}}}";
+    private static final String IMPLEMENTATION = "a".repeat(64);
     private static final AgentTaskContract TASK_WITH_TOOL = new AgentTaskContract(TASK.id(), TASK.goal(), Set.of("search"),
             TASK.permittedDataScopes(), TASK.riskTier(), TASK.limits(), TASK.requestingSubject(), TASK.delegationGrantId());
     private static final ToolCall CALL = new ToolCall(TASK.id(), "search", "{\"query\":\"x\"}");
@@ -27,7 +29,13 @@ class GovernedToolGatewayTest {
     private static final GovernedToolGateway.ToolBudget TEST_BUDGET = new GovernedToolGateway.ToolBudget() {
         @Override public void admit(GovernedToolGateway.Approval approval) { }
         @Override public void requireCurrent(GovernedToolGateway.Approval approval) { }
+        @Override public void requireProfile(GovernedToolGateway.Approval approval, ApprovedToolProfile profile) { }
     };
+
+    private static ApprovedToolProfile profile(Map<String, GovernedToolGateway.Registration> registry) {
+        return new ApprovedToolProfile("test-profile", "1", GovernedToolGateway.configurationFingerprint(registry),
+                AGENT, Set.of("search"), 100, Duration.ofSeconds(2));
+    }
 
     private static final class Rig {
         final AtomicReference<GovernedToolGateway.Approval> approval = new AtomicReference<>(APPROVAL);
@@ -45,10 +53,11 @@ class GovernedToolGatewayTest {
         boolean mutating;
         Duration timeout = Duration.ofSeconds(2);
         GovernedToolGateway gateway() {
-            var registration = new GovernedToolGateway.Registration(INPUT, OUTPUT, mutating, timeout, tool);
+            var registration = new GovernedToolGateway.Registration(INPUT, OUTPUT, mutating, timeout, IMPLEMENTATION, tool);
+            var registry = Map.of("search", registration);
             var pep = new Pep(request -> { decisions.incrementAndGet(); return new Decision("test", outcome, "test", POLICY, NOW); },
                     event -> { audits.incrementAndGet(); duringAudit.run(); }, Duration.ofSeconds(5), CLOCK);
-            return new GovernedToolGateway(Map.of("search", registration), () -> Optional.ofNullable(approval.get()), pep,
+            return new GovernedToolGateway(registry, () -> Optional.ofNullable(approval.get()), profile(registry), pep,
                     event -> { records.add(event); boundaryEvents.add(event.action()); duringBoundaryAudit.accept(event.action()); },
                     new GovernedToolGateway.ToolBudget() {
                         @Override public void admit(GovernedToolGateway.Approval approval) {
@@ -57,6 +66,9 @@ class GovernedToolGatewayTest {
                         }
                         @Override public void requireCurrent(GovernedToolGateway.Approval approval) {
                             if (!budgetCurrent.get()) throw new NodeRefused("test budget unavailable");
+                        }
+                        @Override public void requireProfile(GovernedToolGateway.Approval approval, ApprovedToolProfile profile) {
+                            if (!budgetCurrent.get()) throw new NodeRefused("test profile unavailable");
                         }
                     }, CLOCK);
         }
@@ -124,7 +136,7 @@ class GovernedToolGatewayTest {
         for (String key : new String[] {"$ref", "$dynamicRef", "$recursiveRef", "$id", "$schema"}) {
             String schema = "{\"" + key + "\":\"https://example.invalid/schema\"}";
             assertThrows(IllegalArgumentException.class,
-                    () -> new GovernedToolGateway.Registration(schema, OUTPUT, false, Duration.ofSeconds(1), args -> "{}"));
+                    () -> new GovernedToolGateway.Registration(schema, OUTPUT, false, Duration.ofSeconds(1), IMPLEMENTATION, args -> "{}"));
         }
     }
 
@@ -157,10 +169,10 @@ class GovernedToolGatewayTest {
         var rig = new Rig();
         var reg = new GovernedToolGateway.Registration(
                 "{\"type\":\"object\",\"properties\":{\"query\":{\"type\":\"string\",\"format\":\"email\"}}}",
-                OUTPUT, false, Duration.ofSeconds(1), rig.tool);
+                OUTPUT, false, Duration.ofSeconds(1), IMPLEMENTATION, rig.tool);
         var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
                 event -> { }, Duration.ofSeconds(5), CLOCK);
-        var gateway = new GovernedToolGateway(Map.of("search", reg), () -> Optional.of(APPROVAL), pep, event -> { }, TEST_BUDGET, CLOCK);
+        var gateway = new GovernedToolGateway(Map.of("search", reg), () -> Optional.of(APPROVAL), profile(Map.of("search", reg)), pep, event -> { }, TEST_BUDGET, CLOCK);
         assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(CALL));
         assertEquals(0, rig.calls.get());
     }
@@ -227,17 +239,17 @@ class GovernedToolGatewayTest {
     @Test void registrationRequiresABoundedPositiveTimeout() {
         for (Duration timeout : new Duration[] {Duration.ZERO, Duration.ofNanos(1), Duration.ofMinutes(2)})
             assertThrows(IllegalArgumentException.class,
-                    () -> new GovernedToolGateway.Registration(INPUT, OUTPUT, false, timeout, args -> "{}"));
+                    () -> new GovernedToolGateway.Registration(INPUT, OUTPUT, false, timeout, IMPLEMENTATION, args -> "{}"));
     }
 
     @Test void approvalUnavailableOnTheWorkerRefusesBeforeCallingTheTool() {
         var rig = new Rig();
-        var registration = new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofSeconds(1), rig.tool);
+        var registration = new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofSeconds(1), IMPLEMENTATION, rig.tool);
         var caller = Thread.currentThread();
         var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
                 event -> { }, Duration.ofSeconds(5), CLOCK);
         var gateway = new GovernedToolGateway(Map.of("search", registration),
-                () -> Thread.currentThread() == caller ? Optional.of(APPROVAL) : Optional.empty(), pep, event -> { }, TEST_BUDGET, CLOCK);
+                () -> Thread.currentThread() == caller ? Optional.of(APPROVAL) : Optional.empty(), profile(Map.of("search", registration)), pep, event -> { }, TEST_BUDGET, CLOCK);
         assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(CALL));
         assertEquals(0, rig.calls.get());
     }
@@ -248,7 +260,7 @@ class GovernedToolGatewayTest {
         var release = new java.util.concurrent.CountDownLatch(1);
         var lookupFinished = new java.util.concurrent.CountDownLatch(1);
         var invoked = new java.util.concurrent.CountDownLatch(1);
-        var reg = new GovernedToolGateway.Registration(INPUT, OUTPUT, true, Duration.ofMillis(150),
+        var reg = new GovernedToolGateway.Registration(INPUT, OUTPUT, true, Duration.ofMillis(150), IMPLEMENTATION,
                 args -> { invoked.countDown(); return "{\"result\":\"late\"}"; });
         var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
                 event -> { }, Duration.ofSeconds(5), CLOCK);
@@ -259,7 +271,7 @@ class GovernedToolGatewayTest {
                 finally { lookupFinished.countDown(); }
             }
             return Optional.of(APPROVAL);
-        }, pep, event -> { }, TEST_BUDGET, CLOCK);
+        }, profile(Map.of("search", reg)), pep, event -> { }, TEST_BUDGET, CLOCK);
         try {
             assertTrue(assertInstanceOf(ToolResult.Failed.class, gateway.invoke(CALL)).effectMayHaveHappened());
             assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS));
@@ -306,5 +318,52 @@ class GovernedToolGatewayTest {
         lost.tool = args -> { lost.calls.incrementAndGet(); lost.budgetCurrent.set(false); return "{\"result\":\"private\"}"; };
         assertTrue(assertInstanceOf(ToolResult.Failed.class, lost.gateway().invoke(CALL)).effectMayHaveHappened());
         assertEquals(1, lost.admissions.get()); assertEquals(1, lost.calls.get());
+    }
+
+    @Test void profileAndRegistryMustMatchBeforeTheToolCanRun() {
+        var rig = new Rig();
+        var original = new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofSeconds(1), IMPLEMENTATION, rig.tool);
+        var altered = new GovernedToolGateway.Registration(INPUT, OUTPUT, true, Duration.ofSeconds(1), IMPLEMENTATION, rig.tool);
+        var registry = Map.of("search", original);
+        var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
+                event -> { }, Duration.ofSeconds(5), CLOCK);
+        var approved = profile(registry);
+        assertThrows(IllegalArgumentException.class, () -> new GovernedToolGateway(Map.of("search", altered),
+                () -> Optional.of(APPROVAL), approved, pep, event -> { }, TEST_BUDGET, CLOCK));
+        var noTools = new ApprovedToolProfile(approved.id(), approved.version(), approved.configurationFingerprint(),
+                AGENT, Set.of(), approved.maxCalls(), approved.maxCallTime());
+        var restricted = new GovernedToolGateway(registry, () -> Optional.of(APPROVAL), noTools, pep, event -> { }, TEST_BUDGET, CLOCK);
+        assertInstanceOf(ToolResult.Rejected.class, restricted.invoke(CALL));
+        var shortTime = new ApprovedToolProfile(approved.id(), approved.version(), approved.configurationFingerprint(),
+                AGENT, Set.of("search"), approved.maxCalls(), Duration.ofMillis(100));
+        var tooSlow = new GovernedToolGateway(registry, () -> Optional.of(APPROVAL), shortTime, pep, event -> { }, TEST_BUDGET, CLOCK);
+        assertInstanceOf(ToolResult.Rejected.class, tooSlow.invoke(CALL));
+        assertEquals(0, rig.calls.get());
+    }
+
+    @Test void registryFingerprintPinsSchemasTimeoutAndImplementationIdentity() {
+        GovernedToolGateway.Tool tool = args -> "{}";
+        var first = new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofSeconds(1), IMPLEMENTATION, tool);
+        String hash = GovernedToolGateway.configurationFingerprint(Map.of("search", first));
+        for (var changed : java.util.List.of(
+                new GovernedToolGateway.Registration("{\"type\":\"object\"}", OUTPUT, false, Duration.ofSeconds(1), IMPLEMENTATION, tool),
+                new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofSeconds(2), IMPLEMENTATION, tool),
+                new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofSeconds(1), "b".repeat(64), tool)))
+            assertNotEquals(hash, GovernedToolGateway.configurationFingerprint(Map.of("search", changed)));
+    }
+
+    @Test void anUnprofiledBudgetCannotAuthorizeTheGateway() {
+        var rig = new Rig();
+        var registration = new GovernedToolGateway.Registration(INPUT, OUTPUT, false, Duration.ofSeconds(1), IMPLEMENTATION, rig.tool);
+        var registry = Map.of("search", registration);
+        var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
+                event -> { }, Duration.ofSeconds(5), CLOCK);
+        var unprofiled = new GovernedToolGateway.ToolBudget() {
+            @Override public void admit(GovernedToolGateway.Approval approval) { fail("must not admit"); }
+            @Override public void requireCurrent(GovernedToolGateway.Approval approval) { }
+        };
+        var gateway = new GovernedToolGateway(registry, () -> Optional.of(APPROVAL), profile(registry), pep, event -> { }, unprofiled, CLOCK);
+        assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(CALL));
+        assertEquals(0, rig.calls.get());
     }
 }

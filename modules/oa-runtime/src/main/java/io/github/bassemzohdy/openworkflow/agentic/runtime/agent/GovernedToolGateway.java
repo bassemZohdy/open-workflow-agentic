@@ -9,6 +9,9 @@ import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SchemaRegistryConfig;
 import com.networknt.schema.SpecificationVersion;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AgentTaskContract;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ApprovedToolProfile;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.common.CanonicalEncoder;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.common.Checks;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.Decision;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.DecisionOutcome;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.governance.PolicyRef;
@@ -69,6 +72,10 @@ public final class GovernedToolGateway implements ToolGateway {
     public interface ToolBudget {
         void admit(Approval approval);
         void requireCurrent(Approval approval);
+        /** An unprofiled budget never authorizes a gateway call. */
+        default void requireProfile(Approval approval, ApprovedToolProfile profile) {
+            throw new NodeRefused("retained tool profile is unavailable");
+        }
     }
 
     /** A tool is registered by trusted composition with fixed schemas and declared side-effect semantics. */
@@ -78,9 +85,16 @@ public final class GovernedToolGateway implements ToolGateway {
         private final boolean mutating;
         private final Tool tool;
         private final Duration timeout;
+        private final String inputSource;
+        private final String outputSource;
+        private final String implementationFingerprint;
 
-        public Registration(String inputSchema, String outputSchema, boolean mutating, Duration timeout, Tool tool) {
+        public Registration(String inputSchema, String outputSchema, boolean mutating, Duration timeout,
+                            String implementationFingerprint, Tool tool) {
             this.input = schema(inputSchema); this.output = schema(outputSchema);
+            this.inputSource = inputSchema; this.outputSource = outputSchema;
+            this.implementationFingerprint = Checks.requireMatching("tool implementation fingerprint", implementationFingerprint,
+                    java.util.regex.Pattern.compile("[0-9a-f]{64}"));
             this.mutating = mutating; this.tool = Objects.requireNonNull(tool);
             this.timeout = Objects.requireNonNull(timeout);
             if (timeout.compareTo(Duration.ofMillis(1)) < 0 || timeout.compareTo(Duration.ofMinutes(1)) > 0)
@@ -94,13 +108,31 @@ public final class GovernedToolGateway implements ToolGateway {
     private final Clock clock;
     private final AuditSink audit;
     private final ToolBudget budget;
+    private final ApprovedToolProfile profile;
     private static final Subject GATEWAY = new Subject(SubjectKind.SERVICE, "tool-gateway");
 
     public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
-                               Pep pep, AuditSink audit, ToolBudget budget, Clock clock) {
+                               ApprovedToolProfile profile, Pep pep, AuditSink audit, ToolBudget budget, Clock clock) {
         this.registry = Map.copyOf(registry); this.approvals = Objects.requireNonNull(approvals);
+        this.profile = Objects.requireNonNull(profile);
+        if (!configurationFingerprint(this.registry).equals(profile.configurationFingerprint()))
+            throw new IllegalArgumentException("registered tool configuration differs from profile");
         this.pep = Objects.requireNonNull(pep); this.audit = Objects.requireNonNull(audit);
         this.budget = Objects.requireNonNull(budget); this.clock = Objects.requireNonNull(clock);
+    }
+
+    /** Fingerprints exact schemas, timeouts, declared side effects and composition-supplied implementation digests. */
+    public static String configurationFingerprint(Map<String, Registration> registry) {
+        var entries = Map.copyOf(registry);
+        if (entries.size() > AgentTaskContract.MAX_ALLOW_LIST_SIZE) throw new IllegalArgumentException("too many registered tools");
+        var encoder = new CanonicalEncoder("oa.tool.registry.v1").number(entries.size());
+        entries.keySet().stream().sorted().forEach(name -> {
+            Checks.requireMatching("tool name", name, AgentTaskContract.TOKEN);
+            var entry = entries.get(name);
+            encoder.text(name).text(entry.inputSource).text(entry.outputSource).text(entry.implementationFingerprint)
+                    .number(entry.mutating ? 1 : 0).number(entry.timeout.getSeconds()).number(entry.timeout.getNano());
+        });
+        return CanonicalEncoder.sha256Hex(encoder.toBytes());
     }
 
     @Override public ToolResult invoke(ToolCall call) {
@@ -110,12 +142,17 @@ public final class GovernedToolGateway implements ToolGateway {
         if (approved == null || !approved.task().id().equals(call.taskId())) return reject(call, null, attempt, "no matching task approval");
         if (!approved.task().permitsTool(call.toolName())) return reject(call, approved, attempt, "tool is not permitted by the task");
         if (approved.budgetRemainingMicros() == 0) return reject(call, approved, attempt, "no tool budget remaining");
+        try { profile.requireWithin(approved.task(), approved.agent()); }
+        catch (IllegalArgumentException mismatch) { return reject(call, approved, attempt, "tool profile differs from task"); }
+        if (!profile.tools().contains(call.toolName())) return reject(call, approved, attempt, "tool is not permitted by the profile");
         Registration entry = registry.get(call.toolName());
         if (entry == null) return reject(call, approved, attempt, "tool is not registered");
+        if (entry.timeout.compareTo(profile.maxCallTime()) > 0) return reject(call, approved, attempt, "tool timeout exceeds profile");
         JsonNode arguments = parse(call.argumentsJson());
         if (arguments == null || !arguments.isObject() || !valid(entry.input, arguments))
             return reject(call, approved, attempt, "tool arguments are invalid");
-        if (!same(approved)) return reject(call, approved, attempt, "tool approval changed");
+        if (!same(approved) || !budgetCurrent(approved) || !same(approved))
+            return reject(call, approved, attempt, "tool approval or profile is unavailable");
         final Decision decision;
         try { decision = pep.toolCall(approved.agent(), approved.task(), call.toolName(), approved.budgetRemainingMicros()); }
         catch (RuntimeException failure) { return reject(call, approved, attempt, "tool policy is unavailable"); }
@@ -182,7 +219,7 @@ public final class GovernedToolGateway implements ToolGateway {
     }
     private boolean same(Approval expected) { return expected.equals(current()); }
     private boolean budgetCurrent(Approval expected) {
-        try { budget.requireCurrent(expected); return true; }
+        try { budget.requireCurrent(expected); budget.requireProfile(expected, profile); return true; }
         catch (RuntimeException unavailable) { return false; }
     }
     private static final class ApprovalExpired extends Exception { }
