@@ -299,6 +299,38 @@ class LifecycleRecoveryIT {
                 + " and outcome = 'started'", id) >= 1, "the reconciler's start is audited");
     }
 
+    @Test
+    void aWaitWhoseDeadlinePassesWhileStoppedIsCancelledBeforeItCanResume() throws Exception {
+        String tenant = newTenant(), key = "deadline-" + UUID.randomUUID();
+        int port = ManagedProcess.freePort();
+        var deadlineSetting = Map.of("agentic.reconciler.wait-deadline", "PT45S");
+        ManagedProcess first = app("deadline-run1", port, true, deadlineSetting);
+        String id = startInstance(first, tenant, key, "ok");
+        String engineId = await(first, id, tenant, "WAITING");
+        await("the pre-wait checkpoint to be stored", Duration.ofSeconds(20), () -> {
+            try {
+                return count("select count(*) from public.taskinfoentity where workflowinstanceid = ? "
+                        + "and jsonpointer = 'do/0/effect'", engineId) > 0;
+            } catch (Exception e) { return false; }
+        });
+        first.kill();
+        await("the original deadline to pass while the process is down", Duration.ofSeconds(60), () -> {
+            try {
+                return count("select count(*) from task.instance where id = ? and status = 'WAITING' "
+                        + "and wait_deadline < clock_timestamp()", id) == 1;
+            } catch (Exception e) { return false; }
+        });
+
+        ManagedProcess restarted = app("deadline-run2", port, true, deadlineSetting);
+        await(restarted, id, tenant, "CANCELLED");
+        assertEquals(1L, count("select count(*) from task.instance_event where instance_id = ? "
+                + "and reason = 'reconciler.deadline.passed'", id));
+        assertEquals(0L, count("select resume_epoch from task.instance where id = ?", id),
+                "expired restored work must not be started");
+        assertEquals(1L, count("select count(*) from task.instance where tenant = ? and idempotency_key = ?",
+                tenant, key));
+    }
+
     /** Waits until the registry shows one of the statuses, using the instance's own process. */
     private static String await(ManagedProcess process, String id, String tenant, String expected)
             throws Exception {
