@@ -25,8 +25,9 @@ The first run used the wrong checkpoint lookup and timed out before stopping the
 the persisted `do/0/effect` row and the expired deadline, then failed waiting for `CANCELLED`. Its retained child log
 recorded `engine refused the cancel ... (deadline)` followed by repeated cancellation-repair passes.
 
-The observer filters the SDK's cancellation-shaped timeout failure, but it cannot guarantee recovery when the
-subsequent cancellation report cannot be recorded. The engine adapter exposes the SDK status to reconciliation,
-which can poll `FAULTED` and record `FAILED` for a still-pending cancellation. This is a source-level risk, not a
-completed failure-injection reproduction. Add a real-process regression with a failed cancellation report and design
-durable outcome recovery before treating this path as production-ready.
+A process-level failure-injection test rejected registry writes for cancellation after a restored timed wait.
+Without a retry, the SDK checkpoint was removed and the registry remained `CANCEL_REQUESTED` after database writes
+were restored. The observer now buffers confirmed cancellation events locally and the reconciler retries them; the
+buffer has a fixed capacity and is lost on process exit. Durable outcome recovery, buffer exhaustion, and cross-replica
+races remain open. A separate source-level concern is that polling a transient `FAULTED` status may report `FAILED`;
+a race-specific regression is still needed.

@@ -19,6 +19,7 @@ class FlowEngineObserverCancellationTest {
     private static final class RecordingSync extends EngineStatusSync {
         final List<EngineStatus> observations = new ArrayList<>();
         boolean failCancellationReport;
+        boolean noRow;
         RecordingSync() {
             super(proxy(InstanceStore.class), new RegistryScan(proxy(DataSource.class)),
                     new LifecycleSettings(false, Duration.ofSeconds(1), Duration.ofSeconds(1), Duration.ofSeconds(1),
@@ -26,6 +27,7 @@ class FlowEngineObserverCancellationTest {
         }
         @Override public Result observe(String id, EngineStatus status, String source) {
             if (status == EngineStatus.CANCELLED && failCancellationReport) throw new IllegalStateException("store unavailable");
+            if (noRow) return Result.NO_ROW;
             observations.add(status); return Result.CHANGED;
         }
     }
@@ -62,6 +64,29 @@ class FlowEngineObserverCancellationTest {
         observer.onWorkflowFailed(new WorkflowFailedEvent(unrelated, new WorkflowException(WorkflowError.timeout().build(),
                 new CancellationException())));
         assertEquals(List.of(EngineStatus.FAULTED, EngineStatus.FAULTED), sync.observations);
+    }
+
+    @Test void failedCancellationEventIsRetriedOnceTheRegistryRecovers() {
+        var sync = new RecordingSync(); sync.failCancellationReport = true;
+        var observer = new FlowEngineObserver(sync); var context = proxy(WorkflowContextData.class);
+        observer.onWorkflowCancelled(new WorkflowCancelledEvent(context));
+        observer.retryCancellationReports();
+        assertTrue(sync.observations.isEmpty());
+        sync.failCancellationReport = false;
+        observer.retryCancellationReports();
+        observer.retryCancellationReports();
+        assertEquals(List.of(EngineStatus.CANCELLED), sync.observations);
+    }
+
+    @Test void cancellationWithoutRegistryRowDoesNotOccupyRetryBuffer() {
+        var sync = new RecordingSync(); sync.noRow = true;
+        var observer = new FlowEngineObserver(sync); var context = proxy(WorkflowContextData.class);
+        observer.onWorkflowCancelled(new WorkflowCancelledEvent(context));
+        observer.retryCancellationReports();
+        assertTrue(sync.observations.isEmpty());
+        sync.noRow = false;
+        observer.retryCancellationReports();
+        assertTrue(sync.observations.isEmpty());
     }
 
     @Test void failedCancellationReportCannotTurnALaterCancellationWrapperIntoFailure() {

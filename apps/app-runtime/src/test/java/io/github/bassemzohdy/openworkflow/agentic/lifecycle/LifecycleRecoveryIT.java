@@ -365,6 +365,48 @@ class LifecycleRecoveryIT {
         assertEquals(1L, count("select resume_epoch from task.instance where id = ?", id));
     }
 
+    @Test
+    void cancellationReportIsRecoveredAfterTheRegistryIsUnavailable() throws Exception {
+        String tenant = newTenant(), key = "lost-cancellation-" + UUID.randomUUID();
+        int port = ManagedProcess.freePort();
+        var settings = Map.of("agentic.reconciler.wait-deadline", "PT45S");
+        ManagedProcess first = app("lost-cancellation-run1", port, true, settings);
+        String id = startInstance(first, tenant, key, "ok");
+        String engineId = await(first, id, tenant, "WAITING");
+        await("the pre-wait checkpoint to be stored", Duration.ofSeconds(20), () -> {
+            try { return count("select count(*) from public.taskinfoentity where workflowinstanceid = ? "
+                    + "and jsonpointer = 'do/0/effect'", engineId) > 0; }
+            catch (Exception e) { return false; }
+        });
+        first.kill();
+        applyPendingCancellationSchema();
+        ManagedProcess restarted = app("lost-cancellation-run2", port, true,
+                Map.of("agentic.reconciler.wait-deadline", "PT45S", "agentic.test.pending-cancellation-reader", "true"));
+        await("the waiting instance to resume", Duration.ofSeconds(30), () -> {
+            try { return count("select resume_epoch from task.instance where id = ?", id) == 1
+                    && "WAITING".equals(status(restarted, id, tenant)); }
+            catch (Exception e) { return false; }
+        });
+        try (var connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
+             var statement = connection.createStatement()) {
+            statement.execute("create function task.reject_test_cancellation() returns trigger language plpgsql as $$ "
+                    + "begin if new.id = '" + id + "' and new.status = 'CANCELLED' then "
+                    + "raise exception 'injected cancellation report failure'; end if; return new; end $$");
+            statement.execute("create trigger reject_test_cancellation before update on task.instance "
+                    + "for each row execute function task.reject_test_cancellation()");
+        }
+        await("the cancellation pass to finish after the injected failure", Duration.ofSeconds(60), () -> {
+            String log = read(restarted.logFile());
+            return log.contains("injected cancellation report failure") && log.contains("deadline.examined=1");
+        });
+        try (var connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
+             var statement = connection.createStatement()) {
+            statement.execute("drop trigger reject_test_cancellation on task.instance");
+            statement.execute("drop function task.reject_test_cancellation()");
+        }
+        await(restarted, id, tenant, "CANCELLED");
+    }
+
     private static void applyPendingCancellationSchema() throws Exception {
         try (var connection = DriverManager.getConnection(dbUrl, DB_USER, DB_PASSWORD);
              var statement = connection.createStatement();

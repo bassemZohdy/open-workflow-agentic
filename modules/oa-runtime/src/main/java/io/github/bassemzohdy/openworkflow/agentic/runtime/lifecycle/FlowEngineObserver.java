@@ -13,7 +13,10 @@ import io.serverlessworkflow.impl.lifecycle.WorkflowEvent;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
@@ -23,10 +26,10 @@ import org.jboss.logging.Logger;
  * The Quarkus Flow lifecycle listener that feeds {@link EngineStatusSync} (WP-105c, scope item 3). Flow binds every
  * CDI bean of type {@link WorkflowExecutionListener} into the {@code WorkflowApplication} when it is built
  * (bytecode of {@code WorkflowApplicationCreator}, 1.2.0), so no registration is needed. {@link Unremovable} keeps the
- * bean, which nothing injects.
+ * bean in deployments that do not otherwise inject it.
  *
  * <p>The listener only reports. An exception here would reach the engine's thread, so each handler catches and logs
- * failures; the reconciler's poll repairs whatever a failed report left behind.
+ * failures; the reconciler retries locally buffered cancellation events; process loss can still lose the evidence.
  */
 @Singleton
 @Unremovable
@@ -34,6 +37,10 @@ public class FlowEngineObserver implements WorkflowExecutionListener {
 
     private static final Logger LOG = Logger.getLogger(FlowEngineObserver.class);
 
+    // Best-effort local retry only: a process crash can still lose these reports. Bounded to avoid an
+    // unbounded heap when the registry is unavailable; durable outcome recovery remains a separate requirement.
+    private static final int MAX_PENDING_CANCELLATIONS = 1024;
+    private final Set<String> pendingCancellations = new LinkedHashSet<>();
     private final EngineStatusSync sync;
     private final Map<WorkflowContextData, Boolean> cancelledFaults = Collections.synchronizedMap(new WeakHashMap<>());
 
@@ -77,7 +84,45 @@ public class FlowEngineObserver implements WorkflowExecutionListener {
 
     @Override
     public void onWorkflowCancelled(WorkflowCancelledEvent event) {
-        report(event, EngineStatus.CANCELLED);
+        String id;
+        try {
+            id = String.valueOf(event.workflowContext().instanceData().id());
+        } catch (RuntimeException unreadable) {
+            LOG.warnf(unreadable, "cancellation event without an instance id was not reported");
+            return;
+        }
+        if (!reportCancellation(id)) {
+            synchronized (pendingCancellations) {
+                if (pendingCancellations.size() < MAX_PENDING_CANCELLATIONS || pendingCancellations.contains(id)) {
+                    pendingCancellations.add(id);
+                } else {
+                    LOG.errorf("cancellation retry buffer full; outcome for %s needs durable recovery", id);
+                }
+            }
+        }
+    }
+
+    /** Retries only actual cancellation events, never a cancellation request or a polled status. */
+    void retryCancellationReports() {
+        List<String> pending;
+        synchronized (pendingCancellations) { pending = List.copyOf(pendingCancellations); }
+        for (String id : pending) {
+            if (reportCancellation(id)) {
+                synchronized (pendingCancellations) { pendingCancellations.remove(id); }
+            }
+        }
+    }
+
+    private boolean reportCancellation(String id) {
+        try {
+            // A prepared instance can be discarded before it has a registry row. Retrying NO_ROW forever
+            // would let such orphan events fill the bounded buffer and crowd out actual storage failures.
+            sync.observe(id, EngineStatus.CANCELLED, "observed");
+            return true;
+        } catch (RuntimeException failed) {
+            LOG.errorf(failed, "registry could not record engine status CANCELLED for instance %s", id);
+            return false;
+        }
     }
 
     private static boolean cancellationWrappedAsTimeout(Throwable cause) {

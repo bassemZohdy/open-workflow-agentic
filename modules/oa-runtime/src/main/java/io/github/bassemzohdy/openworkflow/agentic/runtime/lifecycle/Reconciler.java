@@ -98,6 +98,9 @@ public class Reconciler {
         }
     }
 
+    @Inject
+    FlowEngineObserver observer;
+
     private final InstanceStore store;
     private final WorkflowEngine engine;
     private final EngineStatusSync sync;
@@ -295,6 +298,7 @@ public class Reconciler {
      * reconciler is repairing are skipped.
      */
     public ReconcileReport reconcileOnce() {
+        if (observer != null) observer.retryCancellationReports();
         ReconcileReport report = new ReconcileReport();
         Instant now = clock.instant();
         startingRows(report, now);
