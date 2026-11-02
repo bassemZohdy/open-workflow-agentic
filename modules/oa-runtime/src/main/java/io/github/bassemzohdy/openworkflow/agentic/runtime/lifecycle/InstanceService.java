@@ -61,19 +61,26 @@ public class InstanceService {
     private final Clock clock;
     private final UlidGenerator ids;
     @Inject PersistenceCommitGate checkpoints;
+    private final LifecycleSettings lifetimeSettings;
 
     @Inject
+    public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, LifecycleSettings settings) {
+        this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared(), settings);
+    }
+
+    /** Explicit callers without a configured limit retain the documented unbounded default. */
     public InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults) {
-        this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared());
+        this(store, engine, faults, Clock.systemUTC(), UlidGenerator.shared(), LifecycleSettings.defaults());
     }
 
     InstanceService(InstanceStore store, WorkflowEngine engine, LifecycleFaults faults, Clock clock,
-                    UlidGenerator ids) {
+                    UlidGenerator ids, LifecycleSettings settings) {
         this.store = Objects.requireNonNull(store, "store");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.faults = Objects.requireNonNull(faults, "faults");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.ids = Objects.requireNonNull(ids, "ids");
+        this.lifetimeSettings = Objects.requireNonNull(settings, "settings");
     }
 
     /**
@@ -159,6 +166,22 @@ public class InstanceService {
         }
     }
 
+    /** The original limit commits with the new instance and the caller's authority hook. */
+    private InstanceStore.InsertHook pinLifetime(InstanceRecord candidate, InstanceStore.InsertHook delegate) {
+        if (lifetimeSettings.maxLifetime.isEmpty()) return delegate;
+        // PostgreSQL stores microseconds: round down so persistence never extends the configured bound.
+        Instant deadline = candidate.createdAt().plus(lifetimeSettings.maxLifetime.orElseThrow()).truncatedTo(ChronoUnit.MICROS);
+        return (connection, instanceId) -> {
+            if (!candidate.id().equals(instanceId)) throw new IllegalStateException("lifetime instance differs");
+            try (var statement = connection.prepareStatement("insert into task.instance_lifetime(instance_id,deadline) values (?,?)")) {
+                statement.setString(1, instanceId.value());
+                statement.setTimestamp(2, java.sql.Timestamp.from(deadline));
+                statement.executeUpdate();
+            }
+            if (delegate != null) delegate.afterInsert(connection, instanceId);
+        };
+    }
+
     private StartResult startAs(StartRequest request, String reason, Subject actor,
                                 InstanceStore.InsertHook onCreate) {
         if (checkpoints != null && !checkpoints.status().healthy()) {
@@ -173,7 +196,7 @@ public class InstanceService {
             throw new DefinitionNotFoundException(request.definition());
         }
         InstanceRecord candidate = InstanceRecord.starting(ids.next(), request, now());
-        InstanceStore.Insertion insertion = store.insertIfAbsent(candidate, reason, actor, onCreate);
+        InstanceStore.Insertion insertion = store.insertIfAbsent(candidate, reason, actor, pinLifetime(candidate, onCreate));
         InstanceRecord row = insertion.record();
         if (!insertion.created()) {
             requireSameStart(row, request);

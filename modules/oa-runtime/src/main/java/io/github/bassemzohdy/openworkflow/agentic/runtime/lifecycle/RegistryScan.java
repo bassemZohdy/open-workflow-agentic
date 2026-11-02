@@ -74,16 +74,39 @@ public class RegistryScan {
         }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
     }
 
-    /** Running or waiting rows created before {@code cutoff}: instances past their maximum lifetime. */
-    public List<Ref> livePastLifetime(Instant cutoff, int limit) {
+    /** Expired original pins or an expired stricter current setting, earliest effective deadline first. */
+    public List<Ref> livePastLifetime(Instant now, Optional<Instant> currentCutoff, int limit) {
+        Objects.requireNonNull(now); Objects.requireNonNull(currentCutoff);
+        if (currentCutoff.isEmpty()) {
+            // The default deployment has no current setting; use the pin index instead of scanning every instance.
+            return query("""
+                    select i.id, i.tenant from task.instance_lifetime p
+                      join task.instance i on i.id = p.instance_id
+                     where p.deadline < ? and i.status in ('RUNNING', 'WAITING')
+                     order by p.deadline, i.id limit ?
+                    """, statement -> {
+                statement.setTimestamp(1, Timestamp.from(now)); statement.setInt(2, limit);
+            }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
+        }
+        Timestamp cutoff = Timestamp.from(currentCutoff.orElseThrow());
         return query("""
-                select id, tenant from task.instance
-                 where status in ('RUNNING', 'WAITING') and created_at < ?
-                 order by created_at limit ?
+                select i.id, i.tenant from task.instance i
+                  left join task.instance_lifetime p on p.instance_id = i.id
+                 where i.status in ('RUNNING', 'WAITING')
+                   and (p.deadline < ? or (cast(? as timestamptz) is not null and i.created_at < ?))
+                 order by least(p.deadline, i.created_at + (cast(? as timestamptz) - cast(? as timestamptz))), i.id
+                 limit ?
                 """, statement -> {
-            statement.setTimestamp(1, Timestamp.from(cutoff));
-            statement.setInt(2, limit);
+            statement.setTimestamp(1, Timestamp.from(now)); statement.setTimestamp(2, cutoff);
+            statement.setTimestamp(3, cutoff); statement.setTimestamp(4, Timestamp.from(now));
+            statement.setTimestamp(5, cutoff); statement.setInt(6, limit);
         }, rs -> new Ref(rs.getString("id"), rs.getString("tenant")));
+    }
+
+    /** The immutable original deadline, absent for unbounded or pre-migration starts. */
+    public Optional<Instant> pinnedLifetime(String instanceId) {
+        return query("select deadline from task.instance_lifetime where instance_id = ?",
+                statement -> statement.setString(1, instanceId), rs -> rs.getTimestamp(1).toInstant()).stream().findFirst();
     }
 
     /** The registry row that holds this engine instance, if any. */

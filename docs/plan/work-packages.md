@@ -610,13 +610,14 @@ Deliverables:
 - Kubernetes lease durable mode; failover test with two replicas and verify restored work starts after warmup
 
 Implementation status: **partial**.
+- Implemented: New starts with a configured maximum lifetime atomically pin their original absolute deadline; reconciliation applies the earlier of that pin and a stricter current setting, including after the setting is removed or increased. Legacy/unbounded starts use current configuration, and old replicas do not enforce pins. STARTING-instance lifetime, escalation, deployed role grants, real two-replica failover and T12 remain open.
 - Implemented: db-scheduler is embedded and reconciliation stores absolute workflow wait deadlines.
 - Implemented: Optional persisted maximum instance lifetime landed (PR 138): agentic.reconciler.max-lifetime (unset by default) makes the reconciler cancel RUNNING/WAITING instances whose stored created_at is older than the limit, through the same cancel path as a passed wait deadline (request recorded first, refused cancel re-sent, engine-lost instance FAILED, repair kind lifetime); six database-backed reconciler tests pass in CI. Escalation timers, duplicate-timer-delivery proof, two-replica Kubernetes-lease failover and T12 remain open, so WP-109 stays partial.
 - Implemented: Duplicate delivery of a due timer is proven harmless (PR 139, database-backed, CI): a due wait deadline or maximum lifetime delivered twice writes one history row and leaves the row version unchanged; a late duplicate after the engine confirmed the cancel changes nothing on the terminal row; two reconcilers delivering the same due deadline at once admit exactly one transition.
 
 Remaining gates:
 
-- Complete persisted maximum lifetimes, escalation timers and deadline recovery across restart.
+- Extend lifetime enforcement to STARTING work and define legacy/mixed-version rollout and deployed role grants; implement escalation timers and deadline recovery across restart.
 - Run two execution replicas with durable Kubernetes lease mode; test node loss and post-warmup recovery.
 - Automate T12.
 

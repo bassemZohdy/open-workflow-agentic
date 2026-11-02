@@ -416,33 +416,24 @@ public class Reconciler {
     // ---- (vi-b) instances past their maximum lifetime --------------------------------------------------------------
 
     private void lifetimesExceeded(ReconcileReport report, Instant now) {
-        if (settings.maxLifetime.isEmpty()) {
-            return;
-        }
-        for (RegistryScan.Ref ref : scan.livePastLifetime(now.minus(settings.maxLifetime.get()), settings.batchSize)) {
-            if (!tenantScope.test(ref.tenant())) {
-                continue;
-            }
+        Optional<Instant> cutoff = settings.maxLifetime.map(now::minus);
+        for (RegistryScan.Ref ref : scan.livePastLifetime(now, cutoff, settings.batchSize)) {
+            if (!tenantScope.test(ref.tenant())) continue;
             report.bump(withInstance(ref.id(), () -> repairLifetime(ref, now)) ? "lifetime.examined" : "busy");
         }
     }
 
-    /**
-     * Cancels a RUNNING or WAITING instance created longer ago than the configured maximum lifetime, exactly as a
-     * passed wait deadline is cancelled (the request is recorded first, a refused cancel is re-sent by the next pass,
-     * an instance the engine no longer holds is failed). The age is judged on the row as loaded now, never on the scan.
-     */
+    /** Recheck both the original pin and any stricter current setting after acquiring the instance lock. */
     private void repairLifetime(RegistryScan.Ref ref, Instant now) {
-        if (settings.maxLifetime.isEmpty()) {
-            return;
-        }
         InstanceRecord row = load(ref);
-        if ((row.status() != InstanceStatus.RUNNING && row.status() != InstanceStatus.WAITING)
-                || !row.createdAt().isBefore(now.minus(settings.maxLifetime.get()))) {
-            return;
-        }
+        if (row.status() != InstanceStatus.RUNNING && row.status() != InstanceStatus.WAITING) return;
+        Optional<Instant> pinned = scan.pinnedLifetime(ref.id());
+        Optional<Instant> current = settings.maxLifetime.map(row.createdAt()::plus);
+        Instant deadline = pinned.isEmpty() ? current.orElse(null)
+                : current.isEmpty() || pinned.get().isBefore(current.get()) ? pinned.get() : current.get();
+        if (deadline == null || !deadline.isBefore(now)) return;
         cancelOverdue(row, now, "lifetime", "reconciler.lifetime.no-engine-instance", "reconciler.lifetime.exceeded",
-                "created " + row.createdAt() + ", maximum lifetime " + settings.maxLifetime.get() + " exceeded");
+                "maximum lifetime deadline " + deadline + " exceeded");
     }
 
     private void cancelOverdue(InstanceRecord row, Instant now, String kind, String noEngineReason, String cancelReason,

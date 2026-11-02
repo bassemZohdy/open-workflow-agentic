@@ -281,10 +281,17 @@ No sleep. The reconciler's startup pass is started by Flow's `WorkflowApplicatio
 | `agentic.reconciler.start-backoff` | `PT5S` | Wait after the first failed attempt; doubles per attempt |
 | `agentic.reconciler.cancel-reissue-after` | `PT30S` | A `CANCEL_REQUESTED` row is sent to the engine again after this time |
 | `agentic.reconciler.wait-deadline` | `PT24H` | Wait given to a `WAITING` instance when the observer records it |
-| `agentic.reconciler.max-lifetime` | unset (no limit) | Longest a `RUNNING` or `WAITING` instance may live from creation. Past it the reconciler cancels the instance like a passed wait deadline (request recorded first, a refused cancel is re-sent, an instance the engine no longer holds is `FAILED`; repair kind `lifetime`). Persisted `created_at`, so it holds across restart and failover. |
+| `agentic.reconciler.max-lifetime` | unset (no limit) | Maximum age from creation for `RUNNING` or `WAITING` instances; minimum one microsecond. New instances started with a limit retain an immutable absolute deadline, rounded down to database precision. A later tighter setting applies too, but a larger or removed setting cannot extend that original deadline. After the effective deadline, the reconciler requests cancellation or marks a missing engine instance `FAILED` (repair kind `lifetime`). |
 | `agentic.reconciler.batch-size` | `100` | Rows per page of the scans |
 | `agentic.dev.fault.crash-at` | unset | Dev only: halt the process (`137`) at `after-insert`, `after-prepare` or `before-accept` |
 | `agentic.dev.lifecycle-probes` | `false` | Dev only: expose `/dev/lifecycle/*` (probe effect, event injection). Never in a deployment. |
+
+The original deadline is inserted in the instance creation transaction. Instances created before this migration,
+instances started with no configured limit, and starts made by older replicas without this feature have no original
+pin: the current setting applies to them. Update every replica before relying on pins across a rolling deployment;
+older reconcilers do not read them. The runtime database role needs access to `task.instance_lifetime`. Enforcement
+still depends on reconciliation running and does not stop work already executing; `STARTING` instances, escalation
+and two-replica failover evidence remain outside this limit's current scope.
 
 ### 9.6 Entry points for 105d
 
