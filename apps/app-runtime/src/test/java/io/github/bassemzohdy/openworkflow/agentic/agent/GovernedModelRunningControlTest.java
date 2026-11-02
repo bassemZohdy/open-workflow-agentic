@@ -668,6 +668,9 @@ class GovernedModelRunningControlTest {
         final ControlledToolEffects controlled;
         final GovernedToolGateway gateway;
         final AtomicInteger bindings = new AtomicInteger();
+        final AtomicReference<DecisionOutcome> outcome = new AtomicReference<>(DecisionOutcome.ALLOW);
+        final AtomicReference<String> failedAudit = new AtomicReference<>();
+        final java.util.List<String> auditEvents = new java.util.ArrayList<>();
         volatile Runnable during = () -> { };
         final EffectTarget target = new EffectTarget() {
             @Override public String target() { return "registered:test"; }
@@ -697,10 +700,14 @@ class GovernedModelRunningControlTest {
                     assertEquals(approved, approval); assertEquals(profile, expected);
                 }
             };
-            var pep = new Pep(request -> new Decision("fixture", DecisionOutcome.ALLOW, "allow", POLICY, NOW),
+            var pep = new Pep(request -> new Decision("fixture", outcome.get(), "fixture", POLICY, NOW),
                     event -> { }, Duration.ofSeconds(5), CLOCK);
-            controlled = new ControlledToolEffects(new DurableEffects(ledger, Clock.systemUTC()), pep, () -> Optional.of(approved));
-            gateway = new GovernedToolGateway(registry, () -> Optional.of(approved), profile, pep, event -> { }, budget, CLOCK);
+            var effects = new DurableEffects(ledger, Clock.systemUTC());
+            controlled = new ControlledToolEffects(effects, pep, () -> Optional.of(approved));
+            gateway = new GovernedToolGateway(registry, () -> Optional.of(approved), profile, pep, event -> {
+                auditEvents.add(event.action());
+                if (event.action().equals(failedAudit.get())) throw new IllegalStateException("audit unavailable");
+            }, budget, CLOCK, effects);
         }
 
         ToolCall call(String args) { return new ToolCall(allocation.allocation().contract().id(), "tool:research", args); }
@@ -719,14 +726,55 @@ class GovernedModelRunningControlTest {
             var rig = new ToolEffectRig(entry);
             var invalid = rig.call("[]");
             assertThrows(ModelCallRefused.class, () -> rig.gateway.invokeEffect(running, entry, rig.allocation,
-                    rig.occurrence(running, entry, invalid), invalid, rig.controlled));
+                    rig.occurrence(running, entry, invalid), invalid));
             assertEquals(0, rig.bindings.get()); assertEquals(0, rig.dispatches.get());
             var call = rig.call("{\"query\":\"one\"}");
             var occurrence = rig.occurrence(running, entry, call);
-            var first = rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call, rig.controlled);
+            var first = rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call);
             assertEquals(EffectState.CONFIRMED, first.state());
-            assertEquals(first, rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call, rig.controlled));
+            assertEquals(first, rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call));
             assertEquals(1, rig.dispatches.get()); assertEquals(1, rig.admissions.get());
+            return null;
+        });
+    }
+
+    @Test void registeredEffectUsesGatewayPolicyAndCannotDispatchWhenDenied() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{}");
+            var occurrence = rig.occurrence(running, entry, call);
+            rig.outcome.set(DecisionOutcome.DENY);
+            assertThrows(PolicyDenied.class, () -> rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call));
+            assertEquals(0, rig.dispatches.get()); assertEquals(0, rig.admissions.get());
+            assertTrue(rig.ledger.find(occurrence.effectCommand("registered:test").key()).isEmpty());
+            assertEquals(java.util.List.of("agent.tool.started", "agent.tool.failed"), rig.auditEvents);
+            return null;
+        });
+    }
+
+    @Test void missingStartAuditNeverCreatesAnEffect() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{}");
+            var occurrence = rig.occurrence(running, entry, call);
+            rig.failedAudit.set("agent.tool.started");
+            assertThrows(ModelCallRefused.class, () -> rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call));
+            assertEquals(0, rig.dispatches.get()); assertEquals(0, rig.admissions.get());
+            assertTrue(rig.ledger.find(occurrence.effectCommand("registered:test").key()).isEmpty());
+            return null;
+        });
+    }
+
+    @Test void missingOutcomeAuditWithholdsButDoesNotLoseOrRepeatTheEffect() throws Exception {
+        inCallback((running, entry, checks) -> {
+            var rig = new ToolEffectRig(entry); var call = rig.call("{}");
+            var occurrence = rig.occurrence(running, entry, call);
+            rig.failedAudit.set("agent.tool.effect.retained");
+            assertThrows(ModelCallRefused.class, () -> rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call));
+            assertEquals(EffectState.CONFIRMED, rig.ledger.find(occurrence.effectCommand("registered:test").key()).orElseThrow().state());
+            rig.failedAudit.set(null);
+            assertEquals(EffectState.CONFIRMED, rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call).state());
+            assertEquals(1, rig.dispatches.get()); assertEquals(1, rig.admissions.get());
+            assertEquals(java.util.List.of("agent.tool.started", "agent.tool.effect.retained", "agent.tool.started",
+                    "agent.tool.effect.retained"), rig.auditEvents);
             return null;
         });
     }

@@ -28,6 +28,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolCall;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolGateway;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ToolResult;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.effect.DurableEffects;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditDraft;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditSink;
 import java.time.Clock;
@@ -130,16 +131,25 @@ public final class GovernedToolGateway implements ToolGateway {
     private final AuditSink audit;
     private final ToolBudget budget;
     private final ApprovedToolProfile profile;
+    private final ControlledToolEffects controlledEffects;
     private static final Subject GATEWAY = new Subject(SubjectKind.SERVICE, "tool-gateway");
 
     public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
                                ApprovedToolProfile profile, Pep pep, AuditSink audit, ToolBudget budget, Clock clock) {
+        this(registry, approvals, profile, pep, audit, budget, clock, null);
+    }
+
+    /** Effect execution is enabled only by trusted composition, with the same policy and approval source. */
+    public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
+                               ApprovedToolProfile profile, Pep pep, AuditSink audit, ToolBudget budget, Clock clock,
+                               DurableEffects ledger) {
         this.registry = Map.copyOf(registry); this.approvals = Objects.requireNonNull(approvals);
         this.profile = Objects.requireNonNull(profile);
         if (!configurationFingerprint(this.registry).equals(profile.configurationFingerprint()))
             throw new IllegalArgumentException("registered tool configuration differs from profile");
         this.pep = Objects.requireNonNull(pep); this.audit = Objects.requireNonNull(audit);
         this.budget = Objects.requireNonNull(budget); this.clock = Objects.requireNonNull(clock);
+        this.controlledEffects = ledger == null ? null : new ControlledToolEffects(ledger, this.pep, this.approvals);
     }
 
     /** Fingerprints exact schemas, timeouts, declared side effects, target IDs and composition-supplied digests.
@@ -244,9 +254,10 @@ public final class GovernedToolGateway implements ToolGateway {
      * is an approval ceiling, not a timer around this synchronous call. This is opt-in, not production wiring.
      */
     public Effect invokeEffect(Running control, ResourceExecutionEntry execution, AllocatedResourceTask allocation,
-                               ResourceToolCall occurrence, ToolCall call, ControlledToolEffects effects) {
+                               ResourceToolCall occurrence, ToolCall call) {
         Objects.requireNonNull(control); Objects.requireNonNull(execution); Objects.requireNonNull(allocation);
-        Objects.requireNonNull(occurrence); Objects.requireNonNull(call); Objects.requireNonNull(effects);
+        Objects.requireNonNull(occurrence); Objects.requireNonNull(call);
+        if (controlledEffects == null) throw new ModelCallRefused("controlled effects are unavailable");
         control.requireCurrent(execution, occurrence.executor());
         Approval approved = current();
         if (approved == null || !approved.task().id().equals(call.taskId()) || approved.budgetRemainingMicros() == 0)
@@ -271,7 +282,28 @@ public final class GovernedToolGateway implements ToolGateway {
         control.requireCurrent(execution, occurrence.executor());
         if (!same(approved) || !budgetCurrent(approved) || !same(approved))
             throw new ModelCallRefused("tool approval or profile changed");
-        return effects.execute(control, execution, allocation, profile, occurrence, call, budget, registration.effectTarget, target);
+        String attempt = UlidGenerator.shared().next().value();
+        if (!record(call, approved, attempt, "agent.tool.started"))
+            throw new ModelCallRefused("tool start audit is unavailable");
+        control.requireCurrent(execution, occurrence.executor());
+        if (!same(approved) || !budgetCurrent(approved) || !same(approved))
+            throw new ModelCallRefused("tool approval or profile changed");
+        final Effect result;
+        try {
+            result = controlledEffects.execute(control, execution, allocation, profile, occurrence, call,
+                    budget, registration.effectTarget, target);
+        } catch (RuntimeException failure) {
+            record(call, approved, attempt, "agent.tool.failed");
+            throw failure;
+        }
+        control.requireCurrent(execution, occurrence.executor());
+        if (!same(approved) || !budgetCurrent(approved) || !same(approved)
+                || !record(call, approved, attempt, "agent.tool.effect.retained"))
+            throw new ModelCallRefused("tool effect outcome is withheld");
+        control.requireCurrent(execution, occurrence.executor());
+        if (!same(approved) || !budgetCurrent(approved) || !same(approved))
+            throw new ModelCallRefused("tool effect outcome is withheld");
+        return result;
     }
 
     private Approval current() {
