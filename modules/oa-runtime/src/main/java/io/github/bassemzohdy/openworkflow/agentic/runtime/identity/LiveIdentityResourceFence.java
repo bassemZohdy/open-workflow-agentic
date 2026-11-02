@@ -62,20 +62,20 @@ public final class LiveIdentityResourceFence implements ResourceExecutionFence, 
     }
 
     /**
-     * Pairs the same credential with a composite containing this exact identity delegate and a policy delegate bound
-     * to the same witness and entry, and a task check bound to this exact credential and entry. The trusted
-     * composition root must supply the remaining delegates.
+     * Validates data for the trusted composition root; this does not construct a credential fence or grant permission.
+     * The composite must contain this exact identity delegate, policy on the same witness and entry, and task check
+     * on the same credential and entry. The root must source the remaining delegates from trusted components.
      */
-    public JdbcResourceExecutionGate.CredentialFence pair(CompositeExecutionFence composite,
-                                                          LiveResearchPolicyFence policy, ResourceTaskExecutionFence task) {
+    public void requirePairing(ResourceCallBinding credential, CompositeExecutionFence composite,
+                               LiveResearchPolicyFence policy, ResourceTaskExecutionFence task) {
         if (closed.get() || Thread.currentThread().isInterrupted()) throw refused("identity context unavailable");
+        if (!binding.equals(credential)) throw refused("credential differs");
         if (!Objects.requireNonNull(composite, "composite").usesIdentity(this))
             throw refused("composite identity differs");
         if (policy == null || !composite.usesPolicy(policy) || !policy.boundTo(bound, entry))
             throw refused("composite policy differs");
         if (task == null || !composite.usesTask(task) || !task.boundTo(entry, binding))
             throw refused("composite task or credential differs");
-        return JdbcResourceExecutionGate.CredentialFence.pair(binding, composite);
     }
 
     private static final class IdentityRefusedException extends IllegalStateException {

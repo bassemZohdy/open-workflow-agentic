@@ -12,6 +12,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceTaskAllocations;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.*;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.execution.GovernedExecutionRoot;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcNodeBudget;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.JdbcToolCallBudget;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedToolGateway;
@@ -255,7 +256,7 @@ class ResourceTaskAllocationStoreTest {
                 else builder.with(check,ignored->{});
             }
             var composite=builder.build();
-            assertThrows(IllegalStateException.class,()->identity.pair(composite,policy,otherTask));
+            assertThrows(IllegalStateException.class,()->GovernedExecutionRoot.pair(canonical,identity,policy,otherTask,composite));
             var mismatched=CompositeExecutionFence.builder();
             for(var check:CompositeExecutionFence.Check.values()) {
                 if(check==CompositeExecutionFence.Check.IDENTITY)mismatched.with(check,identity);
@@ -263,9 +264,10 @@ class ResourceTaskAllocationStoreTest {
                 else if(check==CompositeExecutionFence.Check.TASK_AND_TARGET)mismatched.with(check,otherTask);
                 else mismatched.with(check,ignored->{});
             }
-            assertThrows(IllegalStateException.class,()->identity.pair(mismatched.build(),policy,otherTask),
+            assertThrows(IllegalStateException.class,()->GovernedExecutionRoot.pair(canonical,identity,policy,otherTask,mismatched.build()),
                     "the task and identity must carry the same exact credential");
-            var paired=identity.pair(composite,policy,task);
+            assertThrows(IllegalStateException.class,()->GovernedExecutionRoot.pair(refreshed,identity,policy,task,composite));
+            var paired=GovernedExecutionRoot.pair(canonical,identity,policy,task,composite);
             assertThrows(IllegalStateException.class,()->gate.openGoverned(refreshed,entry,UUID.randomUUID(),paired));
             var callsMade=new AtomicInteger();
             var result=gate.openGoverned(canonical,entry,UUID.randomUUID(),paired)

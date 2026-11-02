@@ -404,7 +404,10 @@ managed async path now runs the synchronous callback on a fresh gate-owned virtu
 thread locals and a bounded worker-slot semaphore. Cancelling the waiter or closing the gate invalidates the attempt
 without releasing that worker slot until the worker exits. Tests cover cancellation during admission and callback,
 shutdown, retained entries, nested-stage quarantine and context isolation. This path is not installed in production;
-it cannot detect hidden detached work, stop an in-flight effect, or impose a process-wide bound across gates.
+it cannot detect hidden detached work, stop an in-flight effect, or impose a process-wide bound across gates. Credential-fence construction is confined to an explicit, non-CDI composition boundary which validates
+identity, policy, task and credential pairing. Architecture tests also guard the async entry and this pairing factory
+against calls from the scanned project packages outside that boundary. This static check is not a runtime privilege
+boundary or protection from reflection. The boundary does not itself dispatch or supply production owner, target or audit.
 
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`

@@ -11,6 +11,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.id.UlidGenerator;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceInvocations;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.*;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.execution.GovernedExecutionRoot;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceCallBindings;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.CompositeExecutionFence;
@@ -341,13 +342,13 @@ class ResourceRunningControlTest {
                 var pep=new Pep(request->new Decision("fixture",DecisionOutcome.ALLOW,"fixture",
                         PolicyRef.FAIL_CLOSED,clock.instant()),event->{},Duration.ofSeconds(3),clock);
                 var policy=new LiveResearchPolicyFence(admission,first,f.entry(1),pep);
-                assertThrows(IllegalStateException.class,()->identity.pair(wrongComposite.build(),policy,null));
+                assertThrows(IllegalStateException.class,()->GovernedExecutionRoot.pair(one,identity,policy,null,wrongComposite.build()));
                 var otherPolicy=new LiveResearchPolicyFence(admission,second,f.entry(1),pep);
                 var swappedPolicyComposite=CompositeExecutionFence.builder();
                 for(var check:CompositeExecutionFence.Check.values())
                     swappedPolicyComposite.with(check,check==CompositeExecutionFence.Check.IDENTITY?identity:
                             check==CompositeExecutionFence.Check.POLICY?otherPolicy:ignored->{});
-                assertThrows(IllegalStateException.class,()->identity.pair(swappedPolicyComposite.build(),otherPolicy,null));
+                assertThrows(IllegalStateException.class,()->GovernedExecutionRoot.pair(one,identity,otherPolicy,null,swappedPolicyComposite.build()));
                 var policyEntered=new CountDownLatch(1);var policyRelease=new CountDownLatch(1);
                 var blockingPep=new Pep(request->{
                     policyEntered.countDown();

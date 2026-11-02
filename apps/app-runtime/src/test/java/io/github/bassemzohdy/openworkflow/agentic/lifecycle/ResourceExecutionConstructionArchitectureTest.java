@@ -10,6 +10,10 @@ import com.tngtech.archunit.core.importer.*;
 import com.tngtech.archunit.lang.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityResourceFence;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveResearchPolicyFence;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.CompositeExecutionFence;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.ResourceTaskExecutionFence;
 import java.util.*;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
@@ -34,8 +38,10 @@ class ResourceExecutionConstructionArchitectureTest {
                             boolean legacy=(owner.equals(GATE)&&name.equals("open"))
                                     ||(owner.equals(GATE+"$Attempt")&&name.equals("execute"));
                             boolean controlled=(owner.equals(GATE)&&name.equals("openGoverned"))
+                                    ||(owner.equals(GATE)&&name.equals("executeGovernedAsync"))
                                     ||(owner.equals(GATE+"$CredentialFence")&&name.equals("pair"))
-                                    ||(owner.equals(GATE+"$Attempt")&&name.equals("executeGoverned"));
+                                    ||(owner.equals(GATE+"$Attempt")&&name.equals("executeGoverned"))
+                                    ||(owner.equals(ROOT)&&name.equals("pair"));
                             if(legacy||(controlled&&!root))events.add(SimpleConditionEvent.violated(item,call.getDescription()));
                         }
                     }
@@ -48,7 +54,8 @@ class ResourceExecutionConstructionArchitectureTest {
         rule(Set.of(ROOT)).check(imported);
     }
     @TestFactory Stream<DynamicTest> eachIndependentBypassFixtureIsRejected() {
-        return Stream.of(ConstructorLeak.class,LegacyEntryLeak.class,LegacyCallbackLeak.class,FenceLeak.class,GovernedExecutionRoot.class)
+        return Stream.of(ConstructorLeak.class,LegacyEntryLeak.class,LegacyCallbackLeak.class,FenceLeak.class,
+                        AsyncEntryLeak.class,RootPairLeak.class,GovernedExecutionRoot.class)
                 .map(type->DynamicTest.dynamicTest(type.getSimpleName(),()->{
                     var imported=new ClassFileImporter().importClasses(type);
                     assertTrue(rule(Set.of(ROOT)).evaluate(imported).hasViolation(),"missing guard for "+type.getName());
@@ -73,6 +80,19 @@ class ResourceExecutionConstructionArchitectureTest {
     }
     static class FenceLeak {
         static Object make(ResourceCallBinding b){return JdbcResourceExecutionGate.CredentialFence.pair(b,ignored->{ });}
+    }
+    static class AsyncEntryLeak {
+        static Object run(JdbcResourceExecutionGate gate,ResourceCallBinding b,ResourceExecutionEntry e,
+                          JdbcResourceExecutionGate.CredentialFence fence) {
+            return gate.executeGovernedAsync(b,e,UUID.randomUUID(),fence,r->"fixture");
+        }
+    }
+    static class RootPairLeak {
+        static Object make(ResourceCallBinding b,LiveIdentityResourceFence identity,LiveResearchPolicyFence policy,
+                           ResourceTaskExecutionFence task,CompositeExecutionFence composite) {
+            return io.github.bassemzohdy.openworkflow.agentic.runtime.execution.GovernedExecutionRoot
+                    .pair(b,identity,policy,task,composite);
+        }
     }
     // Same simple name is insufficient: only the exact reviewed production package can be allowed.
     static class GovernedExecutionRoot {
