@@ -1,5 +1,7 @@
 # Changelog
 
+- Verify corrupted retained audit bindings cannot stage human wake events, and give the lease-expiry test a wider timing margin.
+
 - Test repeat-safe component recovery of a checkpointed human wake before acknowledgement, without duplicate acknowledgement audit or redelivery. Process restart remains unproved.
 
 - Test staged human wake delivery against the actual SDK and JPA checkpoint writer, including lost-owner rollback. The targeted callback is test-only; production dispatch and restart recovery remain open.

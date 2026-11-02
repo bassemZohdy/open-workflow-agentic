@@ -211,6 +211,26 @@ class RegisteredHumanWaitFenceTest {
         } finally { s.leases().release(s.claim()); }
     }
 
+    @Test void corruptedAuditBindingCannotStageAReferenceOnlyEvent() throws Exception {
+        var f = fixture(Duration.ofMinutes(2)); var s = staging(f);
+        try {
+            // Deliberately bypass only the test database's guards to model retained-data corruption.
+            try (var c = owned.getConnection(); var sql = c.createStatement()) {
+                sql.execute("alter table human_proposal.pending disable trigger human_pending_no_change");
+                sql.execute("alter table human_proposal.pending disable trigger human_pending_update_complete");
+                try (var q = c.prepareStatement("update human_proposal.pending set audit_occurred_at=audit_occurred_at + interval '1 second' where tenant=? and decision_id=?")) {
+                    q.setString(1, "tenant"); q.setString(2, f.decision().id().value()); assertEquals(1, q.executeUpdate());
+                } finally {
+                    sql.execute("alter table human_proposal.pending enable trigger human_pending_no_change");
+                    sql.execute("alter table human_proposal.pending enable trigger human_pending_update_complete");
+                }
+            }
+            assertThrows(IllegalStateException.class, () -> s.stage().stage(f.decision(), f.registered(), s.claim(), s.group(), SNAPSHOT));
+            assertEquals("BLOCKED", pendingState(f)); assertEquals(0, inboxCount(f));
+            assertTrue(s.inbox().boundSignal(f.registered()).isEmpty());
+        } finally { s.leases().release(s.claim()); }
+    }
+
     @Test void pendingCannotBeForgedDirectlyIntoStagedState() throws Exception {
         var f = fixture(Duration.ofMinutes(2));
         coordinator(f.registered()).recordNew(f.authority(), f.decision());
@@ -250,11 +270,11 @@ class RegisteredHumanWaitFenceTest {
         assertTrue(s.leases().release(s.claim()));
         try (var c = owned.getConnection(); var sql = c.createStatement()) {
             sql.execute("create function human_proposal.test_stage_delay() returns trigger language plpgsql as $$ "
-                    + "begin perform pg_sleep(6); return null; end $$");
+                    + "begin perform pg_sleep(11); return null; end $$");
             sql.execute("create constraint trigger human_stage_delay after insert on human_proposal.wake_stage "
                     + "deferrable initially deferred for each row execute function human_proposal.test_stage_delay()");
         }
-        var shortClaim = s.leases().acquire(f.registered().task(), "short-" + UUID.randomUUID(), Duration.ofSeconds(5)).orElseThrow().claim();
+        var shortClaim = s.leases().acquire(f.registered().task(), "short-" + UUID.randomUUID(), Duration.ofSeconds(10)).orElseThrow().claim();
         try {
             assertThrows(StoreUnavailableException.class,
                     () -> s.stage().stage(f.decision(), f.registered(), shortClaim, s.group(), SNAPSHOT));
