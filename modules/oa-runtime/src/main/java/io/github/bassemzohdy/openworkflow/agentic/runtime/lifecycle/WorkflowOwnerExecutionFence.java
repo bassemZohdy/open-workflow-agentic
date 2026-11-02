@@ -31,5 +31,7 @@ public class WorkflowOwnerExecutionFence {
             leases.withCurrentLease(claim, connection -> null);
             return null;
         });
+        if (!bindings.require(context).equals(claim))
+            throw new IllegalStateException("local owner generation changed during execution check");
     }
 }

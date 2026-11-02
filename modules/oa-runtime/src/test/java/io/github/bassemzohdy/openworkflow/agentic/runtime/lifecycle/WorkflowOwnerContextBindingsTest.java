@@ -29,5 +29,11 @@ class WorkflowOwnerContextBindingsTest {
         bindings.bind(b, successor);
         assertEquals(first, bindings.require(a));
         assertEquals(successor, bindings.require(b));
+        assertFalse(bindings.revoke(a, successor));
+        assertTrue(bindings.revoke(a, first));
+        assertThrows(IllegalStateException.class, () -> bindings.require(a));
+        assertThrows(IllegalStateException.class, () -> bindings.bind(a, first), "revoked contexts cannot be revived");
+        assertThrows(IllegalStateException.class, () -> bindings.bind(a, successor));
+        assertEquals(successor, bindings.require(b));
     }
 }

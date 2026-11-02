@@ -28,8 +28,10 @@ public class OwnerFencedJpaWriter extends JpaInstanceWriter {
                                                              WorkflowContextData context) {
         var claim = bindings.require(context); // Capture before dispatch; later ownership changes cannot replace it.
         return operations -> {
+            if (!bindings.require(context).equals(claim)) throw new IllegalStateException("local owner generation changed");
             fence.requireCurrent(context, claim);
             operation.accept(operations);
+            if (!bindings.require(context).equals(claim)) throw new IllegalStateException("local owner generation changed");
             fence.requireCurrent(context, claim);
         };
     }

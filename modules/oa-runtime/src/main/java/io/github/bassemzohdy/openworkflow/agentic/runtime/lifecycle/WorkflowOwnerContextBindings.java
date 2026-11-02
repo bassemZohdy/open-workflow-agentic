@@ -17,7 +17,12 @@ import java.util.Objects;
 public class WorkflowOwnerContextBindings {
     private static final int LIMIT = 4096;
     private final ReferenceQueue<WorkflowContextData> collected = new ReferenceQueue<>();
-    private final Map<IdentityKey, JdbcWorkflowOwnerLease.Claim> claims = new HashMap<>();
+    private final Map<IdentityKey, Bound> claims = new HashMap<>();
+    private static final class Bound {
+        final JdbcWorkflowOwnerLease.Claim claim;
+        boolean revoked;
+        Bound(JdbcWorkflowOwnerLease.Claim claim) { this.claim = claim; }
+    }
 
     public synchronized void bind(WorkflowContextData context, JdbcWorkflowOwnerLease.Claim claim) {
         Objects.requireNonNull(context, "context"); Objects.requireNonNull(claim, "claim");
@@ -25,18 +30,28 @@ public class WorkflowOwnerContextBindings {
         var probe = new IdentityKey(context, null);
         var existing = claims.get(probe);
         if (existing != null) {
-            if (!existing.equals(claim)) throw new IllegalStateException("SDK context already has another owner generation");
+            if (existing.revoked || !existing.claim.equals(claim))
+                throw new IllegalStateException("SDK context already has an unavailable owner generation");
             return;
         }
         if (claims.size() >= LIMIT) throw new IllegalStateException("workflow owner context capacity exhausted");
-        claims.put(new IdentityKey(context, collected), claim);
+        claims.put(new IdentityKey(context, collected), new Bound(claim));
     }
 
     public synchronized JdbcWorkflowOwnerLease.Claim require(WorkflowContextData context) {
         Objects.requireNonNull(context, "context"); clean();
         var claim = claims.get(new IdentityKey(context, null));
-        if (claim == null) throw new IllegalStateException("SDK context has no trusted owner generation");
-        return claim;
+        if (claim == null || claim.revoked) throw new IllegalStateException("SDK context has no current local owner generation");
+        return claim.claim;
+    }
+
+    /** Revocation is permanent for a live context; it cannot be rebound after uncertain renewal or shutdown. */
+    public synchronized boolean revoke(WorkflowContextData context, JdbcWorkflowOwnerLease.Claim claim) {
+        Objects.requireNonNull(context, "context"); Objects.requireNonNull(claim, "claim"); clean();
+        var bound = claims.get(new IdentityKey(context, null));
+        if (bound == null || !bound.claim.equals(claim)) return false;
+        bound.revoked = true;
+        return true;
     }
 
     private void clean() {

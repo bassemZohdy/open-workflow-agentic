@@ -356,6 +356,13 @@ a lease can expire immediately after the check. Owner acquisition and renewal, p
 cleanup and external-effect fencing remain open. These primitives cannot stop an in-flight external effect or establish
 split-brain safety.
 
+A separately composed, bounded process-local coordinator can acquire and renew one generation for a context supplied
+by a trusted caller. A failed or uncertain renewal or shutdown revokes that exact context locally and leaves the
+database lease to expire; it does not stop work already in flight. Tests cover renewal, failure while the database
+lease remains live, a writer and an execution check blocked during revocation, and shutdown during a blocked
+acquisition. The coordinator is not installed in application startup or restore. Trusted context provenance, pool
+and scheduler capacity, cross-process failure and production rollout remain open.
+
 When a previously restored, running timed task is cancelled, the pinned SDK can wrap the task cancellation as a
 timeout failure after setting its own state to `CANCELLED`. The observer defers only the `CANCELLED` to `FAULTED`
 transition, suppressing the following failure only if it is the SDK timeout wrapping a cancellation; it then waits
