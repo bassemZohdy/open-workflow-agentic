@@ -251,4 +251,34 @@ class GovernedToolGatewayTest {
         assertTrue(lookupFinished.await(5, java.util.concurrent.TimeUnit.SECONDS));
         assertFalse(invoked.await(300, java.util.concurrent.TimeUnit.MILLISECONDS));
     }
+
+    @Test void eachToolCallUsesAFreshThreadWithoutInheritedCallerState() {
+        var local = new ThreadLocal<String>();
+        var inherited = new InheritableThreadLocal<String>();
+        inherited.set("caller-private");
+        var first = new AtomicReference<Thread>();
+        var second = new AtomicReference<Thread>();
+        var leaked = new AtomicReference<String>();
+        var rig = new Rig();
+        rig.tool = args -> {
+            if (rig.calls.getAndIncrement() == 0) {
+                first.set(Thread.currentThread());
+                if (inherited.get() != null) leaked.set(inherited.get());
+                local.set("previous-call-private");
+            } else {
+                second.set(Thread.currentThread());
+                if (local.get() != null) leaked.set(local.get());
+                if (inherited.get() != null) leaked.set(inherited.get());
+            }
+            return "{\"result\":\"ok\"}";
+        };
+        try {
+            var gateway = rig.gateway();
+            assertInstanceOf(ToolResult.Completed.class, gateway.invoke(CALL));
+            assertInstanceOf(ToolResult.Completed.class, gateway.invoke(CALL));
+            assertNotNull(first.get()); assertNotNull(second.get());
+            assertNotSame(first.get(), second.get());
+            assertNull(leaked.get());
+        } finally { inherited.remove(); }
+    }
 }
