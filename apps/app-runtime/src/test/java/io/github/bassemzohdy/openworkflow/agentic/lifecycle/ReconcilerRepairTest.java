@@ -413,6 +413,98 @@ class ReconcilerRepairTest {
     }
 
     @Test
+    void waitExpiringDuringResumeEpochWriteIsNotResumed() {
+        String tenant = newTenant(), engineId = "deadline-during-epoch-" + RUN;
+        FakeEngine engine = new FakeEngine(); engine.report(engineId, EngineStatus.PENDING);
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        Instant before = Instant.now().truncatedTo(ChronoUnit.MICROS), deadline = before.plusSeconds(30);
+        row = move(row, InstanceStatus.WAITING, engineId, deadline);
+        var now = new AtomicReference<>(before);
+        Clock clock = new Clock() {
+            @Override public ZoneId getZone() { return ZoneId.of("UTC"); }
+            @Override public Clock withZone(ZoneId zone) { return this; }
+            @Override public Instant instant() { return now.get(); }
+        };
+        var delayed = new RepairStore(dataSource) {
+            @Override public long incrementResumeEpoch(String id) {
+                long epoch = super.incrementResumeEpoch(id); now.set(deadline); return epoch;
+            }
+        };
+        new Reconciler(store, engine, sync, scan, delayed, settings(3), dataSource, clock, tenant::equals,
+                ResumeGate.ALLOW, ignored -> true).reconcileOnce();
+        assertEquals(0, engine.restarts.get());
+        assertEquals(1, engine.cancels.get());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+    }
+
+    @Test
+    void lifetimeExpiringDuringResumeEpochWriteIsNotResumed() {
+        String tenant = newTenant(), engineId = "lifetime-during-epoch-" + RUN;
+        FakeEngine engine = new FakeEngine(); engine.report(engineId, EngineStatus.PENDING);
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        Instant lifetime = row.createdAt().plus(Duration.ofMinutes(10));
+        var now = new AtomicReference<>(lifetime.minusSeconds(30));
+        Clock clock = new Clock() {
+            @Override public ZoneId getZone() { return ZoneId.of("UTC"); }
+            @Override public Clock withZone(ZoneId zone) { return this; }
+            @Override public Instant instant() { return now.get(); }
+        };
+        var delayed = new RepairStore(dataSource) {
+            @Override public long incrementResumeEpoch(String id) {
+                long epoch = super.incrementResumeEpoch(id); now.set(lifetime); return epoch;
+            }
+        };
+        var bounded = new LifecycleSettings(true, Duration.ofSeconds(30), Duration.ofSeconds(120), TINY, 3,
+                TINY, TINY, Duration.ofHours(24), 100, Optional.empty(), Optional.of(Duration.ofMinutes(10)));
+        new Reconciler(store, engine, sync, scan, delayed, bounded, dataSource, clock, tenant::equals,
+                ResumeGate.ALLOW, ignored -> true).reconcileOnce();
+        assertEquals(0, engine.restarts.get());
+        assertEquals(1, engine.cancels.get());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+    }
+
+    @Test
+    void authorityLostDuringResumeEpochWriteCannotStartTheInstance() {
+        String tenant = newTenant(), engineId = "authority-during-epoch-" + RUN;
+        FakeEngine engine = new FakeEngine(); engine.report(engineId, EngineStatus.PENDING);
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.WAITING, engineId, Instant.now().plusSeconds(60));
+        var available = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var delayed = new RepairStore(dataSource) {
+            @Override public long incrementResumeEpoch(String id) {
+                long epoch = super.incrementResumeEpoch(id); available.set(false); return epoch;
+            }
+        };
+        ResumeGate gate = ignored -> available.get() ? ResumeGate.Decision.proceed()
+                : new ResumeGate.Decision(ResumeGate.Outcome.UNAVAILABLE, "fixture.unavailable");
+        new Reconciler(store, engine, sync, scan, delayed, settings(3), dataSource, Clock.systemUTC(), tenant::equals,
+                gate, ignored -> true).reconcileOnce();
+        assertEquals(0, engine.restarts.get());
+        assertEquals(InstanceStatus.WAITING, reload(tenant, row).status());
+    }
+
+    @Test
+    void cancellationDuringPostEpochAuthorityCheckCannotStartTheInstance() {
+        String tenant = newTenant(), engineId = "cancel-during-post-epoch-gate-" + RUN;
+        FakeEngine engine = new FakeEngine(); engine.report(engineId, EngineStatus.PENDING);
+        var row = move(newRow(tenant), InstanceStatus.RUNNING, engineId, null);
+        row = move(row, InstanceStatus.WAITING, engineId, Instant.now().plusSeconds(60));
+        var checks = new java.util.concurrent.atomic.AtomicInteger();
+        ResumeGate gate = current -> {
+            if (checks.incrementAndGet() == 3) {
+                store.replace(current.successor(Instant.now().truncatedTo(ChronoUnit.MICROS),
+                        InstanceStatus.CANCEL_REQUESTED, engineId, current.startAttempts(), current.lastError(), null),
+                        current.version(), "operator.cancel", InstanceService.RUNTIME_ACTOR);
+            }
+            return ResumeGate.Decision.proceed();
+        };
+        new Reconciler(store, engine, sync, scan, repairs, settings(3), dataSource, Clock.systemUTC(), tenant::equals,
+                gate, ignored -> true).reconcileOnce();
+        assertEquals(0, engine.restarts.get());
+        assertEquals(InstanceStatus.CANCEL_REQUESTED, reload(tenant, row).status());
+    }
+
+    @Test
     void aWaitPastItsDeadlineWithNoEngineInstanceFailsTheRow() {
         String tenant = newTenant();
         FakeEngine engine = new FakeEngine();

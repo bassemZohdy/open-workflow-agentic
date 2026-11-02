@@ -601,6 +601,8 @@ public class Reconciler {
             boolean wasHeld = isHeldForAuthority(row);
             // The epoch is written first, so the task that runs again sees the new value.
             long epoch = repairs.incrementResumeEpoch(row.id().value());
+            // Epoch persistence can block after the earlier gate/deadline check. Never start on that stale decision.
+            if (!recheckAfterResumeEpoch(row)) return;
             boolean started = engine.startRestored(row.definition(), engineId);
             repairs.record("resume", row.id().value(), started ? "resumed" : "refused", "resume epoch " + epoch);
             if (started && wasHeld) {
@@ -633,6 +635,43 @@ public class Reconciler {
         } catch(RuntimeException failed) {
             LOG.warnf("receipt restore gate failed for instance %s (%s); the instance is not resumed",row.id(),simpleName(failed));
             holdForAuthority(row,new ResumeGate.Decision(ResumeGate.Outcome.UNAVAILABLE,"checkpoint.receipt.unavailable"),now);
+            return false;
+        }
+    }
+
+    /** Recheck after the independently committed epoch write, which may have blocked on the registry row. */
+    private boolean recheckAfterResumeEpoch(InstanceRecord expected) {
+        var ref = new RegistryScan.Ref(expected.id().value(), expected.tenant());
+        try {
+            var current = store.find(expected.tenant(), expected.id()).orElseThrow();
+            if (!resumable(expected, current)) return false;
+            var pinned = scan.pinnedLifetime(ref.id());
+            // The lifetime lookup blocked. Re-read state and authority before using either result.
+            current = store.find(expected.tenant(), expected.id()).orElseThrow();
+            if (!resumable(expected, current)) return false;
+            var decision = gateDecision(current);
+            if (!decision.proceeds()) { holdResume(current, decision, clock.instant()); return false; }
+            // A cancellation may have committed while the authority check blocked.
+            current = store.find(expected.tenant(), expected.id()).orElseThrow();
+            if (!resumable(expected, current)) return false;
+            decision = gateDecision(current); // The state read may itself outlast authority.
+            if (!decision.proceeds()) { holdResume(current, decision, clock.instant()); return false; }
+            // The authority check may block too. Judge both retained wait and lifetime limits after it returns.
+            Instant now = clock.instant();
+            boolean waitExpired = current.status() == InstanceStatus.WAITING && current.waitDeadline() != null
+                    && !current.waitDeadline().isAfter(now);
+            boolean lifetimeExpired = pinned.filter(deadline -> !deadline.isAfter(now)).isPresent()
+                    || (settings.maxLifetime.isPresent()
+                    && !current.createdAt().plus(settings.maxLifetime.orElseThrow()).isAfter(now));
+            if (waitExpired || lifetimeExpired) {
+                if (waitExpired) repairDeadline(ref, now);
+                if (lifetimeExpired) repairLifetime(ref, now);
+                return false;
+            }
+            return true;
+        } catch (RuntimeException failed) {
+            LOG.warnf("post-epoch restore gate failed for instance %s (%s); the instance is not resumed",
+                    expected.id(), simpleName(failed));
             return false;
         }
     }

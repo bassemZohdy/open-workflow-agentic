@@ -643,6 +643,7 @@ Implementation owner: **GPT**; reviewer: **Claude**; backlog: GPT-04. Shared pat
 
 Implemented scope:
 
+- Restored RUNNING/WAITING work rechecks retained wait/lifetime deadlines and current authority after the potentially blocking resume-epoch write; a deadline or lost authority refuses a restart. This does not resolve the SDK's refusal to cancel restored PENDING instances or prove the remaining cross-process and multi-replica gates.
 - New starts with a configured maximum lifetime atomically pin their original absolute deadline; reconciliation applies the earlier of that pin and a stricter current setting, including after the setting is removed or increased. Legacy/unbounded starts use current configuration, and old replicas do not enforce pins. Opt-in STARTING expiry coordinates upgraded JDBC start writers with reconciliation; an unconfirmed engine start remains a cancellation request. Escalation, deployed role grants, real two-replica failover and T12 remain open.
 - Lifetime, overdue-wait, stale-start and unconfirmed-cancellation scans rotate across passes, allowing progress past held locks or unresolved rows; per-reconciler cursors reset on restart.
 - Before starting restored work, the reconciler rechecks the individual wait and lifetime deadlines after authority and checkpoint preparation, including instances outside the current scan batch. This does not fence the engine start atomically across replicas or prove T12.
