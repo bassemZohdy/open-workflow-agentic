@@ -75,7 +75,13 @@ public class GovernedLlmClient {
         var decision = pep.modelCall(expected.agent(), expected.task(), expected.modelId(), expected.budgetRemainingMicros());
         return Pep.guard(decision, () -> {
             requireSameApproval(expected);
-            String output = provider.complete(system, user);
+            final String output;
+            try {
+                output = provider.complete(system, user);
+            } catch (RuntimeException providerFailure) {
+                // Provider exceptions must never masquerade as a refusal before the provider was reached.
+                throw new ProviderCallFailed();
+            }
             try {
                 requireSameApproval(expected);
             } catch (ModelCallRefused lost) {
@@ -87,6 +93,8 @@ public class GovernedLlmClient {
 
     /** The provider was reached, so callers must not report a pre-call rejection. */
     static final class ApprovalLostAfterCall extends RuntimeException { }
+    /** Sanitized failure after entering the provider, irrespective of the provider's exception type. */
+    static final class ProviderCallFailed extends RuntimeException { }
 
     private void requireSameApproval(ApprovedModelContext.Approved expected) {
         final boolean matches;
