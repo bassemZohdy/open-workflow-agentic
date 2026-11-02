@@ -48,6 +48,7 @@ class GovernedToolGatewayTest {
         final java.util.List<io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent> records = new java.util.ArrayList<>();
         java.util.function.Consumer<String> duringBoundaryAudit = action -> { };
         GovernedToolGateway.Tool tool = args -> { calls.incrementAndGet(); return "{\"result\":\"ok\"}"; };
+        ToolCallTelemetry telemetry = ToolCallTelemetry.noop();
         DecisionOutcome outcome = DecisionOutcome.ALLOW;
         Runnable duringAudit = () -> { };
         boolean mutating;
@@ -70,7 +71,7 @@ class GovernedToolGatewayTest {
                         @Override public void requireProfile(GovernedToolGateway.Approval approval, ApprovedToolProfile profile) {
                             if (!budgetCurrent.get()) throw new NodeRefused("test profile unavailable");
                         }
-                    }, CLOCK);
+                    }, CLOCK, null, telemetry);
         }
     }
 
@@ -85,6 +86,56 @@ class GovernedToolGatewayTest {
                 rig.records.get(1).attributes().get("agent.tool.attempt"));
         assertFalse(rig.records.toString().contains("query"));
         assertFalse(rig.records.toString().contains("result"));
+    }
+
+    @Test void toolWorkerGetsOnlyTheTraceAndEmitsANonSensitiveChildSpan() {
+        var exporter=io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter.create();
+        try(var sdk=io.opentelemetry.sdk.trace.SdkTracerProvider.builder()
+                .addSpanProcessor(io.opentelemetry.sdk.trace.export.SimpleSpanProcessor.create(exporter)).build()) {
+            var rig=new Rig();rig.telemetry=new ToolCallTelemetry(sdk.get("tools"));
+            var parent=sdk.get("caller").spanBuilder("parent").startSpan();
+            var inherited=new InheritableThreadLocal<String>();inherited.set("private-local");
+            var seen=new AtomicReference<io.opentelemetry.api.trace.SpanContext>();
+            rig.tool=args->{
+                seen.set(io.opentelemetry.api.trace.Span.current().getSpanContext());
+                assertNull(inherited.get());
+                assertNull(io.opentelemetry.api.baggage.Baggage.current().getEntryValue("secret"));
+                rig.calls.incrementAndGet();return "{\"result\":\"private-output\"}";
+            };
+            var baggage=io.opentelemetry.api.baggage.Baggage.builder().put("secret","private-baggage").build();
+            try(var scope=io.opentelemetry.context.Context.current().with(parent).with(baggage).makeCurrent()) {
+                assertInstanceOf(ToolResult.Completed.class,rig.gateway().invoke(CALL));
+                assertEquals(parent.getSpanContext(),io.opentelemetry.api.trace.Span.current().getSpanContext());
+            } finally {parent.end();inherited.remove();}
+            var tool=exporter.getFinishedSpanItems().stream().filter(s->s.getName().equals("oa.tool.call")).findFirst().orElseThrow();
+            assertEquals(parent.getSpanContext().getSpanId(),tool.getParentSpanId());
+            assertEquals(parent.getSpanContext().getTraceId(),tool.getTraceId());
+            assertEquals(tool.getSpanContext(),seen.get());
+            assertEquals(Set.of(io.opentelemetry.api.common.AttributeKey.stringKey("oa.tool.schema"),
+                    io.opentelemetry.api.common.AttributeKey.stringKey("oa.tool.outcome")),tool.getAttributes().asMap().keySet());
+            assertFalse(tool.toString().contains("private"));assertTrue(tool.getEvents().isEmpty());
+            assertEquals(1,rig.calls.get());
+        }
+    }
+
+    @Test void approvalLostWhileTracingStartsCannotReachTheTool() {
+        var rig=new Rig();
+        var tracer=(io.opentelemetry.api.trace.Tracer) java.lang.reflect.Proxy.newProxyInstance(
+                io.opentelemetry.api.trace.Tracer.class.getClassLoader(),new Class<?>[]{io.opentelemetry.api.trace.Tracer.class},
+                (p,m,a)->{rig.approval.set(null);throw new IllegalStateException("private");});
+        rig.telemetry=new ToolCallTelemetry(tracer);
+        assertInstanceOf(ToolResult.Rejected.class,rig.gateway().invoke(CALL));
+        assertEquals(0,rig.calls.get());
+    }
+
+    @Test void unavailableTracingDoesNotRetryTheTool() {
+        var rig=new Rig();
+        var tracer=(io.opentelemetry.api.trace.Tracer) java.lang.reflect.Proxy.newProxyInstance(
+                io.opentelemetry.api.trace.Tracer.class.getClassLoader(),new Class<?>[]{io.opentelemetry.api.trace.Tracer.class},
+                (p,m,a)->{throw new IllegalStateException("private");});
+        rig.telemetry=new ToolCallTelemetry(tracer);
+        assertInstanceOf(ToolResult.Completed.class,rig.gateway().invoke(CALL));
+        assertEquals(1,rig.calls.get());
     }
 
     @Test void missingOrMismatchedApprovalAndUnlistedToolsNeverCall() {

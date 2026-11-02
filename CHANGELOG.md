@@ -1,5 +1,7 @@
 # Changelog
 
+- Allow explicit governed tool tracing, carrying span context across isolated workers without baggage or caller thread-local values.
+
 - Propagate W3C traceparent on governed HTTP effects and lookups without forwarding tracing baggage or vendor state.
 
 - Trace governed model-call attempts with bounded, non-sensitive outcome attributes, preserving approval checks and research-graph trace context across node execution.

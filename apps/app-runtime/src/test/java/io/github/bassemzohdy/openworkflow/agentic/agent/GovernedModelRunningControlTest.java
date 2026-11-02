@@ -34,6 +34,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ApprovedModelCon
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedLlmClient;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.GovernedToolGateway;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ControlledToolEffects;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ToolCallTelemetry;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.LlmClient;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ModelCallRefused;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.NoApprovedModelContext;
@@ -681,7 +682,9 @@ class GovernedModelRunningControlTest {
             }
         };
 
-        ToolEffectRig(ResourceExecutionEntry entry) {
+        ToolEffectRig(ResourceExecutionEntry entry) { this(entry, null); }
+
+        ToolEffectRig(ResourceExecutionEntry entry, io.opentelemetry.api.trace.Tracer tracer) {
             var task = new AgentTaskContract(UlidGenerator.shared().next(), "tool fixture", Set.of("tool:research"),
                     Set.of(), RiskTier.LOW, new ExecutionLimits(10, Duration.ofMinutes(10), 1000),
                     entry.scope().owner(), UlidGenerator.shared().next());
@@ -704,12 +707,13 @@ class GovernedModelRunningControlTest {
             };
             var pep = new Pep(request -> new Decision("fixture", outcome.get(), "fixture", POLICY, NOW),
                     event -> { }, Duration.ofSeconds(5), CLOCK);
-            var effects = new DurableEffects(ledger, Clock.systemUTC());
+            var effects = tracer == null ? new DurableEffects(ledger, Clock.systemUTC()) :
+                    new DurableEffects(ledger, Clock.systemUTC(), new io.github.bassemzohdy.openworkflow.agentic.runtime.effect.EffectTelemetry(tracer));
             controlled = new ControlledToolEffects(effects, pep, () -> Optional.of(approved));
             gateway = new GovernedToolGateway(registry, () -> Optional.of(approved), profile, pep, event -> {
                 auditEvents.add(event.action());
                 if (event.action().equals(failedAudit.get())) throw new IllegalStateException("audit unavailable");
-            }, budget, CLOCK, effects);
+            }, budget, CLOCK, effects, tracer == null ? new ToolCallTelemetry(io.opentelemetry.api.OpenTelemetry.noop()) : new ToolCallTelemetry(tracer));
         }
 
         ToolCall call(String args) { return new ToolCall(allocation.allocation().contract().id(), "tool:research", args); }
@@ -830,6 +834,48 @@ class GovernedModelRunningControlTest {
             assertEquals(EffectState.CONFIRMED, first.state());
             assertEquals(first, rig.gateway.invokeEffect(running, entry, rig.allocation, occurrence, call));
             assertEquals(1, rig.dispatches.get()); assertEquals(1, rig.admissions.get());
+            return null;
+        });
+    }
+
+    @Test void governedToolSpanParentsTheDurableEffectSpans() throws Exception {
+        var exporter=io.opentelemetry.sdk.testing.exporter.InMemorySpanExporter.create();
+        try(var sdk=io.opentelemetry.sdk.trace.SdkTracerProvider.builder()
+                .addSpanProcessor(io.opentelemetry.sdk.trace.export.SimpleSpanProcessor.create(exporter)).build()) {
+            var parent=sdk.get("caller").spanBuilder("parent").startSpan();
+            try(var scope=parent.makeCurrent()) {
+                inCallback((running, entry, checks) -> {
+                    var rig=new ToolEffectRig(entry,sdk.get("trace"));
+                    var call=rig.call("{\"query\":\"private\"}");
+                    assertEquals(EffectState.CONFIRMED,rig.gateway.invokeEffect(running,entry,rig.allocation,
+                            rig.occurrence(running,entry,call),call).state());
+                    assertEquals(1,rig.dispatches.get());
+                    return null;
+                });
+            } finally {parent.end();}
+            var spans=exporter.getFinishedSpanItems();
+            var tool=spans.stream().filter(s->s.getName().equals("oa.tool.call")).findFirst().orElseThrow();
+            var effect=spans.stream().filter(s->s.getName().equals("oa.effect.execute")).findFirst().orElseThrow();
+            var dispatch=spans.stream().filter(s->s.getName().equals("oa.effect.dispatch")).findFirst().orElseThrow();
+            assertEquals(parent.getSpanContext().getSpanId(),tool.getParentSpanId());
+            assertEquals(tool.getSpanId(),effect.getParentSpanId());
+            assertEquals(effect.getSpanId(),dispatch.getParentSpanId());
+            assertEquals(parent.getSpanContext().getTraceId(),dispatch.getTraceId());
+            assertTrue(spans.stream().noneMatch(span->span.toString().contains("private")));
+        }
+    }
+
+    @Test void controlLostDuringToolTraceSetupCannotStartAnEffect() {
+        inClosingCallback((running, entry, checks) -> {
+            var tracer=(io.opentelemetry.api.trace.Tracer)java.lang.reflect.Proxy.newProxyInstance(
+                    io.opentelemetry.api.trace.Tracer.class.getClassLoader(),
+                    new Class<?>[]{io.opentelemetry.api.trace.Tracer.class},
+                    (p,m,a)->{running.close();throw new IllegalStateException("tracing unavailable");});
+            var rig=new ToolEffectRig(entry,tracer);var call=rig.call("{}");
+            var occurrence=rig.occurrence(running,entry,call);
+            assertThrows(RefusedException.class,()->rig.gateway.invokeEffect(running,entry,rig.allocation,occurrence,call));
+            assertEquals(0,rig.dispatches.get());assertEquals(0,rig.admissions.get());
+            assertTrue(rig.ledger.find(occurrence.effectCommand("registered:test").key()).isEmpty());
             return null;
         });
     }

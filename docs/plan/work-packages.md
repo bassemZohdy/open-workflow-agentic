@@ -707,13 +707,14 @@ Implementation status: **partial**.
 - Implemented: Operational outbox signals landed (PR 129): five bounded gauges re-registered per application lifecycle, Prometheus rules and dashboard as code, promtool/preview validation tooling and the observability workflow, with an endpoint test scraping the real application. This does not complete end-to-end Flow/agent/tool/model tracing, collector deployment or SLO evidence.
 - Implemented: Governed model-call attempts emit an optional OpenTelemetry span with fixed schema and outcome only; no prompt, response, identity, model name or exception details are added by this instrumentation. Approval and execution fences run after span setup and again before releasing results. Research graph nodes explicitly carry the current OpenTelemetry context across the graph executor; this is not identity propagation. Complete Flow/graph/tool/model tracing, restart propagation and production collection remain open.
 - Implemented: The explicit pinned HTTP effect target propagates W3C traceparent on dispatch and lookup while excluding baggage and tracestate, and rechecks authority before network I/O after building tracing headers. Trace identity is distinct from X-Correlation-ID. Full Flow/agent/tool/model linkage, actual production wiring and restart propagation remain open.
+- Implemented: Explicit tool-gateway compositions can emit a fixed-field tool span; isolated worker threads receive only the current span identity, not caller baggage or inherited locals. Tool approval, budget and execution checks remain after tracing setup. This gateway is not production-wired, and complete workflow/restart tracing remains open.
 
 Remaining gates:
 
 - Add OpenTelemetry across workflow, graph, tool and model spans under one correlation ID.
 - Finish structured operational logs and dashboards as code; document collection and alerting.
 
-Evidence: [README.md](../../README.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](../../docs/handoffs/gpt/WP-108-tracing.md), [docs/operations-observability.md](../../docs/operations-observability.md), [deploy/observability/outbox-rules.json](../../deploy/observability/outbox-rules.json), [docs/handoffs/gpt/WP-112-model-tracing.md](../../docs/handoffs/gpt/WP-112-model-tracing.md), [docs/handoffs/gpt/WP-112-http-trace-context.md](../../docs/handoffs/gpt/WP-112-http-trace-context.md)
+Evidence: [README.md](../../README.md), [docs/lifecycle.md](../../docs/lifecycle.md), [docs/handoffs/gpt/WP-108-tracing.md](../../docs/handoffs/gpt/WP-108-tracing.md), [docs/operations-observability.md](../../docs/operations-observability.md), [deploy/observability/outbox-rules.json](../../deploy/observability/outbox-rules.json), [docs/handoffs/gpt/WP-112-model-tracing.md](../../docs/handoffs/gpt/WP-112-model-tracing.md), [docs/handoffs/gpt/WP-112-http-trace-context.md](../../docs/handoffs/gpt/WP-112-http-trace-context.md), [docs/handoffs/gpt/WP-112-tool-tracing.md](../../docs/handoffs/gpt/WP-112-tool-tracing.md)
 
 Reuse: quarkus-flow-opentelemetry, langgraph4j-opentelemetry, quarkus-opentelemetry
 

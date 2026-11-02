@@ -141,6 +141,7 @@ public final class GovernedToolGateway implements ToolGateway {
     private final ToolBudget budget;
     private final ApprovedToolProfile profile;
     private final ControlledToolEffects controlledEffects;
+    private final ToolCallTelemetry telemetry;
     private static final Subject GATEWAY = new Subject(SubjectKind.SERVICE, "tool-gateway");
 
     public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
@@ -152,12 +153,20 @@ public final class GovernedToolGateway implements ToolGateway {
     public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
                                ApprovedToolProfile profile, Pep pep, AuditSink audit, ToolBudget budget, Clock clock,
                                DurableEffects ledger) {
+        this(registry, approvals, profile, pep, audit, budget, clock, ledger, ToolCallTelemetry.noop());
+    }
+
+    /** Explicit tracing is optional and is not an approval or execution capability. */
+    public GovernedToolGateway(Map<String, Registration> registry, Supplier<Optional<Approval>> approvals,
+                               ApprovedToolProfile profile, Pep pep, AuditSink audit, ToolBudget budget, Clock clock,
+                               DurableEffects ledger, ToolCallTelemetry telemetry) {
         this.registry = Map.copyOf(registry); this.approvals = Objects.requireNonNull(approvals);
         this.profile = Objects.requireNonNull(profile);
         if (!configurationFingerprint(this.registry).equals(profile.configurationFingerprint()))
             throw new IllegalArgumentException("registered tool configuration differs from profile");
         this.pep = Objects.requireNonNull(pep); this.audit = Objects.requireNonNull(audit);
         this.budget = Objects.requireNonNull(budget); this.clock = Objects.requireNonNull(clock);
+        this.telemetry = Objects.requireNonNull(telemetry);
         this.controlledEffects = ledger == null ? null : new ControlledToolEffects(ledger, this.pep, this.approvals);
     }
 
@@ -215,11 +224,23 @@ public final class GovernedToolGateway implements ToolGateway {
         if (!same(approved) || !budgetCurrent(approved) || !same(approved))
             return reject(call, approved, attempt, "tool approval or budget changed");
         var mayStart = new java.util.concurrent.atomic.AtomicBoolean(true);
+        // Carry only the span identity across the isolated worker; baggage and arbitrary caller locals stay behind.
+        io.opentelemetry.context.Context trace;
+        try { trace = io.opentelemetry.context.Context.root().with(io.opentelemetry.api.trace.Span.wrap(
+                io.opentelemetry.api.trace.Span.current().getSpanContext())); }
+        catch (RuntimeException unavailable) { trace = io.opentelemetry.context.Context.root(); }
         if (!WORKER_SLOTS.tryAcquire()) return reject(call, approved, attempt, "tool capacity is unavailable");
+        var workerTrace = trace;
         var future = new FutureTask<String>(() -> {
-            if (!same(approved) || !budgetCurrent(approved) || !same(approved)
-                    || !mayStart.compareAndSet(true, false)) throw new ApprovalExpired();
-            return entry.tool.invoke(call.argumentsJson());
+            io.opentelemetry.context.Scope scope = null;
+            try {
+                try { scope = workerTrace.makeCurrent(); } catch (RuntimeException ignored) { }
+                return telemetry.call(() -> {
+                    if (!same(approved) || !budgetCurrent(approved) || !same(approved)
+                            || !mayStart.compareAndSet(true, false)) throw new ApprovalExpired();
+                    return entry.tool.invoke(call.argumentsJson());
+                });
+            } finally { if (scope != null) try { scope.close(); } catch (RuntimeException ignored) { } }
         });
         try {
             // A new thread prevents ordinary thread-local values from leaking between tool calls; inheritable caller
@@ -307,7 +328,14 @@ public final class GovernedToolGateway implements ToolGateway {
         requireControlledCurrent(control, execution, occurrence, approved);
         if (expired(started, registration.timeout)) return reject(call, approved, attempt, "tool deadline elapsed");
         final String answer;
-        try { answer = registration.tool.invoke(call.argumentsJson()); }
+        try { answer = telemetry.call(() -> {
+            try { requireControlledCurrent(control, execution, occurrence, approved); }
+            catch (RuntimeException refusal) { throw new BeforeToolRefusal(refusal); }
+            if (expired(started, registration.timeout)) throw new BeforeToolDeadline();
+            return registration.tool.invoke(call.argumentsJson());
+        }); }
+        catch (BeforeToolRefusal refusal) { throw refusal.original; }
+        catch (BeforeToolDeadline deadline) { return reject(call, approved, attempt, "tool deadline elapsed"); }
         catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             throw new ModelCallRefused("controlled tool was interrupted");
@@ -381,8 +409,11 @@ public final class GovernedToolGateway implements ToolGateway {
             throw new ModelCallRefused("tool approval or profile changed");
         final Effect result;
         try {
-            result = controlledEffects.execute(control, execution, allocation, profile, occurrence, call,
-                    budget, registration.effectTarget, target);
+            result = telemetry.callUnchecked(() -> {
+                requireControlledCurrent(control, execution, occurrence, approved);
+                return controlledEffects.execute(control, execution, allocation, profile, occurrence, call,
+                        budget, registration.effectTarget, target);
+            });
         } catch (RuntimeException failure) {
             record(call, approved, attempt, "agent.tool.failed");
             throw failure;
@@ -407,6 +438,11 @@ public final class GovernedToolGateway implements ToolGateway {
         catch (RuntimeException unavailable) { return false; }
     }
     private static final class ApprovalExpired extends Exception { }
+    private static final class BeforeToolRefusal extends Exception {
+        final RuntimeException original;
+        BeforeToolRefusal(RuntimeException original) { this.original = original; }
+    }
+    private static final class BeforeToolDeadline extends Exception { }
     private ToolResult.Rejected reject(ToolCall call, Approval approval, String attempt, String reason) {
         record(call, approval, attempt, "agent.tool.refused");
         return new ToolResult.Rejected(new Decision("tool-gateway", DecisionOutcome.DENY, reason,
