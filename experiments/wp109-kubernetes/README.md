@@ -32,7 +32,12 @@ also cleared its member lease. The database still held the scheduled
 local test does not prove node failure, network partitions, mixed versions,
 duplicate-effect prevention or T12. `verify_failover.py` automates the same
 scoped scenario against a prebuilt bridge-enabled image, using a unique cluster
-and private kubeconfig and removing that cluster afterward.
+and private kubeconfig and removing that cluster afterward. It also installs the
+proposed cancellation schema, enables the test-only reader, stops an owner
+container and prevents its replacement from scheduling until the deadline
+passes while the other replica stays ready. The replacement then cancels the
+workflow without a resume or post-takeover effect, and a receipt is retained.
+This is a single-node kind test, not a node-loss or split-brain proof.
 
 The Maven profile `wp109-kube-experiment` adds the Kubernetes extension only to
 an explicitly selected experimental build. Build the app with that profile and
