@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Reconciler;
 import jakarta.inject.Inject;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.Test;
@@ -21,6 +23,7 @@ class StartCapacityApiTest {
         }
     }
     @Inject CountingWorkflowEngine engine;
+    @Inject Reconciler reconciler;
 
     @Test void saturationRejectsNewStartsButAllowsIdempotentReadsAndRetry() throws Exception {
         engine.reset(); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
@@ -30,7 +33,9 @@ class StartCapacityApiTest {
         try {
             var first = executor.submit(() -> post(tenant, standardBody(firstKey)).extract().response());
             assertTrue(entered.await(30, TimeUnit.SECONDS));
-            post(tenant, standardBody(firstKey)).statusCode(200);
+            String existing = post(tenant, standardBody(firstKey)).statusCode(200).extract().path("id");
+            assertTimeoutPreemptively(Duration.ofSeconds(5), () ->
+                    assertEquals(1, reconciler.retry(tenant, existing).count("busy")));
             var busy = post(tenant, standardBody(secondKey)).statusCode(503).extract().response();
             assertTrue(busy.asString().contains("retry with the same idempotency key"));
             release.countDown();

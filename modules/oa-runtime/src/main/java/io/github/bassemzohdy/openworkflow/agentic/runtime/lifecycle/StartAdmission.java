@@ -8,7 +8,7 @@ import java.util.concurrent.Semaphore;
 import javax.sql.DataSource;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-/** Process-local bound on starts that can hold a registry coordination connection. */
+/** Process-local budget for starts and reconciler repairs that can hold a registry coordination connection. */
 @Singleton
 public class StartAdmission {
     private final Semaphore slots;

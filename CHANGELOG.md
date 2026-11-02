@@ -1,5 +1,7 @@
 # Changelog
 
+- Share the process-local coordination budget between workflow starts and lifecycle repairs, so competing advisory locks do not consume every small-pool connection.
+
 - Cap start admission below the configured Agroal pool maximum, keeping a slot available for registry work when only starts use the pool; reject a one-connection pool.
 
 - Bound concurrent workflow starts per process; when full, reject new keys before insertion with a retryable response while preserving idempotent repeats.
