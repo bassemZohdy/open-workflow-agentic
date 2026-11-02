@@ -117,16 +117,41 @@ class InboxCheckpointRecoveryTest {
             s.setString(1,row.tenant());s.setString(2,row.id().value());try(var r=s.executeQuery()) {r.next();return r.getInt(1);}
         }
     }
+    private int recoveryAudits(InstanceRecord row) throws Exception {
+        try(var c=dataSource.getConnection();var s=c.prepareStatement("select count(*) from audit.event where event_type='event.checkpoint.observed' and attributes->>'oa.instance'=?")) {
+            s.setString(1,row.id().value());try(var r=s.executeQuery()){r.next();return r.getInt(1);}
+        }
+    }
+    @Test void failureAfterAuditInsertRollsBackAuditAndAcknowledgementTogether() throws Exception {
+        try(var f=new Fixture(2)) {
+            var interrupted=new JdbcInboxCheckpointRecovery(dataSource,(c,e)->{
+                CheckpointRecoveryAudit.append(c,e);throw new IllegalStateException("after audit insert");
+            },Clock.systemUTC());
+            assertThrows(IllegalStateException.class,()->interrupted.repairBatch(f.row,f.appId,64));
+            assertEquals(0,recoveryAudits(f.row));assertEquals(0,acknowledged(f.row));
+            assertTrue(recovery.repairBatch(f.row,f.appId,64));
+            assertEquals(2,recoveryAudits(f.row));assertEquals(2,acknowledged(f.row));
+        }
+    }
+    @Test void concurrentRecoveryCommitsOneAuditPerAcknowledgement() throws Exception {
+        try(var f=new Fixture(2);var pool=Executors.newFixedThreadPool(2)) {
+            var start=new CountDownLatch(1);
+            Callable<Boolean> action=()->{start.await();return recovery.repairBatch(f.row,f.appId,64);};
+            var first=pool.submit(action);var second=pool.submit(action);start.countDown();
+            assertTrue(first.get(15,TimeUnit.SECONDS));assertTrue(second.get(15,TimeUnit.SECONDS));
+            assertEquals(2,recoveryAudits(f.row));assertEquals(2,acknowledged(f.row));
+        }
+    }
     @Test void anUncheckpointedReservationIsNeverInventedAsConsumedOrAcknowledged() throws Exception {
         try(var f=new Fixture(0)) {
-            var calls=new AtomicInteger();var service=new JdbcInboxCheckpointRecovery(dataSource,e->calls.incrementAndGet(),Clock.systemUTC());
+            var calls=new AtomicInteger();var service=new JdbcInboxCheckpointRecovery(dataSource,(c,e)->calls.incrementAndGet(),Clock.systemUTC());
             assertTrue(service.repairBatch(f.row,f.appId,1));assertEquals(0,calls.get());assertEquals(0,acknowledged(f.row));
             assertFalse(proof.consumed(f.waits.getFirst(),f.messages.getFirst()));assertFalse(f.next.isDone());
         }
     }
     @Test void actualRetainedProofsRepairInBoundedBatchesAndDoNotRepeatAcknowledgedAudits() throws Exception {
         try(var f=new Fixture(2)) {
-            var calls=new AtomicInteger();var service=new JdbcInboxCheckpointRecovery(dataSource,e->{calls.incrementAndGet();audit.record(e);},Clock.systemUTC());
+            var calls=new AtomicInteger();var service=new JdbcInboxCheckpointRecovery(dataSource,(c,e)->{calls.incrementAndGet();CheckpointRecoveryAudit.append(c,e);},Clock.systemUTC());
             assertFalse(service.repairBatch(f.row,f.appId,1));assertEquals(1,acknowledged(f.row));
             assertTrue(service.repairBatch(f.row,f.appId,1));assertEquals(2,acknowledged(f.row));assertEquals(2,calls.get());
             assertTrue(service.repairBatch(f.row,f.appId,1));assertEquals(2,calls.get());
@@ -134,7 +159,7 @@ class InboxCheckpointRecoveryTest {
     }
     @Test void mismatchedApplicationTenantAndFullOwnerFailBeforeAuditOrAcknowledgement() throws Exception {
         try(var f=new Fixture(2)) {
-            var calls=new AtomicInteger();var service=new JdbcInboxCheckpointRecovery(dataSource,e->calls.incrementAndGet(),Clock.systemUTC());
+            var calls=new AtomicInteger();var service=new JdbcInboxCheckpointRecovery(dataSource,(c,e)->calls.incrementAndGet(),Clock.systemUTC());
             assertThrows(IllegalStateException.class,()->service.repairBatch(f.row,"wrong-application",64));
             for(var changed:List.of(copy(f.row,"other-tenant",f.row.owner()),
                     copy(f.row,f.row.tenant(),new Subject(SubjectKind.SERVICE,f.row.owner().id()))))
@@ -148,7 +173,7 @@ class InboxCheckpointRecoveryTest {
     }
     @Test void auditFailurePreservesActualProofAndKeepsCheckpointHealthDownUntilRestart() throws Exception {
         try(var f=new Fixture(2);var health=new PersistenceCommitGate(Duration.ofSeconds(5),Clock.systemUTC())) {
-            var failing=new JdbcInboxCheckpointRecovery(dataSource,e->{throw new IllegalStateException("audit unavailable");},Clock.systemUTC());
+            var failing=new JdbcInboxCheckpointRecovery(dataSource,(c,e)->{throw new IllegalStateException("audit unavailable");},Clock.systemUTC());
             var gate=new InboxRestoreCheckpointGate(failing,f.application,health);
             assertThrows(IllegalStateException.class,()->gate.prepare(f.row));assertFalse(health.status().healthy());assertEquals(0,acknowledged(f.row));
             assertTrue(proof.consumed(f.waits.getFirst(),f.messages.getFirst()));

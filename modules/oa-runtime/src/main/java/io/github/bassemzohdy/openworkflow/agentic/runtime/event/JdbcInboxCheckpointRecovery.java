@@ -31,13 +31,16 @@ public class JdbcInboxCheckpointRecovery {
             where p.tenant=? and p.instance_id=?
             """;
     private final DataSource dataSource;
-    private final AuditSink audit;
+    @FunctionalInterface public interface TransactionalAudit {
+        void record(Connection connection, io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent event) throws SQLException;
+    }
+    private final TransactionalAudit audit;
     private final Clock clock;
     private record Receipt(String key,String digest,String fingerprint,int attempt,InboxTask task,String owner,Long epoch) { }
     private record Observed(Receipt receipt,boolean acknowledged) { }
 
-    @Inject public JdbcInboxCheckpointRecovery(DataSource dataSource,AuditTrail audit) { this(dataSource,audit,Clock.systemUTC()); }
-    public JdbcInboxCheckpointRecovery(DataSource dataSource,AuditSink audit,Clock clock) {
+    @Inject public JdbcInboxCheckpointRecovery(DataSource dataSource) { this(dataSource,CheckpointRecoveryAudit::append,Clock.systemUTC()); }
+    public JdbcInboxCheckpointRecovery(DataSource dataSource,TransactionalAudit audit,Clock clock) {
         this.dataSource=Objects.requireNonNull(dataSource);this.audit=Objects.requireNonNull(audit);this.clock=Objects.requireNonNull(clock);
     }
 
@@ -59,7 +62,6 @@ public class JdbcInboxCheckpointRecovery {
             return List.copyOf(found);
         });
         for(var receipt:pending) {
-            record(receipt); // No transaction/connection spans the independently committed audit.
             Transactions.inTransaction(dataSource,c->{
                 lockRegistry(c,expected);
                 try(var s=statement(c,FACTS+" and p.wait_key=? for update of d")) {
@@ -71,6 +73,7 @@ public class JdbcInboxCheckpointRecovery {
                         if(current.acknowledged()) return null;
                     }
                 }
+                record(c,receipt);
                 try(var s=statement(c,"update inbox.delivery set state='ACKNOWLEDGED',acknowledged_at=clock_timestamp() "
                         +"where tenant=? and instance_id=? and wait_key=?")) {
                     key(s,expected);s.setString(3,receipt.key());
@@ -132,12 +135,12 @@ public class JdbcInboxCheckpointRecovery {
         var s=c.prepareStatement(sql);s.setQueryTimeout(5);return s;
     }
     private static void key(PreparedStatement s,InstanceRecord row) throws SQLException { s.setString(1,row.tenant());s.setString(2,row.id().value()); }
-    private void record(Receipt receipt) {
+    private void record(Connection connection,Receipt receipt) throws SQLException {
         var values=new LinkedHashMap<String,String>();
         values.put(AuditKeys.TENANT,receipt.task().tenant());values.put(AuditKeys.INSTANCE,receipt.task().instanceId().value());
         values.put("event.wait",receipt.key());values.put("event.receipt",receipt.fingerprint());
         values.put("event.attempt",Integer.toString(receipt.attempt()));values.put("event.repair","before-restore");
-        audit.record(AuditDraft.of(UlidGenerator.shared().next(),clock.instant(),RECOVERY,"event.checkpoint.observed",
+        audit.record(connection,AuditDraft.of(UlidGenerator.shared().next(),clock.instant(),RECOVERY,"event.checkpoint.observed",
                 "event-delivery",receipt.digest(),values));
     }
 }

@@ -1,5 +1,7 @@
 # Changelog
 
+- Commit checkpoint-recovery audits and acknowledgements atomically, including after a recovery-process crash.
+
 - Exercise human-wake checkpoint acknowledgement and retry in separate recovery processes.
 
 - Mask author-chosen object names in workflow source validation and runtime-capability diagnostic paths.

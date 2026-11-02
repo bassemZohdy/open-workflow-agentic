@@ -9,6 +9,7 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.id.*;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.api.caller.CallerAuthority;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.AuditTrail;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.audit.CheckpointRecoveryAudit;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.event.*;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.VerifiedToken;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.*;
@@ -150,8 +151,13 @@ class HumanWakeCheckpointTest {
                         gate.close(); // Stop the old workflow component before reconstructing it from JPA.
                         if (processRecovery) {
                             assertEquals(0, acknowledgementAudits(row));
+                            recoveryProcess(row, app.id(), "before-ack", 78);
+                            assertEquals(0, acknowledgementAudits(row), "audit must roll back with the uncommitted acknowledgement");
+                            assertTrue(proof.consumed(wait, message));
+                            assertEquals("DISPATCHED", deliveryState(wait));
                             recoveryProcess(row, app.id(), "halt", 77);
                             assertEquals(1, acknowledgementAudits(row));
+                            assertEquals("ACKNOWLEDGED", deliveryState(wait));
                             recoveryProcess(row, app.id(), "repeat", 0);
                             assertEquals(1, acknowledgementAudits(row));
                             assertTrue(owned.reserve(claim, wait).isEmpty());
@@ -161,8 +167,8 @@ class HumanWakeCheckpointTest {
                     }
                     // Simulate a fresh recovery component seeing the committed checkpoint before acknowledgement.
                     var auditCalls = new java.util.concurrent.atomic.AtomicInteger();
-                    var recovery = new JdbcInboxCheckpointRecovery(dataSource, recorded -> {
-                        auditCalls.incrementAndGet(); audit.record(recorded);
+                    var recovery = new JdbcInboxCheckpointRecovery(dataSource, (connection,recorded) -> {
+                        auditCalls.incrementAndGet(); CheckpointRecoveryAudit.append(connection,recorded);
                     }, clock);
                     assertTrue(recovery.repairBatch(row, app.id(), 16));
                     assertTrue(recovery.repairBatch(row, app.id(), 16));
@@ -178,6 +184,12 @@ class HumanWakeCheckpointTest {
     private long acknowledgementAudits(InstanceRecord row) throws Exception {
         try (var c=dataSource.getConnection(); var q=c.prepareStatement("select count(*) from audit.event where event_type='event.checkpoint.observed' and attributes->>'oa.instance'=?")) {
             q.setString(1,row.id().value());try(var r=q.executeQuery()){r.next();return r.getLong(1);}
+        }
+    }
+    private String deliveryState(InboxWait wait) throws Exception {
+        try (var c=dataSource.getConnection();var q=c.prepareStatement("select state from inbox.delivery where tenant=? and instance_id=? and wait_key=?")) {
+            q.setString(1,wait.tenant());q.setString(2,wait.instanceId().value());q.setString(3,wait.key());
+            try(var r=q.executeQuery()){assertTrue(r.next());return r.getString(1);}
         }
     }
     private void recoveryProcess(InstanceRecord row,String appId,String mode,int expectedExit) throws Exception {
@@ -201,7 +213,7 @@ class HumanWakeCheckpointTest {
     private void restoreCheckpoint(InstanceRecord row, String appId, InboxWait wait, InboxMessage message) throws Exception {
         var resumed = new CompletableFuture<Void>(); var release = new CompletableFuture<Void>();
         var cleaned = new CompletableFuture<Void>(); var restoredBroker = new Broker();
-        var recovery = new JdbcInboxCheckpointRecovery(dataSource, audit, Clock.systemUTC());
+        var recovery = new JdbcInboxCheckpointRecovery(dataSource, CheckpointRecoveryAudit::append, Clock.systemUTC());
         try (var freshGate = new PersistenceCommitGate(Duration.ofSeconds(15), Clock.systemUTC());
              var finalizer = new InboxCheckpointFinalizer(owned, leases);
              var app = WorkflowApplication.builder().withId(appId).withEventConsumer(restoredBroker)
