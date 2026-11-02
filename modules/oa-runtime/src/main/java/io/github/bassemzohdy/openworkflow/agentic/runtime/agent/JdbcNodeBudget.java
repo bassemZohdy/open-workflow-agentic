@@ -121,7 +121,7 @@ public class JdbcNodeBudget {
         };
     }
 
-    private static String binding(String thread, Subject actor, AgentTaskContract task) {
+    static String binding(String thread, Subject actor, AgentTaskContract task) {
         var e = new CanonicalEncoder("oa.agent.node-budget.v1").text(thread).text(actor.kind().name()).text(actor.id())
                 .text(task.id().value()).text(task.goal()).text(task.riskTier().name())
                 .number(task.limits().maxIterations()).text(task.limits().maxWallClock().toString())

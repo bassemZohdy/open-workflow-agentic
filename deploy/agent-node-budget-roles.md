@@ -1,10 +1,13 @@
 # Agent node budget permissions
 
-Apply migration V77.3 as the migration owner. Provision two distinct, fresh non-owner
+Apply migrations V77.3 and V77.4 as the migration owner. Provision two distinct, fresh non-owner
 roles with no elevated attributes, inherited permissions or role memberships. The
 allocator is trusted to insert a budget only in the same transaction as a genuinely
 new approved resource-task allocation. The executor reads the existing budget and
-updates only its step count. Neither role may own the table or assume the other role.
+updates only its step or tool-call count. Neither role may own the tables or assume the other role.
+Tool-budget registration is not yet wired atomically into task allocation: the caller of its explicit preparation
+method must establish that the task is genuinely new and its tool-call ceiling approved. Never backfill based on a
+missing row.
 
 Replace `__BUDGET_ALLOCATOR_ROLE__` and `__BUDGET_EXECUTOR_ROLE__` in
 [agent-node-budget-grants.sql](sql/agent-node-budget-grants.sql) with those role
@@ -22,6 +25,6 @@ default datasource; do not treat this template as a deployed security boundary u
 separate allocator and executor identities are wired and verified end to end.
 
 `NodeBudgetRolesTest` applies the exact template to fresh non-owner PostgreSQL roles,
-checks that an executor can consume a retained budget, and verifies denied insertion,
+checks that an executor can consume retained node and tool budgets, and verifies denied insertion,
 reset, deletion, privilege crossing and protected-schema DDL. It is local role evidence,
 not evidence of deployment configuration or whole-project completion.

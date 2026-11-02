@@ -24,12 +24,18 @@ class GovernedToolGatewayTest {
             TASK.permittedDataScopes(), TASK.riskTier(), TASK.limits(), TASK.requestingSubject(), TASK.delegationGrantId());
     private static final ToolCall CALL = new ToolCall(TASK.id(), "search", "{\"query\":\"x\"}");
     private static final GovernedToolGateway.Approval APPROVAL = new GovernedToolGateway.Approval(AGENT, TASK_WITH_TOOL, 100);
+    private static final GovernedToolGateway.ToolBudget TEST_BUDGET = new GovernedToolGateway.ToolBudget() {
+        @Override public void admit(GovernedToolGateway.Approval approval) { }
+        @Override public void requireCurrent(GovernedToolGateway.Approval approval) { }
+    };
 
     private static final class Rig {
         final AtomicReference<GovernedToolGateway.Approval> approval = new AtomicReference<>(APPROVAL);
         final AtomicInteger calls = new AtomicInteger();
         final AtomicInteger decisions = new AtomicInteger();
         final AtomicInteger audits = new AtomicInteger();
+        final AtomicInteger admissions = new AtomicInteger();
+        final java.util.concurrent.atomic.AtomicBoolean budgetCurrent = new java.util.concurrent.atomic.AtomicBoolean(true);
         final java.util.List<String> boundaryEvents = new java.util.ArrayList<>();
         final java.util.List<io.github.bassemzohdy.openworkflow.agentic.contracts.governance.AuditEvent> records = new java.util.ArrayList<>();
         java.util.function.Consumer<String> duringBoundaryAudit = action -> { };
@@ -43,7 +49,16 @@ class GovernedToolGatewayTest {
             var pep = new Pep(request -> { decisions.incrementAndGet(); return new Decision("test", outcome, "test", POLICY, NOW); },
                     event -> { audits.incrementAndGet(); duringAudit.run(); }, Duration.ofSeconds(5), CLOCK);
             return new GovernedToolGateway(Map.of("search", registration), () -> Optional.ofNullable(approval.get()), pep,
-                    event -> { records.add(event); boundaryEvents.add(event.action()); duringBoundaryAudit.accept(event.action()); }, CLOCK);
+                    event -> { records.add(event); boundaryEvents.add(event.action()); duringBoundaryAudit.accept(event.action()); },
+                    new GovernedToolGateway.ToolBudget() {
+                        @Override public void admit(GovernedToolGateway.Approval approval) {
+                            if (!budgetCurrent.get()) throw new NodeRefused("test budget unavailable");
+                            admissions.incrementAndGet();
+                        }
+                        @Override public void requireCurrent(GovernedToolGateway.Approval approval) {
+                            if (!budgetCurrent.get()) throw new NodeRefused("test budget unavailable");
+                        }
+                    }, CLOCK);
         }
     }
 
@@ -52,6 +67,7 @@ class GovernedToolGatewayTest {
         var completed = assertInstanceOf(ToolResult.Completed.class, rig.gateway().invoke(CALL));
         assertEquals("{\"result\":\"ok\"}", completed.output());
         assertEquals(1, rig.decisions.get()); assertEquals(1, rig.audits.get()); assertEquals(1, rig.calls.get());
+        assertEquals(1, rig.admissions.get());
         assertEquals(java.util.List.of("agent.tool.started", "agent.tool.completed"), rig.boundaryEvents);
         assertEquals(rig.records.get(0).attributes().get("agent.tool.attempt"),
                 rig.records.get(1).attributes().get("agent.tool.attempt"));
@@ -144,7 +160,7 @@ class GovernedToolGatewayTest {
                 OUTPUT, false, Duration.ofSeconds(1), rig.tool);
         var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
                 event -> { }, Duration.ofSeconds(5), CLOCK);
-        var gateway = new GovernedToolGateway(Map.of("search", reg), () -> Optional.of(APPROVAL), pep, event -> { }, CLOCK);
+        var gateway = new GovernedToolGateway(Map.of("search", reg), () -> Optional.of(APPROVAL), pep, event -> { }, TEST_BUDGET, CLOCK);
         assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(CALL));
         assertEquals(0, rig.calls.get());
     }
@@ -221,7 +237,7 @@ class GovernedToolGatewayTest {
         var pep = new Pep(request -> new Decision("test", DecisionOutcome.ALLOW, "test", POLICY, NOW),
                 event -> { }, Duration.ofSeconds(5), CLOCK);
         var gateway = new GovernedToolGateway(Map.of("search", registration),
-                () -> Thread.currentThread() == caller ? Optional.of(APPROVAL) : Optional.empty(), pep, event -> { }, CLOCK);
+                () -> Thread.currentThread() == caller ? Optional.of(APPROVAL) : Optional.empty(), pep, event -> { }, TEST_BUDGET, CLOCK);
         assertInstanceOf(ToolResult.Rejected.class, gateway.invoke(CALL));
         assertEquals(0, rig.calls.get());
     }
@@ -243,7 +259,7 @@ class GovernedToolGatewayTest {
                 finally { lookupFinished.countDown(); }
             }
             return Optional.of(APPROVAL);
-        }, pep, event -> { }, CLOCK);
+        }, pep, event -> { }, TEST_BUDGET, CLOCK);
         try {
             assertTrue(assertInstanceOf(ToolResult.Failed.class, gateway.invoke(CALL)).effectMayHaveHappened());
             assertTrue(entered.await(1, java.util.concurrent.TimeUnit.SECONDS));
@@ -280,5 +296,15 @@ class GovernedToolGatewayTest {
             assertNotSame(first.get(), second.get());
             assertNull(leaked.get());
         } finally { inherited.remove(); }
+    }
+
+    @Test void unavailableBudgetPreventsTheToolAndLostDeadlineWithholdsOutput() {
+        var refused = new Rig(); refused.budgetCurrent.set(false);
+        assertInstanceOf(ToolResult.Rejected.class, refused.gateway().invoke(CALL));
+        assertEquals(0, refused.calls.get());
+        var lost = new Rig(); lost.mutating = true;
+        lost.tool = args -> { lost.calls.incrementAndGet(); lost.budgetCurrent.set(false); return "{\"result\":\"private\"}"; };
+        assertTrue(assertInstanceOf(ToolResult.Failed.class, lost.gateway().invoke(CALL)).effectMayHaveHappened());
+        assertEquals(1, lost.admissions.get()); assertEquals(1, lost.calls.get());
     }
 }
