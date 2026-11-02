@@ -64,8 +64,16 @@ engine start and a later audit result can fail after the insert commits.
 No claim is made that a standalone lookup followed by a recheck removes all
 revocation or lease races. The producer and consumer must agree on actual
 transaction/fence boundaries, deadlines and safe behavior when authority cannot
-be established. This proposal adds no schema, public endpoint, CDI consumer,
-policy permission or start implementation.
+be established. A candidate domain-separated event-start key and complete binding fingerprint now cover the normalized envelope,
+route version, producer, owner, original grant and lifecycle request fingerprint. Proposed V83 retains that binding
+and its JDBC primitive can insert it in the instance transaction after the original authority row. Duplicate readback
+compares the retained instance, authority and complete fingerprint. Concurrent PostgreSQL tests exercise one insert,
+changed content/grant, immutability and transaction rollback. The schema is outside Flyway and stores no event payload;
+it is not a durable event receipt or recovery queue. Its insert guard checks matching retained facts but does not prove
+that the instance was created in the same transaction. The caller must enforce new-instance-only insertion and current
+authorization; neither this primitive nor a matching row grants permission. Producer authentication, policy, audit,
+approved routes, current-grant checks, event retention, recovery, launch fencing, role grants and deployment remain open.
+There is no public endpoint, CDI consumer or production start implementation.
 
 ## Required evidence before activation
 
