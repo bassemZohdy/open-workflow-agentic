@@ -347,8 +347,11 @@ component tests cover completed-task checkpoints and rejection of stale task, st
 confirms that the SDK can continue to the next task after an unbound writer rejects its initial checkpoint. The
 candidate is not the normal application writer. Separate opt-in wrappers check the current database lease before a
 selected workflow-level filter and before task execution. Tests cover the selected jq filter, transitions including
-nested and named jumps, restore lookup, takeover between tasks, and use with the candidate JPA writer. Filter-provider
-selection and compatibility across the full SDK remain unproven. The check does not hold a lease across task execution:
+nested and named jumps, restore lookup, takeover between tasks, and use with the candidate JPA writer. In a
+same-process SDK/JPA restore test, a current owner completes a persisted wait, while a replaced owner cannot commit the
+wait checkpoint or start the next task. The test explicitly binds the claim and keeps the original engine in the same
+process; it is not a crash or partition test. Filter-provider selection and compatibility across the full SDK remain
+unproven. The check does not hold a lease across task execution:
 a lease can expire immediately after the check. Owner acquisition and renewal, production composition, cancellation
 cleanup and external-effect fencing remain open. These primitives cannot stop an in-flight external effect or establish
 split-brain safety.
