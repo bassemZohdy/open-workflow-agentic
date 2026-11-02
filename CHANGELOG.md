@@ -1,5 +1,7 @@
 # Changelog
 
+- Exercise the human wake envelope in the pinned workflow SDK. A negative control confirms direct SDK broadcast also reaches another occurrence, so durable fenced dispatch remains unactivated.
+
 - Combine exact human wake occurrence checks with the supported literal listen filters, refusing stop events and unsupported filters. Full SDK predicates, producer and dispatch remain open.
 
 - Encode the proposed human wake reference as a canonical structured CloudEvent and verify it with the real inbox decoder. Delivery and SDK predicate integration remain open.
