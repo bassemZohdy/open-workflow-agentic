@@ -474,6 +474,7 @@ Implemented scope:
 - An explicitly composed bounded SDK consumer wrapper captures one human registration per exact application/workflow/task occurrence without adding it to the delegate type broadcast. Revocable handles are rechecked by the dispatcher; unregister and callback start are serialized locally, with no registry lock held during the callback. A fresh-process reservation-recovery test discovers the restored listener through this wrapper and refuses its stale handle after completion. The wrapper is not production-wired, does not authenticate tenant or producer, and does not replace a durable claim or checkpoint fence.
 - Wait registration now atomically retains a complete immutable wait profile (V77.8); recovery reconstructs and re-hashes it against the retained delivery identity. Existing digest-only registrations are not guessed and can be populated only by exact re-registration without extending their deadline. Process-restart tests reload the wait from PostgreSQL, and restricted-role/rollback/corruption checks pass. This data is not current authorization or a complete saved listener configuration; production replay and T02/T13 remain open.
 - An explicitly constructed isolated-schema recovery reader reconstructs a retained decision and wait by tenant and decision ID, checks their fingerprint, task and audit binding, and classifies blocked, staged, checkpointed, acknowledged or terminal state using retained evidence. Restart tests use the retained decision rather than fixture content; missing or corrupted data is refused. The reader is data access for an independently authorized caller, not production replay authority, discovery, policy or scheduler wiring.
+- An explicit tenant-scoped, bounded keyset scan discovers retained decision IDs for recovery, including terminal or inconsistent records. Each candidate still requires verified loading, current authority and a durable claim; periodic scans must restart from the beginning to observe concurrent inserts. Production scheduler, discovery permissions and replay remain open.
 
 Additional closure/integration tasks:
 
@@ -644,7 +645,7 @@ Implemented scope:
 Additional closure/integration tasks:
 
 - [ ] Integrate governed adapters and effect-aware Flow re-execution through the new execution boundary with WP-105/WP-113.
-- [ ] Integrate policy-verified manual decisions and central audit projection through Claude-owned handoffs; add distributed trace spans. Low-cardinality metrics and CDI ambient-rollback tests are included.
+- [ ] Integrate policy-verified manual decisions and central audit projection. The explicit effect boundary already emits execution, compensation, dispatch and lookup spans; actual Flow/restart trace linkage remains open. Low-cardinality metrics and CDI ambient-rollback tests are included.
 
 Acceptance gates:
 

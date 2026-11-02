@@ -9,6 +9,8 @@ import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.SubjectKind
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.Transactions;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -27,6 +29,31 @@ public final class HumanWakeRecovery {
     private final JdbcInboxCheckpointProof proof;
     public HumanWakeRecovery(DataSource dataSource) {
         this.dataSource=Objects.requireNonNull(dataSource);this.proof=new JdbcInboxCheckpointProof(dataSource);
+    }
+    /**
+     * Lists retained decision IDs for one tenant in ascending order, exclusive of the cursor. This is a bounded
+     * discovery scan, not a claim, a snapshot, or permission to replay. Every returned ID must be loaded and
+     * classified under current authority. Repeat scans from the beginning: a concurrent insert can sort before a
+     * cursor. Terminal and inconsistent records are deliberately included so they are not silently hidden.
+     */
+    public List<Ulid> scan(String tenant, Ulid after, int limit) {
+        Checks.requireText("tenant", tenant, 256);
+        if (limit < 1 || limit > 100) throw new IllegalArgumentException("scan limit must be between 1 and 100");
+        return Transactions.inTransaction(dataSource, c -> {
+            String sql = "select decision_id from human_proposal.decision where tenant=?"
+                    + (after == null ? "" : " and decision_id>?") + " order by decision_id limit ?";
+            try (var q = c.prepareStatement(sql)) {
+                q.setString(1, tenant);
+                int parameter = 2;
+                if (after != null) q.setString(parameter++, after.value());
+                q.setInt(parameter, limit);
+                var ids = new ArrayList<Ulid>();
+                try (var rows = q.executeQuery()) {
+                    while (rows.next()) ids.add(Ulid.parse(rows.getString(1)));
+                }
+                return List.copyOf(ids);
+            }
+        });
     }
     /** Returns retained facts only. Caller must be a separately authorized internal recovery process. */
     public Optional<Retained> load(String tenant,Ulid decisionId) {

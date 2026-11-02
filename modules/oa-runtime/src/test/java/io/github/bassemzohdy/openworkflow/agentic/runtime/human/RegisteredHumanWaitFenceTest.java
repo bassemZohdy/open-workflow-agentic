@@ -130,6 +130,36 @@ class RegisteredHumanWaitFenceTest {
             try (var r = q.executeQuery()) { assertTrue(r.next()); assertEquals("BLOCKED", r.getString(1)); }
         }
     }
+    @Test void recoveryDiscoveryPagesTenantDecisionsWithoutClaimingOrHidingTerminalRecords() throws Exception {
+        var first = fixture(Duration.ofMinutes(2));
+        var second = fixture(Duration.ofMinutes(2));
+        coordinator(first.registered()).recordNew(first.authority(), first.decision());
+        coordinator(second.registered()).recordNew(second.authority(), second.decision());
+        try (var c = owned.getConnection(); var q = c.prepareStatement(
+                "update inbox.delivery set state='CANCELLED' where tenant=? and instance_id=? and wait_key=?")) {
+            q.setString(1, "tenant"); q.setString(2, second.registered().instanceId().value());
+            q.setString(3, second.registered().key()); q.executeUpdate();
+        }
+        var recovery = new HumanWakeRecovery(owned);
+        assertTrue(recovery.scan("different-tenant", null, 2).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> recovery.scan("tenant", null, 0));
+        assertThrows(IllegalArgumentException.class, () -> recovery.scan("tenant", null, 101));
+        var found = new ArrayList<Ulid>(); Ulid cursor = null;
+        while (true) {
+            var page = recovery.scan("tenant", cursor, 2);
+            assertTrue(page.size() <= 2);
+            if (page.isEmpty()) break;
+            for (var id : page) {
+                if (cursor != null) assertTrue(cursor.value().compareTo(id.value()) < 0);
+                found.add(id); cursor = id;
+            }
+        }
+        assertTrue(found.contains(first.decision().id())); assertTrue(found.contains(second.decision().id()));
+        assertEquals(HumanWakeRecovery.State.BLOCKED, recovery.load("tenant", first.decision().id()).orElseThrow().state());
+        assertEquals(HumanWakeRecovery.State.TERMINAL, recovery.load("tenant", second.decision().id()).orElseThrow().state());
+        assertEquals("BLOCKED", pendingState(first)); assertEquals("BLOCKED", pendingState(second));
+    }
+
     @Test void cancelledRegisteredWaitCannotAcceptDecision() throws Exception {
         var f = fixture(Duration.ofSeconds(30));
         try (var c = owned.getConnection(); var q = c.prepareStatement("update inbox.delivery set state='CANCELLED' "

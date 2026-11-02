@@ -1,5 +1,7 @@
 # Changelog
 
+- Add bounded tenant-scoped discovery of retained human decisions for recovery.
+
 - Reconstruct verified retained human-wake data for explicit recovery.
 
 - Retain and verify complete wait profiles for recovery without extending existing deadlines.
