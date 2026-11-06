@@ -1,5 +1,7 @@
 # Changelog
 
+- Retain and revalidate terminal research checkpoint associations before governed result release.
+
 - Connect the audited execution root to reserved research-graph nodes and tracked graph termination.
 
 - Retain governed execution contexts and capacity through managed asynchronous termination.

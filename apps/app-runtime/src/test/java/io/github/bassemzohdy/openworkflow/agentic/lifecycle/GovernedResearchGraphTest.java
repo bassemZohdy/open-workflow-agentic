@@ -13,6 +13,7 @@ import io.github.bassemzohdy.openworkflow.agentic.runtime.policy.Pep;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.transaction.TransactionManager;
+import jakarta.transaction.UserTransaction;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.*;
 @QuarkusTest
 class GovernedResearchGraphTest {
     @Inject TransactionManager manager;
+    @Inject UserTransaction caller;
     ResourceTaskAllocationMigrationTest support;
     Fixture fixture;
     AllocatedResourceTask task;
@@ -72,10 +74,28 @@ class GovernedResearchGraphTest {
             assertEquals(3, calls.get());
             assertEquals(3, count(support.db.owner, "select count(*) from task.model_call_reservation"));
             assertEquals(1, count(support.db.owner, "select count(*) from audit.event where event_type='resource.execution.entered'"));
+            var outcomes = new JdbcResearchOutcomes(support.db.owner, manager, "a".repeat(64));
+            caller.begin();
+            ResourceExecutionOutcome outcome;
+            try { outcome = outcomes.associate(entry); }
+            finally { caller.rollback(); }
+            assertEquals(outcome, outcomes.associate(entry));
+            assertEquals(outcome, outcomes.verify(entry));
+            assertEquals(outcome, outcomes.find(entry).orElseThrow());
+            assertThrows(IllegalStateException.class, () -> new JdbcResearchOutcomes(support.db.owner, manager, "d".repeat(64)).verify(entry));
             var retry = gate.openGoverned(fixture.binding(), entry, UUID.randomUUID(), fence)
                     .executeGoverned(running -> { fail("retained entry re-ran the graph"); return null; });
             assertEquals(JdbcResourceExecutionGate.Kind.RETAINED, retry.kind());
             assertEquals(3, calls.get());
+            try (var c = support.db.owner.getConnection(); var q = c.prepareStatement("""
+                    update public.lg4jcheckpoint set state_data=(select state_data from public.lg4jcheckpoint
+                        where thread_id=? and node_id='plan' limit 1) where checkpoint_id=?
+                    """)) {
+                q.setObject(1, outcome.runId()); q.setObject(2, outcome.checkpointId()); assertEquals(1, q.executeUpdate());
+            }
+            assertEquals(outcome, outcomes.find(entry).orElseThrow(), "historical association must not be rewritten");
+            assertThrows(IllegalStateException.class, () -> outcomes.verify(entry));
+            assertThrows(IllegalStateException.class, () -> outcomes.associate(entry));
         }
     }
 
@@ -124,6 +144,9 @@ class GovernedResearchGraphTest {
                 assertThrows(ExecutionException.class, () -> pending.get(20, TimeUnit.SECONDS));
                 assertEquals(1, calls.get());
                 assertEquals(1, count(support.db.owner, "select count(*) from task.model_call_reservation"));
+                var outcomes = new JdbcResearchOutcomes(support.db.owner, manager, "a".repeat(64));
+                assertThrows(IllegalStateException.class, () -> outcomes.associate(fixture.entry(1)));
+                assertEquals(0, count(support.db.owner, "select count(*) from task.resource_execution_outcome"));
             } finally { release.countDown(); worker.shutdownNow(); }
         }
     }

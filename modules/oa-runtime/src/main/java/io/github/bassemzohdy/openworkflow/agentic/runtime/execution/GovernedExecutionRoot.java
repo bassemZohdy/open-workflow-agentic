@@ -4,17 +4,18 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.identity.ResourceCallBinding;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionEntry;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.AllocatedResourceTask;
+import io.github.bassemzohdy.openworkflow.agentic.contracts.agent.ResourceExecutionOutcome;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.IdempotentAuditSink;
 import io.github.bassemzohdy.openworkflow.agentic.contracts.port.ResourceExecutionFence;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveIdentityResourceFence;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.identity.LiveResearchPolicyFence;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchAgent;
-import io.github.bassemzohdy.openworkflow.agentic.runtime.agent.ResearchState;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.CompositeExecutionFence;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResourceExecutionGate;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.ResourceTaskExecutionFence;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.ResourceEntryAuditSource;
 import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.WorkflowOwnerResourceFence;
+import io.github.bassemzohdy.openworkflow.agentic.runtime.lifecycle.JdbcResearchOutcomes;
 import jakarta.transaction.TransactionManager;
 import java.util.Objects;
 import java.util.UUID;
@@ -31,17 +32,28 @@ import javax.sql.DataSource;
 @JsonSerialize(using = JdbcResourceExecutionGate.TransientControlSerializer.class)
 public final class GovernedExecutionRoot implements AutoCloseable {
     private final JdbcResourceExecutionGate gate;
+    private final JdbcResearchOutcomes researchOutcomes;
 
     private GovernedExecutionRoot(DataSource data, TransactionManager transactions, int maxInFlight,
-                                  JdbcResourceExecutionGate.IoBounds bounds, IdempotentAuditSink sink) {
+                                  JdbcResourceExecutionGate.IoBounds bounds, IdempotentAuditSink sink,
+                                  String checkpointTargetFingerprint) {
         gate = new JdbcResourceExecutionGate(Objects.requireNonNull(data), Objects.requireNonNull(transactions),
                 maxInFlight, Objects.requireNonNull(bounds), new ResourceEntryAuditSource(), Objects.requireNonNull(sink));
+        researchOutcomes = checkpointTargetFingerprint == null ? null
+                : new JdbcResearchOutcomes(data, transactions, checkpointTargetFingerprint);
     }
 
     /** The shared root owns one bounded gate; no unaudited construction is exposed through this factory. */
     public static GovernedExecutionRoot audited(DataSource data, TransactionManager transactions, int maxInFlight,
                                                  JdbcResourceExecutionGate.IoBounds bounds, IdempotentAuditSink sink) {
-        return new GovernedExecutionRoot(data, transactions, maxInFlight, bounds, sink);
+        return new GovernedExecutionRoot(data, transactions, maxInFlight, bounds, sink, null);
+    }
+
+    /** Pins the research checkpoint target to the same configured data source as the entry gate. */
+    public static GovernedExecutionRoot auditedResearch(DataSource data, TransactionManager transactions, int maxInFlight,
+            JdbcResourceExecutionGate.IoBounds bounds, IdempotentAuditSink sink, String checkpointTargetFingerprint) {
+        return new GovernedExecutionRoot(data, transactions, maxInFlight, bounds, sink,
+                Objects.requireNonNull(checkpointTargetFingerprint));
     }
 
     /**
@@ -88,14 +100,21 @@ public final class GovernedExecutionRoot implements AutoCloseable {
         }
     }
 
-    /** Runs the fixed research graph under the audited managed entry and its exclusive live contexts. */
-    public Future<JdbcResourceExecutionGate.Result<ResearchState>> executeResearch(ResourceCallBinding binding,
+    /** Runs the graph and retains terminal checkpoint attribution; private output needs a separate verified release. */
+    public Future<JdbcResourceExecutionGate.Result<ResourceExecutionOutcome>> executeResearch(ResourceCallBinding binding,
             ResourceExecutionEntry entry, UUID executor, LiveIdentityResourceFence identity,
             LiveResearchPolicyFence policy, ResourceTaskExecutionFence task, WorkflowOwnerResourceFence owner,
             ResourceExecutionFence preEntryAudit, ResearchAgent agent, AllocatedResourceTask allocation, String topic) {
         Objects.requireNonNull(agent); Objects.requireNonNull(allocation); Objects.requireNonNull(topic);
+        if (researchOutcomes == null) throw new IllegalStateException("research checkpoint target is not configured");
         return executeAsync(binding, entry, executor, identity, policy, task, owner, preEntryAudit,
-                running -> agent.runGoverned(running, allocation, topic));
+                running -> {
+                    agent.runGoverned(running, allocation, topic);
+                    running.requireCurrent(entry, executor);
+                    var outcome = researchOutcomes.associate(entry);
+                    running.requireCurrent(entry, executor);
+                    return outcome;
+                });
     }
 
     private static CompositeExecutionFence composite(LiveIdentityResourceFence identity, LiveResearchPolicyFence policy,

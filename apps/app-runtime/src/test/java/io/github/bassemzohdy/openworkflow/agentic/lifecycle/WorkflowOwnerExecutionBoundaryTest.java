@@ -216,7 +216,9 @@ class WorkflowOwnerExecutionBoundaryTest {
                      var task = new ResourceTaskExecutionFence(data, transactions, entry, allocation, canonical, (e, t) -> {});
                      var owner = new WorkflowOwnerResourceFence(entry, context.get(), bindings,
                              InstanceRegistryFence.over(store), ownerFence);
-                     var root = GovernedExecutionRoot.audited(data, transactions, 1,
+                     var root = scenario == 10 ? GovernedExecutionRoot.auditedResearch(data, transactions, 1,
+                             JdbcResourceExecutionGate.IoBounds.defaults(), central::appendOnce, "a".repeat(64))
+                             : GovernedExecutionRoot.audited(data, transactions, 1,
                              JdbcResourceExecutionGate.IoBounds.defaults(), central::appendOnce)) {
                     assertThrows(Exception.class, () -> new ObjectMapper().writeValueAsString(root));
                     if (scenario == 10) {
@@ -234,13 +236,15 @@ class WorkflowOwnerExecutionBoundaryTest {
                         ApprovedModelContext modelContext = () -> Optional.of(new ApprovedModelContext.Approved(agent, contract, "model", 5000));
                         var model = new GovernedLlmClient(provider, pep, modelContext, new JdbcResourceModelCalls(data, transactions));
                         var research = ResearchAgentTestFactory.create(data, model, modelContext);
+                        var outcomes = new JdbcResearchOutcomes(data, transactions, "a".repeat(64));
                         var renewer = Executors.newSingleThreadScheduledExecutor();
                         try {
                             renewer.scheduleAtFixedRate(() -> leases.renew(claim.get(), Duration.ofSeconds(30)), 5, 5, TimeUnit.SECONDS);
                             var result = root.executeResearch(canonical, entry, UUID.randomUUID(), identity, policy, task, owner,
                                     ignored -> {}, research, allocation, "approved research").get(90, TimeUnit.SECONDS);
                             assertEquals(JdbcResourceExecutionGate.Kind.CALLED, result.kind());
-                            assertEquals("answer", result.value().text(ResearchState.REVIEW).orElseThrow());
+                            assertEquals(entry, result.value().entry());
+                            assertEquals(result.value(), outcomes.verify(entry));
                             assertEquals(3, providerCalls.get());
                         } finally { renewer.shutdownNow(); }
                         return;

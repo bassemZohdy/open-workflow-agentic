@@ -446,7 +446,7 @@ public final class JdbcResourceExecutionGate implements AutoCloseable {
         if (!fact.entry().equals(entry)) throw new RefusedException("retained epoch differs");
         return new Write(fact, false);
     }
-    private static Optional<EntryFact> read(Connection c, ResourceCallScope expected) throws SQLException {
+    static Optional<EntryFact> read(Connection c, ResourceCallScope expected) throws SQLException {
         try (var q = c.prepareStatement("""
                 select c.*, o.occurrence_key, e.entry_key, e.contract_fingerprint, e.execution_epoch,
                        e.first_binding_key, e.entering_executor, e.entered_at
