@@ -168,8 +168,10 @@ no global runtime configuration, proxy, DNS or trust setting is changed.
 Remaining work includes finding adjudication/resolution, broader released and
 public-provider/TLS checks, actual durable authoring/approved materialization
 and a second-runtime/provider/artifact substitution run. No package or acceptance
-status is promoted by this controlled measurement. See the current handoff in
-docs/handoffs/gpt/WP-605-controlled-ctk.md for exact verification evidence.
+status is promoted by this controlled measurement. The checked-in
+[report](official-ctk-report.json) and
+[test source](../../modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/conformance/OfficialCtkTest.java)
+retain the reproducible assertions; the previously named controlled-CTK handoff is absent from this tree.
 
 The released-declared execution variants change ONLY document.dsl and
 document.version to 1.0.1, retaining the same tasks/input/expected results. A test
@@ -192,16 +194,19 @@ filter; its original report is unchanged. The default platform has its own
 | Default platform service |21/45|15|6|
 
 Only the HTTP query case changes; all other scenario records and definition
-hashes are equal, enforced by a test. A separate real injected Quarkus Flow
-boot test verifies normal and escaped URI inputs on actual owned loopback HTTP.
-This candidate has not merged or deployed. JVM packaging/discovery does not
-establish native-image discovery, target authority, public TLS or full semantic
-portability. See [runtime integration and exact verification](../handoffs/gpt/WP-605-uri-runtime-integration.md).
+hashes are equal, enforced by a test. The resolver and its JVM service descriptor
+are present on main, with
+[standalone SDK coverage](../../modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/conformance/UriTemplateAdapterTest.java).
+The previously claimed separate injected Quarkus Flow URI boot test and runtime-integration handoff
+are absent from this tree. Injected application behavior, native-image discovery,
+target authority, public TLS and full semantic portability remain separate verification gates;
+the standalone measurement does not establish deployment.
 
-The actual injected Flow input-schema boot checks now cover explicit JSON,
-omitted JSON default and unregistered formats, each inline and external.
-They require invalid raw input to stop before filtering/HTTP and valid input
-to complete after filtering. The unregistered-format fallback is an explicit
-remaining interoperability failure, including schema access without a format check.
-The ignored input-validation setting is removed; the existing SDK validator
-is checked directly. See [input schema evidence and preflight gate](../handoffs/gpt/WP-605-input-schema-runtime.md).
+The application includes the SDK validation dependency, but the previously claimed injected Flow
+input-schema boot tests and input-schema handoff are absent from this tree. The 2026-11-19 status check
+removed `quarkus.flow.validation.input.enabled` after the build warned that it was unrecognized and
+ignored. Removing that setting is not evidence of validation enforcement. Add application-level checks for
+explicit JSON, omitted-format defaults and unregistered formats, both inline and external, requiring
+invalid raw input to stop before filtering/HTTP and valid input to complete after filtering. Until those
+checks run, neither the claimed unregistered-format behavior nor complete application input-schema
+enforcement is established here. WP-605 remains partial.

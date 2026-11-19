@@ -60,6 +60,7 @@ Unit tests live with the library they test. Quarkus boot tests and packaged-proc
 
 [CHANGELOG.md](CHANGELOG.md) records shipped capabilities and requirement evidence.
 [TODO.md](TODO.md) tracks every work package, deliverable, acceptance gate, open decision and deferred requirement.
+The [latest project status check](docs/project-status.md) records current verification and remaining delivery gates.
 
 - [Architecture](docs/architecture.md) and [repository structure](docs/repository-structure.md).
 - [Lifecycle and recovery](docs/lifecycle.md), [identity and delegation](docs/identity.md), [policy](docs/policy.md), [audit](docs/audit.md), and [contracts](docs/contracts.md).

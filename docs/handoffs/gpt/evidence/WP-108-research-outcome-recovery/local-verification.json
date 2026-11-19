@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "baseline_commit": "403fce08ab84b2eb637231b2c6c3393d33e9014d",
+  "source_sha256": {
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ResearchOutcomeRecoveryIT.java": "a0da4ce17c483dde84c4f7a3f25e95991f33fd0454394a7feb39a49ca1b838f9",
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ResearchOutcomeRecoveryWorker.java": "8cb1ccd519673decb95555efb2d7f756bffd8bc6798a412c8069700fe67f4a3b",
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/event/InboxDispatchProtocolTest.java": "0b0639935ecea63b3136b142177b64d5c2f072b54fdeeb2c00e87438ab638d48",
+    "apps/app-runtime/src/main/resources/application.properties": "4e640e5ea15742cfea59d3d5596d55eaa5d319c63b80ca7f52974a72d921a3e2"
+  },
+  "platforms": {
+    "windows": {
+      "java": "25.0.2",
+      "maven": "3.9.11",
+      "postgresql": "16.15"
+    },
+    "linux": {
+      "java": "21.0.9+10",
+      "maven": "3.9.11",
+      "postgresql": "16.15",
+      "architecture": "amd64"
+    }
+  },
+  "linux_broad_run": {
+    "command": "mvn -B clean verify",
+    "exit_code": 1,
+    "module_units": {
+      "modules/oa-contracts": {
+        "xml_suites": 32,
+        "tests": 226,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "modules/oa-runtime": {
+        "xml_suites": 117,
+        "tests": 983,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "modules/oa-testkit": {
+        "xml_suites": 21,
+        "tests": 204,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "apps/app-runtime": {
+        "xml_suites": 106,
+        "tests": 905,
+        "failures": 0,
+        "errors": 1,
+        "skipped": 0
+      }
+    },
+    "only_error": {
+      "class": "InboxDispatchProtocolTest",
+      "method": "anotherPinnedVersionOrEngineInstanceCannotRegister",
+      "cause": "The fixed pinned-engine value collides with a retained row from an earlier run on the same development database."
+    },
+    "configuration_note": "This sweep preceded removal of the ignored input-validation property. No production Java source changed."
+  },
+  "inbox_fix": {
+    "change": "Derive the mismatched engine ID from this fixture instance ID; preserve the engine mismatch assertion.",
+    "command": "mvn -B -pl apps/app-runtime -am test -Dtest=InboxDispatchProtocolTest -Dsurefire.failIfNoSpecifiedTests=false",
+    "runs": [
+      {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "exit_code": 0
+      },
+      {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "exit_code": 0
+      }
+    ],
+    "same_database": true,
+    "same_fourteen_case_ids_checked": true
+  },
+  "linux_process_run": {
+    "command": "mvn -B -pl apps/app-runtime -am verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false",
+    "exit_code": 0,
+    "xml_suites": 10,
+    "tests": 19,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "real_keycloak_profiles_executed": false,
+    "note": "Default ITs include the new research outcome case. Both opt-in Keycloak classes report zero tests; no real-provider proof is claimed."
+  },
+  "standalone_research_outcome": {
+    "windows": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "linux": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "proved": "Terminal graph completion and outcome association survive separate JVM halts. Cancellation and exact retries retain one entry/outcome, three reservations/provider calls, and refuse changed checkpoint bytes.",
+    "limits": [
+      "fixture identity/approval/policy/provider",
+      "plain JDBC and fixture no-ambient-JTA manager",
+      "private proposed V78/V79",
+      "no automatic Flow dispatch or private output authorization"
+    ]
+  },
+  "configuration_cleanup": {
+    "command": "mvn -B -pl apps/app-runtime -am package -DskipTests",
+    "exit_code": 0,
+    "unrecognized_configuration_warnings": 0,
+    "note": "Removes an observed ignored property, with no enforcement claim or production Java change."
+  },
+  "acceptance": {
+    "annotated_methods": 12,
+    "passing": 12,
+    "unmatched_markers": 0,
+    "consistent": true,
+    "automated_scenarios": 3,
+    "total_scenarios": 39,
+    "note": "Checked copied Linux unit/IT reports and both sets of original acceptance markers using AcceptanceStatus --check. No status was written."
+  },
+  "other_checks": {
+    "python_tests": 91,
+    "python_passed": true,
+    "generated_documents_current": true,
+    "compose_valid": true,
+    "dependency_policy_passed": true,
+    "native_windows_cleanup_cases": 4,
+    "native_windows_cleanup_passed": true,
+    "updated_manual_document_links_missing": 0
+  },
+  "windows_full_run": {
+    "completed_contract_tests": 226,
+    "runtime_tests": 983,
+    "runtime_errors": 47,
+    "cedar_native_or_initialization_errors": 45,
+    "symlink_privilege_errors": 2,
+    "full_build_passed": false
+  },
+  "logs_sha256": {
+    "target/project-status-linux-broad.log": "48ccdbf5b7f1c9e9bc8a5011aec5e58309dd5150816e553a5b30d9572ba74240",
+    "target/project-status-linux-process.log": "356801092904abc89c971bff0ee82c2009943e9f7c0e8368d5a6af5bc40f5b96",
+    "target/project-status-inbox-first.log": "46959f601d8edc1b097bf36b2e2a90a7110756c94ad0ca5d01e051ec9c68d359",
+    "target/project-status-inbox-second.log": "81445c7f4da4372e732aa5468e5004fa9384bde5198f4093810ee597d83ae8da",
+    "target/project-status-config-package.log": "58384754f5b048f57e62f7fecde6866c2e87670d2168bba16733d371622b9b32",
+    "target/research-outcome-recovery-verify.log": "10e37e25453546640db6681e423b6000cbf4bd9ac344993ca614ebc9219587ec",
+    "target/research-outcome-recovery-linux.log": "7f1a9543c7d8d3c7d9bbc0e6e8fe6f83baeb65f2471383228e0e4b5b95a4dec3",
+    "target/project-status-acceptance.log": "72f9d27f5b471fcb5e60d6268121bdba02b9cae1beb8e8eeac8e6c940df6cb2c",
+    "target/project-status-python-tests.log": "2de226418676f6da163625da19b7ce6e91307006c6af3464269829e08ce7ea52",
+    "target/project-status-dependency-policy.log": "385d58db6edb5c261aea5b4ad0dc1dbb7cc2bce6c825e3de244caca0a4c696bd",
+    "target/project-status-windows-processes.log": "0d0c916dae527d2c1dc6de6b27e670efdcc0fac859844169152108ed16ff74c6"
+  },
+  "conclusion": "Local author coverage combines the broad sweep, the corrected inbox suite rerun twice, separate default process ITs and the final configuration package build. This is not a single green full-reactor run. A clean full CI pass is still required before merge; independent final project review is deferred. WP-108/WP-605 and acceptance counts are unchanged."
+}

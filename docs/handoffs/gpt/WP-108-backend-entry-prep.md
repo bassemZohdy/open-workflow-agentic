@@ -119,3 +119,11 @@ The explicit audited root can invoke the actual fixed plan/draft/review graph us
 ## Terminal checkpoint association
 
 The explicit co-located outcome store inspects the released terminal research checkpoint, retains the exact run, checkpoint and stored-content fingerprint, and verifies the same data on repeat. The audited research root pins the checkpoint target to its configured entry database, associates the terminal result and returns only the data association after live checks; it does not release private graph state. The association is historical, can survive authority loss or caller rollback, and never permits re-entry. Checkpoints can change after a read, so any future private output release must revalidate exact content and live authority; source permissions, trusted target configuration, recovery dispatch and T03 remain open.
+
+The [separate-process recovery check](WP-108-research-outcome-recovery.md) now runs the actual graph with
+retained model reservations, halts after terminal completion before outcome association, and associates the
+same checkpoint in a fresh process after cancellation. A second halt loses the association reply. Repeated
+fresh-process recovery retains one outcome, one entry and three provider calls; changed checkpoint bytes
+are refused without rewriting history. This uses fixture authority, approval, policy and model transport,
+plain JDBC with a fixture transaction manager, and explicitly applied proposed V78/V79. It proves historical
+outcome reconstruction, not production recovery dispatch, output authorization or WP-108/T03 closure.
