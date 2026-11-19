@@ -84,18 +84,23 @@ These apply to every REST endpoint. The types live in `oa-contracts`, the HTTP m
 - An artifact whose POM declares no licence can be added to `tools/dependency-policy-exceptions.json` after its licence is verified from its own metadata. Entries are reviewed, scoped, and fail the build when stale or marked `unverified`.
 - The Maven enforcer enforces Java 21, Maven 3.9 and no duplicate dependency declarations.
 
-## Working as GPT and Claude
+## Working through the delivery plan
 
-[TODO.md](TODO.md#two-agent-delivery-plan) contains two exclusive backlogs, prerequisite handoffs and
-reserved write areas. GPT owns integration and shared tracking; Claude owns identity/policy, agent and
-control features. The other agent reviews every implementation PR at its current head SHA. Record the
-agent name, commit, findings, checks and verdict explicitly when both agents use the same GitHub account.
+[TODO.md](TODO.md#delivery-plan) contains the delivery backlogs, prerequisite handoffs and reserved write
+areas. Owner labels identify domain responsibilities; the active delivery agent may implement across
+domains without waiting for another agent. Start with the first unblocked package, implement its required
+interfaces before consumers depend on them, and record cross-area contracts and failure evidence in
+`docs/handoffs/gpt/<WP-id>.md` or `docs/handoffs/claude/<WP-id>.md`.
 
-Keep separate branches/worktrees and one implementation PR per agent. Pick the first unblocked owned
-package. Request cross-area changes in `docs/handoffs/gpt/<WP-id>.md` or
-`docs/handoffs/claude/<WP-id>.md`; the registered writer implements them. GPT serializes contracts,
-configuration, migrations and source/generated tracking. Never edit applied migrations or allocate
-independent migration ranges to each agent. The full agreement and initial review tasks are in TODO.md.
+Use a separate branch/worktree for each coherent task and preserve existing work elsewhere. Serialize
+changes to contracts, configuration, migrations and source/generated tracking. Never edit applied
+migrations or allocate independent migration ranges to each agent.
+
+The current delivery agreement defers independent project review until all remaining implementation and
+required tests are complete. Author checks remain required for every increment. Retain exact revisions,
+commands, results and unresolved findings for that final review; resolve material review findings before
+claiming overall completion. Record the reviewer, revision and verdict explicitly when both agents use
+the same GitHub account. The full agreement is in TODO.md.
 
 Assignments live in `execution_plan` in `docs/plan/work-packages.json`. CI rejects missing/duplicate
 owners, self-review, missing prerequisite gates, cycles and overlapping reserved paths. When a package

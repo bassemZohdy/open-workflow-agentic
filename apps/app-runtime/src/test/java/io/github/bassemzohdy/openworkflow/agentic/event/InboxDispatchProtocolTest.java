@@ -191,7 +191,7 @@ class InboxDispatchProtocolTest {
                 wait.namespace(),wait.definition(),"2",wait.taskPosition(),wait.iteration(),wait.route(),wait.eventType(),
                 wait.filterDigest(),wait.maxWait());
         assertThrows(IllegalStateException.class,()->dispatch.register(wrongVersion));
-        row=instances.replace(row.successor(now(),row.status(),"pinned-engine",row.startAttempts(),null,null),
+        row=instances.replace(row.successor(now(),row.status(),"pinned-engine-"+row.id().value(),row.startAttempts(),null,null),
                 row.version(),"test.engine",row.owner());
         assertThrows(IllegalStateException.class,()->dispatch.register(wait));
     }

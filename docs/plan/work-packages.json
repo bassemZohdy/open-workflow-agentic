@@ -12,8 +12,8 @@
     },
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
-      "date": "2026-11-01",
-      "baseline_commit": "16989c30e835fa456ef6bda7c32297a25f7cd413",
+      "date": "2026-11-19",
+      "baseline_commit": "403fce08ab84b2eb637231b2c6c3393d33e9014d",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -1051,7 +1051,8 @@
           "The explicit shared audited execution root composes the exact identity, research policy and retained task fences with a real workflow-owner fence, a supplied pre-entry audit check and mandatory co-located entry audit delivery. It bounds gate concurrency and rechecks the live composite after central delivery. The test exercises actual SDK owner lease, task allocation and central audit with fixture verifier, policy, target approval and pre-entry audit. The caller must keep the single-call contexts alive until synchronous termination. Production authority and target sources, V78 deployment, actual Flow/agent dispatch, cross-process safety and T03 remain open.",
           "The explicit audited root now offers managed asynchronous entry with exclusive ownership of identity, policy, task and owner contexts. Cancelling a waiter invalidates the run but keeps contexts and the bounded gate slot until the synchronous worker and termination cleanup actually finish; submission failures retire contexts immediately. Cleanup failure withholds results. Tests cover admission and in-flight cancellation and real SDK owner composition; verifier, PDP and target approval remain fixtures. Hidden detached work and production Flow dispatch remain open; this does not close T03.",
           "The opt-in audited root can invoke the actual fixed research graph with the bound request and retained allocation. Its three fixed nodes derive distinct canonical model occurrences and use the existing durable reservation consumer, with live controls around nodes and model I/O. Existing checkpoints refuse for reconciliation. A per-run barrier tracks admitted nodes and the graph emitter through physical termination; caller interruption is not permission to release a running provider. PostgreSQL/SDK tests exercise three fixture model calls and a real owner lease. Production HTTP/Flow wiring, verified provider, trusted approved-context and target sources, terminal outcome association, crash recovery and T03 remain open; V78/V79 are proposed fixtures.",
-          "An explicit co-located outcome store inspects the released terminal research checkpoint, retains its exact run/checkpoint/content fingerprint once, and rechecks the stored representation on verification. The audited research root pins its checkpoint target to the entry database and returns only this association after live checks, withholding private graph output pending a separately verified release. Historical association may survive caller rollback or authority loss and never authorizes another graph entry. Checkpoint data can change after any read, so current authority and exact-content checks remain mandatory at any future output boundary. Production role/configuration, recovery dispatch and T03 remain open."
+          "An explicit co-located outcome store inspects the released terminal research checkpoint, retains its exact run/checkpoint/content fingerprint once, and rechecks the stored representation on verification. The audited research root pins its checkpoint target to the entry database and returns only this association after live checks, withholding private graph output pending a separately verified release. Historical association may survive caller rollback or authority loss and never authorizes another graph entry. Checkpoint data can change after any read, so current authority and exact-content checks remain mandatory at any future output boundary. Production role/configuration, recovery dispatch and T03 remain open.",
+          "A separate-process actual graph/checkpoint test halts after terminal completion before outcome association, then reconstructs the historical outcome after cancellation in a fresh JVM. A second halt loses the association reply; repeated fresh-process recovery retains one entry/outcome and exactly three model reservations/provider calls. Changed checkpoint bytes refuse verification and reassociation without rewriting history. Caller, approval, policy, provider and no-ambient-JTA manager remain fixtures; proposed V78/V79 are private test setup. Production Flow recovery, current output authorization and package/acceptance closure remain open."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -1124,7 +1125,10 @@
           "docs/handoffs/gpt/evidence/WP-108-manual-resume-failure/current-ci.json",
           "docs/handoffs/gpt/WP-108-early-resume-failures.md",
           "docs/handoffs/gpt/evidence/WP-108-early-resume-failures/current-ci.json",
-          "docs/handoffs/gpt/WP-108-composite-fence.md"
+          "docs/handoffs/gpt/WP-108-composite-fence.md",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ResearchOutcomeRecoveryIT.java",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ResearchOutcomeRecoveryWorker.java",
+          "docs/handoffs/gpt/WP-108-research-outcome-recovery.md"
         ]
       }
     },
@@ -2551,7 +2555,8 @@
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
-          "Close reported divergences or document supported boundaries; provide a product import/export surface and round-trip loss report; extend beyond the pinned SDK profile before any conformance claim."
+          "Close reported divergences or document supported boundaries; provide a product import/export surface and round-trip loss report; extend beyond the pinned SDK profile before any conformance claim.",
+          "Add actual injected Quarkus Flow URI and input-schema boot checks. The 2026-11-19 tree contains standalone resolver/CTK coverage but not the previously claimed injected tests or their handoffs. Removing the ignored input-validation setting is configuration cleanup, not proof of enforcement. Prove explicit JSON, omitted-format and unregistered-format handling for inline/external schemas before claiming application enforcement."
         ],
         "evidence": [
           "docs/conformance/README.md",
@@ -3044,7 +3049,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-27",
-    "status": "WP-108 remains partial: opt-in manual resolution, audit recovery and test-created managed-pool coverage are merged; deployed datasource and role grants, governed adapter/Flow re-execution and T03 remain open. PR99 head faad8091f4de2f596c982e81ffd9681f1c831672 remains open with GPT REQUEST_CHANGES: rebase, request-body authorization order and failing Cedar provider checks require fixes. V78/V79 remain proposals; approved model sources/roles, occurrence/task/lease/PDP/audit/Flow/physical async and supported identity-profile gates remain. Issue75 stays open and issue76 supported-only implementation/proof is open; defaults refuse and package counts and acceptance are unchanged. 2026-11-01 consolidation: main fast-forwarded to origin/main (PR127) and merged claude/WP-102-bound-credential-pairing, claude/WP-103-instance-policy and gpt/WP-108-bound-credential-lookup; twelve stale branches that conflict with current main are not merged and need per-branch triage. Local run had no Postgres/native Cedar, so DB-backed tests are CI-gated; counts and acceptance are unchanged. 2026-11-01: WP-605 assessment (PR128) and WP-112 operational signals (PR129) merged; WP-605 is now partial, WP-112 stays partial. Remaining stacked WP-103/108 branches were verified superseded by reworked code on main. PRs 130 (WP-108 composite fence) and 131 (WP-102 governed async dispatch) merged as unwired building blocks; package statuses and acceptance are unchanged. PRs 132 (WP-102 task guard) and 133 (WP-108 registry fence) merged; statuses and acceptance unchanged. WP-201 runtime increments merged (PRs 134-137); status stays partial. WP-109 maximum lifetime merged (PR 138); status stays partial. WP-109 duplicate-timer proof merged (PR 139); status stays partial. WP-107 inbox retention sweep merged (PR 140); status stays partial. WP-107 inbox tombstones merged (PR 141); status stays partial. PR 142 merged the WP-106 HumanActionFacts contract and facts-aware PEP rules (tenant, due time, initiator separation) as a prerequisite only; WP-106 and T02 stay not started (no durable human-task service, assignment storage, decision identity or wakeup).",
+    "status": "At the start of the 2026-11-19 status check, local main matched origin/main at 403fce08ab84b2eb637231b2c6c3393d33e9014d; no pull requests were open. PR99 is merged. Issues #75 (intermittent identity recovery), #76 (supported-only production identity profile implementation/proof) and #26 (future framework upgrade assessment) remain open. The explicit audited execution root, retained node/model/tool budgets, resource-scoped effect recovery and terminal research outcome association are implemented increments. A separate-process test now verifies terminal research outcome reconstruction after graph-worker and association-worker crashes, including cancellation, exact retries and changed-checkpoint refusal without additional model calls. Production authority/approved target sources, deployed role/datasource grants, governed Flow/effect recovery and private output release remain open. Proposed schemas stay outside default activation. Package counts remain 11 completed, 17 partial and 25 not started; acceptance remains 3/39. Continue with the first unblocked package and retain independent project review until all implementation and required checks are complete. Current verification and its limits are recorded in docs/project-status.md",
     "agents": [
       {
         "id": "GPT",

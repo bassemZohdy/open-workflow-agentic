@@ -1,5 +1,13 @@
 # Changelog
 
+- Verify retained research outcomes across worker crashes without repeating graph or model execution.
+
+- Correct project status and portability evidence claims against the checked repository tree.
+
+- Keep the inbox engine-mismatch fixture unique across repeated test runs on the same database.
+
+- Remove the ignored Flow input-validation configuration switch; retain the application validation proof gate.
+
 - Retain and revalidate terminal research checkpoint associations before governed result release.
 
 - Connect the audited execution root to reserved research-graph nodes and tracked graph termination.
