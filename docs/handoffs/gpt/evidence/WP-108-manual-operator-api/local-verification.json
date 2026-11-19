@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-20",
+  "local_build_base": "1a8716d320284d9849adf777ee24911968323b26",
+  "branch_base": "56f33946cc82bc96014392292ece86e6079e2eeb",
+  "implementation_commit": "df6bbc62ab1b2ba6dbca2673d9e22caa78ea1157",
+  "source_digest_encoding": "SHA-256 with CRLF normalized to LF; nine copied final Linux source files match the branch",
+  "source_sha256": {
+    "apps/app-runtime/src/main/resources/application.properties": "d0e139c03f02764522539f9edcb79576976d950485499a0bdfee578f9b525f5d",
+    "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/api/ManualEffectsResource.java": "14b7878dc44ed3fb0c6b036ee6fd2e7454c112edd3faad19e0356f487fea7442",
+    "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/ManualEffectOperations.java": "b2fa68898b8f563e84943e083e8aa97f40e1aaeb0c08c2e093c5bc240da5afc9",
+    "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/effect/ManualEffectResolver.java": "c1a73b6abc4e9d3067b3e7cf172781cc6556f7e11de46447d465eae1f2361245",
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ManualEffectsApiFixtures.java": "4808ba1b7efe1c768c4d822495978ec9afbaf3fd77183797e087964489006c17",
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ManualEffectsApiResource.java": "44f6974e9f338fba9f12d88752d0153ff74efe6c57b51e29240b0074af77a63e",
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ManualEffectsApiTest.java": "88ae372a72179b7ec0bb366abcdbf9125b45ebebf0625cfd9659d26066754547",
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ManualEffectsDisabledApiTest.java": "95dfa4d3f412b754a2c40e7813796e9f0b928d30e8c27b92a1e1853df4af4acf",
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ManualEffectsPolicyUnavailableApiTest.java": "5792adc58159735ea82b66d3ff18c4fe4aa37d806b420263175911aa079b284b"
+  },
+  "proposed_v80_sha256": "4efb51bf53b01bb4ed8a836cadc3bf6d891d9103145a383050559dcb19a92628",
+  "java": "21.0.9+10-LTS",
+  "maven": "3.9.11",
+  "postgresql": "16.15",
+  "command": "mvn -B -pl apps/app-runtime -am -Dtest=ManualEffectsApiTest,ManualEffectsDisabledApiTest,ManualEffectsPolicyUnavailableApiTest,ManualEffectDecisionStoreTest,ManualEffectDecisionMigrationTest,HttpRouteDefaultDenyTest,PolicyArchitectureTest,ArchitectureTest -Dsurefire.failIfNoSpecifiedTests=false test",
+  "exit_code": 0,
+  "tests": 40,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suites": {
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ManualEffectDecisionMigrationTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "399f331ab3147643f4591a501aee2a4f5b2db4816a2a10f2377355f8aa05e028"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ManualEffectDecisionStoreTest": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "ca8170e47fd27e90c16262e692324979e236b4de23e7e78bccfd12102284897a"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ManualEffectsApiTest": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "8129e51180b477856d655a12c6547202aebc7a2e35616144f72c48049d4bdbc7"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ManualEffectsDisabledApiTest": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "dc5c7781e77c89009ff8b9aff5fa1744371f395671b37c7d726b27af77800bcd"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ManualEffectsPolicyUnavailableApiTest": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "b433e349d2e6c41d7aa1af9f34e96f0392ab045fc283d50a3d8625fb28539441"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.policy.HttpRouteDefaultDenyTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "6d526fb38c6636faf2575cf0b9869bb785c61e0260d890b62b5c049e47cf2191"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.contracts.ArchitectureTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "b77a7b546c83ad017de99f354a7dcd750a5b7b16f09cd877eaf7e9ef7f5c8cc5"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.runtime.ArchitectureTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "bde1ce29d17fe5d434824cf40c4b04644d7750245cd88b8ed11bc07ff40aa4ad"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.runtime.policy.PolicyArchitectureTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "282d902557160ddde07adb2b31dca82a3b649bf0932c9b99b9b6bdd1d3447fe4"
+    }
+  },
+  "log_sha256": "3aabe5a813e1af6a5f4af51f50ade2f3e5675e702e665c8a8cc8066ead259411",
+  "other_checks": {
+    "python_tools": {
+      "tests": 91,
+      "passed": true,
+      "log_sha256": "26701df9e0ab125ae0633f39eac1bf55a98557549c1e1484fb01576afc13e4e1"
+    },
+    "generated_tracking": "passed; rerun after tracking changes",
+    "dependency_policy": "passed; no dependency declarations changed",
+    "compose": "passed",
+    "deployment_links": "passed"
+  },
+  "boundaries": {
+    "caller": "Actual JWT verification and JWKS HTTP; fake issuer signs test credentials",
+    "policy": "Bundled Cedar operations policy; missing snapshot profile also exercised",
+    "schema": "Only V80 is explicitly applied to disposable API test databases; shared Flyway history never advances to proposed versions",
+    "jta_audit_ledger": "Real injected transaction manager, HTTP resource, database and central audit implementation"
+  },
+  "limits": [
+    "Local build precedes PR148 integration; increment source copies match after rebase, and combined-tree full CI remains required.",
+    "No production feature activation, reviewed V80 migration plan, deployed least-privilege-role proof, real-Keycloak route test, cross-process HTTP recovery, automated Flow release or T03/package promotion.",
+    "The startup check verifies required columns can be read, not full DDL/role attestation.",
+    "Independent final project review remains deferred."
+  ]
+}

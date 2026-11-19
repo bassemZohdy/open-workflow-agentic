@@ -2,6 +2,10 @@
 
 Owner: GPT. Status: focused implementation candidate; WP-108 remains partial.
 
+The [operator API increment](WP-108-manual-operator-api.md) now connects an explicitly enabled
+HTTP boundary to this resolver. The original proposal's evidence and limits below remain historical;
+V80 is still outside default Flyway activation and deployed schema/role proof remains open.
+
 ## Scope
 
 This increment adds a proposed V80 store and an explicitly constructed Java

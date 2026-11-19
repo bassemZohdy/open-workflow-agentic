@@ -20,7 +20,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import javax.sql.DataSource;
 
-/** Explicitly constructed, opt-in V80 proposal consumer. It is not CDI registered and opens no public route. */
+/** Explicit V80 consumer; the optional operator boundary owns activation and verified HTTP admission. */
 public final class ManualEffectResolver {
     private static final Set<String> REQUIRED=Set.of("oa.recover");
     private static final Set<String> REASONS=Set.of("TARGET_CONFIRMED","TARGET_REJECTED","OPERATOR_VERIFIED");

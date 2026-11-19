@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-11-20",
+  "pull_request": "https://github.com/bassemZohdy/open-workflow-agentic/pull/148",
+  "head_commit": "b6a8dee6e7b69f0f42b3bb9055fd238567aef4cc",
+  "merge_commit": "56f33946cc82bc96014392292ece86e6079e2eeb",
+  "ci_checkout": "1fa45a2d4b5d8435e51a0aea6412e1f6399522fd",
+  "checked_and_merged_tree": "0dfc40f0f7afc3532fef08b99c6301a985333eaa",
+  "tree_match_verified_via_github_git_commit_api": true,
+  "build": {
+    "run_id": 44606748957,
+    "attempt": 2,
+    "conclusion": "success",
+    "artifact_id": 14570719647,
+    "artifact_name": "build-evidence-44606748957-2",
+    "advertised_artifact_digest": "sha256:d8c786d7851d91011545f00ecfb674ba9cf1359827a9b9632be7c9998a082eef",
+    "digest_limit": "Server-advertised ZIP digest, not independently recomputed. Extracted XML parsed and log retained.",
+    "xml_suites": 290,
+    "tests": 2345,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log_sha256": "6ce448792f02dc113458db2180c605f131af69b6d2daecda6971c4afb9398afa"
+  },
+  "first_attempt": {
+    "conclusion": "failure",
+    "phase": "Root dependency plugin resolution before any compilation or tests",
+    "cause": "Maven Central HTTP429 Too Many Requests",
+    "failed_log_sha256": "ffdc2d99a1c48966d9cd8568ee5c2c73da6ed678797b6331c57e7844f0bcf435",
+    "rerun": "Only failed job, unchanged expected head; no code change or test weakening"
+  },
+  "new_suites": {
+    "io.github.bassemzohdy.openworkflow.agentic.runtime.event.EventRegistrationRaceTest": {
+      "tests": 3,
+      "xml_sha256": "80b2cd9fe4a512981e8624d58100e901ebef2923075c827da3e4906b5b1da61c"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.event.AtomicEventBrokerTest": {
+      "tests": 1,
+      "xml_sha256": "f57364fd68a02a142f21a3d0990b9ac8f0df3609d03acaf40eb99d6a721d7155"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.event.ExplicitEventBrokerTest": {
+      "tests": 1,
+      "xml_sha256": "422438a7fc3f55d8bd17a37450bc25fbcc7cb2dba61334ac0181ce6a3308356e"
+    }
+  },
+  "parent_pr147_postmerge_build": {
+    "run_id": 44606284514,
+    "conclusion": "success"
+  },
+  "limits": [
+    "Author checks; independent final project review deferred.",
+    "Raw SDK interleaving is proven; historical issue75 remains unattributed and open.",
+    "No durable inbox, supported-only delegation or package/acceptance promotion."
+  ]
+}

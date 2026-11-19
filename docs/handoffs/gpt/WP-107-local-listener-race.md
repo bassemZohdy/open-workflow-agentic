@@ -65,6 +65,14 @@ started from main `d476`; this branch also contains PR147's test/evidence increm
 exact tested revision evidence remain required before merge; independent project review
 remains deferred by the current delivery agreement.
 
+PR148 merged as `56f33946cc82bc96014392292ece86e6079e2eeb` after full CI
+`44606748957` attempt 2 passed: 290 XML suites, 2,345 tests, zero failures/errors/skips.
+The actual merge tree equals the tested checkout tree. Attempt 1 stopped before compilation
+because Maven Central returned HTTP429 while resolving a root plugin; only that failed job was
+rerun at the unchanged head. The [CI manifest](evidence/WP-107-local-listener-race/ci-verification.json)
+preserves both results, artifact metadata and checked tree identities. This remains author
+evidence and does not close issue75 or any original package/acceptance gate.
+
 Revisit the adapter when the SDK version changes. A corrected upstream bucket mutation
 should make the raw characterization fail, prompting review and removal of the workaround
 after the application and restart tests pass against the replacement.
