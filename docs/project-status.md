@@ -3,7 +3,10 @@
 The project remains in active implementation. The initial inventory used baseline
 `403fce08ab84b2eb637231b2c6c3393d33e9014d`, which matched local and remote main at the start of this check.
 The recovery/status increment subsequently merged as `d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1`
-after a full CI pass. The next increment adds the injected Flow validation proof described below.
+after a full CI pass. The injected Flow validation proof then merged on 2026-11-20 (Dubai)
+as `1a8716d320284d9849adf777ee24911968323b26` after its full CI pass.
+The following increment corrects a deterministic local-listener registration race; its author checks
+and remaining verification limits are recorded separately.
 
 | Tracking source | Current result |
 | --- | --- |
@@ -36,6 +39,11 @@ complete packages whose production integration and acceptance gates remain open.
   inline/external resources and transformation order. The checked import refuses unknown formats before
   resource access; the raw SDK's JSON fallback remains a measured gap. See the
   [runtime proof](handoffs/gpt/WP-605-flow-runtime-proof.md).
+- Corrected a default local-broker race that could detach a new listener while the last old listener
+  of the same event type was removed. The raw SDK ordering is reproduced deterministically and the
+  replacement keeps the new listener reachable. Configured transports retain their selection path;
+  this local broadcast fix does not complete durable governed event delivery. See the
+  [listener-race handoff](handoffs/gpt/WP-107-local-listener-race.md).
 
 ## Verification
 
@@ -57,6 +65,9 @@ complete packages whose production integration and acceptance gates remain open.
 | Full CI for PR #146 | 2,337 tests in 286 XML suites; zero failures/errors/skips; merged tree equals tested tree |
 | Injected Flow validation proof | Three tests, seven measured cases; zero failures/errors/skips on Linux Java 21 |
 | New workflow fixture | Valid against pinned development 1.0.3 schema; no validation errors or lint warnings |
+| Full CI for PR #147 | 2,340 tests in 287 XML suites; zero failures/errors/skips; merged tree equals tested tree |
+| Final local-broker checks, Linux Java 21 | 15 selected tests pass; five compiled source copies match after line-ending normalization |
+| Packaged identity and lifecycle recovery | Seven tests pass before the final transport-provider discovery guard; final boot checks rerun afterward |
 
 The native Windows full build stopped in `oa-runtime`: 45 errors arise from the unavailable Cedar native
 binding or its failed class initialization, and two filesystem tests cannot create symbolic links with the
@@ -69,8 +80,13 @@ packaged-process suite completed separately. The subsequent package build verifi
 ignored configuration setting. Those local author checks combined several runs. The subsequent
 [full CI run](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/44440610397) passed
 the complete reactor before PR #146 merged. Its [retained proof](handoffs/gpt/evidence/WP-108-research-outcome-recovery/ci-verification.json)
-includes the exact checked tree and parsed report totals. The new Flow validation increment has passed
-its selected application tests; its own full pre-merge CI check remains required.
+includes the exact checked tree and parsed report totals. The Flow validation increment also passed
+its [full CI build](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/44541334921)
+before merge; its [retained evidence](handoffs/gpt/evidence/WP-605-flow-runtime-proof/ci-verification.json)
+records the parsed reports and tree match. The local-listener correction has passed selected author checks;
+its own full combined-tree CI remains required. Its
+[manifest](handoffs/gpt/evidence/WP-107-local-listener-race/local-verification.json) preserves the packaged-run
+source difference and does not claim the historical intermittent identity failure is explained or closed.
 
 The [verification manifest](handoffs/gpt/evidence/WP-108-research-outcome-recovery/local-verification.json)
 records commands, counts, source and log digests, the original local failure and verification limits. Original

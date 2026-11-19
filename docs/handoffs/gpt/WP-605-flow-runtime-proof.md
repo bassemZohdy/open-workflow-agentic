@@ -46,6 +46,14 @@ report is a retained observation snapshot; the tests write only under `target/`.
 digests and the fixture-validation command are in the
 [local verification manifest](evidence/WP-605-flow-runtime-proof/local-verification.json).
 
+PR147 merged as `1a8716d320284d9849adf777ee24911968323b26` after full build
+`44541334921` and conformance `44541334932` succeeded. The retained artifact contains
+287 XML suites and 2,340 tests with zero failures, errors or skips, including these three
+methods and seven observation records. The tested merge-checkout tree equals the actual
+merged tree. The [CI verification manifest](evidence/WP-605-flow-runtime-proof/ci-verification.json)
+records exact revisions, artifact metadata, parsed counts and evidence limits. No package
+or acceptance status is promoted.
+
 This establishes the measured injected JVM paths. It does not prove native-image discovery, public
 TLS/provider availability, a production source/target approval path, deployed role permissions, activation,
 all schema dialects, arbitrary schema formats or second-runtime portability. The basic shipped-workflow

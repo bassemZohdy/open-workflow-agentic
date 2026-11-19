@@ -12,8 +12,8 @@
     },
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
-      "date": "2026-11-19",
-      "baseline_commit": "d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1",
+      "date": "2026-11-20",
+      "baseline_commit": "1a8716d320284d9849adf777ee24911968323b26",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -725,7 +725,8 @@
           "WP-105a/b/c/d implement the registry, task state machines, outbox/projection, reconciler and operator APIs.",
           "Linked retry of FAILED instances and direct cancellation before engine preparation are implemented.",
           "Merged diagnostic90 exposes disabled-by-default actual engine snapshots and asynchronous dev-publish failure evidence. Actual postmerge99631cc passes1432 with verified archived reports; absent engine remains unknown and issue75 is not fixed by passing runs or diagnostics. The application start path now uses the existing authority gate after insertion and again after engine preparation, retaining a denied start as pending and checking registry state before execution. Eighty-five focused PostgreSQL-backed and unit checks passed across the application and lifecycle suites, including real grant revocation, cancellation and actual application dependency injection; disabling the check made the revocation control fail. The reconciler also checks the gate before preparing an unprepared STARTING row and again after preparation and checkpoint repair before first execution. PostgreSQL cases cover a real revoked delegation grant with a controlled engine, unavailable authority, revocation during preparation or receipt repair, and later recovery. Fifty-five distinct focused checks passed; the unavailable-authority regression fails against the preceding implementation. These checks do not atomically fence external effects or complete event-start admission, policy or audit.",
-          "The Flow adapter now claims each pending SDK instance by weak object identity before starting it, refusing a concurrent or uncertain duplicate start without holding the claim lock across SDK execution. The per-classloader claim set is bounded; this does not fence cancellation, direct SDK calls or other processes, and does not establish the cause of issue 75."
+          "The Flow adapter now claims each pending SDK instance by weak object identity before starting it, refusing a concurrent or uncertain duplicate start without holding the claim lock across SDK execution. The per-classloader claim set is bounded; this does not fence cancellation, direct SDK calls or other processes, and does not establish the cause of issue 75.",
+          "The application local-event fallback now serializes whole SDK registration/removal mutations, preventing a new same-type listener from being added to a bucket detached by removal of its last old listener. A deterministic test forces that interleaving in the actual pinned SDK and verifies loss in the raw broker and survival in the replacement. Publishing callbacks remain outside the mutation monitor. Injected-application tests cover successive waits and preservation of an explicit transport; the same managed executor is retained. This is a local broker fix, not durable governed inbox dispatch, distributed recovery acceptance or attribution of the historical issue75 failure."
         ],
         "completed_deliverables": [
           "agent_task state machine linked to the Flow instance and graph checkpoint",
@@ -742,7 +743,9 @@
         "evidence": [
           "docs/lifecycle.md",
           "docs/handoffs/gpt/WP-105-recovery-diagnostics.md",
-          "docs/handoffs/gpt/evidence/WP-105-recovery-diagnostics/combined-main.json"
+          "docs/handoffs/gpt/evidence/WP-105-recovery-diagnostics/combined-main.json",
+          "docs/handoffs/gpt/WP-107-local-listener-race.md",
+          "docs/handoffs/gpt/evidence/WP-107-local-listener-race/local-verification.json"
         ]
       }
     },
@@ -917,7 +920,8 @@
           "Owned delivery checks an already-acknowledged receipt and its actual checkpoint proof without appending another acknowledgement audit on sequential retries, including a retry after checkpoint recovery. This earlier sequential fix is supplemented by the retained audit identity described below.",
           "Owned checkpoint acknowledgement and checkpoint recovery share an immutable per-checkpoint audit source (V77.7), retaining the original audit id and time. Idempotent append validates the source, event hash and recorded head under a source lock; concurrent owned attempts, a race with recovery and a lost audit reply reuse one event. A separate process halts after the owned audit commit and before acknowledgement, and recovery reuses the same event. Legacy claim-based JdbcInboxDispatch acknowledgement remains separate; production grant configuration, external audit delivery and full T02/T13 remain open.",
           "An additive checkpoint-audit grant template is exercised by a fresh restricted PostgreSQL runtime role: missing grants refuse acknowledgement, the template enables actual checkpoint acknowledgement and retry, and update/delete/truncate on the retained audit source are denied. Existing registry and inbox grants are test prerequisites; deployed effective roles and datasource wiring remain unverified.",
-          "Wait registration now atomically retains a complete immutable wait profile (V77.8); recovery reconstructs and re-hashes it against the retained delivery identity. Existing digest-only registrations are not guessed and can be populated only by exact re-registration without extending their deadline. Process-restart tests reload the wait from PostgreSQL, and restricted-role/rollback/corruption checks pass. This data is not current authorization or a complete saved listener configuration; production replay and T02/T13 remain open."
+          "Wait registration now atomically retains a complete immutable wait profile (V77.8); recovery reconstructs and re-hashes it against the retained delivery identity. Existing digest-only registrations are not guessed and can be populated only by exact re-registration without extending their deadline. Process-restart tests reload the wait from PostgreSQL, and restricted-role/rollback/corruption checks pass. This data is not current authorization or a complete saved listener configuration; production replay and T02/T13 remain open.",
+          "The application local-event fallback now serializes whole SDK registration/removal mutations, preventing a new same-type listener from being added to a bucket detached by removal of its last old listener. A deterministic test forces that interleaving in the actual pinned SDK and verifies loss in the raw broker and survival in the replacement. Publishing callbacks remain outside the mutation monitor. Injected-application tests cover successive waits and preservation of an explicit transport; the same managed executor is retained. This is a local broker fix, not durable governed inbox dispatch, distributed recovery acceptance or attribution of the historical issue75 failure."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -952,7 +956,9 @@
           "docs/handoffs/gpt/evidence/WP-107-literal-schema/current-ci.json",
           "docs/handoffs/gpt/WP-106-checkpoint-process-recovery.md",
           "deploy/checkpoint-audit-roles.md",
-          "deploy/wait-profile-roles.md"
+          "deploy/wait-profile-roles.md",
+          "docs/handoffs/gpt/WP-107-local-listener-race.md",
+          "docs/handoffs/gpt/evidence/WP-107-local-listener-race/local-verification.json"
         ]
       }
     },
@@ -2554,7 +2560,8 @@
         "implemented": [
           "Executable OWS portability assessment of the pinned Java SDK landed (PR 128): official CTK feature, pinned 1.0.1/1.0.3 schemas, 42 curated sources, import/export/round-trip report, workflow-source codec/materializer and URI-template resolver, with the ows-conformance workflow. It is an assessment, not a conformance certificate or a product authoring/import/export API; reported divergences stay divergences.",
           "The offline source codec masks author-chosen object names in schema and runtime-capability diagnostic paths, preserving fixed schema fields and array indexes; source values and task names are not returned in these diagnostic paths. This is not a durable authoring API or full portability certification.",
-          "An actual injected Quarkus Flow boot test exercises the selected URI resolver, SDK JSON schema validator and HTTP provider against owned IPv4 loopback. Three tests retain seven cases: normal/escaped URI components, explicit and omitted JSON defaults with inline/external schemas, and raw unknown-format JSON fallback versus checked-import refusal. Missing/wrongly typed raw envelopes are refused before HTTP, while valid envelopes are validated before unwrapping. Distinct schema URLs prevent a warmed resource cache from masking checked-import I/O. The raw SDK still fetches/validates unknown formats as JSON and emits the legacy validation error URI. The checked materializer refuses unsupported formats before binding or resource access. This is JVM/fixture evidence; production approval/activation, public TLS, native images, broader dialects and second-runtime support remain open. The pinned normative workflow fixture validates; CI retains observation JSON. No package or acceptance promotion."
+          "An actual injected Quarkus Flow boot test exercises the selected URI resolver, SDK JSON schema validator and HTTP provider against owned IPv4 loopback. Three tests retain seven cases: normal/escaped URI components, explicit and omitted JSON defaults with inline/external schemas, and raw unknown-format JSON fallback versus checked-import refusal. Missing/wrongly typed raw envelopes are refused before HTTP, while valid envelopes are validated before unwrapping. Distinct schema URLs prevent a warmed resource cache from masking checked-import I/O. The raw SDK still fetches/validates unknown formats as JSON and emits the legacy validation error URI. The checked materializer refuses unsupported formats before binding or resource access. This is JVM/fixture evidence; production approval/activation, public TLS, native images, broader dialects and second-runtime support remain open. The pinned normative workflow fixture validates; CI retains observation JSON. No package or acceptance promotion.",
+          "The injected Flow validation increment merged as PR147/1a8716d3 after full build44541334921 and conformance44541334932 succeeded. Downloaded reports contain287 suites/2340 tests with no failures/errors/skips and seven actual probe observations; the tested checkout and merged tree match. Unknown-format JSON fallback and the original production activation/portability gates remain open; no package or acceptance promotion."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -2569,7 +2576,8 @@
           "apps/app-runtime/src/test/resources/conformance/flow-runtime-probe.yaml",
           "docs/conformance/flow-runtime-report.json",
           "docs/handoffs/gpt/WP-605-flow-runtime-proof.md",
-          "docs/handoffs/gpt/evidence/WP-605-flow-runtime-proof/local-verification.json"
+          "docs/handoffs/gpt/evidence/WP-605-flow-runtime-proof/local-verification.json",
+          "docs/handoffs/gpt/evidence/WP-605-flow-runtime-proof/ci-verification.json"
         ]
       }
     },
@@ -3057,7 +3065,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-27",
-    "status": "At the start of the 2026-11-19 status check, local main matched origin/main at 403fce08ab84b2eb637231b2c6c3393d33e9014d; no pull requests were open. PR99 is merged. Issues #75 (intermittent identity recovery), #76 (supported-only production identity profile implementation/proof) and #26 (future framework upgrade assessment) remain open. The explicit audited execution root, retained node/model/tool budgets, resource-scoped effect recovery and terminal research outcome association are implemented increments. A separate-process test now verifies terminal research outcome reconstruction after graph-worker and association-worker crashes, including cancellation, exact retries and changed-checkpoint refusal without additional model calls. Production authority/approved target sources, deployed role/datasource grants, governed Flow/effect recovery and private output release remain open. Proposed schemas stay outside default activation. Package counts remain 11 completed, 17 partial and 25 not started; acceptance remains 3/39. Continue with the first unblocked package and retain independent project review until all implementation and required checks are complete. Current verification and its limits are recorded in docs/project-status.md. PR146 is now merged as d476aa8d after inspected full CI (2337 tests, zero failures/errors/skips). The injected Flow URI/input-schema proof now covers seven controlled cases; the raw unknown-format fallback and production activation/portability gates remain open. Package and acceptance counts are unchanged",
+    "status": "At the start of the 2026-11-19 status check, local main matched origin/main at 403fce08ab84b2eb637231b2c6c3393d33e9014d; no pull requests were open. PR99 is merged. Issues #75 (intermittent identity recovery), #76 (supported-only production identity profile implementation/proof) and #26 (future framework upgrade assessment) remain open. The explicit audited execution root, retained node/model/tool budgets, resource-scoped effect recovery and terminal research outcome association are implemented increments. A separate-process test now verifies terminal research outcome reconstruction after graph-worker and association-worker crashes, including cancellation, exact retries and changed-checkpoint refusal without additional model calls. Production authority/approved target sources, deployed role/datasource grants, governed Flow/effect recovery and private output release remain open. Proposed schemas stay outside default activation. Package counts remain 11 completed, 17 partial and 25 not started; acceptance remains 3/39. Continue with the first unblocked package and retain independent project review until all implementation and required checks are complete. Current verification and its limits are recorded in docs/project-status.md. PR146 is now merged as d476aa8d after inspected full CI (2337 tests, zero failures/errors/skips). The injected Flow URI/input-schema proof now covers seven controlled cases; the raw unknown-format fallback and production activation/portability gates remain open. Package and acceptance counts are unchanged PR147 is now merged as1a8716d3 after inspected full CI (2340 tests, no failures/errors/skips) and matching tested/merged trees. A subsequent local-listener race fix has deterministic SDK regression and actual injected-broker checks; 15 final selected Linux methods and seven original packaged recovery cases passed, with the packaged source difference retained. Full combined-tree author CI remains required for that correction. Issue75 and all original acceptance gates remain open.",
     "agents": [
       {
         "id": "GPT",
