@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-19",
+  "baseline_commit": "d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1",
+  "command": "mvn -B -pl apps/app-runtime -am test -Dtest=FlowRuntimeValidationTest -Dsurefire.failIfNoSpecifiedTests=false",
+  "exit_code": 0,
+  "tests": 3,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "observation_records": 7,
+  "java": "21.0.9+10-LTS",
+  "maven": "3.9.11",
+  "postgresql": "16.15",
+  "profile": "Isolated Quarkus test profile with no configuration or provider overrides",
+  "disposable_database": true,
+  "source_sha256": {
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/conformance/FlowRuntimeValidationTest.java": "f3a14559a77cca61f25ad873522e1e135ebe3ddca2ccd9365b92535b7f86e498",
+    "apps/app-runtime/src/test/resources/conformance/flow-runtime-probe.yaml": "07387f773f5b4fcfd720ec8004fb7e6ee8592b0cbe142a3d0a290dbdbad22b1f"
+  },
+  "report_sha256": "e4d7665eed4ffcbebea3a07f4d47169d7e4a54eb0efa6dfacba435823844904f",
+  "xml_sha256": "a061908d7454c78e0df07cc33e48155e24e4dd89b3fc99e9aefe735f0a674a62",
+  "log_sha256": "b5e4748b307859b50f53d6587eaea30958faec15c4612c7dc0a7e4c667477349",
+  "fixture_validation": {
+    "command": "python C:/Users/Bassem/.agents/skills/open-workflow-dsl/scripts/validate_workflow.py --schema modules/oa-runtime/src/test/resources/conformance/schema/workflow-1.0.3.yaml apps/app-runtime/src/test/resources/conformance/flow-runtime-probe.yaml",
+    "validator_sha256": "e9cf505aa5b8f74c02c77b2b1abe132c80ced18dda9d45612746aa9730dd523b",
+    "schema_sha256": "704ef5e91c5d823167dd8751794edb1dd1a6f9a3bdf9bfd389bf9c6b23ae3816",
+    "errors": 0,
+    "warnings": 0,
+    "info": [
+      "L021: read-only loopback call intentionally has no retry/catch so failures remain visible"
+    ],
+    "log_sha256": "fca4b989f943202c5cb88406b2e57c223c132c6e0494c4cd5089588f85980161"
+  },
+  "providers": {
+    "validator": "io.serverlessworkflow.impl.jackson.schema.JsonSchemaValidatorFactory",
+    "uriResolver": "io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.source.ComponentUriTemplateResolver"
+  },
+  "validation_error_type": "https://serverlessworkflow.io/spec/1.0.0/errors/validation",
+  "facts": [
+    "Normal/escaped URI components observed through actual HTTP",
+    "Four explicit/default JSON and inline/external combinations refuse two invalid raw inputs each, before unwrapped valid input reaches HTTP",
+    "Two raw unknown-format declarations are treated as JSON; their invalid input refuses and valid input runs",
+    "The raw external unknown-format declaration fetches its schema",
+    "Two checked unknown-format declarations refuse before SDK registration/resource access; distinct cold resource URLs prevent cache masking"
+  ],
+  "not_proved": [
+    "public TLS",
+    "production source/target authority",
+    "native-image discovery",
+    "activation",
+    "all schema dialects",
+    "arbitrary schema formats",
+    "second runtime",
+    "complete OWS semantic conformance"
+  ],
+  "status": "Local author evidence. Full CI required before merge; no acceptance/work-package promotion and no independent project review."
+}

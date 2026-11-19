@@ -1,7 +1,9 @@
 # Project status — 2026-11-19
 
-The project remains in active implementation. The checked baseline is
-`403fce08ab84b2eb637231b2c6c3393d33e9014d`, which matched both local and remote main at the start of this check.
+The project remains in active implementation. The initial inventory used baseline
+`403fce08ab84b2eb637231b2c6c3393d33e9014d`, which matched local and remote main at the start of this check.
+The recovery/status increment subsequently merged as `d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1`
+after a full CI pass. The next increment adds the injected Flow validation proof described below.
 
 | Tracking source | Current result |
 | --- | --- |
@@ -14,7 +16,7 @@ The authoritative backlog remains [TODO.md](../TODO.md), generated from
 [work-packages.json](plan/work-packages.json). Implemented components and passing component tests do not
 complete packages whose production integration and acceptance gates remain open.
 
-## Completed in this increment
+## Completed during this status check
 
 - Added [research outcome crash recovery](handoffs/gpt/WP-108-research-outcome-recovery.md): an actual
   graph worker completes three reserved model calls and halts before outcome association. Fresh workers
@@ -30,6 +32,10 @@ complete packages whose production integration and acceptance gates remain open.
   configuration cleanup does not establish the missing application-level validation behavior.
 - Fixed an inbox test's reused engine ID, which caused repeated test runs on the same development
   database to fail before reaching the engine-mismatch assertion.
+- Added actual injected Flow checks for URI components and explicit/default JSON schemas, including
+  inline/external resources and transformation order. The checked import refuses unknown formats before
+  resource access; the raw SDK's JSON fallback remains a measured gap. See the
+  [runtime proof](handoffs/gpt/WP-605-flow-runtime-proof.md).
 
 ## Verification
 
@@ -48,6 +54,9 @@ complete packages whose production integration and acceptance gates remain open.
 | Package after ignored-setting cleanup | Pass; no unrecognized configuration warnings |
 | Acceptance status consistency | 12 annotated methods pass; all three recorded automated scenarios remain consistent |
 | Dependency boundaries and license policy | Pass |
+| Full CI for PR #146 | 2,337 tests in 286 XML suites; zero failures/errors/skips; merged tree equals tested tree |
+| Injected Flow validation proof | Three tests, seven measured cases; zero failures/errors/skips on Linux Java 21 |
+| New workflow fixture | Valid against pinned development 1.0.3 schema; no validation errors or lint warnings |
 
 The native Windows full build stopped in `oa-runtime`: 45 errors arise from the unavailable Cedar native
 binding or its failed class initialization, and two filesystem tests cannot create symbolic links with the
@@ -57,11 +66,14 @@ establish that the full application suite supports native Windows; Linux remains
 The selected recovery command is in its handoff. The broad `mvn -B clean verify` run exited with the
 single inbox fixture error. The corrected suite passed twice on the same database, and the default
 packaged-process suite completed separately. The subsequent package build verified removal of the
-ignored configuration setting. This combines author checks across those runs; it is not a single green
-full-reactor run. A clean full CI pass remains required before merging.
+ignored configuration setting. Those local author checks combined several runs. The subsequent
+[full CI run](https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/44440610397) passed
+the complete reactor before PR #146 merged. Its [retained proof](handoffs/gpt/evidence/WP-108-research-outcome-recovery/ci-verification.json)
+includes the exact checked tree and parsed report totals. The new Flow validation increment has passed
+its selected application tests; its own full pre-merge CI check remains required.
 
 The [verification manifest](handoffs/gpt/evidence/WP-108-research-outcome-recovery/local-verification.json)
-records commands, counts, source and log digests, the original failure and verification limits. Original
+records commands, counts, source and log digests, the original local failure and verification limits. Original
 XML and process logs remain under `target/project-status-linux*`. The opt-in real-Keycloak profiles
 were not executed: their two classes report zero tests in the default process run. No provider proof
 or production-readiness claim follows from the passing default suite.

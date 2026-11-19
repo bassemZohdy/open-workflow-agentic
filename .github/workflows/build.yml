@@ -63,5 +63,6 @@ jobs:
             apps/*/target/failsafe-reports/*.xml
             apps/*/target/process-logs/*.log
             apps/app-runtime/target/conformance/checkpoint-schema/cases.json
+            apps/app-runtime/target/conformance/flow-runtime/*.json
           if-no-files-found: ignore
           retention-days: 7

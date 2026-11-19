@@ -161,5 +161,7 @@
     "target/project-status-dependency-policy.log": "385d58db6edb5c261aea5b4ad0dc1dbb7cc2bce6c825e3de244caca0a4c696bd",
     "target/project-status-windows-processes.log": "0d0c916dae527d2c1dc6de6b27e670efdcc0fac859844169152108ed16ff74c6"
   },
-  "conclusion": "Local author coverage combines the broad sweep, the corrected inbox suite rerun twice, separate default process ITs and the final configuration package build. This is not a single green full-reactor run. A clean full CI pass is still required before merge; independent final project review is deferred. WP-108/WP-605 and acceptance counts are unchanged."
+  "conclusion": "Local author coverage combines the broad sweep, the corrected inbox suite rerun twice, separate default process ITs and the final configuration package build. This is not a single green full-reactor run. A clean full CI pass is still required before merge; independent final project review is deferred. WP-108/WP-605 and acceptance counts are unchanged.",
+  "subsequent_ci_verification": "ci-verification.json",
+  "subsequent_outcome": "Full CI passed before PR146 merged. Original local-run facts are retained unchanged."
 }

@@ -1,0 +1,44 @@
+document:
+  dsl: '1.0.3'
+  namespace: flow-runtime-proof
+  name: validate-input
+  version: '1.0.0'
+  title: Validate raw input before an owned HTTP probe
+  summary: |
+    Test-only request workflow. Validate the payload envelope, unwrap it and make
+    one read-only GET to the test's owned loopback server. Return its observed URI
+    components. The test supplies the loopback port; no secret or event is required.
+input:
+  schema:
+    format: json
+    document:
+      type: object
+      additionalProperties: false
+      required: [payload]
+      properties:
+        payload:
+          type: object
+          additionalProperties: false
+          required: [id, tag]
+          properties:
+            id: {type: string, minLength: 1}
+            tag: {type: string, minLength: 1}
+  from: '${ .payload }'
+do:
+  - observeInput:
+      call: http
+      with:
+        method: get
+        endpoint: 'http://127.0.0.1:12345/observe/{id}?tag={tag}&literal=x%26y'
+      timeout:
+        after: {seconds: 5}
+output:
+  schema:
+    format: json
+    document:
+      type: object
+      additionalProperties: false
+      required: [path, query]
+      properties:
+        path: {type: string}
+        query: {type: string}
