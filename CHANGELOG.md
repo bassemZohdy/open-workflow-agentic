@@ -1,5 +1,7 @@
 # Changelog
 
+- Keep new local Flow listeners reachable when the last old listener is removed concurrently.
+
 - Verify injected Flow URI handling and raw-input schemas through actual loopback HTTP, retaining the raw unknown-format fallback and checked-import refusal as separate facts.
 
 - Verify retained research outcomes across worker crashes without repeating graph or model execution.
