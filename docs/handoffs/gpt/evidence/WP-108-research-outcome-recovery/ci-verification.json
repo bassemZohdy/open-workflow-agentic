@@ -1,0 +1,54 @@
+{
+  "date": "2026-11-19",
+  "pull_request": "https://github.com/bassemZohdy/open-workflow-agentic/pull/146",
+  "head_commit": "2578d0bfed8fa0b6fa1761cbbe9ffbc12e0060e2",
+  "checkout_commit": "e54006ae42e9da2f27b83380adc2b02926e92f8e",
+  "merge_commit": "d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1",
+  "tested_and_merged_tree": "e70420ab9eb5de6322bb52a2ac4877c1e0ead20e",
+  "build_run": {
+    "id": 44440610397,
+    "url": "https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/44440610397",
+    "conclusion": "success",
+    "command": "mvn -B verify",
+    "xml_suites": 286,
+    "tests": 2337,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "conformance_run": {
+    "id": 44440610496,
+    "url": "https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/44440610496",
+    "conclusion": "success"
+  },
+  "artifact": {
+    "id": 14492456536,
+    "name": "build-evidence-44440610397-1",
+    "advertised_archive_digest": "sha256:b0815179776dc3e2bf67c92356f906c129226d82a0faa47281cf4a5e68e5f583",
+    "note": "Reports downloaded and parsed. The advertised ZIP digest is retained as GitHub metadata, not a locally recomputed archive digest."
+  },
+  "new_recovery_suite": {
+    "name": "io.github.bassemzohdy.openworkflow.agentic.lifecycle.ResearchOutcomeRecoveryIT",
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "xml_sha256": "3dbcfa34aaa723940261dd39b54ba41af5bedf78ef768e5503d43567eeaef89a"
+  },
+  "java_version": "21.0.13",
+  "acceptance_status_consistent": true,
+  "python_tests": 91,
+  "real_keycloak_profiles_executed": false,
+  "review": "Author evidence inspected. Independent final project review remains deferred; work-package and acceptance statuses are unchanged.",
+  "postmerge_build": {
+    "id": 44535194606,
+    "url": "https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/44535194606",
+    "head_commit": "d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1",
+    "conclusion": "success"
+  },
+  "postmerge_conformance": {
+    "id": 44535194563,
+    "url": "https://github.com/bassemZohdy/open-workflow-agentic/actions/runs/44535194563",
+    "conclusion": "success"
+  }
+}

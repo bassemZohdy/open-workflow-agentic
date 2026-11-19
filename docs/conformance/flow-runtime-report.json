@@ -1,0 +1,75 @@
+{
+  "cases" : [ {
+    "validatorClass" : "io.serverlessworkflow.impl.jackson.schema.JsonSchemaValidatorFactory",
+    "uriResolverClass" : "io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.source.ComponentUriTemplateResolver",
+    "httpCalls" : 2,
+    "case" : "injected-uri-components",
+    "escapedOutput" : {
+      "path" : "/observe/a%2Fb%3Fc%23d",
+      "query" : "tag=ready%26admin%3Dtrue&literal=x%26y"
+    }
+  }, {
+    "checkedBoundary" : "REFUSED_BEFORE_SDK_BINDING",
+    "external" : false,
+    "checkedSchemaReads" : 0,
+    "validatorClass" : "io.serverlessworkflow.impl.jackson.schema.JsonSchemaValidatorFactory",
+    "uriResolverClass" : "io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.source.ComponentUriTemplateResolver",
+    "rawSchemaReads" : 0,
+    "rawSdkBehavior" : "DIVERGED_JSON_FALLBACK",
+    "invalidRawInputsRefused" : 2,
+    "checkedHttpCalls" : 0,
+    "rawHttpCalls" : 1,
+    "case" : "unknown-format"
+  }, {
+    "checkedBoundary" : "REFUSED_BEFORE_SDK_BINDING",
+    "external" : true,
+    "checkedSchemaReads" : 0,
+    "validatorClass" : "io.serverlessworkflow.impl.jackson.schema.JsonSchemaValidatorFactory",
+    "uriResolverClass" : "io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.source.ComponentUriTemplateResolver",
+    "rawSchemaReads" : 1,
+    "rawSdkBehavior" : "DIVERGED_JSON_FALLBACK",
+    "invalidRawInputsRefused" : 2,
+    "checkedHttpCalls" : 0,
+    "rawHttpCalls" : 1,
+    "case" : "unknown-format"
+  }, {
+    "case" : "input-schema",
+    "httpCalls" : 1,
+    "schemaReads" : 0,
+    "external" : false,
+    "uriResolverClass" : "io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.source.ComponentUriTemplateResolver",
+    "validatorClass" : "io.serverlessworkflow.impl.jackson.schema.JsonSchemaValidatorFactory",
+    "format" : "json",
+    "invalidRawInputsRefused" : 2
+  }, {
+    "case" : "input-schema",
+    "httpCalls" : 1,
+    "schemaReads" : 0,
+    "external" : false,
+    "uriResolverClass" : "io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.source.ComponentUriTemplateResolver",
+    "validatorClass" : "io.serverlessworkflow.impl.jackson.schema.JsonSchemaValidatorFactory",
+    "format" : "OMITTED",
+    "invalidRawInputsRefused" : 2
+  }, {
+    "case" : "input-schema",
+    "httpCalls" : 1,
+    "schemaReads" : 1,
+    "external" : true,
+    "uriResolverClass" : "io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.source.ComponentUriTemplateResolver",
+    "validatorClass" : "io.serverlessworkflow.impl.jackson.schema.JsonSchemaValidatorFactory",
+    "format" : "json",
+    "invalidRawInputsRefused" : 2
+  }, {
+    "case" : "input-schema",
+    "httpCalls" : 1,
+    "schemaReads" : 1,
+    "external" : true,
+    "uriResolverClass" : "io.github.bassemzohdy.openworkflow.agentic.runtime.adapter.source.ComponentUriTemplateResolver",
+    "validatorClass" : "io.serverlessworkflow.impl.jackson.schema.JsonSchemaValidatorFactory",
+    "format" : "OMITTED",
+    "invalidRawInputsRefused" : 2
+  } ],
+  "scope" : "Injected Quarkus Flow with actual SDK validator, URI resolver and owned loopback HTTP",
+  "notProved" : [ "public TLS", "production source/target authority", "native-image discovery", "activation" ],
+  "validationErrorType" : "https://serverlessworkflow.io/spec/1.0.0/errors/validation"
+}

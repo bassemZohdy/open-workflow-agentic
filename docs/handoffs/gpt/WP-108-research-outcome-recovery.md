@@ -37,4 +37,7 @@ Per-process logs and Failsafe XML are retained under the application's `target/`
 existing full CI workflow. The
 [verification manifest](evidence/WP-108-research-outcome-recovery/local-verification.json) records the
 passing default process suite, the separate unit-sweep fixture correction, source digests and limits.
-A single clean full-reactor CI pass remains required before merge.
+The subsequent [full CI verification](evidence/WP-108-research-outcome-recovery/ci-verification.json)
+passed 2,337 tests across 286 XML suites with zero failures/errors/skips, including this recovery IT.
+PR #146 merged as `d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1`; its tree exactly matches the CI checkout.
+This closes that increment's pre-merge CI gate without changing package acceptance or the deferred review.

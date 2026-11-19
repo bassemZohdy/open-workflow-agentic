@@ -197,16 +197,22 @@ Only the HTTP query case changes; all other scenario records and definition
 hashes are equal, enforced by a test. The resolver and its JVM service descriptor
 are present on main, with
 [standalone SDK coverage](../../modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/conformance/UriTemplateAdapterTest.java).
-The previously claimed separate injected Quarkus Flow URI boot test and runtime-integration handoff
-are absent from this tree. Injected application behavior, native-image discovery,
-target authority, public TLS and full semantic portability remain separate verification gates;
-the standalone measurement does not establish deployment.
+The new [injected application checks](../../apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/conformance/FlowRuntimeValidationTest.java)
+also verify normal/escaped URI inputs through actual owned loopback HTTP using the default Quarkus
+application and providers. They replace the earlier unsupported runtime-integration claim with actual
+test source and [retained observations](flow-runtime-report.json).
 
-The application includes the SDK validation dependency, but the previously claimed injected Flow
-input-schema boot tests and input-schema handoff are absent from this tree. The 2026-11-19 status check
-removed `quarkus.flow.validation.input.enabled` after the build warned that it was unrecognized and
-ignored. Removing that setting is not evidence of validation enforcement. Add application-level checks for
-explicit JSON, omitted-format defaults and unregistered formats, both inline and external, requiring
-invalid raw input to stop before filtering/HTTP and valid input to complete after filtering. Until those
-checks run, neither the claimed unregistered-format behavior nor complete application input-schema
-enforcement is established here. WP-605 remains partial.
+The injected checks cover explicit JSON, omitted JSON defaults and unregistered formats, each inline
+and external. Missing/wrongly typed raw input raises the SDK's validation error before HTTP; valid
+enveloped input is validated, unwrapped and passed to HTTP. Raw SDK construction still interprets an
+unregistered format as JSON, including fetching its external schema. That fallback is not evidence that
+the declared format is implemented. The checked source materializer refuses both unknown-format
+shapes before definition registration or resource access, using distinct cold URLs to avoid cache-based
+false evidence. This explicit API is not a production activation route or a global raw-SDK interceptor.
+
+The ignored `quarkus.flow.validation.input.enabled` setting was removed during the status check; these
+tests exercise the actual validator instead. The basic shipped-workflow input refusal remains in
+`AgenticAppTest`. The SDK's legacy validation-error URI is retained in the observations as a separate
+portability boundary. See the [scope, commands and remaining gates](../handoffs/gpt/WP-605-flow-runtime-proof.md).
+Native-image discovery, target/source authority, public TLS, broader schema/dialect support, activation
+and full semantic portability remain unproved. WP-605 remains partial; no CTK baseline is rewritten.

@@ -13,7 +13,7 @@
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
       "date": "2026-11-19",
-      "baseline_commit": "403fce08ab84b2eb637231b2c6c3393d33e9014d",
+      "baseline_commit": "d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -1052,7 +1052,8 @@
           "The explicit audited root now offers managed asynchronous entry with exclusive ownership of identity, policy, task and owner contexts. Cancelling a waiter invalidates the run but keeps contexts and the bounded gate slot until the synchronous worker and termination cleanup actually finish; submission failures retire contexts immediately. Cleanup failure withholds results. Tests cover admission and in-flight cancellation and real SDK owner composition; verifier, PDP and target approval remain fixtures. Hidden detached work and production Flow dispatch remain open; this does not close T03.",
           "The opt-in audited root can invoke the actual fixed research graph with the bound request and retained allocation. Its three fixed nodes derive distinct canonical model occurrences and use the existing durable reservation consumer, with live controls around nodes and model I/O. Existing checkpoints refuse for reconciliation. A per-run barrier tracks admitted nodes and the graph emitter through physical termination; caller interruption is not permission to release a running provider. PostgreSQL/SDK tests exercise three fixture model calls and a real owner lease. Production HTTP/Flow wiring, verified provider, trusted approved-context and target sources, terminal outcome association, crash recovery and T03 remain open; V78/V79 are proposed fixtures.",
           "An explicit co-located outcome store inspects the released terminal research checkpoint, retains its exact run/checkpoint/content fingerprint once, and rechecks the stored representation on verification. The audited research root pins its checkpoint target to the entry database and returns only this association after live checks, withholding private graph output pending a separately verified release. Historical association may survive caller rollback or authority loss and never authorizes another graph entry. Checkpoint data can change after any read, so current authority and exact-content checks remain mandatory at any future output boundary. Production role/configuration, recovery dispatch and T03 remain open.",
-          "A separate-process actual graph/checkpoint test halts after terminal completion before outcome association, then reconstructs the historical outcome after cancellation in a fresh JVM. A second halt loses the association reply; repeated fresh-process recovery retains one entry/outcome and exactly three model reservations/provider calls. Changed checkpoint bytes refuse verification and reassociation without rewriting history. Caller, approval, policy, provider and no-ambient-JTA manager remain fixtures; proposed V78/V79 are private test setup. Production Flow recovery, current output authorization and package/acceptance closure remain open."
+          "A separate-process actual graph/checkpoint test halts after terminal completion before outcome association, then reconstructs the historical outcome after cancellation in a fresh JVM. A second halt loses the association reply; repeated fresh-process recovery retains one entry/outcome and exactly three model reservations/provider calls. Changed checkpoint bytes refuse verification and reassociation without rewriting history. Caller, approval, policy, provider and no-ambient-JTA manager remain fixtures; proposed V78/V79 are private test setup. Production Flow recovery, current output authorization and package/acceptance closure remain open.",
+          "The research-outcome recovery/status increment merged in PR146 as d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1 after full build 44440610397 and conformance 44440610496 passed. The retained full-build artifact contains 286 XML suites and 2337 tests with zero failures/errors/skips, including the new recovery IT; the actual merged tree equals the tested merge-checkout tree. This is author evidence, with no package/acceptance promotion or independent final review."
         ],
         "completed_deliverables": [
           "Write-ahead intent with a stable idempotency key; reuse the same key for engine retries and restart re-execution"
@@ -1128,7 +1129,8 @@
           "docs/handoffs/gpt/WP-108-composite-fence.md",
           "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ResearchOutcomeRecoveryIT.java",
           "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/lifecycle/ResearchOutcomeRecoveryWorker.java",
-          "docs/handoffs/gpt/WP-108-research-outcome-recovery.md"
+          "docs/handoffs/gpt/WP-108-research-outcome-recovery.md",
+          "docs/handoffs/gpt/evidence/WP-108-research-outcome-recovery/ci-verification.json"
         ]
       }
     },
@@ -2551,17 +2553,23 @@
         "status": "partial",
         "implemented": [
           "Executable OWS portability assessment of the pinned Java SDK landed (PR 128): official CTK feature, pinned 1.0.1/1.0.3 schemas, 42 curated sources, import/export/round-trip report, workflow-source codec/materializer and URI-template resolver, with the ows-conformance workflow. It is an assessment, not a conformance certificate or a product authoring/import/export API; reported divergences stay divergences.",
-          "The offline source codec masks author-chosen object names in schema and runtime-capability diagnostic paths, preserving fixed schema fields and array indexes; source values and task names are not returned in these diagnostic paths. This is not a durable authoring API or full portability certification."
+          "The offline source codec masks author-chosen object names in schema and runtime-capability diagnostic paths, preserving fixed schema fields and array indexes; source values and task names are not returned in these diagnostic paths. This is not a durable authoring API or full portability certification.",
+          "An actual injected Quarkus Flow boot test exercises the selected URI resolver, SDK JSON schema validator and HTTP provider against owned IPv4 loopback. Three tests retain seven cases: normal/escaped URI components, explicit and omitted JSON defaults with inline/external schemas, and raw unknown-format JSON fallback versus checked-import refusal. Missing/wrongly typed raw envelopes are refused before HTTP, while valid envelopes are validated before unwrapping. Distinct schema URLs prevent a warmed resource cache from masking checked-import I/O. The raw SDK still fetches/validates unknown formats as JSON and emits the legacy validation error URI. The checked materializer refuses unsupported formats before binding or resource access. This is JVM/fixture evidence; production approval/activation, public TLS, native images, broader dialects and second-runtime support remain open. The pinned normative workflow fixture validates; CI retains observation JSON. No package or acceptance promotion."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
           "Close reported divergences or document supported boundaries; provide a product import/export surface and round-trip loss report; extend beyond the pinned SDK profile before any conformance claim.",
-          "Add actual injected Quarkus Flow URI and input-schema boot checks. The 2026-11-19 tree contains standalone resolver/CTK coverage but not the previously claimed injected tests or their handoffs. Removing the ignored input-validation setting is configuration cleanup, not proof of enforcement. Prove explicit JSON, omitted-format and unregistered-format handling for inline/external schemas before claiming application enforcement."
+          "Resolve/adjudicate raw SDK unknown-format JSON fallback and legacy error URIs; use the checked source/resource approval boundary in actual activation paths. Extend injected provider/TLS/native-image, schema-dialect and second-runtime verification before broader portability claims."
         ],
         "evidence": [
           "docs/conformance/README.md",
           "docs/conformance/ows-portability-report.json",
-          ".github/workflows/ows-conformance.yml"
+          ".github/workflows/ows-conformance.yml",
+          "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/conformance/FlowRuntimeValidationTest.java",
+          "apps/app-runtime/src/test/resources/conformance/flow-runtime-probe.yaml",
+          "docs/conformance/flow-runtime-report.json",
+          "docs/handoffs/gpt/WP-605-flow-runtime-proof.md",
+          "docs/handoffs/gpt/evidence/WP-605-flow-runtime-proof/local-verification.json"
         ]
       }
     },
@@ -3049,7 +3057,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-27",
-    "status": "At the start of the 2026-11-19 status check, local main matched origin/main at 403fce08ab84b2eb637231b2c6c3393d33e9014d; no pull requests were open. PR99 is merged. Issues #75 (intermittent identity recovery), #76 (supported-only production identity profile implementation/proof) and #26 (future framework upgrade assessment) remain open. The explicit audited execution root, retained node/model/tool budgets, resource-scoped effect recovery and terminal research outcome association are implemented increments. A separate-process test now verifies terminal research outcome reconstruction after graph-worker and association-worker crashes, including cancellation, exact retries and changed-checkpoint refusal without additional model calls. Production authority/approved target sources, deployed role/datasource grants, governed Flow/effect recovery and private output release remain open. Proposed schemas stay outside default activation. Package counts remain 11 completed, 17 partial and 25 not started; acceptance remains 3/39. Continue with the first unblocked package and retain independent project review until all implementation and required checks are complete. Current verification and its limits are recorded in docs/project-status.md",
+    "status": "At the start of the 2026-11-19 status check, local main matched origin/main at 403fce08ab84b2eb637231b2c6c3393d33e9014d; no pull requests were open. PR99 is merged. Issues #75 (intermittent identity recovery), #76 (supported-only production identity profile implementation/proof) and #26 (future framework upgrade assessment) remain open. The explicit audited execution root, retained node/model/tool budgets, resource-scoped effect recovery and terminal research outcome association are implemented increments. A separate-process test now verifies terminal research outcome reconstruction after graph-worker and association-worker crashes, including cancellation, exact retries and changed-checkpoint refusal without additional model calls. Production authority/approved target sources, deployed role/datasource grants, governed Flow/effect recovery and private output release remain open. Proposed schemas stay outside default activation. Package counts remain 11 completed, 17 partial and 25 not started; acceptance remains 3/39. Continue with the first unblocked package and retain independent project review until all implementation and required checks are complete. Current verification and its limits are recorded in docs/project-status.md. PR146 is now merged as d476aa8d after inspected full CI (2337 tests, zero failures/errors/skips). The injected Flow URI/input-schema proof now covers seven controlled cases; the raw unknown-format fallback and production activation/portability gates remain open. Package and acceptance counts are unchanged",
     "agents": [
       {
         "id": "GPT",
