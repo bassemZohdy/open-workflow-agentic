@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-11-20",
+  "pull_request": "https://github.com/bassemZohdy/open-workflow-agentic/pull/147",
+  "head_commit": "d9aade42deef5f4f9847166b06adf63aaa55d972",
+  "merge_commit": "1a8716d320284d9849adf777ee24911968323b26",
+  "ci_checkout": "3b2cada7b4feaa4fc760186c4c0f6f43b09d49ff",
+  "checked_and_merged_tree": "8511232eb1c24932696917123004e1534fe2125c",
+  "tree_match_verified_via_github_git_commit_api": true,
+  "build": {
+    "run_id": 44541334921,
+    "conclusion": "success",
+    "artifact_id": 14539792781,
+    "artifact_name": "build-evidence-44541334921-1",
+    "advertised_artifact_digest": "sha256:762ca76549c81bc1e5682959dd3f4cc22e4adc43b475aa4efc63c29b8787e9ec",
+    "digest_limit": "Server-advertised ZIP digest; the ZIP hash was not independently recomputed. XML and observation files were downloaded and inspected.",
+    "xml_suites": 287,
+    "tests": 2340,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log_sha256": "b20955f100dc9680305ad63a93fd5afe7b1fd921011e125392d4c6082f855302"
+  },
+  "conformance": {
+    "run_id": 44541334932,
+    "conclusion": "success"
+  },
+  "flow_probe": {
+    "tests": 3,
+    "observations": 7,
+    "unknown_format_cases": 2,
+    "observations_sha256": "a16df32a0eff89aa023ec372640d2cf1e84801374ad85988bcf4f889e11bf7fc",
+    "results": [
+      {
+        "case": "injected-uri-components",
+        "external": null,
+        "format": null,
+        "invalid_raw_inputs_refused": null,
+        "checked_boundary": null
+      },
+      {
+        "case": "unknown-format",
+        "external": false,
+        "format": null,
+        "invalid_raw_inputs_refused": 2,
+        "checked_boundary": "REFUSED_BEFORE_SDK_BINDING"
+      },
+      {
+        "case": "unknown-format",
+        "external": true,
+        "format": null,
+        "invalid_raw_inputs_refused": 2,
+        "checked_boundary": "REFUSED_BEFORE_SDK_BINDING"
+      },
+      {
+        "case": "input-schema",
+        "external": false,
+        "format": "json",
+        "invalid_raw_inputs_refused": 2,
+        "checked_boundary": null
+      },
+      {
+        "case": "input-schema",
+        "external": false,
+        "format": "OMITTED",
+        "invalid_raw_inputs_refused": 2,
+        "checked_boundary": null
+      },
+      {
+        "case": "input-schema",
+        "external": true,
+        "format": "json",
+        "invalid_raw_inputs_refused": 2,
+        "checked_boundary": null
+      },
+      {
+        "case": "input-schema",
+        "external": true,
+        "format": "OMITTED",
+        "invalid_raw_inputs_refused": 2,
+        "checked_boundary": null
+      }
+    ]
+  },
+  "tooling": {
+    "tests": 91,
+    "passed": true
+  },
+  "limits": [
+    "Author verification; independent final project review deferred.",
+    "No package or acceptance promotion, production source/target activation, full schema portability, native-image proof or supported-only delegated Flow proof."
+  ]
+}

@@ -12,8 +12,8 @@
     },
     "size_note": "Days of focused engineering for one senior engineer, mid-point of a range. Use for relative comparison and critical-path analysis only.",
     "progress_review": {
-      "date": "2026-11-19",
-      "baseline_commit": "d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1",
+      "date": "2026-11-20",
+      "baseline_commit": "1a8716d320284d9849adf777ee24911968323b26",
       "acceptance_source": "docs/requirements/test-status.json",
       "next_work": [
         "WP-102",
@@ -744,7 +744,8 @@
           "docs/lifecycle.md",
           "docs/handoffs/gpt/WP-105-recovery-diagnostics.md",
           "docs/handoffs/gpt/evidence/WP-105-recovery-diagnostics/combined-main.json",
-          "docs/handoffs/gpt/WP-107-local-listener-race.md"
+          "docs/handoffs/gpt/WP-107-local-listener-race.md",
+          "docs/handoffs/gpt/evidence/WP-107-local-listener-race/local-verification.json"
         ]
       }
     },
@@ -956,7 +957,8 @@
           "docs/handoffs/gpt/WP-106-checkpoint-process-recovery.md",
           "deploy/checkpoint-audit-roles.md",
           "deploy/wait-profile-roles.md",
-          "docs/handoffs/gpt/WP-107-local-listener-race.md"
+          "docs/handoffs/gpt/WP-107-local-listener-race.md",
+          "docs/handoffs/gpt/evidence/WP-107-local-listener-race/local-verification.json"
         ]
       }
     },
@@ -2558,7 +2560,8 @@
         "implemented": [
           "Executable OWS portability assessment of the pinned Java SDK landed (PR 128): official CTK feature, pinned 1.0.1/1.0.3 schemas, 42 curated sources, import/export/round-trip report, workflow-source codec/materializer and URI-template resolver, with the ows-conformance workflow. It is an assessment, not a conformance certificate or a product authoring/import/export API; reported divergences stay divergences.",
           "The offline source codec masks author-chosen object names in schema and runtime-capability diagnostic paths, preserving fixed schema fields and array indexes; source values and task names are not returned in these diagnostic paths. This is not a durable authoring API or full portability certification.",
-          "An actual injected Quarkus Flow boot test exercises the selected URI resolver, SDK JSON schema validator and HTTP provider against owned IPv4 loopback. Three tests retain seven cases: normal/escaped URI components, explicit and omitted JSON defaults with inline/external schemas, and raw unknown-format JSON fallback versus checked-import refusal. Missing/wrongly typed raw envelopes are refused before HTTP, while valid envelopes are validated before unwrapping. Distinct schema URLs prevent a warmed resource cache from masking checked-import I/O. The raw SDK still fetches/validates unknown formats as JSON and emits the legacy validation error URI. The checked materializer refuses unsupported formats before binding or resource access. This is JVM/fixture evidence; production approval/activation, public TLS, native images, broader dialects and second-runtime support remain open. The pinned normative workflow fixture validates; CI retains observation JSON. No package or acceptance promotion."
+          "An actual injected Quarkus Flow boot test exercises the selected URI resolver, SDK JSON schema validator and HTTP provider against owned IPv4 loopback. Three tests retain seven cases: normal/escaped URI components, explicit and omitted JSON defaults with inline/external schemas, and raw unknown-format JSON fallback versus checked-import refusal. Missing/wrongly typed raw envelopes are refused before HTTP, while valid envelopes are validated before unwrapping. Distinct schema URLs prevent a warmed resource cache from masking checked-import I/O. The raw SDK still fetches/validates unknown formats as JSON and emits the legacy validation error URI. The checked materializer refuses unsupported formats before binding or resource access. This is JVM/fixture evidence; production approval/activation, public TLS, native images, broader dialects and second-runtime support remain open. The pinned normative workflow fixture validates; CI retains observation JSON. No package or acceptance promotion.",
+          "The injected Flow validation increment merged as PR147/1a8716d3 after full build44541334921 and conformance44541334932 succeeded. Downloaded reports contain287 suites/2340 tests with no failures/errors/skips and seven actual probe observations; the tested checkout and merged tree match. Unknown-format JSON fallback and the original production activation/portability gates remain open; no package or acceptance promotion."
         ],
         "completed_deliverables": [],
         "remaining_tasks": [
@@ -2573,7 +2576,8 @@
           "apps/app-runtime/src/test/resources/conformance/flow-runtime-probe.yaml",
           "docs/conformance/flow-runtime-report.json",
           "docs/handoffs/gpt/WP-605-flow-runtime-proof.md",
-          "docs/handoffs/gpt/evidence/WP-605-flow-runtime-proof/local-verification.json"
+          "docs/handoffs/gpt/evidence/WP-605-flow-runtime-proof/local-verification.json",
+          "docs/handoffs/gpt/evidence/WP-605-flow-runtime-proof/ci-verification.json"
         ]
       }
     },
@@ -3061,7 +3065,7 @@
   ],
   "execution_plan": {
     "date": "2026-10-27",
-    "status": "At the start of the 2026-11-19 status check, local main matched origin/main at 403fce08ab84b2eb637231b2c6c3393d33e9014d; no pull requests were open. PR99 is merged. Issues #75 (intermittent identity recovery), #76 (supported-only production identity profile implementation/proof) and #26 (future framework upgrade assessment) remain open. The explicit audited execution root, retained node/model/tool budgets, resource-scoped effect recovery and terminal research outcome association are implemented increments. A separate-process test now verifies terminal research outcome reconstruction after graph-worker and association-worker crashes, including cancellation, exact retries and changed-checkpoint refusal without additional model calls. Production authority/approved target sources, deployed role/datasource grants, governed Flow/effect recovery and private output release remain open. Proposed schemas stay outside default activation. Package counts remain 11 completed, 17 partial and 25 not started; acceptance remains 3/39. Continue with the first unblocked package and retain independent project review until all implementation and required checks are complete. Current verification and its limits are recorded in docs/project-status.md. PR146 is now merged as d476aa8d after inspected full CI (2337 tests, zero failures/errors/skips). The injected Flow URI/input-schema proof now covers seven controlled cases; the raw unknown-format fallback and production activation/portability gates remain open. Package and acceptance counts are unchanged",
+    "status": "At the start of the 2026-11-19 status check, local main matched origin/main at 403fce08ab84b2eb637231b2c6c3393d33e9014d; no pull requests were open. PR99 is merged. Issues #75 (intermittent identity recovery), #76 (supported-only production identity profile implementation/proof) and #26 (future framework upgrade assessment) remain open. The explicit audited execution root, retained node/model/tool budgets, resource-scoped effect recovery and terminal research outcome association are implemented increments. A separate-process test now verifies terminal research outcome reconstruction after graph-worker and association-worker crashes, including cancellation, exact retries and changed-checkpoint refusal without additional model calls. Production authority/approved target sources, deployed role/datasource grants, governed Flow/effect recovery and private output release remain open. Proposed schemas stay outside default activation. Package counts remain 11 completed, 17 partial and 25 not started; acceptance remains 3/39. Continue with the first unblocked package and retain independent project review until all implementation and required checks are complete. Current verification and its limits are recorded in docs/project-status.md. PR146 is now merged as d476aa8d after inspected full CI (2337 tests, zero failures/errors/skips). The injected Flow URI/input-schema proof now covers seven controlled cases; the raw unknown-format fallback and production activation/portability gates remain open. Package and acceptance counts are unchanged PR147 is now merged as1a8716d3 after inspected full CI (2340 tests, no failures/errors/skips) and matching tested/merged trees. A subsequent local-listener race fix has deterministic SDK regression and actual injected-broker checks; 15 final selected Linux methods and seven original packaged recovery cases passed, with the packaged source difference retained. Full combined-tree author CI remains required for that correction. Issue75 and all original acceptance gates remain open.",
     "agents": [
       {
         "id": "GPT",

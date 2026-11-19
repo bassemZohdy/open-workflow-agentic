@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-19",
+  "local_build_base_commit": "d476aa8d379ce3766b2d5c64ff1dea4e62ee7ea1",
+  "branch_base_commit": "d9aade42deef5f4f9847166b06adf63aaa55d972",
+  "local_build_scope": "Isolated Linux copy of main d476 plus this increment; branch subsequently composed with PR147, whose changes add tests and evidence rather than production Java. Five final increment source files match. Combined-tree full CI remains required.",
+  "implementation_commit": "d0a41dc47f665a66aa0bc882ff7a2ce7d74bfb36",
+  "platforms": {
+    "linux": {
+      "java": "21.0.9+10-LTS",
+      "maven": "3.9.11",
+      "postgresql": "16.15",
+      "architecture": "amd64"
+    },
+    "windows": {
+      "java": "25.0.2",
+      "maven": "3.9.11",
+      "compile_release": 21
+    }
+  },
+  "source_digest_encoding": "SHA-256 over source bytes normalized from CRLF to LF; each final Linux copied source matches the checked-out implementation",
+  "normalized_source_sha256": {
+    "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/AtomicInMemoryEvents.java": "31c4ccfb7945cf89760f509526f8b7597b7ccfe7b9605ad537420623ac15b1ee",
+    "modules/oa-runtime/src/main/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/AtomicLocalEventsCustomizer.java": "7e4020dc98e4ce541cc293fa25f955c0be1d1acc1c336f3dc063e3886a2e90fd",
+    "modules/oa-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/runtime/event/EventRegistrationRaceTest.java": "58d5d63eb760f3c7df0267cfd4d835af8334077ee1ac351ef28d111407911097",
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/event/AtomicEventBrokerTest.java": "5d9268d28b4fe98ad349a01d1a987361dc1f8a10559cf34f36350d4c857423d9",
+    "apps/app-runtime/src/test/java/io/github/bassemzohdy/openworkflow/agentic/event/ExplicitEventBrokerTest.java": "dbe33eed89a96d18e5c529fe720a442b25266b6f1538b67ffad362be9de47489"
+  },
+  "pinned_sdk": {
+    "coordinates": "io.serverlessworkflow:serverlessworkflow-impl-core:7.35.3.Final",
+    "sources_jar_sha256": "ffe80ea69237a44263724a2f20184d44d34cb71463b8ce23234ed7323a598c9e",
+    "abstract_type_consumer_source_sha256": "5a0c09ba30a3e4cfdb7fb260a095d621c2f720d83594b04f255e884e5c70a58f"
+  },
+  "checks": {
+    "windows_final_units": {
+      "command": "mvn -B -pl modules/oa-runtime -am -Dtest=EventRegistrationRaceTest,SdkEventRegistrationSemanticsTest,HumanWakeSdkBehaviorTest -Dsurefire.failIfNoSpecifiedTests=false test",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "log_sha256": "7d548bc1a492b9b72e718e59b4dc635e0c4e8c0f6e1fc7de352f03c1653699e9"
+    },
+    "linux_final_selected": {
+      "command": "mvn -B -pl apps/app-runtime -am -Dtest=EventRegistrationRaceTest,SdkEventRegistrationSemanticsTest,HumanWakeSdkBehaviorTest,AtomicEventBrokerTest,ExplicitEventBrokerTest,FlowStatusSyncTest -Dsurefire.failIfNoSpecifiedTests=false test",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "log_sha256": "2f4681b0b6af0c7502e99689ab1fe06bc17e832fd3d85a01db37db453f978692"
+    },
+    "linux_packaged_recovery": {
+      "command": "mvn -B -pl apps/app-runtime -am verify -Dtest=NoUnitTests -Dsurefire.failIfNoSpecifiedTests=false -Dit.test=IdentityRecoveryIT,LifecycleRecoveryIT -Dfailsafe.failIfNoSpecifiedTests=false",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "log_sha256": "cc3a4868388eb679d30fcdd81a7f3a2317c86b92165521b789fc0a0465194e1b",
+      "source_variant": "Run before the additional ServiceLoader metadata-preservation guard; registration/removal implementation and tests identical. Final selected boot tests rerun after that guard; final full CI remains required.",
+      "customizer_normalized_sha256": "e85467b0db1e38e67f42e7e6f0a2ee91b158572426607cc9f3ecd6913132640d"
+    },
+    "python_tools": {
+      "tests": 91,
+      "passed": true,
+      "log_sha256": "c6ba31aaa32ef60fe924bc3e8275ffef3ed0efbd19ba5721ac951ddef6371c19"
+    },
+    "generated_tracking": "python tools/render_requirements.py --check passes",
+    "compose": "docker compose config --quiet passes"
+  },
+  "linux_xml_suites": {
+    "io.github.bassemzohdy.openworkflow.agentic.event.AtomicEventBrokerTest": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "20ca98caa99526c474f341fcb0f926913cbf4a687b7b54a64e21e381d3c468d1"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.event.ExplicitEventBrokerTest": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "94778a6857d93e7fcc0ed4de73bd294a069a85b63dbe40e52415c6ca924c118d"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.FlowStatusSyncTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "5898654c328fe97f8385ec5b5851e2f20dfdb3e2a1c6003f6d5e1eaf5470df80"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.identity.IdentityRecoveryIT": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "69cd7bf67eecf918bef8194200f1e569164f04225dfdbd259b11ff434458858c"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.lifecycle.LifecycleRecoveryIT": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "264f9fa586daf64abf797fc22c9498fc0927914e912ac6694f61d851e5cc5797"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.runtime.event.EventRegistrationRaceTest": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "c6781f1861176b07ffa83c90fb141363a6023f1fd056d186a6f488d7d59121aa"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.runtime.event.HumanWakeSdkBehaviorTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "50b1872dd189f5aaabf7e945a71245b4d47f86ad25ca2b08adcf91034c86d82a"
+    },
+    "io.github.bassemzohdy.openworkflow.agentic.runtime.event.SdkEventRegistrationSemanticsTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xml_sha256": "d4f6252288251e809b5998c3c4b25bf680c28c3098ab6e98bd3e9b4593a5f14a"
+    }
+  },
+  "development_failure": "The first Linux selected build found an incorrect WorkflowReader test import; corrected to io.serverlessworkflow.api.WorkflowReader before the passing application runs.",
+  "limits": [
+    "Raw SDK race is forced through a test-only private-map scheduling barrier; production uses no reflection.",
+    "Passing original IdentityRecoveryIT does not attribute or close historical issue75.",
+    "No strict real-provider matrix, competing-owner closure, durable inbox acceptance, production delegated Flow consumer or deployment activation is established by these selected runs.",
+    "Package and acceptance statuses unchanged; full author CI and deferred independent project review remain required."
+  ]
+}

@@ -50,8 +50,18 @@ or weaken the revoked-grant, renewed-authority or credential-persistence asserti
 
 ## Verification
 
+The final selected Linux run passed 15 tests in six suites with no failures, errors or skips.
+The original packaged `IdentityRecoveryIT` and all six `LifecycleRecoveryIT` cases also
+passed. That packaged run preceded the additional service-provider metadata guard;
+the final selected application tests were rerun after it. The manifest records that exact
+source difference rather than attributing the earlier packaged run to a later revision.
+Eleven overlapping library cases also passed on Windows Java 25, compiling for Java 21.
+All 91 Python tooling tests, generated-document and compose checks passed.
+
 Selected commands and inspected report digests are retained in the accompanying
-`evidence/WP-107-local-listener-race/local-verification.json` manifest. Full author CI and
+[verification manifest](evidence/WP-107-local-listener-race/local-verification.json). Five final
+Linux source copies match the branch after normalizing line endings. The isolated Linux build
+started from main `d476`; this branch also contains PR147's test/evidence increment. Full combined-tree author CI and
 exact tested revision evidence remain required before merge; independent project review
 remains deferred by the current delivery agreement.
 
